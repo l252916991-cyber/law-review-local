@@ -629,6 +629,18 @@ function renderEvidence() {
   renderGapDashboard();
 }
 
+// Evidence text is untrusted input: build tooltips as DOM text nodes instead
+// of HTML strings, because the graph popup library interprets markup.
+function evidenceTooltip(lines) {
+  const box = document.createElement('div');
+  box.style.cssText = 'max-width:320px;white-space:pre-wrap;font-size:12px;';
+  lines.forEach((line, index) => {
+    if (index > 0) box.appendChild(document.createElement('br'));
+    box.appendChild(document.createTextNode(line == null ? '' : String(line)));
+  });
+  return box;
+}
+
 function renderEvidenceGraph() {
   if (!state.evidence || state.evidence.length === 0) {
     $("#evidence-graph").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">暂无证据数据</div>';
@@ -645,7 +657,7 @@ function renderEvidenceGraph() {
     state.evidence.map(e => ({
       id: e.id,
       label: e.title.length > 20 ? e.title.substring(0, 20) + '...' : e.title,
-      title: `${e.title}\n\n${e.fact}\n\n来源: ${e.source_name || '未知'} 第${e.source_page_start}页`,
+      title: evidenceTooltip([e.title, '', e.fact, '', `来源: ${e.source_name || '未知'} 第${e.source_page_start}页`]),
       color: getColorByStatus(e.status),
       shape: 'box',
       font: { size: 12, color: '#334842' },
@@ -661,7 +673,7 @@ function renderEvidenceGraph() {
       label: r.relation_type,
       color: getColorByRelationType(r.relation_type),
       arrows: 'to',
-      title: r.note,
+      title: r.note ? evidenceTooltip([r.note]) : undefined,
       font: { size: 10, align: 'middle' }
     }))
   );
