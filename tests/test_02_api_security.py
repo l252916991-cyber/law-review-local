@@ -36,6 +36,45 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
     def tearDownClass(cls):
         cls.client_context.__exit__(None, None, None)
 
+    def test_request_correlation_id_echoed_generated_and_logged(self):
+        import json as json_module
+        import logging
+        from app.logger import StructuredFormatter, request_id as request_id_var
+        echoed = self.client.get("/api/health", headers={"X-Request-ID": "req-fixed-123456"})
+        self.assertEqual(echoed.headers["x-request-id"], "req-fixed-123456")
+        generated = self.client.get("/api/health")
+        fresh = generated.headers["x-request-id"]
+        self.assertTrue(8 <= len(fresh) <= 80)
+        self.assertNotEqual(fresh, "req-fixed-123456")
+        # Hostile or malformed ids are replaced, not echoed.
+        hostile = self.client.get("/api/health", headers={"X-Request-ID": "x" * 200 + " evil\n"})
+        self.assertNotIn("evil", hostile.headers["x-request-id"])
+        records: list[logging.LogRecord] = []
+
+        class Capture(logging.Handler):
+            def emit(self, record):
+                records.append(record)
+
+        logger = logging.getLogger("law_review.access")
+        capture = Capture()
+        logger.addHandler(capture)
+        previous_level = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            self.client.get("/api/health", headers={"X-Request-ID": "req-logged-123456"})
+        finally:
+            logger.removeHandler(capture)
+            logger.setLevel(previous_level)
+        self.assertTrue(records)
+        self.assertEqual(getattr(records[-1], "status", None), 200)
+        self.assertIsInstance(getattr(records[-1], "duration_ms", None), int)
+        token = request_id_var.set("req-logged-123456")
+        try:
+            rendered = json_module.loads(StructuredFormatter().format(records[-1]))
+        finally:
+            request_id_var.reset(token)
+        self.assertEqual(rendered["request_id"], "req-logged-123456")
+
     def test_case_title_min_length_boundary(self):
         """案件标题最小长度边界"""
         # 1字符应该失败

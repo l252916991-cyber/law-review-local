@@ -12,6 +12,7 @@ from typing import Any, TextIO
 
 
 _context: ContextVar[dict[str, Any]] = ContextVar("lexvault_log_context", default={})
+request_id: ContextVar[str] = ContextVar("lexvault_request_id", default="")
 _FIELDS = {"case_id", "run_id", "job_id", "user_name", "duration_ms", "tool_name", "error_type", "runtime", "status"}
 _HANDLER_NAME = "lexvault_structured"
 
@@ -40,6 +41,8 @@ class StructuredFormatter(logging.Formatter):
             value = getattr(record, key, context.get(key))
             if value is not None and isinstance(value, (str, int, float, bool)):
                 data[key] = _safe_message(value) if isinstance(value, str) else value
+        if request_id.get():
+            data["request_id"] = request_id.get()
         if record.exc_info and record.exc_info[0]:
             data["error_type"] = record.exc_info[0].__name__
         return json.dumps(data, ensure_ascii=False, separators=(",", ":"))

@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,6 +21,7 @@ from starlette.formparsers import MultiPartException
 
 from .config import config
 from .db import connect, get_db_path, init_db, now, process_ownership, record_security_event, sync_fts_index, transaction
+from .logger import request_id as logger_request_id
 from .services import (
     auto_analyze_case,
     build_export,
@@ -40,6 +42,7 @@ from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, ge
 
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+access_logger = logging.getLogger("law_review.access")
 
 
 async def probe_redis() -> bool:
@@ -97,6 +100,47 @@ app = FastAPI(
 app.add_middleware(AccessMiddleware)
 app.include_router(access_router)
 app.include_router(review_job_router)
+
+
+class RequestCorrelationMiddleware:
+    """Attach a request id to every response and emit one access log line.
+
+    A client-supplied id is echoed only when it looks sane; otherwise a fresh
+    id is generated so hostile header values cannot pollute logs.
+    """
+
+    MAX_HEADER_LENGTH = 80
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        headers = dict(scope.get("headers", []))
+        raw = headers.get(b"x-request-id", b"").decode("ascii", errors="ignore").strip()
+        identifier = raw if 8 <= len(raw) <= self.MAX_HEADER_LENGTH and re.fullmatch(r"[\w.-]+", raw) else uuid.uuid4().hex
+        token = logger_request_id.set(identifier)
+        started = time.perf_counter()
+        status_holder = {"status": 0}
+
+        async def observing_send(message):
+            if message["type"] == "http.response.start":
+                status_holder["status"] = message["status"]
+                message = {**message, "headers": [*message.get("headers", []), (b"x-request-id", identifier.encode("ascii"))]}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, observing_send)
+        finally:
+            logger_request_id.reset(token)
+            if scope.get("path", "").startswith("/api/"):
+                duration_ms = round((time.perf_counter() - started) * 1000)
+                access_logger.info("%s %s", scope.get("method", ""), scope.get("path", ""),
+                                   extra={"status": status_holder["status"], "duration_ms": duration_ms})
+
+
+app.add_middleware(RequestCorrelationMiddleware)
 
 
 class UploadBodyLimitMiddleware:
