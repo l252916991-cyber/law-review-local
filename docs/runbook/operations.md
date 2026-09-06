@@ -48,3 +48,46 @@ token 模式的 `LAW_REVIEW_API_TOKENS_JSON` 是“随机 token → principal �
 单次任务使用 `POST /api/cases/{id}/agent-jobs`，返回 `202`、`job_id` 和 `poll_url`；轮询结果包含状态、已完成步骤、run_id、最终结果及恢复资格。前端刷新后可继续追踪任务。当前单进程最多 2 个执行线程、4 个已接收任务；队列满返回 429，不是分布式 worker 平台。
 
 服务重启将未完成后台任务标记 interrupted；有有效 LangGraph checkpoint 时可通过原 run 恢复，原生运行不具备 checkpoint 续跑。同步 `agent-chat` 仍保留向后兼容，双版本 `agent-compare` 与 `resume` 仍为同步响应，尚未提供 SSE token 流。
+
+## 恢复演练（每季度至少一次，E18）
+
+前置：在独立目录演练，禁止触碰真实案件数据。记录每次演练的实际数据损失窗口与总耗时。
+
+1. `python scripts/data_snapshot.py --output /tmp/drill-$(date +%Y%m%d)` 生成停写快照（业务库 + checkpoint + 文件清单哈希）。
+2. 模拟原环境不可用：清空 `LAW_REVIEW_DATA_DIR` 指向的新目录，将快照恢复到该目录，并确认恢复工具的路径重定位输出。
+3. 用恢复后的目录启动服务（`LAW_REVIEW_AUTH_MODE=local`、指向空 Redis 或跳过批量导入），验证：案件列表可读、文档原文可下载、证据与确认状态完整、清单哈希与快照清单一致。
+4. 故障注入核查：`PRAGMA integrity_check` 与外键检查在恢复副本上执行；缺失文件应被恢复工具标记而非静默跳过。
+5. Redis 恢复另测：Redis 丢库后，已登记批量导入按 outbox 在下一次启动重派；中断的阅卷任务保持 interrupted 并可从 checkpoint 恢复。
+6. 填写演练记录：快照耗时、恢复耗时、校验结果、发现的问题；两次演练之间至少一次使用与生产相同的部署方式（容器化部署后用 compose 卷恢复）。
+
+边界：当前快照要求停写，不含 Redis 数据与 `.env` 密钥；异地副本加密与 RPO/RTO 目标需按组织制度另行确定，见企业化报告 E18。
+
+## 告警阈值示例（E19 起点，按实际部署调整）
+
+以下为最小告警集（Prometheus rule 风格伪配置；当前版本暴露 `/api/system/health` 而非 /metrics，接入指标导出器后再落地）：
+
+```yaml
+groups:
+  - name: lexvault-core
+    rules:
+      - alert: ServiceNotReady
+        expr: system_health_ready == 0            # /api/system/health 返回 503
+        for: 2m
+      - alert: DatabaseUnavailable
+        expr: system_health_database != 1
+        for: 1m
+      - alert: RedisDownBatchDisabled
+        expr: system_health_batch_import != 1     # 可选功能降级，通知而非呼警
+        for: 15m
+      - alert: HttpErrorRateHigh
+        expr: sum(rate(access_log_status{code=~"5.."}[5m])) / sum(rate(access_log_status[5m])) > 0.05
+        for: 5m
+      - alert: QueueBacklogGrowing
+        expr: review_jobs_admitted - review_jobs_finished > 8
+        for: 10m
+      - alert: SecurityDenialSpike
+        expr: sum(increase(security_events_total{outcome="denied"}[10m])) > 100
+        for: 0m                                   # 认证拒绝激增，安全值守查看
+```
+
+日志侧基线：`law_review.access` 的 p95 时长、`embedding_fallback`/`Chat model failed` 频率（模型服务劣化）、`Security event write failed`（审计链路异常，出现即需人工介入）。阈值与值班负责人应在试点启动时登记，不属于本手册默认承诺。
