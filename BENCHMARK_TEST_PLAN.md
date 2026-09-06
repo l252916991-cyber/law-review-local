@@ -7,11 +7,12 @@
 
 ## 固定设计
 
-- 模型：Qwythos-9B-v2-4bit-mlx，本地 oMLX；temperature=0，thinking=false，max_tokens=900，timeout=180 秒。
+- 模型：Qwythos-9B-v2-**8bit**-mlx，本地 oMLX；temperature=0，thinking=false，max_tokens=900，timeout=180 秒。
+  （2026-09-07 起由 4bit 改为 8bit：oMLX 当前加载与历史最优配置均为 8bit；换用不影响评测流程，仅模型权重量化不同。）
 - 数据：固定版本 LawBench zero-shot 的 20 类任务；每类随机 50 题，seed=42；总计 1,000 题。
-- 正式目录：`output/benchmark_fixed_1000_20260905`。
+- 正式目录：`output/benchmark_fixed_1000_20260907_8bit`（8bit 配置的正式运行；2026-09-05 的 `output/benchmark_fixed_1000_20260905` 为 4bit 历史记录，不可重开）。
 - 旧回答：`output/benchmark_full_10k/run_20260903_145445/detailed_results.jsonl`，只取相同 question_id，先核对 question/reference。
-- 新旧回答都使用 `lawbench-local-v2` 重评；旧保存分数只作历史参考。
+- 新旧回答使用当前冻结评分器（`lawbench-local-v3`）重评；旧保存分数只作历史参考。
 - 全题混合均分不排除空回答、解析失败或技术失败。无期/死刑参考答案单独标记为 reference_invalid，保留零分，不冒充模型错误。
 - 模型调用前冻结抽样清单、提示词哈希、源码哈希、模型配置和旧数据哈希；运行中不修改提示词和评分器。
 
@@ -42,15 +43,22 @@ python3 -m unittest discover -s tests -v
 - 新评分器对旧 10,000 条回答离线预检：无异常，分数均处于 [0,1]。
 - 日志：`output/benchmark_fix_validation_20260905/benchmark_unit_tests.log`、`full_unit_tests_final.log`。
 
+2026-09-07 8bit 正式运行（`output/benchmark_fixed_1000_20260907_8bit`）：
+
+- 1,000/1,000 完成，`verify_benchmark_run.py` 全项通过（抽样清单、哈希、离线重评一致）。
+- 混合均分 **57.35%**（scorer `lawbench-local-v3`、prompt `lawbench-task-guided-v3`）；解析失败 2、截断 3、技术失败 0；均延迟 3.27s、p50 2.23s、p95 7.97s，总时长 0.91 小时。
+- 对照旧 10k 回答同题重评 16.53%：+40.8pp（622 升 / 127 降）；差值主要反映旧运行的提示与解析质量，不作为本次增强证据。
+- 历史最优 59.31%（hybrid 白名单 + statutory RAG 增强配置）与本次直接运行相差约 2pp；本次为未启用检索增强的固定流程复测。
+
 ## 正式运行和恢复
 
 ```sh
-LAW_REVIEW_LLM_MODEL=Qwythos-9B-v2-4bit-mlx \
+LAW_REVIEW_LLM_MODEL=Qwythos-9B-v2-8bit-mlx \
 LAW_REVIEW_LLM_URL=http://127.0.0.1:8000/v1 \
 python3 -u unified_benchmark_runner.py \
   --dataset lawbench --tasks all --limit-per-task 50 --sample-seed 42 \
   --timeout 180 --max-tokens 900 --retry 2 \
-  --run-dir output/benchmark_fixed_1000_20260905 \
+  --run-dir output/benchmark_fixed_1000_20260907_8bit \
   --baseline-results output/benchmark_full_10k/run_20260903_145445/detailed_results.jsonl
 ```
 
@@ -58,7 +66,7 @@ python3 -u unified_benchmark_runner.py \
 正常运行时不要再开第二个模型评测进程。完成后离线验证：
 
 ```sh
-python3 verify_benchmark_run.py output/benchmark_fixed_1000_20260905
+python3 verify_benchmark_run.py output/benchmark_fixed_1000_20260907_8bit
 ```
 
 验收：1,000 个唯一 question_id、20 类各 50 题、checkpoint 与 JSONL 逐条一致、提示词和源码哈希一致、离线重评与保存分数一致、汇总和配对差值可复算。
