@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 import zipfile
@@ -87,6 +88,41 @@ def contained_path(path: Path, root: Path) -> Path:
 def _check_parse_budget(path: Path) -> None:
     if path.stat().st_size > MAX_PARSE_BYTES:
         raise ValueError("文件超过解析大小限制")
+
+
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+REMOTE_MODEL_APPROVAL_ENV = "LAW_REVIEW_ALLOW_REMOTE_MODELS"
+
+
+def assert_model_endpoint_allowed(base_url: str) -> None:
+    """Case text must not leave this machine without explicit deployment approval.
+
+    Loopback model endpoints are always allowed. Any other destination requires
+    LAW_REVIEW_ALLOW_REMOTE_MODELS=1 and https, so an operator cannot silently
+    point case data at an unapproved remote service.
+    """
+    parsed = urllib.parse.urlparse(base_url)
+    host = (parsed.hostname or "").lower()
+    if not parsed.scheme or not host:
+        raise ValueError("模型服务地址无效")
+    if host in LOOPBACK_HOSTS and parsed.scheme in {"http", "https"}:
+        return
+    if os.getenv(REMOTE_MODEL_APPROVAL_ENV) != "1":
+        raise ValueError("外发模型服务未获批准：仅允许本机回环地址，或显式配置 LAW_REVIEW_ALLOW_REMOTE_MODELS=1")
+    if parsed.scheme != "https":
+        raise ValueError("远端模型服务必须使用 https")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so a server cannot relay request bodies elsewhere."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ARG002
+        return None
+
+
+def egress_opener() -> urllib.request.OpenerDirector:
+    """Opener with system proxies disabled and redirects refused."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 def run_text_command(args: list[str], timeout: int = 120) -> str:
@@ -433,8 +469,13 @@ def local_llm_available(model_name: str | None = None) -> tuple[bool, str]:
     llm = LLMConfig.from_env()
     desired_model = model_name or llm.model
     try:
+        assert_model_endpoint_allowed(llm.base_url)
+    except ValueError:
+        # Do not even probe an unapproved destination.
+        return False, desired_model
+    try:
         req = urllib.request.Request(f"{llm.base_url}/models")
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        opener = egress_opener()
         with opener.open(req, timeout=2) as response:
             payload = json.load(response)
         ids = [x.get("id", "") for x in payload.get("data", [])]
@@ -498,6 +539,11 @@ def call_local_llm(
 ) -> str:
     llm = LLMConfig.from_env()
     timeout = llm.timeout if timeout is None else timeout
+    try:
+        assert_model_endpoint_allowed(llm.base_url)
+    except ValueError as exc:
+        logger.error("Model egress rejected: %s", exc)
+        raise RuntimeError(str(exc)) from exc
     available, model = local_llm_available(model_override)
     if not available:
         raise RuntimeError(f"本地模型不可用：{model}")
@@ -530,7 +576,7 @@ def call_local_llm(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    opener = egress_opener()
     deadline = time.monotonic() + timeout
     try:
         with opener.open(req, timeout=timeout) as response:

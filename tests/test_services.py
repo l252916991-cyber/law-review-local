@@ -177,6 +177,41 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
             with self.assertRaises(ValueError):
                 contained_path(link, root)
 
+    def test_model_egress_policy_requires_approval_and_https(self):
+        from app.services import assert_model_endpoint_allowed
+        for url in ("http://127.0.0.1:8000/v1", "https://127.0.0.1:8000/v1", "http://localhost:8000/v1", "http://[::1]:8000/v1"):
+            assert_model_endpoint_allowed(url)
+        for url in ("http://203.0.113.9:8000/v1", "https://203.0.113.9/v1", "ftp://203.0.113.9", "http://[2001:db8::1]/v1"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                assert_model_endpoint_allowed(url)
+        with patch.dict(os.environ, {"LAW_REVIEW_ALLOW_REMOTE_MODELS": "1"}):
+            assert_model_endpoint_allowed("https://models.internal.example/v1")
+            with self.assertRaises(ValueError):
+                assert_model_endpoint_allowed("http://models.internal.example/v1")
+
+    def test_call_local_llm_refuses_unapproved_remote_endpoint_before_any_io(self):
+        from app.services import call_local_llm
+        with patch.dict(os.environ, {"LAW_REVIEW_LLM_URL": "http://203.0.113.9:8000/v1"}), \
+                patch("app.services.urllib.request.build_opener", side_effect=AssertionError("egress attempted")):
+            with self.assertRaises(RuntimeError) as ctx:
+                call_local_llm("案件问题", "事实检索", [])
+        self.assertIn("未获批准", str(ctx.exception))
+
+    def test_embedding_client_falls_back_instead_of_unapproved_egress(self):
+        from app.rag import EmbeddingClient
+        with patch.dict(os.environ, {"LAW_REVIEW_EMBEDDING_URL": "http://203.0.113.9:8000/v1"}), \
+                patch("app.rag.urllib.request.build_opener", side_effect=AssertionError("egress attempted")):
+            client = EmbeddingClient(prefer_remote=True)
+            vectors, backend = client.embed(["卷宗文本"])
+        self.assertEqual(backend, "hashed-local")
+        self.assertEqual(len(vectors), 1)
+        self.assertEqual(client.last_failure, "ValueError")
+
+    def test_egress_opener_refuses_redirects(self):
+        from app.services import _NoRedirect, egress_opener
+        self.assertIsNone(_NoRedirect().redirect_request(Mock(), Mock(), 302, "Found", {}, "http://elsewhere.example/"))
+        self.assertIsNotNone(egress_opener())
+
 
 if __name__ == "__main__":
     unittest.main()

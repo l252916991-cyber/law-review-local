@@ -21,8 +21,10 @@ from typing import Any
 from .db import connect, now, transaction
 from .services import (
     LOCAL_LLM_URL,
+    assert_model_endpoint_allowed,
     best_quote,
     concise,
+    egress_opener,
     query_terms,
     rowdict,
     search_pages,
@@ -108,6 +110,8 @@ class EmbeddingClient:
         self.last_failure = None
         if self.prefer_remote:
             try:
+                # Case page text must never reach an unapproved destination.
+                assert_model_endpoint_allowed(self.base_url)
                 payload = json.dumps({"model": self.model, "input": texts}, ensure_ascii=False).encode("utf-8")
                 request = urllib.request.Request(
                     f"{self.base_url}/embeddings",
@@ -115,7 +119,7 @@ class EmbeddingClient:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                opener = egress_opener()
                 with opener.open(request, timeout=120) as response:
                     body = json.load(response)
                 ordered = sorted(body["data"], key=lambda item: item["index"])
