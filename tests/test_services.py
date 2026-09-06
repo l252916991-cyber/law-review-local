@@ -177,6 +177,31 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertTrue(document["content_hash"])
         self.assertEqual(len(document["content_hash"]), 64)
 
+    def test_docx_tables_are_extracted_in_document_order(self):
+        import docx as docx_module
+        from app.services import extract_docx_pages
+        with tempfile.TemporaryDirectory(prefix="lexvault-docx-") as directory:
+            path = Path(directory) / "含表格.docx"
+            document = docx_module.Document()
+            document.add_paragraph("表格前的段落说明。")
+            table = document.add_table(rows=2, cols=2)
+            table.cell(0, 0).text = "项目"
+            table.cell(0, 1).text = "金额"
+            table.cell(1, 0).text = "转账"
+            table.cell(1, 1).text = "800,000元"
+            document.add_paragraph("表格后的结论段落。")
+            document.save(path)
+            pages = extract_docx_pages(path)
+        combined = "\n".join(pages)
+        self.assertIn("表格前的段落说明。", combined)
+        self.assertIn("【表格】", combined)
+        self.assertIn("项目 | 金额", combined)
+        self.assertIn("转账 | 800,000元", combined)
+        self.assertIn("表格后的结论段落。", combined)
+        table_index = combined.index("【表格】")
+        self.assertLess(combined.index("表格前的段落说明。"), table_index)
+        self.assertGreater(combined.index("表格后的结论段落。"), table_index)
+
     def test_parse_budget_rejects_oversized_files_and_caps_text(self):
         from app.services import MAX_PARSE_BYTES, _cap_total_text, _check_parse_budget
         with tempfile.TemporaryDirectory(prefix="lexvault-budget-") as directory:

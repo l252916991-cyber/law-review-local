@@ -191,21 +191,46 @@ def extract_pdf_pages(path: Path) -> list[str]:
     return _cap_total_text(pages)
 
 
+def _table_text(table) -> str:
+    rows = []
+    for row in table.rows:
+        cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+        if any(cells):
+            rows.append(" | ".join(cells))
+    return "\n".join(rows)
+
+
 def extract_docx_pages(path: Path) -> list[str]:
     _check_parse_budget(path)
     doc = DocxDocument(path)
     chunks: list[str] = []
     current: list[str] = []
-    for para in doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            continue
-        current.append(text)
-        if sum(len(x) for x in current) >= 1800:
+
+    def flush() -> None:
+        nonlocal current
+        if current:
             chunks.append("\n".join(current))
             current = []
-    if current or not chunks:
-        chunks.append("\n".join(current))
+
+    # Tables carry legal facts (amounts, parties); drop nothing and keep
+    # document order. DOCX has no physical pages, so logical segments are
+    # prefixed where a table begins to stay honest about the layout source.
+    for block in doc.iter_inner_content():
+        if hasattr(block, "text"):  # Paragraph
+            text = block.text.strip()
+            if not text:
+                continue
+            current.append(text)
+            if sum(len(x) for x in current) >= 1800:
+                flush()
+        else:  # Table
+            flush()
+            table = _table_text(block)
+            if table:
+                chunks.append(f"【表格】\n{table}")
+    flush()
+    if not chunks:
+        chunks.append("")
     return _cap_total_text(chunks)
 
 
