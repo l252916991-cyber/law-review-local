@@ -309,6 +309,147 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(created.json()["evidence"]["approved_by"], "律师甲")
         self.assertEqual(self.client.post("/api/cases", headers=self.headers, json={"title": "x"}).status_code, 403)
 
+    def test_oidc_unconfigured_is_disabled_and_partial_config_fails_closed(self):
+        self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 404)
+        for partial in ({"LAW_REVIEW_OIDC_ISSUER": "https://idp.example"},
+                        {"LAW_REVIEW_OIDC_CLIENT_ID": "app"}):
+            with self.subTest(partial=partial), patch.dict(os.environ, partial):
+                self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+        with patch.dict(os.environ, {"LAW_REVIEW_OIDC_ISSUER": "http://idp.example",
+                                     "LAW_REVIEW_OIDC_CLIENT_ID": "app",
+                                     "LAW_REVIEW_OIDC_CLIENT_SECRET": "s"}):
+            self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+
+    def test_oidc_login_flow_with_mock_provider(self):
+        import jwt as pyjwt
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_pem = private_key.public_key().public_numbers()
+        def int_to_b64(value):
+            import base64
+            raw = value.to_bytes((value.bit_length() + 7) // 8, "big")
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+        jwks = {"keys": [{"kty": "RSA", "kid": "test-key", "alg": "RS256", "use": "sig",
+                          "n": int_to_b64(public_pem.n), "e": int_to_b64(public_pem.e)}]}
+        discovery = {"authorization_endpoint": "https://idp.example/authorize",
+                     "token_endpoint": "https://idp.example/token", "jwks_uri": "https://idp.example/jwks"}
+        state = nonce = None
+        captured_authorize = {}
+
+        def fake_fetch(url, *, data=None, timeout=5):
+            if url.endswith("openid-configuration"):
+                return discovery
+            if url.endswith("/jwks"):
+                return jwks
+            if url.endswith("/authorize"):
+                captured_authorize.update({"url": url, "query": url.split("?", 1)[1]})
+                return {}
+            if url.endswith("/token"):
+                self.assertEqual(data["grant_type"], "authorization_code")
+                code = data["code"]
+                flows = security_module._oidc_flows
+                claims = {"iss": "https://idp.example", "aud": "lexvault-client", "nonce": flows[code][0] if code in flows else "stale",
+                          "sub": "user-001", "email": "lv@example.com", "exp": 9999999999}
+                token = pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "test-key"})
+                return {"id_token": token, "access_token": "at"}
+            raise AssertionError(url)
+
+        security_module = __import__("app.security", fromlist=["security"])
+        principal_env = patch.dict(os.environ, {
+            "LAW_REVIEW_OIDC_ISSUER": "https://idp.example", "LAW_REVIEW_OIDC_CLIENT_ID": "lexvault-client",
+            "LAW_REVIEW_OIDC_CLIENT_SECRET": "secret",
+            "LAW_REVIEW_OIDC_PRINCIPALS_JSON": json.dumps({"user-001": {"name": "外聘律师", "case_ids": [self.cases[0]], "permissions": ["view", "edit"]}}),
+        })
+        principal_env.start()
+        self.addCleanup(principal_env.stop)
+        with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
+            from urllib.parse import parse_qs
+            import urllib.parse as parse
+            # discover endpoints through login redirect
+            login_response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            self.assertEqual(login_response.status_code, 302, login_response.text)
+            authorize_url = login_response.headers["location"]
+            query = parse_qs(parse.urlparse(authorize_url).query)
+            self.assertEqual(query["client_id"], ["lexvault-client"])
+            self.assertIn("openid", query["scope"][0])
+            state, nonce = query["state"][0], query["nonce"][0]
+            # register a fake authorization code bound to that flow nonce
+            security_module._oidc_flows["auth-code-1"] = (nonce, security_module.time.monotonic() + 60)
+            with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
+                callback = self.client.get(f"/api/auth/oidc/callback?code=auth-code-1&state={state}", follow_redirects=False)
+        self.assertEqual(callback.status_code, 302, callback.text)
+        self.assertEqual(callback.headers["location"], "/")
+        me = self.client.get("/api/auth/me")
+        self.assertEqual(me.json()["name"], "外聘律师")
+        self.assertEqual(sorted(me.json()["permissions"]), ["edit", "view"])
+        # The mapped principal's case scope is enforced.
+        self.assertEqual(self.client.get(f"/api/cases/{self.cases[0]}").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/cases/{self.cases[1]}").status_code, 404)
+        # State is single use: replay is rejected.
+        replay = self.client.get("/api/auth/oidc/callback?code=auth-code-2&state=" + state, follow_redirects=False)
+        self.assertEqual(replay.status_code, 400)
+
+    def test_oidc_unmapped_identity_and_bad_audience_rejected(self):
+        import jwt as pyjwt
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        security_module = __import__("app.security", fromlist=["security"])
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_numbers = private_key.public_key().public_numbers()
+        import base64
+        def int_to_b64(value):
+            raw = value.to_bytes((value.bit_length() + 7) // 8, "big")
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+        jwks = {"keys": [{"kty": "RSA", "kid": "k1", "alg": "RS256", "use": "sig",
+                          "n": int_to_b64(public_numbers.n), "e": int_to_b64(public_numbers.e)}]}
+        discovery = {"authorization_endpoint": "https://idp.example/authorize",
+                     "token_endpoint": "https://idp.example/token", "jwks_uri": "https://idp.example/jwks"}
+        env = patch.dict(os.environ, {
+            "LAW_REVIEW_OIDC_ISSUER": "https://idp.example", "LAW_REVIEW_OIDC_CLIENT_ID": "lexvault-client",
+            "LAW_REVIEW_OIDC_CLIENT_SECRET": "secret",
+            "LAW_REVIEW_OIDC_PRINCIPALS_JSON": json.dumps({"known-user": {"name": "已授权"}}),
+        })
+        env.start()
+        self.addCleanup(env.stop)
+
+        def token_for(claims):
+            return pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "k1"})
+
+        base_claims = {"iss": "https://idp.example", "aud": "lexvault-client", "sub": "stranger", "exp": 9999999999, "nonce": "nonce-x"}
+        def fake_fetch(url, *, data=None, timeout=5):
+            if url.endswith("openid-configuration"):
+                return discovery
+            if url.endswith("/jwks"):
+                return jwks
+            if url.endswith("/token"):
+                return {"id_token": token_for(base_claims)}
+            raise AssertionError(url)
+        with patch.object(security_module, "fetch_json", side_effect=lambda url, **kw: discovery if url.endswith("openid-configuration") else {}):
+            self.client.get("/api/auth/oidc/login", follow_redirects=False)
+        with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
+            with transaction() as conn:
+                state = "manual-state"
+                conn.execute("SELECT 1")
+            security_module._oidc_flows["flow-stranger"] = ("nonce-x", security_module.time.monotonic() + 60)
+            stranger = self.client.get("/api/auth/oidc/callback?code=c&state=flow-stranger", follow_redirects=False)
+        self.assertEqual(stranger.status_code, 403)
+        self.assertNotIn("lexvault_session", stranger.headers.get("set-cookie", ""))
+        # Wrong audience fails validation with a sanitized message.
+        security_module._oidc_flows["flow-badaud"] = ("nonce-y", security_module.time.monotonic() + 60)
+        bad_claims = dict(base_claims, sub="known-user", aud="someone-else", nonce="nonce-y")
+        def bad_fetch(url, *, data=None, timeout=5):
+            if url.endswith("openid-configuration"):
+                return discovery
+            if url.endswith("/jwks"):
+                return jwks
+            return {"id_token": token_for(bad_claims)}
+        with patch.object(security_module, "fetch_json", side_effect=bad_fetch):
+            bad = self.client.get("/api/auth/oidc/callback?code=c&state=flow-badaud", follow_redirects=False)
+        self.assertEqual(bad.status_code, 401)
+        self.assertNotIn("lexvault-client", bad.text)
+        with closing(connect()) as conn:
+            failures = conn.execute("SELECT COUNT(*) FROM security_events WHERE event_type='auth' AND outcome='login_failed' AND detail LIKE '%OIDC%'").fetchone()[0]
+        self.assertGreaterEqual(failures, 2)
+
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
         export_dir = self.root / "exports"

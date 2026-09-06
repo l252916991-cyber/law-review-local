@@ -15,6 +15,7 @@ dependencies = [
   "langgraph-checkpoint-sqlite>=3.1,<4",
   "jieba>=0.42.1,<1",
   "cn2an>=0.5.23,<1",
+  "pyjwt[crypto]>=2.13.0",
 ]
 
 [dependency-groups]
