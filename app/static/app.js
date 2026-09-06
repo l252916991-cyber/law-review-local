@@ -641,6 +641,19 @@ function evidenceTooltip(lines) {
   return box;
 }
 
+async function loadExportTemplates() {
+  const selector = $("#export-template");
+  if (!selector) return;
+  try {
+    const templates = await api("/api/export-templates");
+    selector.innerHTML = '<option value="">默认结案包（完整归档）</option>' +
+      templates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}${t.builtin ? "" : "（自定义）"}</option>`).join("");
+  } catch (error) {
+    selector.innerHTML = '<option value="">默认结案包（完整归档）</option>';
+    console.warn("Failed to load export templates:", error);
+  }
+}
+
 function renderEvidenceGraph() {
   if (!state.evidence || state.evidence.length === 0) {
     $("#evidence-graph").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">暂无证据数据</div>';
@@ -926,9 +939,41 @@ function bindEvents() {
   $("#new-chat").addEventListener("click", resetChat);
   $("#chat-form").addEventListener("submit", sendChat);
   $("#chat-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat(); } });
-  $("#export-btn").addEventListener("click", () => { window.location.href = `/api/cases/${state.caseId}/export`; toast("正在本机生成案件审阅包"); });
+  $("#export-btn").addEventListener("click", () => {
+    const templateId = $("#export-template").value;
+    const query = templateId ? `?template_id=${encodeURIComponent(templateId)}` : "";
+    window.location.href = `/api/cases/${state.caseId}/export${query}`;
+    toast("正在本机生成案件审阅包");
+  });
+  $("#export-final-btn").addEventListener("click", async () => {
+    const templateId = $("#export-template").value;
+    const query = templateId ? `?template_id=${encodeURIComponent(templateId)}&final=true` : "?final=true";
+    try {
+      const response = await fetch(`/api/cases/${state.caseId}/export${query}`);
+      if (!response.ok) {
+        let message = `结案打包失败(${response.status})`;
+        try { const body = await response.json(); if (typeof body.detail === "string") message = body.detail; } catch (e) { /* binary or empty body */ }
+        toast(message, "error");
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = decodeURIComponent((response.headers.get("content-disposition") || "").match(/filename="?([^";]+)"?/)?.[1] || "结案包.zip");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      const sha = response.headers.get("x-package-sha256");
+      toast(sha ? `结案包已生成，包哈希 ${sha.slice(0, 16)}（已写入审计）` : "结案包已生成（已写入审计）");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
   $("#new-case-btn").addEventListener("click", () => $("#case-dialog").showModal());
   $("#case-form").addEventListener("submit", createCase);
+  loadExportTemplates();
 
   // 批量上传事件
   $("#batch-upload-btn").addEventListener("click", showBatchUpload);

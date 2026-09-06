@@ -296,7 +296,15 @@
             <div class="export-art"><div class="box-lid"></div><div class="box-body">ZIP</div></div>
             <div class="export-copy"><span class="privacy-chip inline"><i></i>本地生成</span><h2>案件数字资产包</h2><p>适合内部归档、团队交接和结案复盘。所有 AI 结论均保留来源列，便于后续复核。</p>
               <ul><li><b>案件摘要.md</b><span>案件概况与处理说明</span></li><li><b>内容级目录.csv</b><span>文件、人员、时间、页码与摘要</span></li><li><b>证据目录.csv</b><span>待证事实、可信度、原文及状态</span></li><li><b>阅卷问答记录.md</b><span>按用户与会话归档</span></li><li><b>原始卷宗/</b><span>已上传的原文件</span></li></ul>
-              <button id="export-btn" class="primary-button large">生成并下载审阅包 <b>⇩</b></button>
+              <div class="export-template-row">
+                <label for="export-template">结案模板</label>
+                <select id="export-template"></select>
+              </div>
+              <div class="export-actions">
+                <button id="export-btn" class="primary-button large">生成并下载审阅包 <b>⇩</b></button>
+                <button id="export-final-btn" class="secondary-button large">按模板结案打包 <b>✓</b></button>
+              </div>
+              <p id="export-final-hint" class="export-final-hint">结案打包会校验模板必选内容（目录/证据/原始卷宗），并把操作人与包哈希写入审计。</p>
             </div>
           </div>
         </div>

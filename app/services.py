@@ -26,7 +26,7 @@ from typing import Any
 
 from docx import Document as DocxDocument
 
-from .db import SCHEMA_VERSION, connect, get_db_path, now, transaction
+from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
 
 
@@ -839,7 +839,71 @@ def csv_safe_cell(value: Any) -> Any:
     return value
 
 
-def build_export(case_id: int) -> Path:
+EXPORT_RENDERER_VERSION = "export-blocks-v1"
+DEFAULT_EXPORT_BLOCKS = BUILTIN_EXPORT_TEMPLATES[0]["blocks"]
+EXPORT_BLOCK_TYPES = ("case_summary", "catalog_csv", "evidence_table", "qa_log", "static_markdown", "attachments")
+_TEXT_BLOCK_EXT = {"case_summary": ".md", "qa_log": ".md", "static_markdown": ".md", "catalog_csv": ".csv", "evidence_table": ".csv"}
+
+
+def _export_evidence_rows(evidence: list[dict[str, Any]], status: str | None) -> list[dict[str, Any]]:
+    if not status:
+        return evidence
+    return [item for item in evidence if item["status"] == status]
+
+
+def _evidence_table_csv(rows: list[dict[str, Any]]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["证据事项", "类别", "待证事实", "可信度", "来源文件", "页码", "原文", "状态"])
+    for item in rows:
+        writer.writerow(
+            [csv_safe_cell(value) for value in (item["title"], item["category"], item["fact"], item["credibility"], item.get("source_name", ""), f"{item['source_page_start']}-{item['source_page_end']}", item["quote"], item["status"])]
+        )
+    return buffer.getvalue()
+
+
+def _block_filename(block: dict[str, Any]) -> str:
+    explicit = block.get("filename")
+    if explicit:
+        return safe_filename(explicit)
+    return safe_filename(block.get("title") or block["type"]) + _TEXT_BLOCK_EXT.get(block["type"], "")
+
+
+def _block_has_data(block: dict[str, Any], context: dict[str, Any]) -> bool:
+    kind = block["type"]
+    if kind == "case_summary" or kind == "static_markdown":
+        return True
+    if kind == "catalog_csv":
+        return bool(context["documents"])
+    if kind == "evidence_table":
+        return bool(_export_evidence_rows(context["evidence"], block.get("evidence_status")))
+    if kind == "qa_log":
+        return bool(context["messages"])
+    if kind == "attachments":
+        return any(
+            (Path(doc["stored_path"]) if doc["stored_path"] else None) and Path(doc["stored_path"]).is_file()
+            for doc in context["documents"]
+        )
+    return False
+
+
+def get_export_template(template_id: int) -> dict[str, Any] | None:
+    conn = connect()
+    try:
+        row = conn.execute("SELECT * FROM export_templates WHERE id = ?", (template_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    template = rowdict(row)
+    template["blocks"] = json.loads(template["blocks_json"])
+    template["builtin"] = bool(template["builtin"])
+    return template
+
+
+def build_export_package(
+    case_id: int, template_id: int | None = None, *, final: bool = False, actor: str = ""
+) -> tuple[Path, str]:
     conn = connect()
     try:
         case = rowdict(conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
@@ -871,23 +935,25 @@ def build_export(case_id: int) -> Path:
     finally:
         conn.close()
 
+    if template_id is None:
+        blocks, template_info = DEFAULT_EXPORT_BLOCKS, {"id": None, "name": "默认结案包", "builtin": True, "version": None}
+    else:
+        template = get_export_template(template_id)
+        if template is None:
+            raise ValueError("结案模板不存在")
+        blocks = template["blocks"]
+        template_info = {"id": template["id"], "name": template["name"], "builtin": template["builtin"], "version": template["updated_at"]}
+    context = {"case": case, "documents": documents, "evidence": evidence, "messages": messages}
+
+    if final:
+        missing = [block.get("title") or block["type"] for block in blocks if block.get("required") and not _block_has_data(block, context)]
+        if missing:
+            raise ValueError("结案包缺少必选内容：" + "、".join(missing))
+
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     export_dir = get_db_path().parent / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     path = export_dir / f"{safe_filename(case['title'])}_{stamp}_{uuid.uuid4().hex[:8]}.zip"
-    directory_csv = io.StringIO()
-    writer = csv.writer(directory_csv)
-    writer.writerow(["文件名", "文书类型", "页数", "涉及人员", "时间范围", "摘要", "状态"])
-    for doc in documents:
-        writer.writerow([csv_safe_cell(doc[key]) for key in ("name", "doc_type", "pages", "people", "date_range", "summary", "status")])
-
-    evidence_csv = io.StringIO()
-    writer = csv.writer(evidence_csv)
-    writer.writerow(["证据事项", "类别", "待证事实", "可信度", "来源文件", "页码", "原文", "状态"])
-    for item in evidence:
-        writer.writerow(
-            [csv_safe_cell(value) for value in (item["title"], item["category"], item["fact"], item["credibility"], item.get("source_name", ""), f"{item['source_page_start']}-{item['source_page_end']}", item["quote"], item["status"])]
-        )
 
     summary = (
         f"# {case['title']}\n\n"
@@ -896,14 +962,34 @@ def build_export(case_id: int) -> Path:
         f"## 案件说明\n\n{case['description']}\n\n"
         "> 本文件由本地复刻系统生成，所有AI结果均需执业律师复核。\n"
     )
+    directory_csv_rows = []
+    for doc in documents:
+        directory_csv_rows.append([csv_safe_cell(doc[key]) for key in ("name", "doc_type", "pages", "people", "date_range", "summary", "status")])
+    directory_csv = io.StringIO()
+    writer = csv.writer(directory_csv)
+    writer.writerow(["文件名", "文书类型", "页数", "涉及人员", "时间范围", "摘要", "状态"])
+    writer.writerows(directory_csv_rows)
     chats = ["# 阅卷问答记录\n"]
     for message in messages:
         chats.append(f"## {message['conversation_title']} · {message['user_name']}\n\n**{message['role']}**\n\n{message['content']}\n")
+    if not messages:
+        chats.append("\n[待补充：暂无问答记录]")
+
+    block_renderers = {
+        "case_summary": lambda block: summary,
+        "catalog_csv": lambda block: "\ufeff" + directory_csv.getvalue(),
+        "evidence_table": lambda block: "\ufeff" + _evidence_table_csv(_export_evidence_rows(evidence, block.get("evidence_status"))),
+        "qa_log": lambda block: "\n".join(chats),
+        "static_markdown": lambda block: block.get("content") or "[待补充：模板未填写内容]",
+    }
 
     manifest = {
         "generated_at": now(),
         "schema_version": SCHEMA_VERSION,
+        "renderer_version": EXPORT_RENDERER_VERSION,
+        "finalized": bool(final),
         "case": {"id": case["id"], "title": case["title"], "case_no": case["case_no"], "status": case["status"]},
+        "template": {**template_info, "blocks": blocks},
         "documents": [
             {"id": doc["id"], "name": doc["name"], "content_hash": doc.get("content_hash"),
              "pages": doc["pages"], "doc_type": doc["doc_type"], "status": doc["status"]}
@@ -920,26 +1006,38 @@ def build_export(case_id: int) -> Path:
     }
 
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("案件摘要.md", summary)
-        archive.writestr("内容级目录.csv", "\ufeff" + directory_csv.getvalue())
-        archive.writestr("证据目录.csv", "\ufeff" + evidence_csv.getvalue())
-        archive.writestr("阅卷问答记录.md", "\n".join(chats))
-        for doc in documents:
-            stored = Path(doc["stored_path"]) if doc["stored_path"] else None
-            if stored and stored.exists() and stored.is_file():
-                # Export must not package files outside the managed data
-                # directory, even if database metadata was tampered with.
-                stored = contained_path(stored, get_db_path().parent)
-                archive_name = f"原始卷宗/{safe_filename(doc['name'])}"
-                archive.write(stored, archive_name)
-                manifest["files"].append({
-                    "archive_name": archive_name, "document_id": doc["id"],
-                    "sha256": _file_sha256(stored), "size": stored.stat().st_size,
-                })
+        for block in blocks:
+            kind = block["type"]
+            if kind == "attachments":
+                folder = safe_filename(block.get("filename") or block.get("title") or "原始卷宗")
+                for doc in documents:
+                    stored = Path(doc["stored_path"]) if doc["stored_path"] else None
+                    if stored and stored.exists() and stored.is_file():
+                        # Export must not package files outside the managed data
+                        # directory, even if database metadata was tampered with.
+                        stored = contained_path(stored, get_db_path().parent)
+                        archive_name = f"{folder}/{safe_filename(doc['name'])}"
+                        archive.write(stored, archive_name)
+                        manifest["files"].append({
+                            "archive_name": archive_name, "document_id": doc["id"],
+                            "sha256": _file_sha256(stored), "size": stored.stat().st_size,
+                        })
+                continue
+            archive.writestr(_block_filename(block), block_renderers[kind](block))
         archive.writestr("清单.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     with transaction() as conn:
         conn.execute(
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '导出结案包', ?, ?)",
             (case_id, path.name, now()),
         )
-    return path
+        if final:
+            conn.execute(
+                "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '模板结案打包', ?, ?)",
+                (case_id, f"模板[{template_info['name']}] 操作人[{actor or '未知'}] 包哈希 {_file_sha256(path)[:16]}", now()),
+            )
+    return path, _file_sha256(path)
+
+
+def build_export(case_id: int) -> Path:
+    """Back-compatible wrapper: default layout, no final gating."""
+    return build_export_package(case_id)[0]

@@ -450,6 +450,71 @@ class AccessControlTests(unittest.TestCase):
             failures = conn.execute("SELECT COUNT(*) FROM security_events WHERE event_type='auth' AND outcome='login_failed' AND detail LIKE '%OIDC%'").fetchone()[0]
         self.assertGreaterEqual(failures, 2)
 
+    def test_export_template_crud_requires_manage_and_custom_templates_render(self):
+        viewer = self.headers
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        listed = self.client.get("/api/export-templates", headers=viewer)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertGreaterEqual(len(listed.json()), 2)
+        self.assertEqual(self.client.get("/api/export-templates/1", headers=viewer).status_code, 403)
+        body = {
+            "name": "测试质证模板",
+            "description": "只导出已确认证据",
+            "blocks": [
+                {"type": "evidence_table", "title": "已确认证据", "filename": "confirmed.csv", "evidence_status": "已确认", "required": True},
+                {"type": "static_markdown", "title": "律师说明", "filename": "说明.md", "content": "律师复核说明", "required": True},
+            ],
+        }
+        self.assertEqual(self.client.post("/api/export-templates", headers=viewer, json=body).status_code, 403)
+        created = self.client.post("/api/export-templates", headers=admin, json=body)
+        self.assertEqual(created.status_code, 201, created.text)
+        template_id = created.json()["id"]
+        detail = self.client.get(f"/api/export-templates/{template_id}", headers=admin)
+        self.assertEqual(detail.status_code, 200)
+        self.assertFalse(detail.json()["builtin"])
+        self.assertEqual(self.client.delete("/api/export-templates/1", headers=admin).status_code, 409)
+        rejected = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn("缺少必选内容", rejected.text)
+        preview = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}", headers=admin)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertTrue(preview.headers.get("x-package-sha256"))
+
+        # Add the required source/evidence and verify a real final package.
+        source = self.root / "final-source.txt"
+        source.write_text("结案原始材料", encoding="utf-8")
+        with transaction() as conn:
+            document_id = conn.execute(
+                "INSERT INTO documents(case_id,name,stored_path,mime_type,pages,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (self.cases[0], "final-source.txt", str(source), "text/plain", 1, "已索引", now(), now()),
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO evidence(case_id,title,category,fact,credibility,status,source_document_id,source_page_start,source_page_end,quote,approved_by,approved_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (self.cases[0], "已确认结案事实", "书证", "材料支持该事实", "高", "已确认", document_id, 1, 1, "结案原始材料", "管理员", now(), now()),
+            )
+        final = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
+        self.assertEqual(final.status_code, 200, final.text)
+        self.assertTrue(final.headers.get("x-package-sha256"))
+
+    def test_export_template_invalid_blocks_fail_closed(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        invalid = {"name": "错误模板", "blocks": [{"type": "static_markdown", "title": "空", "content": ""}]}
+        response = self.client.post("/api/export-templates", headers=admin, json=invalid)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("必须填写内容", response.text)
+
+    def test_export_template_update_and_delete_custom(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        body = {"name": "可删除模板", "description": "", "blocks": [{"type": "case_summary", "title": "摘要", "required": False}]}
+        created = self.client.post("/api/export-templates", headers=admin, json=body)
+        self.assertEqual(created.status_code, 201)
+        template_id = created.json()["id"]
+        updated = self.client.put(f"/api/export-templates/{template_id}", headers=admin,
+                                  json={**body, "name": "已更新模板"})
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(self.client.delete(f"/api/export-templates/{template_id}", headers=admin).status_code, 200)
+        self.assertEqual(self.client.get(f"/api/export-templates/{template_id}", headers=admin).status_code, 404)
+
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
         export_dir = self.root / "exports"

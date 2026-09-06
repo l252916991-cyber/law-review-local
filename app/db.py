@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
@@ -374,7 +375,33 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
+
+# Built-in case-closing export templates (E32). Block schema is owned by the
+# renderer in services.py; this constant is the seeding source of truth.
+BUILTIN_EXPORT_TEMPLATES = [
+    {
+        "name": "刑事阅卷结案包",
+        "description": "完整阅卷归档：案件摘要、双层目录、证据清单、问答记录与原始卷宗。",
+        "blocks": [
+            {"type": "case_summary", "title": "案件摘要", "filename": "案件摘要.md", "required": False},
+            {"type": "catalog_csv", "title": "内容级目录", "filename": "内容级目录.csv", "required": True},
+            {"type": "evidence_table", "title": "证据目录", "filename": "证据目录.csv", "evidence_status": None, "required": True},
+            {"type": "qa_log", "title": "阅卷问答记录", "filename": "阅卷问答记录.md", "required": False},
+            {"type": "attachments", "title": "原始卷宗", "filename": "原始卷宗", "required": True},
+        ],
+    },
+    {
+        "name": "质证材料包",
+        "description": "面向质证场景：案件摘要、全状态证据清单（状态列区分草稿与已确认）与问答记录。",
+        "blocks": [
+            {"type": "case_summary", "title": "案件摘要", "filename": "案件摘要.md", "required": False},
+            {"type": "evidence_table", "title": "质证证据清单", "filename": "质证证据清单.csv", "evidence_status": None, "required": True},
+            {"type": "qa_log", "title": "阅卷问答记录", "filename": "阅卷问答记录.md", "required": False},
+            {"type": "attachments", "title": "原始卷宗", "filename": "原始卷宗", "required": False},
+        ],
+    },
+]
 
 
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
@@ -468,6 +495,34 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     _execute_script(conn, "ALTER TABLE messages ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';")
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    # Template-driven case-closing exports (E32). Built-in templates are seeded
+    # once and marked immutable; custom templates are managed via the API.
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS export_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    blocks_json TEXT NOT NULL,
+    builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+""",
+    )
+    current = now()
+    for template in BUILTIN_EXPORT_TEMPLATES:
+        conn.execute(
+            """INSERT INTO export_templates(name, description, blocks_json, builtin, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, 1, 'system', ?, ?)
+               ON CONFLICT(name) DO NOTHING""",
+            (template["name"], template["description"], json.dumps(template["blocks"], ensure_ascii=False), current, current),
+        )
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -475,7 +530,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
