@@ -11,6 +11,11 @@ FastAPI + SQLite 的本地阅卷工作台，支持文档提取、页级检索、
 - 双运行时顺序对比，读取相同的执行前记忆快照并关闭长期记忆写入，展示引用、节点、契约和耗时差异。
 - 证据事项和关系管理、时间线及疏漏展示；Redis + arq 提供可选批量导入，不是基础单文件导入的必需服务。
 - 证据标注新增/编辑/删除；可选 token 登录与案件范围授权，身份由服务器配置而非用户填写的名称决定。
+- 逐主体权限矩阵（`view`/`edit`/`approve`/`export`/`manage`；未配置时保持旧行为，新配置应显式列出）。
+- 可选 OIDC 组织登录（授权码流程）：三项配置全部为空即保持禁用，部分配置按失败关闭处理；已验证主体必须映射到已知 principal，否则拒绝。
+- 原件入库记录内容哈希并做同案件去重；证据审批记录归属人，确认内容被编辑后审批自动失效回待复核；独立 `security_events` 审计不随案件删除而消失。
+- 导出包附 `清单.json`（文件哈希与审批状态）；每条 LLM 回答记录 provenance（提示词版本与摘要、模型、采样参数），规则回答显式声明未用模型。
+- 请求级关联 ID 贯穿访问日志；DOCX 表格按文档顺序提取。
 - 单次 Agent 阅卷使用 `202` 后台任务与节点状态轮询，刷新后可继续追踪；双版本对比与失败恢复接口仍同步执行，不宣称已实现 SSE。
 
 SQLite checkpoint 不是业务审计替代品；故障恢复也不等于任意外部副作用天然只执行一次。生产多实例、人工审批 interrupt、数据库静态加密仍需单独设计。
@@ -48,6 +53,15 @@ uv run arq app.tasks.WorkerSettings
 ```
 
 Web 与 worker 必须共享数据目录、`REDIS_URL` 和 `ARQ_QUEUE_NAME`。Redis 未启动时基础功能仍可用，批量导入返回服务不可用。更多说明见[运维手册](docs/runbook/operations.md)。
+
+也可以用容器方式同时运行 web/worker/redis（镜像以非 root 用户运行）：
+
+```bash
+docker build -t lexvault-local .
+docker compose up -d
+```
+
+身份配置进阶：token 模式下每个 principal 可声明 `permissions` 列表（`view`/`edit`/`approve`/`export`/`manage`）；组织登录配置 `LAW_REVIEW_OIDC_ISSUER`/`CLIENT_ID`/`CLIENT_SECRET`/`PRINCIPALS_JSON`（见 [.env.example](.env.example) 注释）。OIDC issuer 在回环之外必须为 https。
 
 ## 测试与评测
 
@@ -95,8 +109,10 @@ DELETE /api/auth/session                 退出
 ## 发布与边界
 
 - 默认 `local` 模式仅允许回环连接；通过反向代理、局域网或公网提供服务必须改用 `token` 模式，并配置允许的 Host 与 TLS。token 和案件授权是单机最小边界，不是完整组织级 IAM。[认证配置](docs/runbook/operations.md)
-- 模型服务 URL 应指向受控本机服务；改为远端会把相关提示词/证据发往该端点，不再满足纯本地边界。
+- 模型服务 URL 默认仅允许本机回环地址：改为远端必须显式设置 `LAW_REVIEW_ALLOW_REMOTE_MODELS=1` 并使用 https，HTTP 重定向一律拒绝；批准后相关提示词与证据才会发往该端点。
+- OIDC 登录的代码路径与 mock 提供方测试已就绪，但真实 issuer 连通、组织账户治理属部署验收项，未验收前不宣称组织级 SSO 可用。
+- CI 每周运行 pip-audit 依赖漏洞审计与 gitleaks 秘密扫描（`.github/workflows/security.yml`）；扫描发现的问题按[组件许可与来源清单](docs/runbook/licenses.md)的治理流程处置。
 - 不删除原始实验或案件来“清理仓库”；`.gitignore` 排除私有数据，发布脚本使用白名单并拒绝符号链接。[发布说明](docs/runbook/release.md)
 - 未指定本项目开源许可；公开分发前应由维护者选择许可证，并核对模型及 LawBench 原始数据源的再分发条件。
 
-[文档入口](docs/README.md) · [架构](docs/architecture/system.md) · [42 项修复映射](docs/runbook/improvement-checklist.md) · [历史报告索引](docs/history/README.md)
+[文档入口](docs/README.md) · [架构](docs/architecture/system.md) · [42 项修复映射](docs/runbook/improvement-checklist.md) · [组件许可](docs/runbook/licenses.md) · [历史报告索引](docs/history/README.md) · [优化编年史](docs/history/optimization-chronicle.md)
