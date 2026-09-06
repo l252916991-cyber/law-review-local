@@ -19,7 +19,8 @@ sys.path.insert(0, str(ROOT))
 
 from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item
 from app.benchmark_reporting import atomic_json, metrics
-from app.lawbench import LAW_BENCH_COMMIT, LAW_BENCH_DIR, TASK_NAMES, load_task
+from app import lawbench
+from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task
 
 
 def digest(path: Path) -> str:
@@ -113,7 +114,7 @@ def prepare(baseline: Path, destination: Path, seed: int = 8505) -> dict[str, An
         "split_counts": dict(Counter(row["split"] for row in inputs)),
         "files": {name: digest(destination / name) for name in ("inputs.jsonl", "references.jsonl")},
         "frozen_sources": frozen_files,
-        "dataset_files": {task: digest(LAW_BENCH_DIR / f"{task}.json") for task in TASK_NAMES},
+        "dataset_files": {task: digest(lawbench.LAW_BENCH_DIR / f"{task}.json") for task in TASK_NAMES},
         "profiles": profiles(),
         "note": "Development only for selection; anchor previously inspected. Confirmation held out. No gold in solve inputs.",
     }
@@ -134,7 +135,7 @@ def validate_campaign(directory: Path) -> dict[str, Any]:
         if name not in {"app/benchmark_metrics.py", "app/lawbench.py"} or digest(ROOT / name) != expected:
             raise ValueError(f"Frozen scorer changed: {name}")
     for task, expected in manifest["dataset_files"].items():
-        if task not in TASK_NAMES or digest(LAW_BENCH_DIR / f"{task}.json") != expected:
+        if task not in TASK_NAMES or digest(lawbench.LAW_BENCH_DIR / f"{task}.json") != expected:
             raise ValueError(f"Frozen dataset changed: {task}")
     if SCORER_VERSION != manifest["scorer_version"]:
         raise ValueError("Scorer version changed")
