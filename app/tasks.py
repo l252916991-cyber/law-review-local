@@ -157,6 +157,62 @@ async def process_batch_import(
 async def worker_startup(ctx: dict[str, Any]) -> None:
     init_db(seed=False)
     ctx["indexing_semaphore"] = asyncio.Semaphore(max(1, config.indexing_concurrency))
+    # The worker owns a live Redis connection, so it can discharge batches whose
+    # enqueue outcome was never confirmed (crash between commit and enqueue).
+    await reconcile_batch_dispatches()
+
+
+def _load_pending_dispatches() -> list[dict[str, Any]]:
+    with transaction() as conn:
+        return [dict(row) for row in conn.execute(
+            """SELECT d.batch_id, d.case_id, d.attempts
+               FROM batch_dispatch d JOIN batch_imports b ON b.id = d.batch_id
+               WHERE d.state = 'pending' AND b.status = 'queued'
+               ORDER BY d.batch_id"""
+        ).fetchall()]
+
+
+def _dispatch_files(batch_id: int) -> list[dict[str, Any]]:
+    with transaction() as conn:
+        return [dict(row) for row in conn.execute(
+            "SELECT file_key, filename, stored_path, mime_type FROM batch_import_files WHERE batch_id=? ORDER BY id",
+            (batch_id,),
+        ).fetchall()]
+
+
+def _mark_dispatched(batch_id: int, *, success: bool) -> None:
+    with transaction() as conn:
+        state = "discharged" if success else "pending"
+        conn.execute(
+            "UPDATE batch_dispatch SET state=?, attempts=attempts+1, updated_at=? WHERE batch_id=?",
+            (state, now(), batch_id),
+        )
+
+
+async def reconcile_batch_dispatches() -> int:
+    """Re-enqueue registered batches with unconfirmed enqueue outcomes.
+
+    Deterministic job IDs make this at-least-once: arq deduplicates a still
+    queued job, and process_batch_import resumes only unfinished files.
+    """
+    dispatched = 0
+    for entry in _load_pending_dispatches():
+        batch_id = entry["batch_id"]
+        files = _dispatch_files(batch_id)
+        if not files:
+            # A queued batch without staged files cannot be processed; keep it
+            # pending so the state stays visible instead of vanishing silently.
+            logger.warning("Batch %s has no staged files; dispatch stays pending", batch_id)
+            continue
+        try:
+            await enqueue_batch_import(batch_id, entry["case_id"], files)
+        except Exception as exc:
+            logger.warning("Batch %s re-dispatch failed (%s)", batch_id, type(exc).__name__)
+            _mark_dispatched(batch_id, success=False)
+            continue
+        _mark_dispatched(batch_id, success=True)
+        dispatched += 1
+    return dispatched
 
 
 class WorkerSettings:

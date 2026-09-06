@@ -36,7 +36,7 @@ from .services import (
 from .security import actor_name, allowed_case_ids, require_case_access
 from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
-from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool
+from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
 
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -74,6 +74,11 @@ async def lifespan(application: FastAPI):
         try:
             application.state.indexing_semaphore = asyncio.Semaphore(max(1, config.indexing_concurrency))
             application.state.redis_available = await probe_redis()
+            if application.state.redis_available:
+                # Discharge batches whose enqueue outcome was never confirmed.
+                dispatched = await reconcile_batch_dispatches()
+                if dispatched:
+                    logging.info("Redispatched %s pending batch import(s)", dispatched)
             application.state.ready = True
             yield
         finally:
@@ -485,16 +490,30 @@ async def batch_import_documents(case_id: int, files: list[UploadFile] = File(..
                        VALUES (?,?,?,?,?,'pending','',?)""",
                     (batch_id, item["file_key"], item["filename"], item["stored_path"], item["mime_type"], now()),
                 )
+            # The dispatch outbox row commits atomically with the file manifest:
+            # a crash before enqueue leaves a pending dispatch, not a lost batch.
+            conn.execute(
+                "INSERT INTO batch_dispatch(batch_id,case_id,state,attempts,created_at,updated_at) VALUES (?,?,'pending',0,?,?)",
+                (batch_id, case_id, now(), now()),
+            )
         job_id = await enqueue_batch_import(batch_id, case_id, file_infos)
+        with transaction() as conn:
+            conn.execute("UPDATE batch_dispatch SET state='discharged',updated_at=? WHERE batch_id=?", (now(), batch_id))
     except BaseException as exc:
         retained = False
+        dispatch_pending = False
         if batch_id is not None:
             with transaction() as conn:
                 # If Redis accepted the job but its acknowledgment was lost, a
                 # worker may already own these files. Do not delete its inputs.
                 batch = conn.execute("SELECT status FROM batch_imports WHERE id=?", (batch_id,)).fetchone()
                 retained = bool(batch and batch["status"] != "queued")
-                if not retained:
+                dispatch_pending = bool(
+                    conn.execute(
+                        "SELECT 1 FROM batch_dispatch WHERE batch_id=? AND state='pending'", (batch_id,)
+                    ).fetchone()
+                )
+                if not retained and not dispatch_pending:
                     public_error = getattr(exc, "detail", "批量任务提交失败") if isinstance(exc, HTTPException) else f"批量任务提交失败（{type(exc).__name__}）"
                     conn.execute(
                         "UPDATE batch_imports SET status='failed',error_log_json=?,finished_at=? WHERE id=?",
@@ -504,7 +523,7 @@ async def batch_import_documents(case_id: int, files: list[UploadFile] = File(..
                         "UPDATE batch_import_files SET status='failed',error=?,updated_at=? WHERE batch_id=? AND status='pending'",
                         ("上传或入队失败", now(), batch_id),
                     )
-            if not retained:
+            if not retained and not dispatch_pending:
                 cleanup_batch_files(batch_id)
         if isinstance(exc, HTTPException) or not isinstance(exc, Exception):
             raise
@@ -513,6 +532,10 @@ async def batch_import_documents(case_id: int, files: list[UploadFile] = File(..
             return {"batch_id": batch_id, "job_id": f"batch-import-{batch_id}",
                     "total_files": len(files), "status": batch["status"],
                     "message": "任务已被接收；入队回执异常，请通过任务 ID 查询进度"}
+        if dispatch_pending:
+            return {"batch_id": batch_id, "job_id": f"batch-import-{batch_id}",
+                    "total_files": len(files), "status": "queued",
+                    "message": "任务已接收；入队未确认，队列恢复后将自动重新派发，请通过任务 ID 查询进度"}
         raise HTTPException(503, "批量任务提交失败，请检查队列服务后重试") from exc
     finally:
         for upload in files:

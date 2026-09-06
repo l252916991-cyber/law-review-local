@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from app.config import config
-from app.db import connect, db_scope, transaction
+from app.db import connect, db_scope, now, transaction
 from app.main import app
 from app import tasks
 from app.services import index_upload
@@ -142,15 +142,61 @@ class QueueContractTests(unittest.TestCase):
             pool.aclose.assert_awaited_once()
         asyncio.run(run())
 
-    def test_enqueue_failure_cleans_staging_and_marks_failed(self):
+    def test_unconfirmed_enqueue_keeps_dispatch_pending_and_redispatches(self):
         with patch("app.main.enqueue_batch_import", AsyncMock(side_effect=ConnectionError("offline"))):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import",
                                         files=[("files", ("test.txt", "内容", "text/plain"))])
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 202, response.text)
+        body = response.json()
+        self.assertEqual(body["status"], "queued")
+        self.assertIn("自动重新派发", body["message"])
+        batch_id = body["batch_id"]
+        self.assertTrue(tasks.batch_temp_dir(batch_id).exists())
         with closing(connect()) as conn:
-            batch = dict(conn.execute("SELECT * FROM batch_imports WHERE case_id=?", (self.case_id,)).fetchone())
-        self.assertEqual(batch["status"], "failed")
-        self.assertFalse(tasks.batch_temp_dir(batch["id"]).exists())
+            batch = dict(conn.execute("SELECT * FROM batch_imports WHERE id=?", (batch_id,)).fetchone())
+            dispatch = dict(conn.execute("SELECT * FROM batch_dispatch WHERE batch_id=?", (batch_id,)).fetchone())
+            staged = conn.execute("SELECT COUNT(*) FROM batch_import_files WHERE batch_id=?", (batch_id,)).fetchone()[0]
+        self.assertEqual(batch["status"], "queued")
+        self.assertEqual(staged, 1)
+        self.assertEqual(dispatch["state"], "pending")
+
+        redispatched = AsyncMock(return_value="job-again")
+        with patch("app.tasks.enqueue_batch_import", redispatched):
+            count = asyncio.run(tasks.reconcile_batch_dispatches())
+        self.assertEqual(count, 1)
+        redispatched.assert_awaited_once()
+        args = redispatched.await_args.args
+        self.assertEqual(args[0], batch_id)
+        self.assertEqual(args[1], self.case_id)
+        self.assertEqual(len(args[2]), 1)
+        with closing(connect()) as conn:
+            dispatch = dict(conn.execute("SELECT * FROM batch_dispatch WHERE batch_id=?", (batch_id,)).fetchone())
+        self.assertEqual(dispatch["state"], "discharged")
+        self.assertEqual(dispatch["attempts"], 1)
+
+    def test_reconcile_failure_stays_pending_and_worker_owned_batch_skipped(self):
+        batch_id, _ = self._stage_batch(1)
+        with transaction() as conn:
+            conn.execute("UPDATE batch_dispatch SET state='pending', attempts=0, updated_at=?", (now(),))
+
+        async def failed_dispatch(batch_id, case_id, files):
+            raise ConnectionError("offline")
+
+        with patch("app.tasks.enqueue_batch_import", failed_dispatch):
+            self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
+        with closing(connect()) as conn:
+            dispatch = dict(conn.execute("SELECT * FROM batch_dispatch WHERE batch_id=?", (batch_id,)).fetchone())
+        self.assertEqual(dispatch["state"], "pending")
+        self.assertEqual(dispatch["attempts"], 1)
+
+        # A batch already owned by a worker is never re-enqueued.
+        with transaction() as conn:
+            conn.execute("UPDATE batch_imports SET status='processing' WHERE id=?", (batch_id,))
+            conn.execute("UPDATE batch_dispatch SET state='pending', updated_at=?", (now(),))
+        redispatched = AsyncMock(return_value="job")
+        with patch("app.tasks.enqueue_batch_import", redispatched):
+            self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
+        redispatched.assert_not_awaited()
 
     def test_lost_queue_ack_preserves_files_owned_by_worker(self):
         async def accepted_but_lost_ack(batch_id, case_id, files):

@@ -348,7 +348,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
@@ -390,6 +390,25 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
     _execute_script(conn, FTS_TRIGGERS)
 
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    # Durable dispatch outbox: a batch registered in SQLite but whose enqueue
+    # outcome was never confirmed is re-discharged on the next startup.
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS batch_dispatch (
+    batch_id INTEGER PRIMARY KEY REFERENCES batch_imports(id) ON DELETE CASCADE,
+    case_id INTEGER NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','discharged')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_batch_dispatch_pending ON batch_dispatch(state, batch_id);
+""",
+    )
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -397,7 +416,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
