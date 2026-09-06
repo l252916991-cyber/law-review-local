@@ -1,0 +1,3855 @@
+{
+  "dataset_name": "LexVault RAG Project Benchmark",
+  "version": "1.0",
+  "date": "2026-09-03",
+  "total_questions": 240,
+  "categories": {
+    "精确引用": 80,
+    "跨文档综合": 60,
+    "矛盾检测": 40,
+    "不存在答案": 40,
+    "时间线推理": 20
+  },
+  "questions": [
+    {
+      "id": "rag_proj_001",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目1)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_002",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目2)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_003",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目3)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_004",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目4)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_005",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目5)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_006",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目6)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_007",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目7)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_008",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目8)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_009",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目9)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_010",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目10)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_011",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目11)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_012",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目12)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_013",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目13)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_014",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目14)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_015",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目15)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_016",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目16)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_017",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目17)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_018",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目18)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_019",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目19)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_020",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目20)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_021",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目21)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_022",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目22)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_023",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目23)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_024",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目24)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_025",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目25)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_026",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目26)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_027",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目27)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_028",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目28)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_029",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目29)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_030",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目30)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_031",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目31)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_032",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目32)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_033",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目33)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_034",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目34)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_035",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目35)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_036",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目36)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_037",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目37)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_038",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目38)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_039",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目39)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_040",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目40)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_041",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目41)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_042",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目42)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_043",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目43)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_044",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目44)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_045",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目45)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_046",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目46)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_047",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目47)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_048",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目48)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_049",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目49)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_050",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目50)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_051",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目51)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_052",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目52)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_053",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目53)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_054",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目54)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_055",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目55)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_056",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目56)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_057",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目57)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_058",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目58)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_059",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目59)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_060",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目60)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_061",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目61)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_062",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目62)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_063",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目63)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_064",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目64)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_065",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目65)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_066",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目66)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_067",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目67)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_068",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目68)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_069",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目69)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_070",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目70)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_071",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目71)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_072",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目72)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_073",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目73)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_074",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目74)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_075",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目75)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_076",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目76)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_077",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目77)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_078",
+      "category": "精确引用",
+      "difficulty": "困难",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目78)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_079",
+      "category": "精确引用",
+      "difficulty": "简单",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目79)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_080",
+      "category": "精确引用",
+      "difficulty": "中等",
+      "question": "在卷宗第X页中，明确记载了什么信息？ (题目80)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_081",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目1)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_082",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目2)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_083",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目3)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_084",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目4)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_085",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目5)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_086",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目6)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_087",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目7)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_088",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目8)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_089",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目9)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_090",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目10)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_091",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目11)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_092",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目12)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_093",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目13)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_094",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目14)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_095",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目15)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_096",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目16)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_097",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目17)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_098",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目18)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_099",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目19)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_100",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目20)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_101",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目21)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_102",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目22)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_103",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目23)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_104",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目24)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_105",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目25)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_106",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目26)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_107",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目27)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_108",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目28)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_109",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目29)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_110",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目30)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_111",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目31)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_112",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目32)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_113",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目33)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_114",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目34)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_115",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目35)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_116",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目36)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_117",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目37)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_118",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目38)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_119",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目39)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_120",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目40)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_121",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目41)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_122",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目42)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_123",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目43)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_124",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目44)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_125",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目45)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_126",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目46)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_127",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目47)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_128",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目48)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_129",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目49)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_130",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目50)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_131",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目51)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_132",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目52)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_133",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目53)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_134",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目54)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_135",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目55)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_136",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目56)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_137",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目57)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_138",
+      "category": "跨文档综合",
+      "difficulty": "简单",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目58)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_139",
+      "category": "跨文档综合",
+      "difficulty": "中等",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目59)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_140",
+      "category": "跨文档综合",
+      "difficulty": "困难",
+      "question": "综合多份文档，被告的辩解是否一致？ (题目60)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_141",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目1)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_142",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目2)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_143",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目3)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_144",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目4)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_145",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目5)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_146",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目6)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_147",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目7)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_148",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目8)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_149",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目9)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_150",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目10)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_151",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目11)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_152",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目12)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_153",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目13)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_154",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目14)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_155",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目15)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_156",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目16)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_157",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目17)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_158",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目18)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_159",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目19)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_160",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目20)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_161",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目21)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_162",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目22)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_163",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目23)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_164",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目24)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_165",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目25)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_166",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目26)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_167",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目27)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_168",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目28)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_169",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目29)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_170",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目30)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_171",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目31)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_172",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目32)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_173",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目33)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_174",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目34)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_175",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目35)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_176",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目36)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_177",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目37)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_178",
+      "category": "矛盾检测",
+      "difficulty": "中等",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目38)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_179",
+      "category": "矛盾检测",
+      "difficulty": "困难",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目39)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_180",
+      "category": "矛盾检测",
+      "difficulty": "简单",
+      "question": "文档A和文档B中关于X的陈述是否矛盾？ (题目40)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_181",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目1)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_182",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目2)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_183",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目3)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_184",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目4)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_185",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目5)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_186",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目6)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_187",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目7)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_188",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目8)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_189",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目9)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_190",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目10)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_191",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目11)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_192",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目12)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_193",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目13)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_194",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目14)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_195",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目15)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_196",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目16)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_197",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目17)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_198",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目18)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_199",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目19)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_200",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目20)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_201",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目21)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_202",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目22)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_203",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目23)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_204",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目24)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_205",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目25)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_206",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目26)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_207",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目27)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_208",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目28)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_209",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目29)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_210",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目30)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_211",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目31)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_212",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目32)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_213",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目33)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_214",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目34)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_215",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目35)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_216",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目36)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_217",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目37)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_218",
+      "category": "不存在答案",
+      "difficulty": "中等",
+      "question": "案卷中是否包含关于X的信息？ (题目38)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_219",
+      "category": "不存在答案",
+      "difficulty": "困难",
+      "question": "案卷中是否包含关于X的信息？ (题目39)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_220",
+      "category": "不存在答案",
+      "difficulty": "简单",
+      "question": "案卷中是否包含关于X的信息？ (题目40)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_221",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目1)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_222",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目2)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_223",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目3)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_224",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目4)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_225",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目5)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_226",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目6)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_227",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目7)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_228",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目8)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_229",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目9)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_230",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目10)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_231",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目11)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_232",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目12)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_233",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目13)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_234",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目14)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_235",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目15)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_236",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目16)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_237",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目17)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_238",
+      "category": "时间线推理",
+      "difficulty": "困难",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目18)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_239",
+      "category": "时间线推理",
+      "difficulty": "简单",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目19)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    },
+    {
+      "id": "rag_proj_240",
+      "category": "时间线推理",
+      "difficulty": "中等",
+      "question": "根据多份笔录，事件发生的时间顺序是？ (题目20)",
+      "answer": "[待补充标准答案]",
+      "evidence_source": [
+        {
+          "document_id": 1,
+          "page_start": 1,
+          "page_end": 1
+        }
+      ],
+      "key_excerpt": "[待补充关键引用片段]",
+      "notes": "需要基于实际案卷材料补充"
+    }
+  ]
+}

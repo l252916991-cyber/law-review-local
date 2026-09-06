@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>LexVault · 本地阅卷系统</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c765d'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/assets/styles.css" />
+  <!-- 可视化库 -->
+  <script src="/assets/vendor/vis-network.min.js"></script>
+  <script src="/assets/vendor/echarts.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">律</div>
+        <div><strong>LexVault</strong><span>私有化阅卷系统</span></div>
+      </div>
+
+      <div class="privacy-chip"><i></i>本机私有模式</div>
+
+      <nav class="main-nav" aria-label="主导航">
+        <button class="nav-item active" data-view="overview"><span>⌂</span>案件总览</button>
+        <button class="nav-item" data-view="directory"><span>▤</span>双层目录</button>
+        <button class="nav-item" data-view="evidence"><span>⌘</span>证据关系</button>
+        <button class="nav-item" data-view="assistant"><span>✦</span>AI 阅卷</button>
+        <button class="nav-item" data-view="lab"><span>◇</span>Agent 实验室</button>
+        <button class="nav-item" data-view="export"><span>⇩</span>成果导出</button>
+      </nav>
+
+      <div class="sidebar-section-title">案件空间</div>
+      <div id="case-list" class="case-list"></div>
+      <button id="new-case-btn" class="new-case-btn">＋ 新建案件</button>
+
+      <div class="sidebar-footer">
+        <div class="model-dot" id="model-dot"></div>
+        <div><strong id="model-state">检测本地模型…</strong><span id="model-name">数据不会离开本机</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="case-type">金融犯罪 · 阅卷空间</div>
+          <h1 id="case-title">正在载入案件…</h1>
+        </div>
+        <div class="top-actions">
+          <label class="global-search">
+            <span>⌕</span><input id="global-search" placeholder="搜索卷宗、人名、金额…" />
+          </label>
+          <button class="icon-button" title="全程留痕">◎</button>
+          <button id="sign-out" class="text-button" hidden>退出登录</button>
+          <div class="avatar">律</div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div id="overview-view" class="view active">
+          <div class="hero-card">
+            <div>
+              <div class="hero-kicker"><span></span>全链路本地处理</div>
+              <h2>从散装卷宗，到可检索、可关联、可溯源的案件资产</h2>
+              <p id="case-description">自动拆页建目、提取证据、保留原文定位，并把律师校准结果沉淀回检索链路。</p>
+              <div class="hero-actions">
+                <button class="primary-button" data-go="assistant">开始 AI 阅卷 <b>→</b></button>
+                <button class="secondary-button" id="hero-upload">上传卷宗</button>
+              </div>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+              <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+              <div class="vault-core"><span>PRIVATE</span><strong>本地</strong><small>证据知识库</small></div>
+              <div class="floating-tag tag-one">原页溯源</div>
+              <div class="floating-tag tag-two">目录校准</div>
+              <div class="floating-tag tag-three">多步推理</div>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article><div class="metric-icon blue">▤</div><div><span>卷宗文件</span><strong id="metric-docs">0</strong><small>已进入双层目录</small></div></article>
+            <article><div class="metric-icon violet">◫</div><div><span>内容页</span><strong id="metric-pages">0</strong><small>支持页级引用</small></div></article>
+            <article><div class="metric-icon amber">⌘</div><div><span>证据事项</span><strong id="metric-evidence">0</strong><small id="metric-confirmed">0 条已确认</small></div></article>
+            <article><div class="metric-icon green">✓</div><div><span>数据出域</span><strong>0</strong><small>全部在本机处理</small></div></article>
+          </div>
+
+          <div class="two-column">
+            <article class="panel workflow-panel">
+              <div class="panel-heading"><div><span class="section-label">复刻工作流</span><h3>卷宗处理闭环</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
+              <div class="workflow">
+                <div class="workflow-step done"><span>01</span><div><strong>文档解析与 OCR</strong><small>影印 PDF 自动切页并识别中文</small></div></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step active"><span>02</span><div><strong>文件级 + 内容级目录</strong><small>人员、日期、页码和摘要可人工校准</small></div></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step"><span>03</span><div><strong>多路检索与证据关联</strong><small>统计、事实、对比分路处理</small></div></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step"><span>04</span><div><strong>律师复核与资产沉淀</strong><small>引用原页，结果回写并打包输出</small></div></div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading"><div><span class="section-label">审计记录</span><h3>最近活动</h3></div><span class="live-pill">● LIVE</span></div>
+              <div id="activity-list" class="activity-list"></div>
+            </article>
+          </div>
+
+          <article class="panel upload-panel" id="upload-zone">
+            <div class="upload-icon">⇧</div>
+            <div><h3>投递卷宗材料</h3><p>支持 PDF、DOCX、TXT、图片；扫描件会调用本机中文 OCR。</p></div>
+            <button class="secondary-button">选择文件</button>
+            <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.tif,.tiff,.webp" hidden />
+          </article>
+        </div>
+
+        <div id="directory-view" class="view">
+          <div class="view-heading">
+            <div><span class="section-label">内容级目录数据库</span><h2>双层卷宗目录</h2><p>文件级信息与页级内容同步索引，人工修改会回写检索链路。</p></div>
+            <button class="primary-button" id="directory-upload">＋ 上传卷宗</button>
+          </div>
+
+          <!-- 批量上传区域 -->
+          <div class="batch-upload-zone panel" id="batch-upload-zone" style="display: none;">
+            <div class="batch-upload-header">
+              <h3>📦 批量导入</h3>
+              <button class="close-btn" id="batch-upload-close">×</button>
+            </div>
+            <div class="batch-drop-area" id="batch-drop-area">
+              <div class="batch-drop-content">
+                <span class="upload-icon-large">⇧</span>
+                <p><strong>拖拽文件或文件夹到此处</strong></p>
+                <p class="hint">或点击下方按钮选择文件（最多 200 个）</p>
+                <button class="secondary-button" id="batch-file-select">选择文件</button>
+                <input type="file" id="batch-file-input" multiple hidden />
+              </div>
+            </div>
+            <div class="batch-progress" id="batch-progress" style="display: none;">
+              <div class="progress-header">
+                <strong>正在处理...</strong>
+                <span id="batch-progress-text">0 / 0</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="batch-progress-fill" style="width: 0%;"></div>
+              </div>
+              <div class="progress-details">
+                <span class="success-count">✓ <span id="batch-success-count">0</span> 成功</span>
+                <span class="failed-count">✗ <span id="batch-failed-count">0</span> 失败</span>
+              </div>
+              <div class="batch-errors" id="batch-errors" style="display: none;"></div>
+            </div>
+          </div>
+
+          <div class="toolbar panel-lite">
+            <label class="table-search"><span>⌕</span><input id="directory-search" placeholder="搜索文件、人员、日期、摘要" /></label>
+            <div class="filter-chips" id="directory-filters"><button class="active" data-filter="全部">全部</button><button data-filter="询问笔录">笔录</button><button data-filter="银行流水">流水</button><button data-filter="电子数据">电子数据</button></div>
+            <button class="secondary-button" id="batch-upload-btn" style="margin-left: auto;">📦 批量导入</button>
+            <span class="record-count" id="directory-count">0 条记录</span>
+          </div>
+          <div class="table-card">
+            <table>
+              <thead><tr><th>文件 / 内容</th><th>文书类型</th><th>涉及人员</th><th>时间范围</th><th>页数</th><th>状态</th><th></th></tr></thead>
+              <tbody id="directory-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="evidence-view" class="view">
+          <div class="view-heading">
+            <div><span class="section-label">关系数据库</span><h2>证据事项与关联</h2><p>把事实结论、证据来源、矛盾与资金链路放在同一张可信网络中。</p></div>
+            <div style="display: flex; gap: 9px;">
+              <button class="secondary-button" id="create-evidence-btn">➕ 添加证据</button>
+              <button class="primary-button" id="analyze-btn">✦ 运行本地证据分析</button>
+            </div>
+          </div>
+          <div class="evidence-summary" id="evidence-summary"></div>
+
+          <!-- 证据关系图谱 -->
+          <div class="evidence-graph-panel panel" style="margin-bottom: 18px;">
+            <div class="panel-heading">
+              <div><span class="section-label">关系图谱</span><h3>证据关系可视化</h3></div>
+              <div class="graph-controls">
+                <button class="icon-button" id="graph-fit-btn" title="适应画布">⊡</button>
+                <button class="icon-button" id="graph-layout-btn" title="重新布局">⟲</button>
+              </div>
+            </div>
+            <div id="evidence-graph" style="height: 500px; background: #f8faf9; border-radius: 12px;"></div>
+          </div>
+
+          <!-- 证据时间线 -->
+          <div class="evidence-timeline-panel panel" style="margin-bottom: 18px;">
+            <div class="panel-heading">
+              <div><span class="section-label">时间轴</span><h3>证据时间分布</h3></div>
+            </div>
+            <div id="evidence-timeline" style="height: 300px; background: #f8faf9; border-radius: 12px;"></div>
+          </div>
+
+          <!-- 证据疏漏检测仪表板 -->
+          <div class="gap-dashboard-panel panel" style="margin-bottom: 18px;">
+            <div class="panel-heading">
+              <div><span class="section-label">疏漏检测</span><h3>证据完整性分析</h3></div>
+              <button class="secondary-button" id="run-gap-detection-btn">🔍 运行疏漏检测</button>
+            </div>
+            <div id="gap-dashboard">
+              <div class="gap-summary-grid" id="gap-summary-grid"></div>
+              <div class="gap-details-list" id="gap-details-list"></div>
+            </div>
+          </div>
+
+          <div class="evidence-layout">
+            <div><div class="subheading"><h3>证据事项</h3><span id="evidence-count"></span></div><div id="evidence-grid" class="evidence-grid"></div></div>
+            <aside class="relation-panel panel"><span class="section-label">证据链</span><h3>关联关系</h3><div id="relation-list"></div></aside>
+          </div>
+        </div>
+
+        <div id="assistant-view" class="view assistant-view">
+          <div class="assistant-shell">
+            <aside class="conversation-sidebar">
+              <button id="new-chat" class="primary-button wide">＋ 新建独立会话</button>
+              <label class="user-field"><span>当前使用人</span><input id="user-name" value="本机律师" /></label>
+              <div class="conversation-title">会话记录</div>
+              <div id="conversation-list"></div>
+              <div class="isolation-note"><strong>会话隔离</strong><span>不同律师、不同会话的上下文互不交叉。</span></div>
+            </aside>
+            <section class="chat-panel">
+              <div class="chat-header">
+                <div><span class="assistant-avatar">AI</span><div><strong>卷宗分析助手</strong><small><i></i> 仅访问当前案件资料</small></div></div>
+                <label class="toggle"><input type="checkbox" id="llm-toggle" checked /><span></span>调用本地大模型</label>
+              </div>
+              <div id="chat-messages" class="chat-messages">
+                <div class="welcome-message">
+                  <div class="welcome-icon">✦</div><h2>从卷宗中获得可复核的答案</h2>
+                  <p>系统会自动判断统计、事实或对比检索路径，每条关键结论都附原文件与页码。</p>
+                  <div class="prompt-grid">
+                    <button>这个案件涉及多少份卷宗和相关人员？</button>
+                    <button>张某关于固定回报的陈述是否存在矛盾？</button>
+                    <button>梳理募集资金的主要流向</button>
+                    <button>哪些材料体现了“不知情”的口供语义？</button>
+                  </div>
+                </div>
+              </div>
+              <form id="chat-form" class="chat-composer">
+                <textarea id="chat-input" rows="2" placeholder="询问当前案件，例如：对比张某与李某关于收益率审批的陈述…"></textarea>
+                <div class="composer-footer"><span>↵ Enter 发送 · Shift+Enter 换行</span><button type="submit" class="send-button">发送 <b>↑</b></button></div>
+              </form>
+            </section>
+          </div>
+        </div>
+
+        <div id="lab-view" class="view">
+          <div class="view-heading">
+            <div><span class="section-label">INTERVIEW RUNTIME</span><h2>Agent 实验室</h2><p>把任务规划、混合检索、并行专家、审校与长期记忆变成可运行、可追踪、可评测的工程链路。</p></div>
+            <div class="lab-actions"><button class="secondary-button" id="build-index-btn">构建 Hybrid 索引</button><button class="primary-button" id="evaluate-btn">运行 RAG 评测</button></div>
+          </div>
+
+          <div class="metric-grid lab-metrics">
+            <article><div class="metric-icon blue">R</div><div><span>Agent Runs</span><strong id="lab-run-count">0</strong><small id="lab-run-success">尚未运行</small></div></article>
+            <article><div class="metric-icon violet">V</div><div><span>Vector Index</span><strong id="lab-vector-pages">0</strong><small id="lab-vector-meta">等待构建</small></div></article>
+            <article><div class="metric-icon amber">M</div><div><span>Long-term Memory</span><strong id="lab-memory-count">0</strong><small>案件级语义记忆</small></div></article>
+            <article><div class="metric-icon green">@5</div><div><span>Recall@5</span><strong id="lab-recall">—</strong><small id="lab-mrr">运行离线评测</small></div></article>
+          </div>
+
+          <article class="panel agent-architecture">
+            <div class="panel-heading"><div><span class="section-label">EXPLICIT DAG</span><h3>可解释的执行图</h3></div><span class="live-pill">● TRACE ON</span></div>
+            <div class="agent-pipeline">
+              <div><b>01</b><strong>Planner</strong><small>意图 / DAG</small></div><i>→</i>
+              <div><b>02</b><strong>Hybrid RAG</strong><small>BM25 + Legal Lexical + Vector + RRF</small></div><i>→</i>
+              <div class="parallel-node"><b>03</b><strong>Parallel Experts</strong><small>事实 / 证据 / 矛盾</small></div><i>→</i>
+              <div><b>04</b><strong>Critic</strong><small>引用与冲突审校</small></div><i>→</i>
+              <div><b>05</b><strong>Memory</strong><small>向量长期记忆</small></div>
+            </div>
+          </article>
+
+          <div class="lab-layout">
+            <article class="panel lab-console">
+              <div class="panel-heading"><div><span class="section-label">MULTI-AGENT RUN</span><h3>运行一次完整链路</h3></div><div class="runtime-controls"><label class="runtime-select">运行时<select id="agent-runtime"><option value="multi_agent">原生 DAG</option><option value="langgraph">LangGraph</option></select></label><label class="toggle"><input type="checkbox" id="lab-llm-toggle" /><span></span>最终节点调用 LLM</label></div></div>
+              <textarea id="lab-question" rows="3">张某关于固定回报审批的陈述是否存在矛盾？</textarea>
+              <div class="lab-run-actions"><button class="primary-button" id="run-agent-btn">运行原生 DAG <b>→</b></button><button class="secondary-button" id="compare-agent-btn">双版本对比</button></div>
+              <div id="lab-resumable-runs" class="resumable-runs" hidden></div>
+              <div id="lab-result" class="lab-result"><div class="empty-state">运行后将在这里显示最终答复与来源。</div></div>
+            </article>
+            <article class="panel evaluation-panel">
+              <div class="panel-heading"><div><span class="section-label">RAG EVALUATION</span><h3>离线评测集</h3></div><span class="dataset-chip" id="benchmark-chip">加载 LawBench…</span></div>
+              <div id="evaluation-result" class="evaluation-result"><div class="empty-state">10,000 道 LawBench 中文法律题用于模型能力测试；案件级标准答案另行衡量 Recall@5、MRR、原文片段提供率与延迟。</div></div>
+            </article>
+          </div>
+
+          <div id="runtime-comparison" class="panel runtime-comparison" hidden></div>
+          <article class="panel trace-panel">
+            <div class="panel-heading"><div><span class="section-label">OBSERVABILITY</span><h3>最近一次节点追踪</h3></div><span id="trace-total" class="dataset-chip">等待运行</span></div>
+            <div id="agent-trace" class="agent-trace"><div class="empty-state">每个节点会记录依赖、状态、耗时和输出摘要。</div></div>
+          </article>
+        </div>
+
+        <div id="export-view" class="view">
+          <div class="view-heading"><div><span class="section-label">预设模板</span><h2>结案成果打包</h2><p>将目录、证据清单、问答记录和原始卷宗按统一结构一次性输出。</p></div></div>
+          <div class="export-card">
+            <div class="export-art"><div class="box-lid"></div><div class="box-body">ZIP</div></div>
+            <div class="export-copy"><span class="privacy-chip inline"><i></i>本地生成</span><h2>案件数字资产包</h2><p>适合内部归档、团队交接和结案复盘。所有 AI 结论均保留来源列，便于后续复核。</p>
+              <ul><li><b>案件摘要.md</b><span>案件概况与处理说明</span></li><li><b>内容级目录.csv</b><span>文件、人员、时间、页码与摘要</span></li><li><b>证据目录.csv</b><span>待证事实、可信度、原文及状态</span></li><li><b>阅卷问答记录.md</b><span>按用户与会话归档</span></li><li><b>原始卷宗/</b><span>已上传的原文件</span></li></ul>
+              <button id="export-btn" class="primary-button large">生成并下载审阅包 <b>⇩</b></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-stack" class="toast-stack"></div>
+
+  <dialog id="directory-dialog" class="dialog">
+    <form method="dialog" id="directory-form">
+      <div class="dialog-header"><div><span class="section-label">人工校准</span><h3 id="edit-document-name">编辑目录</h3></div><button class="close-button" value="cancel">×</button></div>
+      <input type="hidden" id="edit-document-id" />
+      <div class="form-grid"><label>文书类型<input id="edit-doc-type" /></label><label>涉及人员<input id="edit-people" /></label><label>时间范围<input id="edit-date-range" /></label><label>处理状态<select id="edit-status"><option>已索引</option><option>待复核</option><option>已校准</option></select></label></div>
+      <label>内容摘要<textarea id="edit-summary" rows="5"></textarea></label>
+      <div class="dialog-actions"><button value="cancel" class="secondary-button">取消</button><button type="button" id="save-directory" class="primary-button">保存并回写检索链路</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="auth-dialog" class="dialog" aria-labelledby="auth-title">
+    <form id="auth-form">
+      <div class="dialog-header"><h3 id="auth-title">登录案件空间</h3></div>
+      <p>请输入管理员配置的访问令牌。令牌仅用于建立 HttpOnly 会话，不存入浏览器本地存储。</p>
+      <label>访问令牌<input id="auth-token" type="password" required autocomplete="off" maxlength="512" /></label>
+      <p id="auth-error" role="alert"></p>
+      <button class="primary-button" type="submit">登录</button>
+    </form>
+  </dialog>
+
+  <dialog id="annotations-dialog" class="dialog" aria-labelledby="annotations-title">
+    <div class="dialog-header"><h3 id="annotations-title">证据标注</h3><button class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+    <div id="annotations-list"></div>
+    <form id="annotation-form">
+      <input id="annotation-id" type="hidden" />
+      <label>类型<select id="annotation-type"><option>备注</option><option>疑点</option><option>质证意见</option><option>补证建议</option><option>重点</option><option>其他</option></select></label>
+      <label>内容<textarea id="annotation-content" required maxlength="5000" rows="3"></textarea></label>
+      <label>状态<select id="annotation-status"><option>待处理</option><option>已处理</option></select></label>
+      <div class="dialog-actions"><button class="secondary-button" id="annotation-reset" type="button">新增标注</button><button class="primary-button" type="submit">保存标注</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="page-dialog" class="dialog page-dialog">
+    <div class="dialog-header"><div><span class="section-label">原页溯源</span><h3 id="page-dialog-title">卷宗原文</h3></div><button class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+    <div id="page-dialog-meta" class="page-meta"></div><pre id="page-dialog-text"></pre>
+  </dialog>
+
+  <dialog id="evidence-dialog" class="dialog">
+    <form method="dialog" id="evidence-form">
+      <div class="dialog-header">
+        <div>
+          <span class="section-label">证据编辑</span>
+          <h3 id="evidence-dialog-title">编辑证据</h3>
+        </div>
+        <button class="close-button" value="cancel">×</button>
+      </div>
+
+      <input type="hidden" id="edit-evidence-id" />
+
+      <label>证据标题 *<input id="edit-evidence-title" required placeholder="简明扼要的证据描述" /></label>
+
+      <div class="form-grid">
+        <label>证据类别 *
+          <select id="edit-evidence-category" required>
+            <option value="书证">书证</option>
+            <option value="物证">物证</option>
+            <option value="言词证据">言词证据</option>
+            <option value="银行流水">银行流水</option>
+            <option value="审计报告">审计报告</option>
+            <option value="询问笔录">询问笔录</option>
+            <option value="电子数据">电子数据</option>
+            <option value="其他材料">其他材料</option>
+          </select>
+        </label>
+
+        <label>可信度
+          <select id="edit-evidence-credibility">
+            <option value="待核验">待核验</option>
+            <option value="高">高</option>
+            <option value="较高">较高</option>
+            <option value="中">中</option>
+            <option value="低">低</option>
+          </select>
+        </label>
+
+        <label>审核状态
+          <select id="edit-evidence-status">
+            <option value="待复核">待复核</option>
+            <option value="已确认">已确认</option>
+            <option value="待质证">待质证</option>
+            <option value="待补证">待补证</option>
+          </select>
+        </label>
+
+        <label>来源文档
+          <select id="edit-evidence-source">
+            <option value="">无来源</option>
+          </select>
+        </label>
+
+        <label>起始页码
+          <input id="edit-evidence-page-start" type="number" min="1" value="1" />
+        </label>
+
+        <label>结束页码
+          <input id="edit-evidence-page-end" type="number" min="1" value="1" />
+        </label>
+      </div>
+
+      <label>待证事实 *<textarea id="edit-evidence-fact" rows="3" required placeholder="该证据要证明的事实"></textarea></label>
+
+      <label>原文引用<textarea id="edit-evidence-quote" rows="2" placeholder="来自原文的关键引用"></textarea></label>
+
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary-button">取消</button>
+        <button type="button" id="save-evidence" class="primary-button">保存证据</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="delete-confirm-dialog" class="dialog">
+    <div class="dialog-header">
+      <div>
+        <span class="section-label">确认删除</span>
+        <h3>删除证据</h3>
+      </div>
+      <button class="close-button" onclick="this.closest('dialog').close()">×</button>
+    </div>
+    <div style="padding: 24px;">
+      <p id="delete-confirm-message" style="margin: 0 0 20px; color: var(--ink);"></p>
+      <div class="dialog-actions" style="margin: 0;">
+        <button class="secondary-button" onclick="this.closest('dialog').close()">取消</button>
+        <button id="confirm-delete-evidence" class="primary-button" style="background: #dc6a58;">确认删除</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="case-dialog" class="dialog">
+    <form id="case-form">
+      <div class="dialog-header"><div><span class="section-label">案件空间</span><h3>新建案件</h3></div><button type="button" class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+      <label>案件名称<input id="new-case-title" required placeholder="例如：某公司合同纠纷案" /></label>
+      <div class="form-grid"><label>案号<input id="new-case-no" /></label><label>案件类型<select id="new-case-type"><option>刑事</option><option>金融犯罪</option><option>民商事</option><option>行政</option></select></label><label>当事人<input id="new-case-client" /></label></div>
+      <label>案件说明<textarea id="new-case-description" rows="4"></textarea></label>
+      <div class="dialog-actions"><button type="button" class="secondary-button" onclick="this.closest('dialog').close()">取消</button><button type="submit" class="primary-button">创建案件</button></div>
+    </form>
+  </dialog>
+
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

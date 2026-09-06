@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-critical
+        name: Ruff critical correctness checks
+        entry: uv run --locked ruff check
+        language: system
+        types: [python]
+        files: ^(app|tests|scripts)/
+      - id: engineering-types
+        name: Type-check maintained engineering scripts
+        entry: uv run --locked mypy
+        language: system
+        pass_filenames: false
+        files: ^(scripts/|pyproject\.toml$)

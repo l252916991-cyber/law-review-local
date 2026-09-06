@@ -1,0 +1,147 @@
+{
+  "dataset": "LexEval",
+  "source": "https://github.com/CSHaitao/LexEval",
+  "total_tasks": 23,
+  "total_questions": 14151,
+  "tasks": {
+    "1_1": {
+      "name": "刑法选择题",
+      "category": "记忆",
+      "type": "多选",
+      "count": 500
+    },
+    "1_2": {
+      "name": "司法考试",
+      "category": "记忆",
+      "type": "单选",
+      "count": 1000
+    },
+    "1_3": {
+      "name": "法律常识",
+      "category": "记忆",
+      "type": "判断",
+      "count": 300
+    },
+    "2_1": {
+      "name": "要素识别",
+      "category": "理解",
+      "type": "单选",
+      "count": 500
+    },
+    "2_2": {
+      "name": "阅读理解",
+      "category": "理解",
+      "type": "单选",
+      "count": 300
+    },
+    "2_3": {
+      "name": "文本蕴含",
+      "category": "理解",
+      "type": "单选",
+      "count": 100
+    },
+    "2_4": {
+      "name": "命名实体识别",
+      "category": "理解",
+      "type": "标注",
+      "count": 500
+    },
+    "2_5": {
+      "name": "文本摘要",
+      "category": "理解",
+      "type": "生成",
+      "count": 500
+    },
+    "3_1": {
+      "name": "相似案例匹配",
+      "category": "逻辑推理",
+      "type": "单选",
+      "count": 1000
+    },
+    "3_2": {
+      "name": "法律问答",
+      "category": "逻辑推理",
+      "type": "单选",
+      "count": 1000
+    },
+    "3_3": {
+      "name": "争议焦点识别",
+      "category": "逻辑推理",
+      "type": "单选",
+      "count": 1000
+    },
+    "3_4": {
+      "name": "刑期预测",
+      "category": "逻辑推理",
+      "type": "分类",
+      "count": 500
+    },
+    "3_5": {
+      "name": "罪名预测",
+      "category": "逻辑推理",
+      "type": "分类",
+      "count": 400
+    },
+    "3_6": {
+      "name": "法条推荐",
+      "category": "逻辑推理",
+      "type": "单选",
+      "count": 500
+    },
+    "4_1": {
+      "name": "法律咨询",
+      "category": "辨别",
+      "type": "生成",
+      "count": 500
+    },
+    "4_2": {
+      "name": "司法要件抽取",
+      "category": "辨别",
+      "type": "分类",
+      "count": 300
+    },
+    "5_1": {
+      "name": "司法文书生成",
+      "category": "生成",
+      "type": "生成",
+      "count": 1000
+    },
+    "5_2": {
+      "name": "案件叙述生成",
+      "category": "生成",
+      "type": "生成",
+      "count": 1000
+    },
+    "5_3": {
+      "name": "法律论证生成",
+      "category": "生成",
+      "type": "生成",
+      "count": 251
+    },
+    "5_4": {
+      "name": "辩护意见生成",
+      "category": "生成",
+      "type": "生成",
+      "count": 500
+    },
+    "6_1": {
+      "name": "法律道德判断",
+      "category": "伦理",
+      "type": "单选",
+      "count": 1000
+    },
+    "6_2": {
+      "name": "法律公平性分析",
+      "category": "伦理",
+      "type": "单选",
+      "count": 1000
+    },
+    "6_3": {
+      "name": "冲突场景判断",
+      "category": "伦理",
+      "type": "单选",
+      "count": 500
+    }
+  },
+  "integration_date": "2026-09-02T13:03:27.995796"
+}

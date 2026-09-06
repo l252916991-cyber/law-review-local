@@ -1,0 +1,6019 @@
+{
+  "dataset_name": "LexVault 现行法律时效性测试集",
+  "version": "1.0",
+  "date": "2026-09-03",
+  "reference_date": "2026-09-02",
+  "data_source": "国家法律法规数据库 (flk.npc.gov.cn)",
+  "total_questions": 300,
+  "subjects": {
+    "宪法": 30,
+    "民法典": 50,
+    "刑法": 40,
+    "行政法": 30,
+    "诉讼法": 50,
+    "商法与经济法": 50,
+    "国际法与司法制度": 50
+  },
+  "questions": [
+    {
+      "id": "current_law_001",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_002",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_003",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_004",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_005",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_006",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_007",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_008",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_009",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_010",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_011",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_012",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_013",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_014",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_015",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_016",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_017",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_018",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_019",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_020",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_021",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_022",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_023",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_024",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_025",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_026",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_027",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_028",
+      "subject": "宪法",
+      "difficulty": "基础",
+      "question": "根据现行宪法，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_029",
+      "subject": "宪法",
+      "difficulty": "中等",
+      "question": "根据现行宪法，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_030",
+      "subject": "宪法",
+      "difficulty": "困难",
+      "question": "根据现行宪法，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_031",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_032",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_033",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_034",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_035",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_036",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_037",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_038",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_039",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_040",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_041",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_042",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_043",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_044",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_045",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_046",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_047",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_048",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_049",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_050",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_051",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_052",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_053",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_054",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_055",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_056",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_057",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_058",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_059",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_060",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_061",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题31]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_062",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题32]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_063",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题33]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_064",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题34]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_065",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题35]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_066",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题36]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_067",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题37]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_068",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题38]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_069",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题39]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_070",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题40]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_071",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题41]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_072",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题42]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_073",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题43]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_074",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题44]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_075",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题45]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_076",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题46]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_077",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题47]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_078",
+      "subject": "民法典",
+      "difficulty": "困难",
+      "question": "根据《民法典》规定，[具体法律问题48]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_079",
+      "subject": "民法典",
+      "difficulty": "基础",
+      "question": "根据《民法典》规定，[具体法律问题49]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_080",
+      "subject": "民法典",
+      "difficulty": "中等",
+      "question": "根据《民法典》规定，[具体法律问题50]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_081",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_082",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_083",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_084",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_085",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_086",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_087",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_088",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_089",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_090",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_091",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_092",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_093",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_094",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_095",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_096",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_097",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_098",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_099",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_100",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_101",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_102",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_103",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_104",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_105",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_106",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_107",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_108",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_109",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_110",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_111",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题31]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_112",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题32]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_113",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题33]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_114",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题34]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_115",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题35]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_116",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题36]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_117",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题37]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_118",
+      "subject": "刑法",
+      "difficulty": "中等",
+      "question": "根据《刑法》规定，[具体法律问题38]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_119",
+      "subject": "刑法",
+      "difficulty": "困难",
+      "question": "根据《刑法》规定，[具体法律问题39]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_120",
+      "subject": "刑法",
+      "difficulty": "基础",
+      "question": "根据《刑法》规定，[具体法律问题40]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_121",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_122",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_123",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_124",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_125",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_126",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_127",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_128",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_129",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_130",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_131",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_132",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_133",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_134",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_135",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_136",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_137",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_138",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_139",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_140",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_141",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_142",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_143",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_144",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_145",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_146",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_147",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_148",
+      "subject": "行政法",
+      "difficulty": "基础",
+      "question": "根据《行政诉讼法》规定，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_149",
+      "subject": "行政法",
+      "difficulty": "中等",
+      "question": "根据《行政诉讼法》规定，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_150",
+      "subject": "行政法",
+      "difficulty": "困难",
+      "question": "根据《行政诉讼法》规定，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_151",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_152",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_153",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_154",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_155",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_156",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_157",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_158",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_159",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_160",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_161",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_162",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_163",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_164",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_165",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_166",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_167",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_168",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_169",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_170",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_171",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_172",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_173",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_174",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_175",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_176",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_177",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_178",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_179",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_180",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_181",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题31]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_182",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题32]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_183",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题33]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_184",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题34]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_185",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题35]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_186",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题36]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_187",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题37]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_188",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题38]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_189",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题39]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_190",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题40]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_191",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题41]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_192",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题42]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_193",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题43]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_194",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题44]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_195",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题45]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_196",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题46]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_197",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题47]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_198",
+      "subject": "诉讼法",
+      "difficulty": "困难",
+      "question": "根据《民事诉讼法》规定，[具体法律问题48]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_199",
+      "subject": "诉讼法",
+      "difficulty": "基础",
+      "question": "根据《民事诉讼法》规定，[具体法律问题49]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_200",
+      "subject": "诉讼法",
+      "difficulty": "中等",
+      "question": "根据《民事诉讼法》规定，[具体法律问题50]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_201",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_202",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_203",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_204",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_205",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_206",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_207",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_208",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_209",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_210",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_211",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_212",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_213",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_214",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_215",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_216",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_217",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_218",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_219",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_220",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_221",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_222",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_223",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_224",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_225",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_226",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_227",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_228",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_229",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_230",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_231",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题31]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_232",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题32]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_233",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题33]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_234",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题34]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_235",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题35]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_236",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题36]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_237",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题37]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_238",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题38]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_239",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题39]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_240",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题40]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_241",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题41]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_242",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题42]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_243",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题43]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_244",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题44]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_245",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题45]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_246",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题46]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_247",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题47]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_248",
+      "subject": "商法与经济法",
+      "difficulty": "困难",
+      "question": "根据《公司法》规定，[具体法律问题48]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_249",
+      "subject": "商法与经济法",
+      "difficulty": "基础",
+      "question": "根据《公司法》规定，[具体法律问题49]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_250",
+      "subject": "商法与经济法",
+      "difficulty": "中等",
+      "question": "根据《公司法》规定，[具体法律问题50]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_251",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题1]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_252",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题2]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_253",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题3]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_254",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题4]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_255",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题5]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_256",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题6]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_257",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题7]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_258",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题8]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_259",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题9]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_260",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题10]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_261",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题11]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_262",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题12]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_263",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题13]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_264",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题14]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_265",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题15]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_266",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题16]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_267",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题17]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_268",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题18]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_269",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题19]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_270",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题20]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_271",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题21]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_272",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题22]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_273",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题23]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_274",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题24]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_275",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题25]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_276",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题26]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_277",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题27]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_278",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题28]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_279",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题29]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_280",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题30]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_281",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题31]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_282",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题32]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_283",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题33]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_284",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题34]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_285",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题35]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_286",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题36]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_287",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题37]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_288",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题38]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_289",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题39]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_290",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题40]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_291",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题41]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_292",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题42]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_293",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题43]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_294",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题44]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_295",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题45]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_296",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题46]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_297",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题47]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_298",
+      "subject": "国际法与司法制度",
+      "difficulty": "困难",
+      "question": "根据司法解释，[具体法律问题48]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_299",
+      "subject": "国际法与司法制度",
+      "difficulty": "基础",
+      "question": "根据司法解释，[具体法律问题49]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    },
+    {
+      "id": "current_law_300",
+      "subject": "国际法与司法制度",
+      "difficulty": "中等",
+      "question": "根据司法解释，[具体法律问题50]？",
+      "options": [
+        "A. [选项A]",
+        "B. [选项B]",
+        "C. [选项C]",
+        "D. [选项D]"
+      ],
+      "answer": "A",
+      "legal_basis": "[待补充：具体法条编号]",
+      "law_version": "[待补充：法律版本]",
+      "effective_date": "[待补充：生效日期]",
+      "official_link": "https://flk.npc.gov.cn/",
+      "explanation": "[待补充：答案解释]",
+      "verification_status": "待核验",
+      "review_status": "待复核"
+    }
+  ]
+}

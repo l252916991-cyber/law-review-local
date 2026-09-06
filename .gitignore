@@ -1,0 +1,71 @@
+# Private runtime state: never publish case files, credentials, model weights or traces.
+data/
+models/
+output/
+backup_*/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+!.env.example
+.zcode/
+.playwright-cli/
+
+# Python/tool caches and generated release archives.
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+.DS_Store
+*.log
+*.backup
+*.before_extraction_fix
+
+# Historical experiment artifacts remain on disk, not in a public source release.
+/benchmark_*.json
+/comprehensive_benchmark_results.json
+/langgraph_comparison_results.json
+/langgraph_suitable_questions.json
+/langgraph_test_set.json
+/test_set_*.json
+/.test_completion_receipt.txt
+/analysis_*.txt
+/comparison_partial_report.txt
+/面试题库_*.md
+
+# Keep the source root intentionally small. Historical one-off reports and
+# experiment drivers remain on disk and under docs/history, but are not staged
+# by an accidental `git add .`. Maintained root entry points are allowlisted.
+/*.md
+!/README.md
+!/BENCHMARK_TEST_PLAN.md
+!/AGENTS.md
+/*.py
+!/unified_benchmark_runner.py
+!/verify_benchmark_run.py
+!/compare_agent_runtimes.py
+!/rag_project_benchmark.py
+/*.sh
+!/run.sh
+!/run_worker.sh
+/*.txt
+!/requirements.txt
+!/requirements-dev.txt
+
+# Upstream benchmark examples require an explicit license review and release
+# flag; metadata and synthetic/WIP definitions remain trackable.
+/benchmarks/lawbench/zero_shot/

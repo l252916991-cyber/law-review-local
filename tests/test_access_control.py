@@ -1,0 +1,146 @@
+"""Actual authentication, case isolation, CSRF and trusted identity checks."""
+import json
+import os
+import tempfile
+import unittest
+from contextlib import closing
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from app.db import connect, db_scope, init_db, now, transaction
+from app.main import app
+from app.security import configured_tokens
+
+
+class AccessControlTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory(prefix="lexvault-access-")
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        scope = db_scope(self.root / "law_review.db")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+        init_db(seed=False)
+        with transaction() as conn:
+            self.cases = [conn.execute("INSERT INTO cases(title,created_at,updated_at) VALUES (?,?,?)", (title, now(), now())).lastrowid for title in ("公开给甲", "仅乙可见")]
+            self.doc = conn.execute("INSERT INTO documents(case_id,name,created_at,updated_at) VALUES (?,?,?,?)", (self.cases[1], "乙的卷宗", now(), now())).lastrowid
+            self.evidence = conn.execute("INSERT INTO evidence(case_id,title,created_at) VALUES (?,?,?)", (self.cases[1], "乙的证据", now())).lastrowid
+            self.conversation = conn.execute("INSERT INTO conversations(case_id,user_name,title,created_at) VALUES (?,?,?,?)", (self.cases[1], "乙", "秘密", now())).lastrowid
+            self.run = conn.execute("INSERT INTO agent_runs(case_id,question,route,status,created_at) VALUES (?,?,?,'failed',?)", (self.cases[1], "问题", "事实检索", now())).lastrowid
+        self.token = "a" * 40
+        self.admin_token = "b" * 40
+        env = patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "token", "LAW_REVIEW_ALLOWED_HOSTS": "testserver", "LAW_REVIEW_API_TOKENS_JSON": json.dumps({self.token: {"name": "律师甲", "case_ids": [self.cases[0]]}, self.admin_token: {"name": "管理员", "admin": True}})})
+        env.start()
+        self.addCleanup(env.stop)
+        self.client = TestClient(app)
+        self.addCleanup(self.client.close)
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+
+    def test_anonymous_denied_and_invalid_token_does_not_leak(self):
+        for headers in ({}, {"Authorization": "Bearer invalid"}):
+            result = self.client.get("/api/cases", headers=headers)
+            self.assertEqual(result.status_code, 401)
+            self.assertNotIn("仅乙", result.text)
+
+    def test_list_filtered_and_all_indirect_case_resources_denied(self):
+        result = self.client.get("/api/cases", headers=self.headers)
+        self.assertEqual([row["id"] for row in result.json()], [self.cases[0]])
+        for path in (f"/api/cases/{self.cases[1]}", f"/api/documents/{self.doc}/pages/1", f"/api/documents/{self.doc}/file", f"/api/evidence/{self.evidence}/annotations", f"/api/conversations/{self.conversation}/messages", f"/api/agent-runs/{self.run}"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path, headers=self.headers).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/evidence/{self.evidence}", headers=self.headers).status_code, 404)
+        self.assertEqual(self.client.post(f"/api/agent-runs/{self.run}/resume", headers=self.headers).status_code, 404)
+
+    def test_scoped_member_cannot_create_case_or_read_global_dashboard(self):
+        self.assertEqual(self.client.post("/api/cases", json={"title": "越权新建"}, headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.get("/api/dashboard", headers=self.headers).status_code, 403)
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        self.assertEqual(self.client.post("/api/cases", json={"title": "管理员新建"}, headers=admin).status_code, 201)
+
+    def test_cookie_login_logout_and_csrf_host_rejection(self):
+        response = self.client.post("/api/auth/session", json={"token": self.token})
+        self.assertEqual(response.status_code, 200)
+        cookie = response.headers["set-cookie"].lower()
+        self.assertIn("httponly", cookie)
+        self.assertIn("samesite=strict", cookie)
+        self.assertEqual(self.client.get("/api/cases").status_code, 200)
+        self.assertEqual(self.client.post("/api/auth/session", json={"token": self.token}, headers={"Origin": "https://attacker.example"}).status_code, 403)
+        self.assertEqual(self.client.get("/api/cases", headers={"Host": "attacker.example"}).status_code, 400)
+        self.assertEqual(self.client.delete("/api/auth/session").status_code, 200)
+        self.assertEqual(self.client.get("/api/cases").status_code, 401)
+
+    def test_request_user_name_cannot_forge_audit_identity(self):
+        with patch("app.services.call_local_llm", side_effect=AssertionError("no model")):
+            response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
+        self.assertEqual(response.status_code, 200, response.text)
+        with closing(connect()) as conn:
+            user = conn.execute("SELECT user_name FROM conversations WHERE id=?", (response.json()["conversation_id"],)).fetchone()[0]
+        self.assertEqual(user, "律师甲")
+
+    def test_security_headers_and_no_cache(self):
+        response = self.client.get("/api/cases", headers=self.headers)
+        self.assertEqual(response.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_security_headers_cover_middleware_errors(self):
+        cases = [
+            (self.client.get("/api/cases", headers={}), 401),
+            (self.client.get("/api/cases", headers={"Host": "attacker.example"}), 400),
+            (self.client.get("/api/dashboard", headers=self.headers), 403),
+            (self.client.get("/api/cases/999999", headers=self.headers), 404),
+        ]
+        for response, status in cases:
+            with self.subTest(status=status):
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(response.headers["cache-control"], "no-store")
+                self.assertEqual(response.headers["x-content-type-options"], "nosniff")
+                self.assertEqual(response.headers["x-frame-options"], "DENY")
+
+    def test_bad_configuration_error_has_security_headers(self):
+        with patch.dict(os.environ, {"LAW_REVIEW_API_TOKENS_JSON": "{}"}):
+            response = self.client.get("/api/auth/me")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.headers["x-content-type-options"], "nosniff")
+
+    def test_active_upload_is_rejected_and_legacy_file_is_sandboxed(self):
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        upload = self.client.post(f"/api/cases/{self.cases[0]}/documents", headers=headers,
+                                  files=[("files", ("attack.html", b"<script>fetch('/api/cases')</script>", "text/html"))])
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(upload.json()["documents"], [])
+        self.assertEqual(len(upload.json()["failures"]), 1)
+
+        path = self.root / f"{self._testMethodName}.html"
+        path.write_text("<script>document.title='owned'</script>", encoding="utf-8")
+        with transaction() as conn:
+            doc_id = conn.execute("INSERT INTO documents(case_id,name,stored_path,mime_type,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                                  (self.cases[0], "legacy.html", str(path), "text/html", now(), now())).lastrowid
+        response = self.client.get(f"/api/documents/{doc_id}/file", headers=headers)
+        self.assertEqual(response.headers["content-type"], "application/octet-stream")
+        self.assertIn("attachment", response.headers["content-disposition"])
+        self.assertEqual(response.headers["content-security-policy"], "sandbox; default-src 'none'")
+
+    def test_cross_site_get_cannot_generate_export(self):
+        headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
+        export_dir = self.root / "exports"
+        before = set(export_dir.glob("*.zip"))
+        self.assertEqual(self.client.get(f"/api/cases/{self.cases[0]}/export", headers=headers).status_code, 403)
+        self.assertEqual(set(export_dir.glob("*.zip")), before)
+
+    def test_bad_configuration_fails_closed(self):
+        for value in ("{}", '{"short":{"name":"甲"}}', "[]", "not json"):
+            with self.subTest(value=value), patch.dict(os.environ, {"LAW_REVIEW_API_TOKENS_JSON": value}):
+                self.assertEqual(self.client.get("/api/auth/me").status_code, 503)
+                with self.assertRaises(ValueError):
+                    configured_tokens()
+
+    def test_local_default_rejects_remote_peer(self):
+        with patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "local"}):
+            remote = TestClient(app, client=("198.51.100.2", 5000))
+            try:
+                self.assertEqual(remote.get("/api/auth/me").status_code, 403)
+            finally:
+                remote.close()
