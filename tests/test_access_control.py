@@ -146,6 +146,29 @@ class AccessControlTests(unittest.TestCase):
         self.assertIn("attachment", response.headers["content-disposition"])
         self.assertEqual(response.headers["content-security-policy"], "sandbox; default-src 'none'")
 
+    def test_document_download_rejects_paths_outside_data_dir(self):
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        outside = self.root.parent / "lexvault-outside-secret.txt"
+        outside.write_text("外部机密内容", encoding="utf-8")
+        self.addCleanup(outside.unlink, missing_ok=True)
+        link = self.root / "escape-link.txt"
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            self.skipTest("当前环境不支持符号链接")
+        with transaction() as conn:
+            direct_id = conn.execute(
+                "INSERT INTO documents(case_id,name,stored_path,mime_type,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                (self.cases[0], "outside.txt", str(outside), "text/plain", now(), now())).lastrowid
+            link_id = conn.execute(
+                "INSERT INTO documents(case_id,name,stored_path,mime_type,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                (self.cases[0], "escape.txt", str(link), "text/plain", now(), now())).lastrowid
+        for doc_id in (direct_id, link_id):
+            with self.subTest(doc_id=doc_id):
+                response = self.client.get(f"/api/documents/{doc_id}/file", headers=headers)
+                self.assertEqual(response.status_code, 404)
+                self.assertNotIn("外部机密内容", response.text)
+
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
         export_dir = self.root / "exports"

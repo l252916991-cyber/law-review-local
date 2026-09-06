@@ -146,6 +146,37 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertTrue(path.exists())
         self.assertGreater(path.stat().st_size, 300)
 
+    def test_parse_budget_rejects_oversized_files_and_caps_text(self):
+        from app.services import MAX_PARSE_BYTES, _cap_total_text, _check_parse_budget
+        with tempfile.TemporaryDirectory(prefix="lexvault-budget-") as directory:
+            path = Path(directory) / "large.txt"
+            path.write_bytes(b"x" * 64)
+            with patch("app.services.MAX_PARSE_BYTES", 32):
+                with self.assertRaises(ValueError):
+                    _check_parse_budget(path)
+            self.assertEqual(MAX_PARSE_BYTES, 50 * 1024 * 1024)
+        with patch("app.services.MAX_TEXT_CHARS", 100):
+            capped = _cap_total_text(["一" * 80, "二" * 80])
+        self.assertLessEqual(sum(len(x) for x in capped), 100 + len("\n[文本超出提取上限，已截断]"))
+        self.assertIn("文本超出提取上限", capped[-1])
+
+    def test_contained_path_rejects_escape_and_symlink(self):
+        from app.services import contained_path
+        with tempfile.TemporaryDirectory(prefix="lexvault-contain-") as directory:
+            root = Path(directory) / "data"
+            (root / "uploads").mkdir(parents=True)
+            inside = root / "uploads" / "a.txt"
+            inside.write_text("ok", encoding="utf-8")
+            self.assertEqual(contained_path(inside, root), inside.resolve())
+            outside = Path(directory) / "outside.txt"
+            outside.write_text("secret", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                contained_path(outside, root)
+            link = root / "uploads" / "escape.txt"
+            link.symlink_to(outside)
+            with self.assertRaises(ValueError):
+                contained_path(link, root)
+
 
 if __name__ == "__main__":
     unittest.main()

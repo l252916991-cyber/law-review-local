@@ -71,6 +71,24 @@ def safe_filename(name: str, max_len: int = 180) -> str:
     return name[:max_len]
 
 
+MAX_PARSE_BYTES = 50 * 1024 * 1024
+MAX_PDF_PAGES = 500
+MAX_TEXT_CHARS = 5_000_000
+
+
+def contained_path(path: Path, root: Path) -> Path:
+    resolved = path.resolve(strict=False)
+    base = root.resolve(strict=True)
+    if resolved != base and base not in resolved.parents:
+        raise ValueError("文件路径超出案件目录")
+    return resolved
+
+
+def _check_parse_budget(path: Path) -> None:
+    if path.stat().st_size > MAX_PARSE_BYTES:
+        raise ValueError("文件超过解析大小限制")
+
+
 def run_text_command(args: list[str], timeout: int = 120) -> str:
     proc = subprocess.run(args, capture_output=True, timeout=timeout, check=False)
     if proc.returncode:
@@ -89,10 +107,30 @@ def upload_error_message(exc: Exception) -> str:
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"
 
 
+def _cap_total_text(pages: list[str]) -> list[str]:
+    """Bound total extracted text so a hostile document cannot exhaust memory."""
+    total = 0
+    capped: list[str] = []
+    for text in pages:
+        remaining = MAX_TEXT_CHARS - total
+        if remaining <= 0:
+            break
+        if len(text) > remaining:
+            text = text[:remaining]
+        total += len(text)
+        capped.append(text)
+    if sum(len(x) for x in pages) > MAX_TEXT_CHARS:
+        capped[-1] = (capped[-1] if capped else "") + "\n[文本超出提取上限，已截断]"
+    return capped
+
+
 def extract_pdf_pages(path: Path) -> list[str]:
+    _check_parse_budget(path)
     info = run_text_command(["pdfinfo", str(path)])
     match = re.search(r"^Pages:\s+(\d+)", info, re.MULTILINE)
     count = int(match.group(1)) if match else 1
+    if count > MAX_PDF_PAGES:
+        raise ValueError(f"PDF 页数超过解析上限（{MAX_PDF_PAGES} 页）")
     pages: list[str] = []
     for page_no in range(1, count + 1):
         text = run_text_command(
@@ -113,10 +151,11 @@ def extract_pdf_pages(path: Path) -> list[str]:
                     timeout=120,
                 ).strip()
         pages.append(text)
-    return pages
+    return _cap_total_text(pages)
 
 
 def extract_docx_pages(path: Path) -> list[str]:
+    _check_parse_budget(path)
     doc = DocxDocument(path)
     chunks: list[str] = []
     current: list[str] = []
@@ -130,10 +169,11 @@ def extract_docx_pages(path: Path) -> list[str]:
             current = []
     if current or not chunks:
         chunks.append("\n".join(current))
-    return chunks
+    return _cap_total_text(chunks)
 
 
 def extract_image_text(path: Path) -> list[str]:
+    _check_parse_budget(path)
     return [run_text_command(["tesseract", str(path), "stdout", "-l", "chi_sim+eng", "--psm", "6"], timeout=120).strip()]
 
 
@@ -148,10 +188,11 @@ def extract_pages(path: Path, mime_type: str) -> list[str]:
     # The client-provided MIME type is not an authorization to parse an
     # arbitrary active format (HTML/SVG) as a trusted text document.
     if suffix in {".txt", ".md", ".csv", ".json", ".log"}:
+        _check_parse_budget(path)
         raw = path.read_text(encoding="utf-8", errors="ignore")
         if "\f" in raw:
-            return [x.strip() for x in raw.split("\f")]
-        return [raw[i : i + 2200] for i in range(0, max(len(raw), 1), 2200)] or [""]
+            return _cap_total_text([x.strip() for x in raw.split("\f")])
+        return _cap_total_text([raw[i : i + 2200] for i in range(0, max(len(raw), 1), 2200)] or [""])
     raise ValueError(f"暂不支持该文件类型：{suffix or mime_type}")
 
 
@@ -750,6 +791,9 @@ def build_export(case_id: int) -> Path:
         for doc in documents:
             stored = Path(doc["stored_path"]) if doc["stored_path"] else None
             if stored and stored.exists() and stored.is_file():
+                # Export must not package files outside the managed data
+                # directory, even if database metadata was tampered with.
+                stored = contained_path(stored, get_db_path().parent)
                 archive.write(stored, f"原始卷宗/{safe_filename(doc['name'])}")
     with transaction() as conn:
         conn.execute(

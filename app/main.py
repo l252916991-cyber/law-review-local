@@ -24,6 +24,7 @@ from .services import (
     auto_analyze_case,
     build_export,
     chat,
+    contained_path,
     get_document,
     index_upload,
     local_llm_available,
@@ -581,6 +582,12 @@ def document_file(document_id: int):
         raise HTTPException(404, "文件不存在")
     stored = Path(document["stored_path"]) if document["stored_path"] else None
     if stored and stored.exists() and stored.is_file():
+        # Database metadata is not authorization: never serve files outside
+        # the managed data directory, including through symlinks.
+        try:
+            stored = contained_path(stored, config.data_dir)
+        except ValueError:
+            raise HTTPException(404, "文件不存在")
         # Uploaded MIME is untrusted: never execute HTML/SVG at our session origin.
         suffix = stored.suffix.lower()
         safe_types = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".txt": "text/plain", ".md": "text/plain", ".csv": "text/plain", ".json": "text/plain", ".log": "text/plain"}
