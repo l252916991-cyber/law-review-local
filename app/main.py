@@ -33,7 +33,7 @@ from .services import (
     search_pages,
     upload_error_message,
 )
-from .security import actor_name, allowed_case_ids, require_case_access
+from .security import actor_name, allowed_case_ids, require_case_access, require_permission
 from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
@@ -685,6 +685,8 @@ def list_evidence(case_id: int):
 def create_evidence(case_id: int, body: EvidenceCreate):
     """手动创建证据事项"""
     require_case(case_id)
+    if body.status == "已确认":
+        require_permission("approve")
 
     conn = connect()
     try:
@@ -771,6 +773,7 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
         # path to this endpoint, so a confirmed status always has a human name.
         if body.status is not None:
             if body.status == "已确认":
+                require_permission("approve")
                 updates.append("approved_by = ?")
                 params.append(actor_name())
                 updates.append("approved_at = ?")

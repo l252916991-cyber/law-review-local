@@ -59,12 +59,23 @@ class AccessConfigurationError(ValueError):
     pass
 
 
+ALL_PERMISSIONS = frozenset({"view", "edit", "approve", "export", "manage"})
+# Principals configured before permissions existed keep exactly the abilities
+# they always had (admins keep everything). New configurations should list
+# permissions explicitly instead of relying on this compatibility default.
+LEGACY_MEMBER_PERMISSIONS = frozenset({"view", "edit", "approve", "export"})
+
+
 @dataclass(frozen=True)
 class Principal:
     name: str
     admin: bool
     case_ids: tuple[int, ...] = ()
     local: bool = False
+    permissions: frozenset[str] = LEGACY_MEMBER_PERMISSIONS
+
+    def has(self, permission: str) -> bool:
+        return self.admin or permission in self.permissions
 
 
 _principal: ContextVar[Principal | None] = ContextVar("lexvault_principal", default=None)
@@ -91,10 +102,12 @@ def configured_tokens() -> dict[str, Principal]:
             name = value["name"]
             admin = value.get("admin", False)
             ids = value.get("case_ids", [])
-            if not isinstance(name, str) or not name.strip() or name in names or type(admin) is not bool or not isinstance(ids, list) or any(type(i) is not int or i < 1 for i in ids):
+            permissions = value.get("permissions", list(ALL_PERMISSIONS if admin else LEGACY_MEMBER_PERMISSIONS))
+            valid_permissions = isinstance(permissions, list) and permissions and all(p in ALL_PERMISSIONS for p in permissions)
+            if not isinstance(name, str) or not name.strip() or name in names or type(admin) is not bool or not isinstance(ids, list) or any(type(i) is not int or i < 1 for i in ids) or not valid_permissions:
                 raise ValueError("Invalid principal configuration")
             names.add(name)
-            tokens[token] = Principal(name, admin, tuple(ids))
+            tokens[token] = Principal(name, admin, tuple(ids), permissions=frozenset(permissions))
         return tokens
     except (ValueError, TypeError, KeyError) as exc:
         raise AccessConfigurationError("Token mode requires valid unique principals and tokens of at least 32 characters") from exc
@@ -113,7 +126,7 @@ def current_principal() -> Principal:
     if value is None:
         if auth_mode() == "token":
             raise HTTPException(401, "需要身份认证")
-        return Principal("本机律师", True, local=True)
+        return Principal("本机律师", True, local=True, permissions=ALL_PERMISSIONS)
     return value
 
 
@@ -131,6 +144,24 @@ def require_case_access(case_id: int) -> None:
     ids = allowed_case_ids()
     if ids is not None and case_id not in ids:
         raise HTTPException(404, "案件不存在或无访问权限")
+
+
+PERMISSION_LABELS = {"view": "查看", "edit": "编辑", "approve": "审批确认", "export": "导出", "manage": "管理"}
+
+
+def require_permission(permission: str) -> None:
+    """Endpoint-level check for body-dependent permissions such as approve."""
+    principal = current_principal()
+    if not principal.has(permission):
+        raise HTTPException(403, f"需要{PERMISSION_LABELS[permission]}权限")
+
+
+def _required_case_permission(method: str, path: str) -> str:
+    if path.endswith("/export"):
+        return "export"
+    if method in {"POST", "PATCH", "PUT", "DELETE"}:
+        return "edit"
+    return "view"
 
 
 def _owned_case(path: str) -> int | None:
@@ -200,7 +231,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                     local_peer = peer == "testclient"
                 if not local_peer:
                     raise HTTPException(403, "本机模式不接受远程访问，请配置 token 模式")
-                principal = Principal("本机律师", True, local=True)
+                principal = Principal("本机律师", True, local=True, permissions=ALL_PERMISSIONS)
             else:
                 configured_tokens()  # Fail closed even on auth endpoints.
                 authorization = request.headers.get("authorization", "")
@@ -216,7 +247,10 @@ class AccessMiddleware(BaseHTTPMiddleware):
                 case_id = _owned_case(request.url.path)
                 if case_id is not None:
                     require_case_access(case_id)
-                if not principal.admin:
+                    needed = _required_case_permission(request.method, request.url.path)
+                    if not principal.has(needed):
+                        raise HTTPException(403, f"需要{PERMISSION_LABELS[needed]}权限")
+                if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
                         raise HTTPException(403, "仅管理员可以创建案件")
                     if case_id is None and request.url.path not in {"/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/auth/me", "/api/auth/session"}:
@@ -278,7 +312,8 @@ def login(body: Login, request: Request, response: Response):
     response.set_cookie("lexvault_session", session, httponly=True,
                         secure=request.url.scheme == "https" or request.url.hostname not in local_names,
                         samesite="strict", max_age=8 * 3600)
-    return {"name": principal.name, "admin": principal.admin, "case_ids": principal.case_ids}
+    return {"name": principal.name, "admin": principal.admin, "case_ids": principal.case_ids,
+            "permissions": sorted(principal.permissions)}
 
 
 @router.delete("/session")
@@ -293,4 +328,5 @@ def logout(request: Request, response: Response):
 @router.get("/me")
 def identity():
     value = _principal.get()
-    return {"mode": auth_mode(), "authenticated": value is not None, "name": value.name if value else None, "admin": value.admin if value else False}
+    return {"mode": auth_mode(), "authenticated": value is not None, "name": value.name if value else None, "admin": value.admin if value else False,
+            "permissions": sorted(value.permissions) if value else []}

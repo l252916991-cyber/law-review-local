@@ -229,6 +229,66 @@ class AccessControlTests(unittest.TestCase):
         self.assertIsNone(reopened.json()["evidence"]["approved_by"])
         self.assertIsNone(reopened.json()["evidence"]["approved_at"])
 
+    def test_permission_matrix_restricts_view_only_and_approval(self):
+        viewer_token = "c" * 40
+        editor_token = "d" * 40
+        env = patch.dict(os.environ, {"LAW_REVIEW_API_TOKENS_JSON": json.dumps({
+            self.token: {"name": "律师甲", "case_ids": [self.cases[0]]},
+            self.admin_token: {"name": "管理员", "admin": True},
+            viewer_token: {"name": "只读律师", "case_ids": [self.cases[0]], "permissions": ["view"]},
+            editor_token: {"name": "录入律师", "case_ids": [self.cases[0]], "permissions": ["view", "edit"]},
+        })})
+        env.start()
+        self.addCleanup(env.stop)
+        viewer = {"Authorization": f"Bearer {viewer_token}"}
+        editor = {"Authorization": f"Bearer {editor_token}"}
+        # View-only: reads work, any mutation/export/creation is denied.
+        self.assertEqual(self.client.get(f"/api/cases/{self.cases[0]}", headers=viewer).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[0]}/evidence", headers=viewer,
+                                          json={"title": "只读测试", "category": "书证", "fact": "事实"}).status_code, 403)
+        self.assertEqual(self.client.get(f"/api/cases/{self.cases[0]}/export", headers=viewer).status_code, 403)
+        self.assertEqual(self.client.post("/api/cases", headers=viewer, json={"title": "越权"}).status_code, 403)
+        # Edit without approve: metadata updates pass, confirmation is denied.
+        created = self.client.post(f"/api/cases/{self.cases[0]}/evidence", headers=editor,
+                                   json={"title": "录入测试", "category": "书证", "fact": "事实"})
+        self.assertEqual(created.status_code, 201, created.text)
+        evidence_id = created.json()["evidence"]["id"]
+        self.assertEqual(self.client.patch(f"/api/evidence/{evidence_id}", headers=editor,
+                                           json={"credibility": "中"}).status_code, 200)
+        denied = self.client.patch(f"/api/evidence/{evidence_id}", headers=editor, json={"status": "已确认"})
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.json()["detail"], "需要审批确认权限")
+        # Admin approval still works and is attributed.
+        confirmed = self.client.patch(f"/api/evidence/{evidence_id}", headers={"Authorization": f"Bearer {self.admin_token}"},
+                                      json={"status": "已确认"})
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertEqual(confirmed.json()["evidence"]["approved_by"], "管理员")
+
+    def test_invalid_permission_values_fail_closed(self):
+        for value in ('{"permissions": ["root"]}', '{"permissions": []}', '{"permissions": "view"}'):
+            payload = dict(self._token_config())
+            payload[self.token]["permissions"] = json.loads(value)["permissions"]
+            with self.subTest(value=value), patch.dict(os.environ, {"LAW_REVIEW_API_TOKENS_JSON": json.dumps(payload)}):
+                self.assertEqual(self.client.get("/api/auth/me").status_code, 503)
+
+    def _token_config(self):
+        return {
+            self.token: {"name": "律师甲", "case_ids": [self.cases[0]]},
+            self.admin_token: {"name": "管理员", "admin": True},
+        }
+
+    def test_legacy_principal_keeps_prior_abilities_and_me_lists_permissions(self):
+        # No "permissions" key configured: prior behaviour (view/edit/approve/export
+        # inside scoped cases, no global management) must be preserved exactly.
+        me = self.client.get("/api/auth/me", headers=self.headers)
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(sorted(me.json()["permissions"]), ["approve", "edit", "export", "view"])
+        created = self.client.post(f"/api/cases/{self.cases[0]}/evidence", headers=self.headers,
+                                   json={"title": "遗留权限证据", "category": "书证", "fact": "事实", "status": "已确认"})
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(created.json()["evidence"]["approved_by"], "律师甲")
+        self.assertEqual(self.client.post("/api/cases", headers=self.headers, json={"title": "x"}).status_code, 403)
+
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
         export_dir = self.root / "exports"
