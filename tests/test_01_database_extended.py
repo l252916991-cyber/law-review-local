@@ -48,6 +48,62 @@ def insert_evidence(conn, case_id, title, category, fact, source_doc_id=None):
     return cursor.lastrowid
 
 
+class OrderedMigrationTest(unittest.TestCase):
+    def test_supported_versions_upgrade_and_repeat(self):
+        from app import db
+        for version in (0, 1, 2):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
+                with db.db_scope(os.path.join(directory, "test.db")):
+                    with db.transaction() as conn:
+                        schema = db.SCHEMA
+                        if version < 2:
+                            for definition in (
+                                "    import_key TEXT,\n",
+                                "    runtime TEXT NOT NULL DEFAULT 'native',\n",
+                                "    checkpoint_thread_id TEXT NOT NULL DEFAULT '',\n",
+                                "    resume_count INTEGER NOT NULL DEFAULT 0,\n",
+                                "    evaluation_id TEXT NOT NULL DEFAULT '',\n",
+                                "    dataset_name TEXT NOT NULL DEFAULT '',\n",
+                            ):
+                                schema = schema.replace(definition, "")
+                        conn.executescript(schema)
+                        conn.execute(f"PRAGMA user_version = {version}")
+                        insert_case(conn, "preserved", "migration")
+                    db.init_db(seed=False)
+                    db.init_db(seed=False)
+                    with closing(db.connect()) as conn:
+                        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], db.SCHEMA_VERSION)
+                        self.assertEqual(conn.execute("SELECT title FROM cases").fetchone()[0], "preserved")
+
+    def test_future_version_is_not_modified_or_recovered(self):
+        from app import db
+        with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
+            with db.transaction() as conn:
+                conn.execute("CREATE TABLE future_data(value TEXT)")
+                conn.execute("INSERT INTO future_data VALUES ('preserved')")
+                conn.execute("PRAGMA user_version = 99")
+            with self.assertRaisesRegex(RuntimeError, "refusing downgrade"):
+                db.init_db(seed=True, recover_runs=True)
+            with closing(db.connect()) as conn:
+                self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 99)
+                self.assertEqual(conn.execute("SELECT value FROM future_data").fetchone()[0], "preserved")
+                self.assertIsNone(conn.execute("SELECT name FROM sqlite_master WHERE name='cases'").fetchone())
+
+    def test_migration_failure_rolls_back_ddl_and_version(self):
+        from app import db
+        from unittest.mock import patch
+        def fail(conn):
+            conn.execute("CREATE TABLE partial_change(id INTEGER)")
+            raise RuntimeError("injected failure")
+        with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
+            with patch.object(db, "_migrate_v2", fail), self.assertRaisesRegex(RuntimeError, "injected"):
+                db.init_db(seed=False)
+            with closing(db.connect()) as conn:
+                self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 0)
+                self.assertIsNone(conn.execute("SELECT name FROM sqlite_master WHERE name IN ('cases','partial_change')").fetchone())
+            db.init_db(seed=False)
+
+
 class DatabaseTransactionTest(IsolatedDatabaseTestCase):
     """事务回滚和一致性测试"""
 

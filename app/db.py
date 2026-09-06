@@ -326,29 +326,59 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
+SCHEMA_VERSION = 2
+
+
+def _execute_script(conn: sqlite3.Connection, script: str) -> None:
+    """Execute DDL without executescript's implicit transaction commit."""
+    statement = ""
+    for line in script.splitlines(keepends=True):
+        statement += line
+        if sqlite3.complete_statement(statement):
+            conn.execute(statement)
+            statement = ""
+    if statement.strip():
+        raise ValueError("Incomplete migration SQL")
+
+
+def _migrate_v1(conn: sqlite3.Connection) -> None:
+    _execute_script(conn, SCHEMA)
+
+
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    # Legacy version 1 installations predate several auxiliary tables.
+    _execute_script(conn, SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(agent_runs)")}
+    migrations = {
+        "runtime": "ALTER TABLE agent_runs ADD COLUMN runtime TEXT NOT NULL DEFAULT 'native'",
+        "checkpoint_thread_id": "ALTER TABLE agent_runs ADD COLUMN checkpoint_thread_id TEXT NOT NULL DEFAULT ''",
+        "resume_count": "ALTER TABLE agent_runs ADD COLUMN resume_count INTEGER NOT NULL DEFAULT 0",
+    }
+    for column, statement in migrations.items():
+        if column not in columns:
+            conn.execute(statement)
+    document_columns = {row[1] for row in conn.execute("PRAGMA table_info(documents)")}
+    if "import_key" not in document_columns:
+        conn.execute("ALTER TABLE documents ADD COLUMN import_key TEXT")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_import_key ON documents(import_key) WHERE import_key IS NOT NULL")
+    evaluation_columns = {row[1] for row in conn.execute("PRAGMA table_info(rag_evaluations)")}
+    for name in ("evaluation_id", "dataset_name"):
+        if name not in evaluation_columns:
+            conn.execute(f"ALTER TABLE rag_evaluations ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+    _execute_script(conn, FTS_TRIGGERS)
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
-        conn.executescript(SCHEMA)
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(agent_runs)")}
-        migrations = {
-            "runtime": "ALTER TABLE agent_runs ADD COLUMN runtime TEXT NOT NULL DEFAULT 'native'",
-            "checkpoint_thread_id": "ALTER TABLE agent_runs ADD COLUMN checkpoint_thread_id TEXT NOT NULL DEFAULT ''",
-            "resume_count": "ALTER TABLE agent_runs ADD COLUMN resume_count INTEGER NOT NULL DEFAULT 0",
-        }
-        for column, statement in migrations.items():
-            if column not in columns:
-                conn.execute(statement)
-        document_columns = {row[1] for row in conn.execute("PRAGMA table_info(documents)")}
-        if "import_key" not in document_columns:
-            conn.execute("ALTER TABLE documents ADD COLUMN import_key TEXT")
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_import_key ON documents(import_key) WHERE import_key IS NOT NULL")
-        evaluation_columns = {row[1] for row in conn.execute("PRAGMA table_info(rag_evaluations)")}
-        for name in ("evaluation_id", "dataset_name"):
-            if name not in evaluation_columns:
-                conn.execute(f"ALTER TABLE rag_evaluations ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
-        conn.executescript(FTS_TRIGGERS)
-        conn.execute("PRAGMA user_version = 2")
+        conn.execute("BEGIN IMMEDIATE")
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version > SCHEMA_VERSION:
+            raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
+        migrations = (_migrate_v1, _migrate_v2)
+        for target in range(version + 1, SCHEMA_VERSION + 1):
+            migrations[target - 1](conn)
+            conn.execute(f"PRAGMA user_version = {target}")
     if seed:
         seed_demo()
     # A synchronous local-model call can be interrupted by an app restart.
