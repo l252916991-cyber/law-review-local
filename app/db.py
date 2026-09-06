@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -73,6 +74,31 @@ def process_ownership():
         yield
     finally:
         os.close(descriptor)
+
+
+def record_security_event(
+    event_type: str,
+    outcome: str,
+    *,
+    actor: str | None = None,
+    case_id: int | None = None,
+    detail: str = "",
+    request_path: str = "",
+) -> None:
+    """Append one privacy-safe security event to the independent trail.
+
+    Events deliberately have no foreign key to cases, so deleting a case
+    cannot erase accountability records. A failed write is logged at error
+    level and never blocks the operation it observes.
+    """
+    try:
+        with transaction() as conn:
+            conn.execute(
+                "INSERT INTO security_events(event_type,outcome,actor,case_id,detail,request_path,created_at) VALUES (?,?,?,?,?,?,?)",
+                (event_type, outcome, actor, case_id, detail, request_path, now()),
+            )
+    except Exception as exc:
+        logging.getLogger(__name__).error("Security event write failed (%s)", type(exc).__name__)
 
 
 @contextmanager
@@ -348,7 +374,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
@@ -409,6 +435,33 @@ CREATE INDEX IF NOT EXISTS idx_batch_dispatch_pending ON batch_dispatch(state, b
     )
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    # Integrity and accountability fields: original-file hashes, approval
+    # attribution, and a security event trail that survives case deletion
+    # (no foreign key on purpose).
+    _execute_script(
+        conn,
+        """
+ALTER TABLE documents ADD COLUMN content_hash TEXT;
+ALTER TABLE evidence ADD COLUMN approved_by TEXT;
+ALTER TABLE evidence ADD COLUMN approved_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_documents_case_hash ON documents(case_id, content_hash);
+CREATE TABLE IF NOT EXISTS security_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    actor TEXT,
+    case_id INTEGER,
+    detail TEXT NOT NULL DEFAULT '',
+    request_path TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_time ON security_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type, created_at DESC);
+""",
+    )
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -416,7 +469,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")

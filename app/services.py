@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -288,6 +289,7 @@ def concise(text: str, limit: int = 180) -> str:
 
 def index_upload(case_id: int, original_name: str, payload: bytes, content_type: str | None, *, import_key: str | None = None) -> dict[str, Any]:
     from .db import get_db_path
+    content_hash = hashlib.sha256(payload).hexdigest()
     if import_key:
         with closing(connect()) as conn:
             existing = conn.execute("SELECT id,case_id FROM documents WHERE import_key=?", (import_key,)).fetchone()
@@ -295,6 +297,17 @@ def index_upload(case_id: int, original_name: str, payload: bytes, content_type:
             if existing["case_id"] != case_id:
                 raise ValueError("Import key belongs to another case")
             return get_document(existing["id"])
+    with closing(connect()) as conn:
+        same_case = conn.execute(
+            "SELECT id FROM documents WHERE case_id=? AND content_hash=? ORDER BY id LIMIT 1",
+            (case_id, content_hash),
+        ).fetchone()
+    if same_case:
+        # Identical bytes already indexed for this case: an explicit duplicate,
+        # not a silent second copy. Different cases never share this decision.
+        document = get_document(same_case["id"])
+        document["duplicate"] = True
+        return document
     clean_name = safe_filename(original_name)
     case_dir = get_db_path().parent / "uploads" / str(case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -312,10 +325,10 @@ def index_upload(case_id: int, original_name: str, payload: bytes, content_type:
         ts = now()
         with transaction() as conn:
             inserted = conn.execute(
-                """INSERT INTO documents(case_id,name,stored_path,mime_type,pages,status,doc_type,people,date_range,summary,created_at,updated_at,import_key)
-                   VALUES (?,?,?,?,?,'已索引',?,?,?,?,?,?,?)
+                """INSERT INTO documents(case_id,name,stored_path,mime_type,pages,status,doc_type,people,date_range,summary,created_at,updated_at,import_key,content_hash)
+                   VALUES (?,?,?,?,?,'已索引',?,?,?,?,?,?,?,?)
                    ON CONFLICT(import_key) WHERE import_key IS NOT NULL DO NOTHING""",
-                (case_id,clean_name,str(stored),mime_type,len(page_texts),doc_type,people,date_range,summary,ts,ts,import_key),
+                (case_id,clean_name,str(stored),mime_type,len(page_texts),doc_type,people,date_range,summary,ts,ts,import_key,content_hash),
             )
             if inserted.rowcount == 0:
                 existing = conn.execute("SELECT id,case_id FROM documents WHERE import_key=?", (import_key,)).fetchone()

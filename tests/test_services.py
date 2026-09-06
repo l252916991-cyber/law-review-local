@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+from contextlib import closing
 from tests.support import IsolatedDatabaseTestCase
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -145,6 +146,36 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         path = build_export(1)
         self.assertTrue(path.exists())
         self.assertGreater(path.stat().st_size, 300)
+
+    def test_same_case_reupload_deduplicates_by_content_hash(self):
+        from app.db import connect, now, transaction
+        from app.services import index_upload
+        with transaction() as conn:
+            case_id = conn.execute("INSERT INTO cases(title,created_at,updated_at) VALUES (?,?,?)",
+                                   ("哈希去重案件", now(), now())).lastrowid
+            other_case = conn.execute("INSERT INTO cases(title,created_at,updated_at) VALUES (?,?,?)",
+                                      ("哈希跨案件", now(), now())).lastrowid
+        payload = "重复上传内容检测 test dedup payload".encode("utf-8")
+        first = index_upload(case_id, "重复件.txt", payload, "text/plain")
+        self.assertNotIn("duplicate", first)
+        second = index_upload(case_id, "重复件-副本.txt", payload, "text/plain")
+        self.assertTrue(second["duplicate"])
+        self.assertEqual(second["id"], first["id"])
+        with closing(connect()) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM documents WHERE case_id=? AND content_hash=?",
+                (case_id, first["content_hash"])).fetchone()[0]
+        self.assertEqual(count, 1)
+        # Same bytes in a different case are independent documents, not duplicates.
+        other = index_upload(other_case, "重复件.txt", payload, "text/plain")
+        self.assertNotIn("duplicate", other)
+        self.assertNotEqual(other["id"], first["id"])
+
+    def test_confirmation_approval_attribution_defaults_pending(self):
+        from app.services import index_upload
+        document = index_upload(1, "哈希归档.txt", b"approval attribution payload", "text/plain")
+        self.assertTrue(document["content_hash"])
+        self.assertEqual(len(document["content_hash"]), 64)
 
     def test_parse_budget_rejects_oversized_files_and_caps_text(self):
         from app.services import MAX_PARSE_BYTES, _cap_total_text, _check_parse_budget

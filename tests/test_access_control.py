@@ -169,6 +169,66 @@ class AccessControlTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 404)
                 self.assertNotIn("外部机密内容", response.text)
 
+    def test_security_events_record_denials_auth_and_downloads(self):
+        from app.db import connect
+        self.client.get("/api/cases")  # 401 anonymous
+        self.client.get("/api/dashboard", headers=self.headers)  # 403 scoped member
+        self.client.post("/api/auth/session", json={"token": "wrong-token"})  # failed login
+        self.client.post("/api/auth/session", json={"token": self.token})  # success
+        self.client.delete("/api/auth/session")
+        self.client.get("/api/cases", headers={"Host": "attacker.example"})  # 400
+        with closing(connect()) as conn:
+            events = [dict(row) for row in conn.execute(
+                "SELECT event_type,outcome,actor,detail,request_path FROM security_events ORDER BY id")]
+        kinds = {(e["event_type"], e["outcome"]) for e in events}
+        self.assertIn(("access", "denied"), kinds)
+        self.assertIn(("auth", "login_failed"), kinds)
+        self.assertIn(("auth", "login_success"), kinds)
+        self.assertIn(("auth", "logout"), kinds)
+        self.assertTrue(any(e["request_path"] == "/api/cases" and e["actor"] is None for e in events))
+        self.assertTrue(all("Bearer" not in (e["detail"] or "") for e in events))
+
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        path = self.root / "download-event.txt"
+        path.write_text("内容", encoding="utf-8")
+        with transaction() as conn:
+            doc_id = conn.execute(
+                "INSERT INTO documents(case_id,name,stored_path,mime_type,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                (self.cases[0], "download-event.txt", str(path), "text/plain", now(), now())).lastrowid
+        self.assertEqual(self.client.get(f"/api/documents/{doc_id}/file", headers=admin).status_code, 200)
+        with closing(connect()) as conn:
+            download = conn.execute(
+                "SELECT outcome,actor FROM security_events WHERE event_type='document_download' ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertEqual(download["outcome"], "success")
+        self.assertEqual(download["actor"], "管理员")
+
+    def test_security_events_survive_case_deletion(self):
+        from app.db import connect
+        self.client.get(f"/api/dashboard", headers=self.headers)  # record a denial
+        # Business deletion cascades case-owned rows; the security trail has
+        # no foreign key and must survive it.
+        with transaction() as conn:
+            conn.execute("DELETE FROM cases WHERE id=?", (self.cases[1],))
+        with closing(connect()) as conn:
+            remaining = conn.execute(
+                "SELECT COUNT(*) FROM security_events WHERE request_path='/api/dashboard'").fetchone()[0]
+            cases_left = conn.execute("SELECT COUNT(*) FROM cases WHERE id=?", (self.cases[1],)).fetchone()[0]
+        self.assertEqual(cases_left, 0)
+        self.assertGreaterEqual(remaining, 1)
+
+    def test_evidence_confirmation_records_approver_and_clears_on_reopen(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        created = self.client.post(f"/api/cases/{self.cases[0]}/evidence", headers=admin,
+                                   json={"title": "审批归属证据", "category": "书证", "fact": "待核事实", "status": "待复核"})
+        evidence_id = created.json()["evidence"]["id"]
+        confirmed = self.client.patch(f"/api/evidence/{evidence_id}", headers=admin, json={"status": "已确认"})
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertEqual(confirmed.json()["evidence"]["approved_by"], "管理员")
+        self.assertTrue(confirmed.json()["evidence"]["approved_at"])
+        reopened = self.client.patch(f"/api/evidence/{evidence_id}", headers=admin, json={"status": "待复核"})
+        self.assertIsNone(reopened.json()["evidence"]["approved_by"])
+        self.assertIsNone(reopened.json()["evidence"]["approved_at"])
+
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
         export_dir = self.root / "exports"

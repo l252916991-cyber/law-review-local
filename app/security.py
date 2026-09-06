@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from .db import connect, get_db_path, now, transaction
+from .db import connect, get_db_path, now, record_security_event, transaction
 
 SESSION_TTL = 8 * 3600
 _sessions: dict[tuple[str, str], tuple[str, float]] = {}
@@ -177,6 +177,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         marker = None
         case_id = None
+        principal = None
         try:
             mode = auth_mode()
             host = request.url.hostname or ""
@@ -237,8 +238,13 @@ class AccessMiddleware(BaseHTTPMiddleware):
             response = apply_security_headers(response, request.url.path)
             return response
         except HTTPException as exc:
+            record_security_event(
+                "access", "denied", actor=principal.name if principal else None, case_id=case_id,
+                detail=str(exc.detail)[:120], request_path=request.url.path,
+            )
             return apply_security_headers(JSONResponse({"detail": exc.detail}, status_code=exc.status_code), request.url.path)
         except AccessConfigurationError:
+            record_security_event("config", "error", detail="访问控制配置错误", request_path=request.url.path)
             return apply_security_headers(JSONResponse({"detail": "访问控制配置错误，请联系管理员"}, status_code=503), request.url.path)
         finally:
             if marker is not None:
@@ -255,6 +261,7 @@ def login(body: Login, request: Request, response: Response):
         raise HTTPException(409, "本机模式无需登录")
     principal = token_principal(body.token)
     if principal is None:
+        record_security_event("auth", "login_failed", detail="无效访问令牌", request_path=request.url.path)
         raise HTTPException(401, "无效访问令牌")
     local_names = {"localhost", "127.0.0.1", "::1", "testserver"}
     session = secrets.token_urlsafe(32)
@@ -267,6 +274,7 @@ def login(body: Login, request: Request, response: Response):
             raise HTTPException(503, "会话容量已满，请稍后重试")
         _sessions.pop(_session_key(request.cookies.get("lexvault_session", "")), None)
         _sessions[_session_key(session)] = (hashlib.sha256(body.token.encode()).hexdigest(), current + SESSION_TTL)
+    record_security_event("auth", "login_success", actor=principal.name, request_path=request.url.path)
     response.set_cookie("lexvault_session", session, httponly=True,
                         secure=request.url.scheme == "https" or request.url.hostname not in local_names,
                         samesite="strict", max_age=8 * 3600)
@@ -277,6 +285,7 @@ def login(body: Login, request: Request, response: Response):
 def logout(request: Request, response: Response):
     with _session_lock:
         _sessions.pop(_session_key(request.cookies.get("lexvault_session", "")), None)
+    record_security_event("auth", "logout", request_path=request.url.path)
     response.delete_cookie("lexvault_session")
     return {"logged_out": True}
 

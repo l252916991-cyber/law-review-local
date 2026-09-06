@@ -12,14 +12,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
 from .config import config
-from .db import connect, get_db_path, init_db, now, process_ownership, sync_fts_index, transaction
+from .db import connect, get_db_path, init_db, now, process_ownership, record_security_event, sync_fts_index, transaction
 from .services import (
     auto_analyze_case,
     build_export,
@@ -599,7 +599,7 @@ def update_directory(document_id: int, payload: DirectoryUpdate):
 
 
 @app.get("/api/documents/{document_id}/file")
-def document_file(document_id: int):
+def document_file(document_id: int, request: Request):
     document = get_document(document_id)
     if not document:
         raise HTTPException(404, "文件不存在")
@@ -611,6 +611,9 @@ def document_file(document_id: int):
             stored = contained_path(stored, config.data_dir)
         except ValueError:
             raise HTTPException(404, "文件不存在")
+        record_security_event("document_download", "success", actor=actor_name(),
+                              case_id=document["case_id"], detail=f"document:{document_id}",
+                              request_path=request.url.path)
         # Uploaded MIME is untrusted: never execute HTML/SVG at our session origin.
         suffix = stored.suffix.lower()
         safe_types = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".txt": "text/plain", ".md": "text/plain", ".csv": "text/plain", ".json": "text/plain", ".log": "text/plain"}
@@ -702,12 +705,14 @@ def create_evidence(case_id: int, body: EvidenceCreate):
             INSERT INTO evidence (
                 case_id, title, category, fact, credibility, status,
                 source_document_id, source_page_start, source_page_end,
-                quote, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                quote, approved_by, approved_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
         """, (
             case_id, body.title, body.category, body.fact, body.credibility,
             body.status, body.source_document_id, body.source_page_start,
-            body.source_page_end, body.quote
+            body.source_page_end, body.quote,
+            actor_name() if body.status == "已确认" else None,
+            now() if body.status == "已确认" else None
         ))
 
         evidence_id = cursor.lastrowid
@@ -760,6 +765,19 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
             if value is not None:
                 updates.append(f"{field} = ?")
                 params.append(value)
+
+        # Approval is attributed to the authenticated principal; moving an
+        # item out of 已确认 clears the attribution. Model code has no write
+        # path to this endpoint, so a confirmed status always has a human name.
+        if body.status is not None:
+            if body.status == "已确认":
+                updates.append("approved_by = ?")
+                params.append(actor_name())
+                updates.append("approved_at = ?")
+                params.append(now())
+            else:
+                updates.append("approved_by = NULL")
+                updates.append("approved_at = NULL")
 
         if not updates:
             raise HTTPException(400, "至少需要更新一个字段")
@@ -1213,12 +1231,14 @@ def case_platform_metrics(case_id: int):
 
 
 @app.get("/api/cases/{case_id}/export")
-def export_case(case_id: int):
+def export_case(case_id: int, request: Request):
     require_case(case_id)
     try:
         path = build_export(case_id)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    record_security_event("case_export", "success", actor=actor_name(), case_id=case_id,
+                          detail=path.name, request_path=request.url.path)
     return FileResponse(path, media_type="application/zip", filename=path.name)
 
 
