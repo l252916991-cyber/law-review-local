@@ -1,0 +1,19 @@
+# Deny everything private or local-only before any broad COPY can pick it up.
+.git
+.venv
+.env
+.env.*
+*.log
+data/
+output/
+docs/
+benchmarks/
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+Dockerfile
+docker-compose.yml
+.dockerignore
