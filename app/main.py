@@ -133,11 +133,11 @@ class RequestCorrelationMiddleware:
         try:
             await self.app(scope, receive, observing_send)
         finally:
-            logger_request_id.reset(token)
             if scope.get("path", "").startswith("/api/"):
                 duration_ms = round((time.perf_counter() - started) * 1000)
                 access_logger.info("%s %s", scope.get("method", ""), scope.get("path", ""),
                                    extra={"status": status_holder["status"], "duration_ms": duration_ms})
+            logger_request_id.reset(token)
 
 
 app.add_middleware(RequestCorrelationMiddleware)

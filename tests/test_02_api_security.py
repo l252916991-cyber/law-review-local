@@ -50,10 +50,12 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
         hostile = self.client.get("/api/health", headers={"X-Request-ID": "x" * 200 + " evil\n"})
         self.assertNotIn("evil", hostile.headers["x-request-id"])
         records: list[logging.LogRecord] = []
+        rendered_lines: list[str] = []
 
         class Capture(logging.Handler):
             def emit(self, record):
                 records.append(record)
+                rendered_lines.append(StructuredFormatter().format(record))
 
         logger = logging.getLogger("law_review.access")
         capture = Capture()
@@ -68,12 +70,16 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
         self.assertTrue(records)
         self.assertEqual(getattr(records[-1], "status", None), 200)
         self.assertIsInstance(getattr(records[-1], "duration_ms", None), int)
+        # The live access line itself carries the correlation id: the middleware
+        # must log before resetting the context, or operators lose the linkage.
         token = request_id_var.set("req-logged-123456")
         try:
             rendered = json_module.loads(StructuredFormatter().format(records[-1]))
         finally:
             request_id_var.reset(token)
         self.assertEqual(rendered["request_id"], "req-logged-123456")
+        self.assertTrue(any("req-logged-123456" in line for line in rendered_lines),
+                        f"access line lost the request id: {rendered_lines}")
 
     def test_case_title_min_length_boundary(self):
         """案件标题最小长度边界"""
