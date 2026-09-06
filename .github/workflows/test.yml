@@ -21,8 +21,6 @@ jobs:
       matrix:
         python-version: ['3.11', '3.14']
     env:
-      LAW_REVIEW_DATA_DIR: ${{ runner.temp }}/lexvault-data
-      LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB: ${{ runner.temp }}/lexvault-data/checkpoints.sqlite
       LAW_REVIEW_AUTH_MODE: local
       LAW_REVIEW_LLM_URL: http://127.0.0.1:1/v1
       REDIS_URL: redis://127.0.0.1:1/0
@@ -51,6 +49,7 @@ jobs:
           diff requirements-dev.txt "$RUNNER_TEMP/requirements-dev.txt"
       - name: Environment and static checks
         run: |
+          export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
           uv run --locked python scripts/doctor.py
           uv run --locked python -m compileall -q app tests scripts
           uv run --locked ruff check app tests scripts
@@ -58,6 +57,7 @@ jobs:
           node --check app/static/app.js
       - name: Offline tests with actual reports
         run: |
+          export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
           mkdir -p output/ci
           set -o pipefail
           uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py scripts/test_snapshot_runtime.py \
