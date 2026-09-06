@@ -17,6 +17,7 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
+from contextvars import ContextVar
 from collections import defaultdict
 from contextlib import closing
 from datetime import datetime
@@ -630,10 +631,28 @@ def call_local_llm(
         answer = strip_reasoning(payload["choices"][0]["message"]["content"])
         if not answer:
             raise RuntimeError("本地模型返回了推理草稿或空正文")
+        _last_llm_provenance.set(llm_provenance(route, model))
         return answer
     except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as exc:
         logger.warning("Local model response failed error_type=%s", type(exc).__name__)
         raise RuntimeError(f"本地模型调用失败（{type(exc).__name__}）") from exc
+
+
+PROMPT_VERSION = "chat-system-v1"
+_last_llm_provenance: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_last_llm_provenance", default=None)
+
+
+def llm_provenance(route: str, model: str) -> dict[str, Any]:
+    """Identity of the exact inference setup behind one answer (E23)."""
+    llm = LLMConfig.from_env()
+    system = (
+        "你是运行在律所内网的阅卷助手。只能依据提供的卷宗片段回答，不得虚构事实或法条。"
+        "结论与推测必须分开；每个关键事实后用[资料1]格式标注来源。存在矛盾时明确列出。"
+        "输出简洁的中文Markdown，并在末尾给出待律师复核事项。"
+    )
+    prompt_digest = hashlib.sha256(f"{PROMPT_VERSION}|{route}|{system}".encode()).hexdigest()[:16]
+    return {"prompt_version": PROMPT_VERSION, "prompt_sha256_16": prompt_digest,
+            "model": model, "temperature": llm.temperature, "max_tokens": llm.max_tokens}
 
 
 def fallback_answer(question: str, route: str, contexts: list[dict[str, Any]]) -> str:
@@ -669,6 +688,7 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
         answer, contexts = statistics_answer(case_id, question)
         answer += "\n\n以上为当前数据库目录统计，请律师核对材料是否完整。"
         llm_used = False
+        provenance = {"mode": "database-statistics"}
         validation = {
             "valid": True, "scope": "database_metadata_counts",
             "checks": {"metadata_query_succeeded": True}, "issues": [],
@@ -686,19 +706,23 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:
                     llm_used = True
+                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.from_env().model))
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
                     fallback_reason = "模型输出未通过格式/来源校验，已返回原文检索摘要"
                     logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
                     answer = fallback_answer(question, route, contexts)
+                    provenance = {"mode": "rule-retrieval", "llm_attempted": True}
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
                 diagnostic = failure_diagnostic(exc, "chat_llm")
                 fallback_reason = "本地模型调用失败，已返回原文检索摘要"
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
                 answer = fallback_answer(question, route, contexts)
+                provenance = {"mode": "rule-retrieval", "llm_attempted": True}
         else:
             answer = fallback_answer(question, route, contexts)
+            provenance = {"mode": "rule-retrieval", "llm_attempted": False}
         if fallback_reason:
             answer += f"\n\n> {fallback_reason}。"
         validation = validate_review_answer(answer, contexts)
@@ -733,8 +757,8 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
             (conversation_id, question, route, ts),
         )
         conn.execute(
-            "INSERT INTO messages(conversation_id, role, content, citations_json, route, created_at) VALUES (?, 'assistant', ?, ?, ?, ?)",
-            (conversation_id, answer, json.dumps(citations, ensure_ascii=False), route, ts),
+            "INSERT INTO messages(conversation_id, role, content, citations_json, route, provenance_json, created_at) VALUES (?, 'assistant', ?, ?, ?, ?, ?)",
+            (conversation_id, answer, json.dumps(citations, ensure_ascii=False), route, json.dumps(provenance, ensure_ascii=False), ts),
         )
         conn.execute(
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, 'AI阅卷问答', ?, ?)",
@@ -747,6 +771,7 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
         "semantic_expansion": expand_semantics(question),
         "citations": citations,
         "llm_used": llm_used,
+        "provenance": provenance,
         "validation": validation,
         "citation_check": citation_check,
         "rejected_llm_validation": rejected_validation,

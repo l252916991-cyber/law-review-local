@@ -107,6 +107,27 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertEqual(result["route"], "多文档对比")
         self.assertTrue(result["citations"])
         self.assertIn("document_id", result["citations"][0])
+        # Every answer carries provenance: rule answers declare their origin,
+        # so a reader can never mistake them for model output.
+        self.assertEqual(result["provenance"]["mode"], "rule-retrieval")
+        self.assertFalse(result["provenance"]["llm_attempted"])
+        from app.db import connect
+        with closing(connect()) as conn:
+            stored = conn.execute(
+                "SELECT provenance_json FROM messages WHERE conversation_id=? AND role='assistant'",
+                (result["conversation_id"],)).fetchone()[0]
+        self.assertEqual(json.loads(stored)["mode"], "rule-retrieval")
+
+    def test_llm_provenance_binds_prompt_and_parameters(self):
+        from app.services import llm_provenance
+        record = llm_provenance("事实检索", "test-model")
+        self.assertEqual(record["model"], "test-model")
+        self.assertEqual(record["prompt_version"], "chat-system-v1")
+        self.assertTrue(record["prompt_sha256_16"])
+        same = llm_provenance("事实检索", "test-model")
+        self.assertEqual(record["prompt_sha256_16"], same["prompt_sha256_16"])
+        other = llm_provenance("目录统计", "test-model")
+        self.assertNotEqual(record["prompt_sha256_16"], other["prompt_sha256_16"])
 
     def test_csv_cells_neutralize_formulas_and_preserve_plain_values(self):
         from app.services import csv_safe_cell
@@ -155,7 +176,9 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         with zipfile.ZipFile(path) as archive:
             manifest = json.loads(archive.read("清单.json").decode("utf-8"))
             packaged = [name for name in archive.namelist() if name.startswith("原始卷宗/")]
-        self.assertEqual(manifest["schema_version"], 4)
+        from app.db import SCHEMA_VERSION
+        self.assertEqual(manifest["schema_version"], SCHEMA_VERSION)
+        self.assertGreaterEqual(SCHEMA_VERSION, 5)
         self.assertTrue(manifest["case"]["title"])
         self.assertTrue(any(doc["content_hash"] for doc in manifest["documents"]))
         confirmed = next(item for item in manifest["evidence"] if item["approved_by"])

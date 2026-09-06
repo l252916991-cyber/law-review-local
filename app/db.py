@@ -374,7 +374,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
@@ -462,6 +462,12 @@ CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_typ
     )
 
 
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    # Answer provenance (E23): identity of the inference setup behind each
+    # assistant message, so any answer can be traced to its model and prompt.
+    _execute_script(conn, "ALTER TABLE messages ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';")
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -469,7 +475,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
