@@ -54,6 +54,28 @@ def connect() -> sqlite3.Connection:
 
 
 @contextmanager
+def process_ownership():
+    """Hold a local-filesystem Web owner lock before any startup recovery.
+
+    The descriptor stays open for the entire lifespan; never unlink the lock
+    file, which would let another process lock a different inode.
+    """
+    import fcntl
+
+    ensure_dirs()
+    path = get_db_path().resolve().with_suffix(".web.lock")
+    descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("This database already has a Web process owner; use one worker") from exc
+        yield
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
 def transaction():
     conn = connect()
     try:

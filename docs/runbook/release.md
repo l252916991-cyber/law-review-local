@@ -11,6 +11,12 @@ uv run python scripts/package_release.py --output dist/lexvault-source.zip
 
 `.gitignore` 不是发布权限检查，也不会清除已经跟踪的数据。首次 git 提交前检查暂存区，切勿无检查地执行 `git add .`；发布包仍须人工检查源码/文档中是否有手工粘贴的案件片段。不要把“文件不在 data 目录”当作已经脱敏。
 
+## 单进程运行与升级边界
+
+Web 启动在迁移及中断任务恢复之前获取数据库旁的 `law_review.web.lock` 排他锁，持有到后台阅卷执行器停止。第二个 Web 进程会拒绝启动，不会把第一个进程的运行标记中断。部署必须使用单个 Uvicorn worker 和本机文件系统；此锁不是多实例租约，也不适用于网络共享存储。不要删除或替换运行中的锁文件；崩溃后操作系统自动释放文件锁。独立 arq worker 不受 Web 锁管理，维护备份仍须分别停写。
+
+数据库按 `PRAGMA user_version` 有序升级，迁移 DDL 和版本号在同一事务提交，失败整体回滚；新于当前程序支持的版本拒绝启动，不自动降级。升级前完成下述停写备份；应用回滚若遇到较新数据库，应恢复匹配版本的备份到新目录，不能手工调低版本号。
+
 ## 备份与恢复验收
 
 业务 SQLite、独立 LangGraph checkpoint、uploads 和必要配置属于一个恢复单元。为获得一致快照，先停止 Web 新写入与 worker 消费，等待在途任务结束；使用 SQLite backup API 或数据库提供的备份命令，不直接复制正在写入的主文件而遗漏 WAL。

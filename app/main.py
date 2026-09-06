@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
 from .config import config
-from .db import connect, get_db_path, init_db, now, sync_fts_index, transaction
+from .db import connect, get_db_path, init_db, now, process_ownership, sync_fts_index, transaction
 from .services import (
     auto_analyze_case,
     build_export,
@@ -67,17 +67,18 @@ async def lifespan(application: FastAPI):
     if os.getenv("LAW_REVIEW_JSON_LOGS", "0") == "1":
         from .logger import setup_logging
         setup_logging(os.getenv("LAW_REVIEW_LOG_LEVEL", "INFO"))
-    init_db(seed=True, recover_runs=True)
-    start_review_executor()
-    try:
-        application.state.indexing_semaphore = asyncio.Semaphore(max(1, config.indexing_concurrency))
-        application.state.redis_available = await probe_redis()
-        application.state.ready = True
-        yield
-    finally:
-        application.state.ready = False
-        application.state.redis_available = False
-        await asyncio.to_thread(shutdown_review_executor)
+    with process_ownership():
+        init_db(seed=True, recover_runs=True)
+        start_review_executor()
+        try:
+            application.state.indexing_semaphore = asyncio.Semaphore(max(1, config.indexing_concurrency))
+            application.state.redis_available = await probe_redis()
+            application.state.ready = True
+            yield
+        finally:
+            application.state.ready = False
+            application.state.redis_available = False
+            await asyncio.to_thread(shutdown_review_executor)
 
 
 app = FastAPI(

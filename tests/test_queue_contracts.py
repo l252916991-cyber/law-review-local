@@ -85,6 +85,23 @@ class QueueContractTests(unittest.TestCase):
                 shutdown.assert_called_once()
                 self.assertFalse(application.state.ready)
                 self.assertFalse(application.state.redis_available)
+        with db_scope(Path(self.directory.name) / 'cancelled.db'):
+            asyncio.run(run())
+        from app.db import process_ownership
+        with db_scope(Path(self.directory.name) / 'cancelled.db'), process_ownership():
+            pass  # Cancelled startup released ownership.
+
+    def test_second_owner_rejected_before_recovery(self):
+        from app.main import lifespan
+        async def run():
+            application = SimpleNamespace(state=SimpleNamespace())
+            with patch('app.main.init_db') as initialize, patch('app.main.start_review_executor') as start:
+                with self.assertRaisesRegex(RuntimeError, 'already has a Web process owner'):
+                    async with lifespan(application):
+                        self.fail('second owner must not start')
+                initialize.assert_not_called()
+                start.assert_not_called()
+                self.assertFalse(application.state.ready)
         asyncio.run(run())
 
     def test_redis_probe_timeout_and_cancellation_close_pool(self):
