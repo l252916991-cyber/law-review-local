@@ -6,6 +6,10 @@ This is a small single-process deployment boundary, not a full identity provider
 from __future__ import annotations
 
 import hmac
+import hashlib
+import secrets
+import threading
+import time
 import asyncio
 import ipaddress
 import json
@@ -21,7 +25,32 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from .db import connect, now, transaction
+from .db import connect, get_db_path, now, transaction
+
+SESSION_TTL = 8 * 3600
+_sessions: dict[tuple[str, str], tuple[str, float]] = {}
+_session_lock = threading.Lock()
+
+
+def _session_key(value: str) -> tuple[str, str]:
+    return (str(get_db_path().resolve()), hashlib.sha256(value.encode()).hexdigest())
+
+
+def session_principal(value: str) -> Principal | None:
+    with _session_lock:
+        record = _sessions.get(_session_key(value))
+        if record is None:
+            return None
+        fingerprint, expires = record
+        if time.monotonic() >= expires:
+            _sessions.pop(_session_key(value), None)
+            return None
+    # Resolve current authorization on every request; rotation/removal revokes
+    # existing sessions without preserving a stale principal snapshot.
+    for token, principal in configured_tokens().items():
+        if hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(), fingerprint):
+            return principal
+    return None
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +203,10 @@ class AccessMiddleware(BaseHTTPMiddleware):
             else:
                 configured_tokens()  # Fail closed even on auth endpoints.
                 authorization = request.headers.get("authorization", "")
-                token = authorization[7:] if authorization.startswith("Bearer ") else request.cookies.get("lexvault_session", "")
-                principal = token_principal(token) if token else None
+                if authorization.startswith("Bearer "):
+                    principal = token_principal(authorization[7:])
+                else:
+                    principal = session_principal(request.cookies.get("lexvault_session", ""))
                 public = not request.url.path.startswith("/api/") or request.url.path in {"/api/auth/session", "/api/auth/me", "/api/health"}
                 if principal is None and not public:
                     raise HTTPException(401, "需要有效访问令牌")
@@ -226,14 +257,26 @@ def login(body: Login, request: Request, response: Response):
     if principal is None:
         raise HTTPException(401, "无效访问令牌")
     local_names = {"localhost", "127.0.0.1", "::1", "testserver"}
-    response.set_cookie("lexvault_session", body.token, httponly=True,
+    session = secrets.token_urlsafe(32)
+    with _session_lock:
+        current = time.monotonic()
+        for key, (_, expires) in list(_sessions.items()):
+            if expires <= current:
+                del _sessions[key]
+        if len(_sessions) >= 4096:
+            raise HTTPException(503, "会话容量已满，请稍后重试")
+        _sessions.pop(_session_key(request.cookies.get("lexvault_session", "")), None)
+        _sessions[_session_key(session)] = (hashlib.sha256(body.token.encode()).hexdigest(), current + SESSION_TTL)
+    response.set_cookie("lexvault_session", session, httponly=True,
                         secure=request.url.scheme == "https" or request.url.hostname not in local_names,
                         samesite="strict", max_age=8 * 3600)
     return {"name": principal.name, "admin": principal.admin, "case_ids": principal.case_ids}
 
 
 @router.delete("/session")
-def logout(response: Response):
+def logout(request: Request, response: Response):
+    with _session_lock:
+        _sessions.pop(_session_key(request.cookies.get("lexvault_session", "")), None)
     response.delete_cookie("lexvault_session")
     return {"logged_out": True}
 

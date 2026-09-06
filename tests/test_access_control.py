@@ -71,6 +71,29 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.delete("/api/auth/session").status_code, 200)
         self.assertEqual(self.client.get("/api/cases").status_code, 401)
 
+    def test_session_expiry_revocation_rotation_and_replay(self):
+        from app import security
+        self.client.post('/api/auth/session', json={'token': self.token})
+        session = self.client.cookies.get('lexvault_session')
+        self.assertNotEqual(session, self.token)
+        self.assertNotIn(self.token, repr(security._sessions))
+        self.assertEqual(self.client.get('/api/cases', headers={'Authorization': f'Bearer {session}'}).status_code, 401)
+        self.client.delete('/api/auth/session')
+        self.client.cookies.set('lexvault_session', session)
+        self.assertEqual(self.client.get('/api/cases').status_code, 401)
+        self.client.cookies.clear()
+        self.client.post('/api/auth/session', json={'token': self.token})
+        with patch('app.security.SESSION_TTL', 0):
+            self.client.post('/api/auth/session', json={'token': self.token})
+        self.assertEqual(self.client.get('/api/cases').status_code, 401)
+        self.client.post('/api/auth/session', json={'token': self.token})
+        with patch.dict(os.environ, {'LAW_REVIEW_API_TOKENS_JSON': json.dumps({self.admin_token: {'name': '管理员', 'admin': True}})}):
+            self.assertEqual(self.client.get('/api/cases').status_code, 401)
+        # A configured bearer credential is never accepted as a browser session.
+        self.client.cookies.clear()
+        self.client.cookies.set('lexvault_session', self.token)
+        self.assertEqual(self.client.get('/api/cases').status_code, 401)
+
     def test_request_user_name_cannot_forge_audit_identity(self):
         with patch("app.services.call_local_llm", side_effect=AssertionError("no model")):
             response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
