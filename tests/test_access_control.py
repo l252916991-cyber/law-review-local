@@ -229,6 +229,26 @@ class AccessControlTests(unittest.TestCase):
         self.assertIsNone(reopened.json()["evidence"]["approved_by"])
         self.assertIsNone(reopened.json()["evidence"]["approved_at"])
 
+    def test_editing_confirmed_content_voids_the_approval(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        created = self.client.post(f"/api/cases/{self.cases[0]}/evidence", headers=admin,
+                                   json={"title": "失效传播证据", "category": "书证", "fact": "原事实", "status": "已确认"})
+        evidence_id = created.json()["evidence"]["id"]
+        self.assertEqual(created.json()["evidence"]["approved_by"], "管理员")
+        # Content edit without re-confirmation: approval is voided explicitly.
+        edited = self.client.patch(f"/api/evidence/{evidence_id}", headers=admin, json={"quote": "修订后的引用"})
+        self.assertEqual(edited.status_code, 200, edited.text)
+        body = edited.json()["evidence"]
+        self.assertEqual(body["status"], "待复核")
+        self.assertIsNone(body["approved_by"])
+        self.assertIsNone(body["approved_at"])
+        # Editing together with an explicit re-confirmation is a fresh approval
+        # of the new content.
+        reconfirmed = self.client.patch(f"/api/evidence/{evidence_id}", headers=admin,
+                                        json={"quote": "再确认引用", "status": "已确认"})
+        self.assertEqual(reconfirmed.json()["evidence"]["status"], "已确认")
+        self.assertEqual(reconfirmed.json()["evidence"]["approved_by"], "管理员")
+
     def test_permission_matrix_restricts_view_only_and_approval(self):
         viewer_token = "c" * 40
         editor_token = "d" * 40

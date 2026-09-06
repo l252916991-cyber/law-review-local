@@ -784,7 +784,7 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
     try:
         # 验证证据存在
         evidence = conn.execute(
-            "SELECT case_id, source_page_start, source_page_end FROM evidence WHERE id = ?", (evidence_id,)
+            "SELECT case_id, status, source_page_start, source_page_end FROM evidence WHERE id = ?", (evidence_id,)
         ).fetchone()
         if not evidence:
             raise HTTPException(404, "证据不存在")
@@ -825,6 +825,18 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
             else:
                 updates.append("approved_by = NULL")
                 updates.append("approved_at = NULL")
+
+        # An approval binds the exact content that was confirmed. Editing the
+        # content of a confirmed item without explicitly re-confirming voids
+        # the old approval and returns the item to review.
+        content_fields = ('title', 'category', 'fact', 'credibility',
+                          'source_document_id', 'source_page_start', 'source_page_end', 'quote')
+        if evidence["status"] == "已确认" and body.status != "已确认" and any(
+            getattr(body, field) is not None for field in content_fields
+        ):
+            updates.append("status = '待复核'")
+            updates.append("approved_by = NULL")
+            updates.append("approved_at = NULL")
 
         if not updates:
             raise HTTPException(400, "至少需要更新一个字段")
