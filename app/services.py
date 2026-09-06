@@ -25,7 +25,7 @@ from typing import Any
 
 from docx import Document as DocxDocument
 
-from .db import connect, get_db_path, now, transaction
+from .db import SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
 
 
@@ -142,6 +142,14 @@ def upload_error_message(exc: Exception) -> str:
     if isinstance(exc, subprocess.TimeoutExpired):
         return "文档解析超时；请拆分文件或检查 OCR 资源"
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _cap_total_text(pages: list[str]) -> list[str]:
@@ -867,6 +875,25 @@ def build_export(case_id: int) -> Path:
     for message in messages:
         chats.append(f"## {message['conversation_title']} · {message['user_name']}\n\n**{message['role']}**\n\n{message['content']}\n")
 
+    manifest = {
+        "generated_at": now(),
+        "schema_version": SCHEMA_VERSION,
+        "case": {"id": case["id"], "title": case["title"], "case_no": case["case_no"], "status": case["status"]},
+        "documents": [
+            {"id": doc["id"], "name": doc["name"], "content_hash": doc.get("content_hash"),
+             "pages": doc["pages"], "doc_type": doc["doc_type"], "status": doc["status"]}
+            for doc in documents
+        ],
+        "evidence": [
+            {"id": item["id"], "title": item["title"], "status": item["status"],
+             "approved_by": item.get("approved_by"), "approved_at": item.get("approved_at"),
+             "source_document_id": item.get("source_document_id"),
+             "source_pages": [item["source_page_start"], item["source_page_end"]]}
+            for item in evidence
+        ],
+        "files": [],
+    }
+
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("案件摘要.md", summary)
         archive.writestr("内容级目录.csv", "\ufeff" + directory_csv.getvalue())
@@ -878,7 +905,13 @@ def build_export(case_id: int) -> Path:
                 # Export must not package files outside the managed data
                 # directory, even if database metadata was tampered with.
                 stored = contained_path(stored, get_db_path().parent)
-                archive.write(stored, f"原始卷宗/{safe_filename(doc['name'])}")
+                archive_name = f"原始卷宗/{safe_filename(doc['name'])}"
+                archive.write(stored, archive_name)
+                manifest["files"].append({
+                    "archive_name": archive_name, "document_id": doc["id"],
+                    "sha256": _file_sha256(stored), "size": stored.stat().st_size,
+                })
+        archive.writestr("清单.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     with transaction() as conn:
         conn.execute(
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '导出结案包', ?, ?)",

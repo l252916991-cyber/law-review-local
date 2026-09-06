@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+import zipfile
 from contextlib import closing
 from tests.support import IsolatedDatabaseTestCase
 from pathlib import Path
@@ -142,10 +143,30 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
             self.assertEqual(conn.execute("SELECT title FROM evidence WHERE case_id=1 LIMIT 1").fetchone()[0], '+1+1')
 
     def test_export_package(self):
-        from app.services import build_export
+        from app.db import transaction
+        from app.services import build_export, index_upload
+        with transaction() as conn:
+            conn.execute("UPDATE evidence SET status='已确认', approved_by='测试审批人', approved_at='2026-09-07T00:00:00+08:00' WHERE case_id=1 AND id=(SELECT MIN(id) FROM evidence WHERE case_id=1)")
+        index_upload(1, "清单核验原件.txt", b"manifest verification payload", "text/plain")
         path = build_export(1)
         self.assertTrue(path.exists())
         self.assertGreater(path.stat().st_size, 300)
+        import hashlib
+        with zipfile.ZipFile(path) as archive:
+            manifest = json.loads(archive.read("清单.json").decode("utf-8"))
+            packaged = [name for name in archive.namelist() if name.startswith("原始卷宗/")]
+        self.assertEqual(manifest["schema_version"], 4)
+        self.assertTrue(manifest["case"]["title"])
+        self.assertTrue(any(doc["content_hash"] for doc in manifest["documents"]))
+        confirmed = next(item for item in manifest["evidence"] if item["approved_by"])
+        self.assertEqual(confirmed["approved_by"], "测试审批人")
+        self.assertTrue(confirmed["approved_at"])
+        self.assertEqual(len(manifest["files"]), len(packaged))
+        for entry, name in zip(manifest["files"], packaged):
+            self.assertEqual(entry["archive_name"], name)
+            with zipfile.ZipFile(path) as archive:
+                data = archive.read(name)
+            self.assertEqual(hashlib.sha256(data).hexdigest(), entry["sha256"])
 
     def test_same_case_reupload_deduplicates_by_content_hash(self):
         from app.db import connect, now, transaction
