@@ -34,6 +34,8 @@ from .services import (
 EMBEDDING_MODEL = "Qwen3-Embedding-4B-4bit-DWQ"
 EMBEDDING_TEXT_VERSION = "raw-text-v1"
 HASHED_MODEL = "hashed-bigram-v1"
+MAX_RETRIEVAL_CANDIDATES = 48
+NEIGHBOR_RADIUS = 1
 logger = logging.getLogger(__name__)
 
 
@@ -71,6 +73,34 @@ def expand_retrieval_query(query: str) -> str:
     if any(term in query for term in ("审批", "固定回报", "保本保息")):
         additions.extend(["宣传稿", "电子邮件", "回复", "执行", "年化收益"])
     return " ".join([query, *additions])
+
+
+def query_signals(query: str) -> dict[str, Any]:
+    """Extract auditable retrieval constraints without inventing case facts."""
+    amounts = re.findall(r"\d[\d,]*(?:\.\d+)?\s*(?:万|亿)?\s*元?", query)
+    dates = re.findall(r"(?:19|20)\d{2}(?:[-年/.]\d{1,2}(?:[-月/.]\d{1,2})?)?", query)
+    articles = re.findall(r"第[零〇一二三四五六七八九十百千万两0-9]+条(?:之[一二三四五六七八九十0-9]+)?", query)
+    evidence_types = [
+        term for term in ("银行流水", "电子邮件", "电子数据", "审计报告", "询问笔录", "合同", "宣传材料", "判决书")
+        if term in query
+    ]
+    exact_terms = list(dict.fromkeys([*amounts, *dates, *articles, *evidence_types]))
+    if any(term in query for term in ("矛盾", "对比", "不一致", "反驳", "印证")):
+        profile = "cross_source"
+    elif exact_terms:
+        profile = "precision"
+    elif any(term in query for term in ("法律", "法规", "构成要件", "规定", "法条")):
+        profile = "legal_knowledge"
+    else:
+        profile = "semantic_fact"
+    return {
+        "profile": profile,
+        "exact_terms": exact_terms,
+        "amounts": amounts,
+        "dates": dates,
+        "articles": articles,
+        "evidence_types": evidence_types,
+    }
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:
@@ -236,7 +266,7 @@ class HybridRetriever:
         self.keyword_diagnostics = {"fts_available": True}
         terms = [term for term in query_terms(query) if len(term) >= 2][:12]
         if not terms:
-            return search_pages(self.case_id, query, limit)
+            return search_pages(self.case_id, query, limit, allow_fallback=False)
         match = " OR ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
         conn = connect()
         try:
@@ -259,7 +289,7 @@ class HybridRetriever:
         # unicode61 does not segment every Chinese legal phrase consistently.
         # Fuse FTS5's BM25 rank with the application's Chinese bigram lexical
         # rank so exact entities and longer concepts both remain recallable.
-        lexical = search_pages(self.case_id, query, max(limit, 20))
+        lexical = search_pages(self.case_id, query, max(limit, 20), allow_fallback=False)
         fused: dict[tuple[int, int], dict[str, Any]] = {}
         for channel, weight, candidates in (("fts5", 1.0, results), ("legal-bigram", 0.75, lexical)):
             for rank, item in enumerate(candidates, 1):
@@ -273,6 +303,84 @@ class HybridRetriever:
             item["keyword_rank"] = rank
             item["quote"] = best_quote(item["text"], matches)
         return ranked[:limit]
+
+    def _neighbor_candidates(self, direct: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Fetch adjacent pages for a small set of direct hits."""
+        anchors = [item for item in direct if not item.get("is_neighbor")][:3]
+        if not anchors:
+            return []
+        keys = {(int(item["document_id"]), int(item["page_no"])) for item in anchors}
+        clauses = " OR ".join("(p.document_id = ? AND p.page_no BETWEEN ? AND ?)" for _ in keys)
+        params: list[int] = []
+        for document_id, page_no in keys:
+            params.extend((document_id, max(1, page_no - NEIGHBOR_RADIUS), page_no + NEIGHBOR_RADIUS))
+        conn = connect()
+        try:
+            rows = conn.execute(
+                f"""
+                SELECT p.id AS page_id, p.page_no, p.text, p.summary,
+                       d.id AS document_id, d.name, d.doc_type, d.people, d.date_range
+                FROM pages p JOIN documents d ON d.id = p.document_id
+                WHERE d.case_id = ? AND ({clauses})
+                ORDER BY p.document_id, p.page_no
+                """,
+                (self.case_id, *params),
+            ).fetchall()
+        finally:
+            conn.close()
+        direct_keys = {(int(item["document_id"]), int(item["page_no"])) for item in direct}
+        return [
+            {**rowdict(row), "is_neighbor": True, "proximity": 1}
+            for row in rows
+            if (int(row["document_id"]), int(row["page_no"])) not in direct_keys
+        ]
+
+    @staticmethod
+    def _rerank_candidate(
+        item: dict[str, Any], query: str, signals: dict[str, Any], rrf_score: float,
+    ) -> tuple[float, dict[str, float]]:
+        text = " ".join(str(item.get(field, "")) for field in ("name", "doc_type", "people", "text")).lower()
+        terms = [term.lower() for term in signals["exact_terms"]]
+        query_terms_set = {term.lower() for term in query_terms(query) if len(term) >= 2}
+        matched_terms = {term for term in query_terms_set if term in text}
+        exact_hits = {term for term in terms if term in text}
+        components = {
+            "rrf": rrf_score,
+            "term_coverage": min(0.22, 0.22 * len(matched_terms) / max(1, len(query_terms_set))),
+            "exact_signal": min(0.3, 0.1 * len(exact_hits)),
+            "channel_agreement": 0.08 if len(item.get("channels", [])) > 1 else 0.0,
+            "direct_page": 0.08 if not item.get("is_neighbor") else 0.0,
+            "neighbor_penalty": -0.12 if item.get("is_neighbor") else 0.0,
+            "evidence_type": 0.08 if signals["evidence_types"] and any(term.lower() in text for term in signals["evidence_types"]) else 0.0,
+        }
+        return sum(components.values()), components
+
+    @staticmethod
+    def _select_diverse(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+        if not items:
+            return []
+        max_per_document = max(2, math.ceil(limit * 0.6))
+        selected: list[dict[str, Any]] = []
+        counts: dict[int, int] = {}
+        for item in items:
+            document_id = int(item["document_id"])
+            if document_id in counts:
+                continue
+            selected.append(item)
+            counts[document_id] = 1
+            if len(selected) >= limit:
+                return selected
+        for item in items:
+            if item in selected:
+                continue
+            document_id = int(item["document_id"])
+            if counts.get(document_id, 0) >= max_per_document:
+                continue
+            selected.append(item)
+            counts[document_id] = counts.get(document_id, 0) + 1
+            if len(selected) >= limit:
+                break
+        return selected
 
     def vector_search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
         vectors, backend = self.embedding_client.embed([query])
@@ -331,50 +439,93 @@ class HybridRetriever:
         return output
 
     def retrieve(self, query: str, limit: int = 6) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if not isinstance(query, str) or not query.strip():
+            return [], {
+                "mode": "FTS5/BM25 + Legal Lexical + Vector + RRF",
+                "retrieval_mode": "hybrid_rrf", "strategy": "adaptive_hybrid_rerank", "source_count": 0,
+                "confidence": "low", "confidence_reasons": ["empty_query"],
+                "direct_match_count": 0, "neighbor_count": 0, "source_diversity": 0,
+                "degraded": False,
+            }
         started = time.perf_counter()
         expanded_query = expand_retrieval_query(query)
-        keyword = self.keyword_search(expanded_query, max(limit * 3, 12))
-        vector = self.vector_search(expanded_query, max(limit * 3, 12))
+        signals = query_signals(query)
+        candidate_limit = min(MAX_RETRIEVAL_CANDIDATES, max(limit * 8, 24))
+        keyword = self.keyword_search(expanded_query, candidate_limit)
+        vector = self.vector_search(expanded_query, candidate_limit)
         fused: dict[tuple[int, int], dict[str, Any]] = {}
         rrf_k = 60
         # The deterministic hashed fallback is deliberately cheap and useful as
         # a recall channel, but it is not a semantic model and must not outrank
-        # exact legal terms, amounts or document names.  A real local embedding
-        # model retains the original higher fusion weight.
+        # exact legal terms, amounts or document names.
         vector_backend = vector[0].get("query_embedding_backend") if vector else "none"
-        vector_weight = 0.35 if vector_backend == "hashed-local" else 0.85
+        vector_weight = 0.25 if vector_backend == "hashed-local" else (0.75 if signals["profile"] == "precision" else 0.85)
         for channel, weight, results in (("bm25", 1.0, keyword), ("vector", vector_weight, vector)):
             for rank, item in enumerate(results, 1):
                 key = (int(item["document_id"]), int(item["page_no"]))
-                target = fused.setdefault(key, {**item, "rrf_score": 0.0, "channels": []})
+                target = fused.setdefault(key, {**item, "rrf_score": 0.0, "channels": [], "is_neighbor": False})
                 target["rrf_score"] += weight / (rrf_k + rank)
                 target["channels"].append(channel)
                 for field in ("keyword_rank", "vector_rank", "vector_score", "query_embedding_backend"):
                     if field in item:
                         target[field] = item[field]
-        ranked = sorted(fused.values(), key=lambda item: (-item["rrf_score"], item["document_id"], item["page_no"]))
-        for rank, item in enumerate(ranked[:limit], 1):
+        direct = list(fused.values())
+        for item in self._neighbor_candidates(sorted(direct, key=lambda row: -row["rrf_score"])):
+            key = (int(item["document_id"]), int(item["page_no"]))
+            if key not in fused:
+                fused[key] = {**item, "rrf_score": 0.0, "channels": []}
+        for item in fused.values():
+            rerank, components = self._rerank_candidate(item, query, signals, float(item["rrf_score"]))
+            item["rerank_score"] = round(rerank, 6)
+            item["rerank_components"] = {key: round(value, 6) for key, value in components.items()}
+            item["quote"] = best_quote(item["text"], query_terms(query))
+        ranked = sorted(fused.values(), key=lambda item: (-item["rerank_score"], item["document_id"], item["page_no"]))
+        selected = self._select_diverse(ranked, limit)
+        for rank, item in enumerate(selected, 1):
             item["rank"] = rank
             item["rrf_score"] = round(item["rrf_score"], 6)
             item["retrieval_explain"] = (
-                f"RRF={item['rrf_score']}; BM25#{item.get('keyword_rank', '-')}; "
-                f"Vector#{item.get('vector_rank', '-')}"
+                f"重排={item['rerank_score']}; RRF={item['rrf_score']}; "
+                f"BM25#{item.get('keyword_rank', '-')}; Vector#{item.get('vector_rank', '-')}"
             )
+        direct_match_count = sum(1 for item in selected if not item.get("is_neighbor"))
+        neighbor_count = sum(1 for item in selected if item.get("is_neighbor"))
+        source_diversity = len({int(item["document_id"]) for item in selected})
+        reasons = []
+        if not selected:
+            reasons.append("no_retrieval_match")
+        if direct_match_count == 0 and selected:
+            reasons.append("neighbor_only")
+        if source_diversity < 2 and selected:
+            reasons.append("single_source")
+        if vector_backend == "hashed-local":
+            reasons.append("degraded_embedding")
+        confidence = "high" if selected and not reasons else "medium" if selected else "low"
+        if "no_retrieval_match" in reasons:
+            confidence = "low"
         metrics = {
             "mode": "FTS5/BM25 + Legal Lexical + Vector + RRF",
             "retrieval_mode": "hybrid_rrf",
-            "source_count": len(ranked[:limit]),
+            "strategy": "adaptive_hybrid_rerank",
+            "source_count": len(selected),
             "keyword_candidates": len(keyword),
             "vector_candidates": len(vector),
             "vector_weight": vector_weight,
             "fused_candidates": len(fused),
+            "query_profile": signals["profile"],
+            "query_signals": signals,
+            "direct_match_count": direct_match_count,
+            "neighbor_count": neighbor_count,
+            "source_diversity": source_diversity,
+            "confidence": confidence,
+            "confidence_reasons": reasons,
             "query_expansion": expanded_query if expanded_query != query else "none",
             "latency_ms": round((time.perf_counter() - started) * 1000),
             "degraded": bool(self.vector_diagnostics.get("degraded")) or not self.keyword_diagnostics.get("fts_available", True),
             "embedding": dict(self.vector_diagnostics),
             "keyword": dict(self.keyword_diagnostics),
         }
-        return ranked[:limit], metrics
+        return selected, metrics
 
 
 def remember(

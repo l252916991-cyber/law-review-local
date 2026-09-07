@@ -432,7 +432,7 @@ def detect_route(question: str) -> str:
     return "事实检索"
 
 
-def search_pages(case_id: int, question: str, limit: int = 8) -> list[dict[str, Any]]:
+def search_pages(case_id: int, question: str, limit: int = 8, *, allow_fallback: bool = True) -> list[dict[str, Any]]:
     terms = query_terms(question)
     conn = connect()
     try:
@@ -464,7 +464,7 @@ def search_pages(case_id: int, question: str, limit: int = 8) -> list[dict[str, 
             item["quote"] = best_quote(item["text"], matches)
             scored.append((score, item))
     scored.sort(key=lambda x: (-x[0], x[1]["document_id"], x[1]["page_no"]))
-    if not scored:
+    if not scored and allow_fallback:
         fallback = [rowdict(x) for x in rows[:limit]]
         for item in fallback:
             item["score"] = 0

@@ -297,6 +297,32 @@ class RAGRRFFusionTest(IsolatedDatabaseTestCase):
 
         # 应该有结果
         self.assertGreater(len(hybrid_results), 0)
+    def test_adaptive_metrics_and_explanations(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("固定回报", limit=5)
+
+        self.assertEqual(metrics["strategy"], "adaptive_hybrid_rerank")
+        self.assertEqual(metrics["query_profile"], "semantic_fact")
+        self.assertGreaterEqual(metrics["direct_match_count"], 1)
+        self.assertGreaterEqual(metrics["source_diversity"], 1)
+        self.assertIn(metrics["confidence"], {"high", "medium", "low"})
+        self.assertTrue(all("rerank_score" in item and "rerank_components" in item for item in results))
+
+    def test_unrelated_query_does_not_return_first_pages(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("火星采矿许可证", limit=5)
+
+        self.assertEqual(results, [])
+        self.assertEqual(metrics["confidence"], "low")
+        self.assertIn("no_retrieval_match", metrics["confidence_reasons"])
+
+    def test_neighbor_pages_are_deduplicated_and_marked(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("固定回报", limit=5)
+
+        keys = [(item["document_id"], item["page_no"]) for item in results]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(metrics["neighbor_count"], sum(bool(item.get("is_neighbor")) for item in results))
 
 
 if __name__ == "__main__":
