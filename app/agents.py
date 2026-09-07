@@ -21,6 +21,7 @@ from typing import Any, Callable
 from .db import connect, now, transaction
 from .rag import HybridRetriever, recall_memories, remember
 from .services import call_local_llm, concise, detect_route, rowdict
+from .statutory_retrieval import retrieve_statutory
 
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ def specialist_specs(coordinator: Any) -> dict[str, SubAgentSpec]:
         "evidence": SubAgentSpec("evidence", "证据 Agent", "case_pages_and_evidence_catalog", "evidence-v1", ("retrieve",), coordinator.evidence_agent.run),
         "contradiction": SubAgentSpec("contradiction", "矛盾 Agent", "case_pages_and_evidence_catalog", "contradiction-v1", ("retrieve",), coordinator.contradiction_agent.run),
         "gap_detection": SubAgentSpec("gap_detection", "疏漏 Agent", "case_pages_and_evidence_catalog", "gap-v1", ("retrieve", "facts", "evidence"), coordinator.gap_detection_agent.run),
+        "statutory_conflict": SubAgentSpec("statutory_conflict", "法条核验 Agent", "legal_corpus", "statutory-v1", ("retrieve",), lambda question, contexts: StatutoryConflictAgent().run(question, contexts)),
     }
 
 
@@ -151,6 +153,9 @@ class PlannerAgent:
         ]
         if route == "多文档对比" or any(term in question for term in ("口供", "陈述", "审批")):
             nodes.append(PlanNode("contradiction", "矛盾 Agent", ("retrieve",), "跨文件比对否认、确认与客观记录"))
+
+        if any(term in question for term in ("法律", "法规", "构成要件", "规定", "法条")):
+            nodes.append(PlanNode("statutory_conflict", "法条核验 Agent", ("retrieve",), "检索指定版本法条并提示证据与法条核验事项", "legal_corpus", "statutory-v1"))
 
         # 自动添加疏漏检测节点
         if any(term in question for term in ("疏漏", "完整性", "缺失", "遗漏", "缺少", "待补")):
@@ -268,6 +273,21 @@ class ContradictionAgent:
             "summary": f"识别 {len(conflicts)} 组候选矛盾，需由律师回看原页确认",
             "conflicts": conflicts,
         }
+
+
+class StatutoryConflictAgent:
+    role = "法条核验 Agent"
+
+    def run(self, question: str, contexts: list[dict[str, Any]]) -> dict[str, Any]:
+        result = retrieve_statutory(question)
+        items = [
+            {"law_name": hit.get("law_name"), "article_number": hit.get("article_number"),
+             "version_date": hit.get("version_date"), "source_url": hit.get("source_url"),
+             "text": concise(hit.get("text", ""), 400)}
+            for hit in result["hits"]
+        ]
+        return {"status": result["status"], "summary": result["summary"], "statutes": items,
+                "warning": result.get("warning"), "needs_lawyer_review": result["status"] != "ok"}
 
 
 class AnalysisAgent:

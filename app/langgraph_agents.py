@@ -27,6 +27,7 @@ from .agents import (
     PlannerAgent,
     RetrievalAgent,
     ContradictionAgent,
+    StatutoryConflictAgent,
     _citation,
     answer_contract,
     failure_diagnostic,
@@ -306,6 +307,16 @@ class LangGraphCoordinator:
         )
         return {"specialist_outputs": {"gap_detection": output}}
 
+    def _statutory_conflict_node(self, state: ReviewState) -> dict[str, Any]:
+        if "statutory_conflict" not in self._plan_names(state):
+            return {"node_status": {"statutory_conflict": "skipped"}}
+        output = self._run_node(
+            state, "statutory_conflict", "法条核验 Agent",
+            {"input_scope": "legal_corpus", "output_schema": "statutory-v1"},
+            lambda: validate_specialist_output(StatutoryConflictAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="statutory-v1"),
+        )
+        return {"specialist_outputs": {"statutory_conflict": output}}
+
     def _critic_node(self, state: ReviewState) -> dict[str, Any]:
         def run() -> dict[str, Any]:
             output = CriticAgent().run(
@@ -403,6 +414,7 @@ class LangGraphCoordinator:
         builder.add_node("evidence", self._evidence_node)
         builder.add_node("contradiction", self._contradiction_node)
         builder.add_node("gap_detection", self._gap_detection_node)
+        builder.add_node("statutory_conflict", self._statutory_conflict_node)
         builder.add_node("critic", self._critic_node)
         builder.add_node("memory", self._memory_node)
         builder.add_edge(START, "planner")
@@ -411,8 +423,9 @@ class LangGraphCoordinator:
         builder.add_edge("retrieve", "facts")
         builder.add_edge("retrieve", "evidence")
         builder.add_edge("retrieve", "contradiction")
+        builder.add_edge("retrieve", "statutory_conflict")
         builder.add_edge(["facts", "evidence", "contradiction"], "gap_detection")
-        builder.add_edge("gap_detection", "critic")
+        builder.add_edge(["gap_detection", "statutory_conflict"], "critic")
         builder.add_edge("critic", "memory")
         builder.add_edge("memory", END)
         return builder.compile(checkpointer=checkpointer, name="law-review-langgraph")
