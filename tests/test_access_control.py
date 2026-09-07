@@ -76,7 +76,11 @@ class AccessControlTests(unittest.TestCase):
         self.client.post('/api/auth/session', json={'token': self.token})
         session = self.client.cookies.get('lexvault_session')
         self.assertNotEqual(session, self.token)
-        self.assertNotIn(self.token, repr(security._sessions))
+        with closing(connect()) as conn:
+            stored = conn.execute("SELECT session_hash,credential_fingerprint FROM auth_sessions").fetchall()
+        self.assertTrue(stored)
+        self.assertNotIn(self.token, repr(stored))
+        self.assertNotIn(session, repr(stored))
         self.assertEqual(self.client.get('/api/cases', headers={'Authorization': f'Bearer {session}'}).status_code, 401)
         self.client.delete('/api/auth/session')
         self.client.cookies.set('lexvault_session', session)
@@ -94,7 +98,36 @@ class AccessControlTests(unittest.TestCase):
         self.client.cookies.set('lexvault_session', self.token)
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
 
-    def test_request_user_name_cannot_forge_audit_identity(self):
+    def test_persisted_session_survives_security_module_reload_and_expiry_is_purged(self):
+        import importlib
+        import app.security as security
+        response = self.client.post("/api/auth/session", json={"token": self.token})
+        self.assertEqual(response.status_code, 200)
+        cookie = self.client.cookies.get("lexvault_session")
+        self.assertTrue(cookie)
+        with closing(connect()) as conn:
+            row = conn.execute("SELECT session_hash,kind,expires_at FROM auth_sessions").fetchone()
+        self.assertEqual(row["kind"], "token")
+        self.assertNotIn(cookie, row["session_hash"])
+        self.assertNotIn(self.token, row["session_hash"])
+        # A fresh module import must still resolve the SQLite-backed session.
+        importlib.reload(security)
+        self.assertEqual(self.client.get("/api/cases").status_code, 200)
+        with transaction() as conn:
+            conn.execute("UPDATE auth_sessions SET expires_at=? WHERE session_hash=?", (0, security._session_hash(cookie)))
+        self.assertEqual(self.client.get("/api/cases").status_code, 401)
+        with closing(connect()) as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
+
+    def test_oidc_and_token_sessions_share_capacity_and_logout_deletes_row(self):
+        from app import security
+        self.client.post("/api/auth/session", json={"token": self.token})
+        cookie = self.client.cookies.get("lexvault_session")
+        with closing(connect()) as conn:
+            self.assertIsNotNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
+        self.client.delete("/api/auth/session")
+        with closing(connect()) as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
         with patch("app.services.call_local_llm", side_effect=AssertionError("no model")):
             response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
         self.assertEqual(response.status_code, 200, response.text)

@@ -33,53 +33,52 @@ from .db import connect, get_db_path, now, record_security_event, transaction
 from .services import egress_opener
 
 SESSION_TTL = 8 * 3600
-_sessions: dict[tuple[str, str], tuple[str, float]] = {}
-_oidc_sessions: dict[tuple[str, str], tuple[str, float]] = {}
-_session_lock = threading.Lock()
 
 
-def _session_key(value: str) -> tuple[str, str]:
-    return (str(get_db_path().resolve()), hashlib.sha256(value.encode()).hexdigest())
+def _session_hash(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _session_key(value: str) -> str:
+    return _session_hash(value)
+
+
+def _purge_sessions() -> None:
+    with transaction() as conn:
+        from .db import purge_expired_sessions
+        purge_expired_sessions(conn)
 
 
 def session_principal(value: str) -> Principal | None:
-    with _session_lock:
-        record = _sessions.get(_session_key(value))
-        if record is not None:
-            fingerprint, expires = record
-            if time.monotonic() >= expires:
-                _sessions.pop(_session_key(value), None)
-                record = None
-    if record is not None:
-        # Resolve current authorization on every request; rotation/removal revokes
-        # existing sessions without preserving a stale principal snapshot.
+    if not value:
+        return None
+    try:
+        with transaction() as conn:
+            from .db import purge_expired_sessions
+            purge_expired_sessions(conn)
+            row = conn.execute(
+                "SELECT kind, credential_fingerprint, oidc_subject FROM auth_sessions WHERE session_hash=? AND expires_at > ?",
+                (_session_hash(value), int(time.time())),
+            ).fetchone()
+    except Exception as exc:
+        logger.error("Session lookup failed (%s)", type(exc).__name__)
+        return None
+    if row is None:
+        return None
+    if row["kind"] == "token":
         for token, principal in configured_tokens().items():
-            if hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(), fingerprint):
+            if hmac.compare_digest(_session_hash(token), row["credential_fingerprint"]):
                 return principal
-    # Not a credential session: it may be an OIDC browser session.
-    return oidc_session_principal(value)
+        return None
+    settings = oidc_settings()
+    return settings["principals"].get(row["oidc_subject"]) if settings else None
 
 
 def oidc_session_principal(request_value: str) -> Principal | None:
-    """Resolve an OIDC browser session against the CURRENT principal mapping.
+    # Compatibility helper retained for callers; all session kinds now resolve
+    # through the durable table and current authorization mappings.
+    return session_principal(request_value)
 
-    Like token sessions, authorization is re-read from configuration on every
-    request: removing or narrowing a subject's mapping revokes live sessions.
-    """
-    if not request_value:
-        return None
-    with _session_lock:
-        record = _oidc_sessions.get(_session_key(request_value))
-        if record is None:
-            return None
-        subject, expires = record
-        if time.monotonic() >= expires:
-            _oidc_sessions.pop(_session_key(request_value), None)
-            return None
-    settings = oidc_settings()
-    if settings is None:
-        return None
-    return settings["principals"].get(subject)
 
 logger = logging.getLogger(__name__)
 
@@ -319,31 +318,57 @@ class Login(BaseModel):
 
 
 def _register_session(fingerprint: str) -> str:
-    """Create one opaque server-side session for a verified credential."""
+    """Create one opaque durable token session for a verified credential."""
     session = secrets.token_urlsafe(32)
-    with _session_lock:
-        current = time.monotonic()
-        for key, (_, expires) in list(_sessions.items()):
-            if expires <= current:
-                del _sessions[key]
-        if len(_sessions) >= 4096:
-            raise HTTPException(503, "会话容量已满，请稍后重试")
-        _sessions[_session_key(session)] = (fingerprint, current + SESSION_TTL)
+    try:
+        with transaction() as conn:
+            from .db import purge_expired_sessions
+            purge_expired_sessions(conn)
+            count = conn.execute("SELECT COUNT(*) FROM auth_sessions").fetchone()[0]
+            if count >= 4096:
+                raise HTTPException(503, "会话容量已满，请稍后重试")
+            conn.execute(
+                "INSERT INTO auth_sessions(session_hash,kind,credential_fingerprint,expires_at,created_at) VALUES (?, 'token', ?, ?, ?)",
+                (_session_hash(session), fingerprint, int(time.time()) + SESSION_TTL, now()),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Session registration failed (%s)", type(exc).__name__)
+        raise HTTPException(503, "会话服务暂不可用") from exc
     return session
 
 
 def _register_oidc_session(subject: str) -> str:
-    """Create one opaque browser session bound to a verified OIDC subject."""
+    """Create one opaque durable session bound to a verified OIDC subject."""
     session = secrets.token_urlsafe(32)
-    with _session_lock:
-        current = time.monotonic()
-        for key, (_, expires) in list(_oidc_sessions.items()):
-            if expires <= current:
-                del _oidc_sessions[key]
-        if len(_oidc_sessions) >= 4096:
-            raise HTTPException(503, "会话容量已满，请稍后重试")
-        _oidc_sessions[_session_key(session)] = (subject, current + SESSION_TTL)
+    try:
+        with transaction() as conn:
+            from .db import purge_expired_sessions
+            purge_expired_sessions(conn)
+            count = conn.execute("SELECT COUNT(*) FROM auth_sessions").fetchone()[0]
+            if count >= 4096:
+                raise HTTPException(503, "会话容量已满，请稍后重试")
+            conn.execute(
+                "INSERT INTO auth_sessions(session_hash,kind,oidc_subject,expires_at,created_at) VALUES (?, 'oidc', ?, ?, ?)",
+                (_session_hash(session), subject, int(time.time()) + SESSION_TTL, now()),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("OIDC session registration failed (%s)", type(exc).__name__)
+        raise HTTPException(503, "会话服务暂不可用") from exc
     return session
+
+
+def _revoke_session(value: str) -> None:
+    if not value:
+        return
+    try:
+        with transaction() as conn:
+            conn.execute("DELETE FROM auth_sessions WHERE session_hash=?", (_session_hash(value),))
+    except Exception as exc:
+        logger.error("Session revocation failed (%s)", type(exc).__name__)
 
 
 def _issue_session_cookie(response: Response, request: Request, session: str) -> None:
@@ -362,8 +387,7 @@ def login(body: Login, request: Request, response: Response):
         record_security_event("auth", "login_failed", detail="无效访问令牌", request_path=request.url.path)
         raise HTTPException(401, "无效访问令牌")
     fingerprint = hashlib.sha256(body.token.encode()).hexdigest()
-    with _session_lock:
-        _sessions.pop(_session_key(request.cookies.get("lexvault_session", "")), None)
+    _revoke_session(request.cookies.get("lexvault_session", ""))
     session = _register_session(fingerprint)
     record_security_event("auth", "login_success", actor=principal.name, request_path=request.url.path)
     _issue_session_cookie(response, request, session)
@@ -373,10 +397,7 @@ def login(body: Login, request: Request, response: Response):
 
 @router.delete("/session")
 def logout(request: Request, response: Response):
-    with _session_lock:
-        key = _session_key(request.cookies.get("lexvault_session", ""))
-        _sessions.pop(key, None)
-        _oidc_sessions.pop(key, None)
+    _revoke_session(request.cookies.get("lexvault_session", ""))
     record_security_event("auth", "logout", request_path=request.url.path)
     response.delete_cookie("lexvault_session")
     return {"logged_out": True}
