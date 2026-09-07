@@ -1,3 +1,4 @@
+import io
 import os
 import tempfile
 import unittest
@@ -30,6 +31,46 @@ class BankTransactionParserTest(unittest.TestCase):
         from app.bank_transactions import parse_csv
         with self.assertRaises(ValueError):
             parse_csv(("账号,金额\n" + "a,1\n" * 100001).encode())
+
+    def test_xlsx_uses_value_only_parser_and_keeps_sheet_provenance(self):
+        from datetime import date
+
+        from openpyxl import Workbook
+
+        from app.bank_transactions import parse_spreadsheet
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "流水"
+        sheet.append(["账号", "收支方向", "交易金额", "交易日期", "对方户名", "摘要"])
+        sheet.append(["A", "收入", 12.5, date(2024, 1, 2), "B", "入账"])
+        formula_sheet = workbook.create_sheet("公式")
+        formula_sheet.append(["账号", "收支方向", "交易金额", "交易日期", "对方户名"])
+        formula_sheet.append(["A", "收入", "=1+1", date(2024, 1, 3), "C"])
+        payload = io.BytesIO()
+        workbook.save(payload)
+
+        rows = parse_spreadsheet(payload.getvalue(), "流水.xlsx")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].source_sheet, "流水")
+        self.assertEqual(rows[0].amount_minor, 1250)
+        self.assertEqual(rows[0].transaction_time, "2024-01-02")
+        # Formula cells are not executed; without a cached value they remain a
+        # review item instead of being treated as a calculated amount.
+        self.assertIsNone(rows[1].amount_minor)
+        self.assertIn("missing_amount_value", rows[1].warnings)
+
+    def test_spreadsheet_payload_limit_is_checked_before_parsing(self):
+        from app.bank_transactions import MAX_PAYLOAD_BYTES, parse_spreadsheet
+
+        with self.assertRaises(ValueError):
+            parse_spreadsheet(b"x" * (MAX_PAYLOAD_BYTES + 1), "流水.xlsx")
+
+    def test_malformed_spreadsheet_is_a_bounded_value_error(self):
+        from app.bank_transactions import parse_spreadsheet
+
+        with self.assertRaisesRegex(ValueError, "无法解析"):
+            parse_spreadsheet(b"not-a-workbook", "流水.xlsx")
 
 
 class BankTransactionServiceTest(IsolatedDatabaseTestCase):
@@ -74,3 +115,30 @@ class BankTransactionServiceTest(IsolatedDatabaseTestCase):
             conn.execute("DELETE FROM cases WHERE id=?", (case_id,))
         with connect() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM bank_transactions WHERE case_id=?", (case_id,)).fetchone()[0], 0)
+
+    def test_xlsx_upload_is_indexed_and_persisted_with_sheet_reference(self):
+        from datetime import date
+
+        from openpyxl import Workbook
+
+        from app.db import connect
+        from app.services import index_upload, parse_spreadsheet, persist_parsed_bank_rows
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "主表"
+        sheet.append(["账号", "收支方向", "交易金额", "交易日期", "对方户名"])
+        sheet.append(["A", "支出", 20, date(2024, 2, 1), "C"])
+        payload = io.BytesIO()
+        workbook.save(payload)
+        content = payload.getvalue()
+
+        document = index_upload(1, "流水.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        rows = parse_spreadsheet(content, "流水.xlsx")
+        result = persist_parsed_bank_rows(1, document["id"], document["content_hash"], rows)
+
+        self.assertEqual(document["pages"], 1)
+        self.assertEqual(result["parsed"], 1)
+        with connect() as conn:
+            stored = conn.execute("SELECT source_sheet, amount_minor, direction FROM bank_transactions WHERE source_document_id=?", (document["id"],)).fetchone()
+        self.assertEqual(tuple(stored), ("主表", 2000, "outflow"))

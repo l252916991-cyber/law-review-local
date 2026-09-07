@@ -47,8 +47,10 @@ from .services import (
     list_bank_transactions,
     local_llm_available,
     persist_bank_transactions,
+    persist_parsed_bank_rows,
     rowdict,
     safe_filename,
+    parse_spreadsheet,
     search_pages,
     summarize_bank_transactions,
     upload_error_message,
@@ -1373,15 +1375,20 @@ def case_platform_metrics(case_id: int):
 @app.post("/api/cases/{case_id}/bank-transactions/import", status_code=201)
 async def import_bank_transactions(case_id: int, file: UploadFile = File(...)):
     require_case(case_id)
-    if not (file.filename or "").lower().endswith(".csv"):
-        raise HTTPException(400, "首期流水解析仅支持 CSV；XLS/XLSX 将在明确依赖后开放")
+    if not (file.filename or "").lower().endswith((".csv", ".xlsx", ".xls")):
+        raise HTTPException(400, "流水文件仅支持 CSV、XLSX、XLS")
     payload = await file.read(config.max_upload_size + 1)
     await file.close()
     if len(payload) > config.max_upload_size:
         raise HTTPException(413, "流水文件超过单文件大小限制")
     try:
-        result = index_upload(case_id, file.filename or "bank-transactions.csv", payload, "text/csv")
-        persisted = persist_bank_transactions(case_id, result["id"], result.get("content_hash", ""), payload)
+        result = index_upload(case_id, file.filename or "bank-transactions.csv", payload, file.content_type)
+        source_hash = result.get("content_hash", "")
+        if (file.filename or "").lower().endswith((".xlsx", ".xls")):
+            rows = parse_spreadsheet(payload, file.filename or "")
+            persisted = persist_bank_transactions(case_id, result["id"], source_hash, payload) if not rows else persist_parsed_bank_rows(case_id, result["id"], source_hash, rows)
+        else:
+            persisted = persist_bank_transactions(case_id, result["id"], source_hash, payload)
     except (ValueError, OSError) as exc:
         raise HTTPException(400, upload_error_message(exc)) from exc
     record_security_event("bank_import", "success", actor=actor_name(), case_id=case_id,

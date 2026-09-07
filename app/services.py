@@ -28,7 +28,7 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
-from .bank_transactions import PARSER_VERSION, parse_csv
+from .bank_transactions import PARSER_VERSION, parse_csv, parse_spreadsheet
 
 
 class ArchivedConversationError(ValueError):
@@ -150,9 +150,7 @@ def upload_error_message(exc: Exception) -> str:
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"
 
 
-def persist_bank_transactions(case_id: int, document_id: int, source_hash: str, payload: bytes, *, sheet: str = "") -> dict[str, Any]:
-    """Parse and idempotently persist explicit bank CSV rows for one document."""
-    rows = parse_csv(payload, sheet=sheet)
+def _persist_parsed_bank_rows(case_id: int, document_id: int, source_hash: str, rows: list[Any]) -> dict[str, Any]:
     with transaction() as conn:
         document = conn.execute("SELECT case_id FROM documents WHERE id=?", (document_id,)).fetchone()
         if not document or document["case_id"] != case_id:
@@ -163,6 +161,16 @@ def persist_bank_transactions(case_id: int, document_id: int, source_hash: str, 
                 (case_id, document_id, source_hash, item.source_sheet, item.source_row_number, json.dumps({"document_id": document_id, "sheet": item.source_sheet, "row": item.source_row_number}, ensure_ascii=False), item.account, item.direction, item.amount_minor, item.currency, item.amount_raw, item.transaction_time, item.time_raw, item.counterparty, item.memo, item.raw_row_json, item.parse_status, json.dumps(item.warnings, ensure_ascii=False), PARSER_VERSION, item.row_fingerprint, now()),
             )
     return {"rows": len(rows), "parsed": sum(x.parse_status == "parsed" for x in rows), "needs_review": sum(x.parse_status == "needs_review" for x in rows), "parser_version": PARSER_VERSION}
+
+
+def persist_bank_transactions(case_id: int, document_id: int, source_hash: str, payload: bytes, *, sheet: str = "") -> dict[str, Any]:
+    """Parse and idempotently persist explicit bank CSV rows for one document."""
+    return _persist_parsed_bank_rows(case_id, document_id, source_hash, parse_csv(payload, sheet=sheet))
+
+
+def persist_parsed_bank_rows(case_id: int, document_id: int, source_hash: str, rows: list[Any]) -> dict[str, Any]:
+    """Persist already parsed spreadsheet rows through the CSV-equivalent contract."""
+    return _persist_parsed_bank_rows(case_id, document_id, source_hash, rows)
 
 
 def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, account: str | None = None, direction: str | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None) -> dict[str, Any]:
@@ -314,6 +322,16 @@ def extract_pages(path: Path, mime_type: str) -> list[str]:
         return extract_docx_pages(path)
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}:
         return extract_image_text(path)
+    if suffix in {".xls", ".xlsx"}:
+        _check_parse_budget(path)
+        rows = parse_spreadsheet(path.read_bytes(), path.name)
+        if not rows:
+            return [""]
+        lines = [
+            f"【工作表：{row.source_sheet or '默认'}｜第{row.source_row_number}行】\n{row.raw_row_json}"
+            for row in rows
+        ]
+        return _cap_total_text(["\n\n".join(lines[i : i + 200]) for i in range(0, len(lines), 200)])
     # The client-provided MIME type is not an authorization to parse an
     # arbitrary active format (HTML/SVG) as a trusted text document.
     if suffix in {".txt", ".md", ".csv", ".json", ".log"}:
