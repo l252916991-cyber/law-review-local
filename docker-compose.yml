@@ -22,12 +22,12 @@ services:
     build: .
     image: lexvault-local
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
-      LAW_REVIEW_ALLOWED_HOSTS: localhost,127.0.0.1
+      LAW_REVIEW_ALLOWED_HOSTS: ${LAW_REVIEW_ALLOWED_HOSTS:-localhost,127.0.0.1}
     volumes:
       - web-data:/data
     depends_on:
