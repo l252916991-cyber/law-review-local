@@ -31,6 +31,10 @@ from .config import LLMConfig
 from .bank_transactions import PARSER_VERSION, parse_csv
 
 
+class ArchivedConversationError(ValueError):
+    """Raised when a read-only archived conversation is used for new chat."""
+
+
 LOCAL_LLM_URL = LLMConfig.from_env().base_url
 LOCAL_LLM_MODEL = LLMConfig.from_env().model
 logger = logging.getLogger(__name__)
@@ -797,10 +801,12 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
     with transaction() as conn:
         if conversation_id:
             valid = conn.execute(
-                "SELECT id FROM conversations WHERE id = ? AND case_id = ?", (conversation_id, case_id)
+                "SELECT id, archived_at FROM conversations WHERE id = ? AND case_id = ?", (conversation_id, case_id)
             ).fetchone()
             if not valid:
                 conversation_id = None
+            elif valid["archived_at"] is not None:
+                raise ArchivedConversationError("该会话已归档，只能查看历史记录；如需继续提问，请新建会话")
         if not conversation_id:
             conversation_id = conn.execute(
                 "INSERT INTO conversations(case_id, user_name, title, created_at) VALUES (?, ?, ?, ?)",

@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -596,6 +596,29 @@ CREATE TABLE IF NOT EXISTS bank_transaction_relations (
     )
 
 
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    _execute_script(
+        conn,
+        """
+ALTER TABLE conversations ADD COLUMN archived_at TEXT;
+ALTER TABLE conversations ADD COLUMN archive_expires_at INTEGER;
+ALTER TABLE conversations ADD COLUMN archived_by TEXT;
+CREATE INDEX IF NOT EXISTS idx_conversations_archive_expiry ON conversations(archive_expires_at);
+""",
+    )
+
+
+CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+
+
+def purge_expired_conversations(conn: sqlite3.Connection, current_epoch: int | None = None) -> int:
+    current_epoch = int(time.time()) if current_epoch is None else current_epoch
+    return conn.execute(
+        "DELETE FROM conversations WHERE archive_expires_at IS NOT NULL AND archive_expires_at <= ?",
+        (current_epoch,),
+    ).rowcount
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -603,7 +626,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
@@ -622,6 +645,8 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
                 (now(),),
             )
             conn.execute("UPDATE review_jobs SET status='interrupted', error_json='{}', finished_at=? WHERE status IN ('queued','running')", (now(),))
+    with transaction() as conn:
+        purge_expired_conversations(conn)
     sync_fts_index()
 
 

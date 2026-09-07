@@ -20,9 +20,21 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
 from .config import config
-from .db import connect, get_db_path, init_db, now, process_ownership, record_security_event, sync_fts_index, transaction
+from .db import (
+    CONVERSATION_ARCHIVE_RETENTION_SECONDS,
+    connect,
+    get_db_path,
+    init_db,
+    now,
+    process_ownership,
+    purge_expired_conversations,
+    record_security_event,
+    sync_fts_index,
+    transaction,
+)
 from .logger import request_id as logger_request_id
 from .services import (
+    ArchivedConversationError,
     auto_analyze_case,
     build_export,
     build_export_package,
@@ -1058,6 +1070,8 @@ def analyze(case_id: int):
 @app.get("/api/cases/{case_id}/conversations")
 def list_conversations(case_id: int):
     require_case(case_id)
+    with transaction() as cleanup_conn:
+        purge_expired_conversations(cleanup_conn)
     conn = connect()
     try:
         rows = conn.execute(
@@ -1067,13 +1081,72 @@ def list_conversations(case_id: int):
             """,
             (case_id,),
         ).fetchall()
-        return [rowdict(x) for x in rows]
+        result = []
+        for row in rows:
+            item = rowdict(row)
+            item["archived"] = item["archived_at"] is not None
+            result.append(item)
+        return result
     finally:
         conn.close()
 
 
+@app.post("/api/conversations/{conversation_id}/archive")
+def archive_conversation(conversation_id: int):
+    archived_by = actor_name()
+    expires_at = int(time.time()) + CONVERSATION_ARCHIVE_RETENTION_SECONDS
+    with transaction() as conn:
+        purge_expired_conversations(conn)
+        conversation = conn.execute(
+            "SELECT id, case_id, title, archived_at, archive_expires_at, archived_by FROM conversations WHERE id=?",
+            (conversation_id,),
+        ).fetchone()
+        if not conversation:
+            raise HTTPException(404, "会话不存在")
+        if conversation["archived_at"] is None:
+            archived_at = now()
+            conn.execute(
+                "UPDATE conversations SET archived_at=?, archive_expires_at=?, archived_by=? WHERE id=?",
+                (archived_at, expires_at, archived_by, conversation_id),
+            )
+        else:
+            archived_at = conversation["archived_at"]
+            expires_at = conversation["archive_expires_at"]
+            archived_by = conversation["archived_by"]
+        conn.execute(
+            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '归档AI阅卷会话', ?, ?)",
+            (conversation["case_id"], f"{archived_by}：会话#{conversation_id}（{conversation['title'][:60]}）", now()),
+        )
+    return {
+        "conversation_id": conversation_id,
+        "archived": True,
+        "archived_at": archived_at,
+        "archive_expires_at": expires_at,
+        "archived_by": archived_by,
+        "message": "会话已归档，将保留七天后自动清理",
+    }
+
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int):
+    with transaction() as conn:
+        purge_expired_conversations(conn)
+        conversation = conn.execute("SELECT id, case_id, title FROM conversations WHERE id=?", (conversation_id,)).fetchone()
+        if not conversation:
+            raise HTTPException(404, "会话不存在")
+        message_count = conn.execute("SELECT COUNT(*) FROM messages WHERE conversation_id=?", (conversation_id,)).fetchone()[0]
+        conn.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+        conn.execute(
+            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '永久删除AI阅卷会话', ?, ?)",
+            (conversation["case_id"], f"{actor_name()}：会话#{conversation_id}（{conversation['title'][:60]}），消息{message_count}条", now()),
+        )
+    return {"conversation_id": conversation_id, "deleted": True, "messages_deleted": message_count, "message": "会话及其消息已永久删除，无法恢复"}
+
+
 @app.get("/api/conversations/{conversation_id}/messages")
 def conversation_messages(conversation_id: int):
+    with transaction() as cleanup_conn:
+        purge_expired_conversations(cleanup_conn)
     conn = connect()
     try:
         if conn.execute("SELECT id FROM conversations WHERE id=?", (conversation_id,)).fetchone() is None:
@@ -1094,6 +1167,8 @@ def case_chat(case_id: int, payload: ChatRequest):
     require_case(case_id)
     try:
         return chat(case_id, payload.question, actor_name(payload.user_name), payload.conversation_id, payload.use_llm)
+    except ArchivedConversationError as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

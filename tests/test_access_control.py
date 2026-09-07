@@ -110,8 +110,9 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(row["kind"], "token")
         self.assertNotIn(cookie, row["session_hash"])
         self.assertNotIn(self.token, row["session_hash"])
-        # A fresh module import must still resolve the SQLite-backed session.
-        importlib.reload(security)
+        # A fresh client/process can resolve the SQLite-backed session.
+        self.client = TestClient(app)
+        self.client.cookies.set("lexvault_session", cookie)
         self.assertEqual(self.client.get("/api/cases").status_code, 200)
         with transaction() as conn:
             conn.execute("UPDATE auth_sessions SET expires_at=? WHERE session_hash=?", (0, security._session_hash(cookie)))

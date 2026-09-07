@@ -368,7 +368,7 @@ G3 放行：对新的组织、实例、数据规模和故障域重新做隔离�
 
 - **P1 子智能体协议**（提交 `d5ebb86` / `e0785a1`）：现有 Facts/Evidence/Contradiction/Gap 运行器统一进入 `SubAgentSpec` registry，声明输入范围、依赖和 output schema；native/LangGraph 共用结构校验，引用索引越界会以结构化失败结束；statutory-conflict 节点按法律问题条件加入，轨迹包含 schema/scope 元数据。
 - **P2 产品法条核验**（提交 `e0785a1`）：新增独立 `statutory_retrieval` adapter，不依赖 benchmark task ID；配置 `LAW_REVIEW_LEGAL_CORPUS_DIR` 后才读取只读法条库；版本歧义、缺失、哈希损坏均返回 `needs_review`，不猜版本、不宣称法律适用正确性。
-- **P3 结构化流水**（当前提交）：schema v8 `bank_transactions` + `bank_transaction_relations`；显式 CSV 导入（普通 CSV 上传不改变），UTF-8/GB18030、中文列别名、Decimal→整数分、方向/日期/金额 warning、行指纹幂等；案件 scoped 分页/summary/资金链路 graph API（account:/party: 命名空间、方向边、聚合交易 ID）；导出包新增资金流水.csv 与 sha256 artifact 清单。
+- **P3 结构化流水**（提交 `7a98a0d`）：schema v8 `bank_transactions` + `bank_transaction_relations`；首期显式 CSV 导入（普通 CSV 上传不改变），UTF-8/GB18030、中文列别名、Decimal→整数分、方向/日期/金额 warning、行指纹幂等；案件 scoped 分页/summary/资金链路 graph API（account:/party: 命名空间、方向边、聚合交易 ID）；导出包新增资金流水.csv 与 sha256 artifact 清单。XLS/XLSX 与真实律所流水仍待依赖/业务验收。
 - **验证**：P1/P2 agent parity 33 tests、P3 bank parser/service 5 tests、完整套件将在本提交前重跑；当前 E33 Docker/TLS 目标机执行和 P3 真实 Excel/律师流水验收仍待外部环境。
 
 - **提交范围**：当前任务分支实现 schema v6 `export_templates`（两个内置模板：刑事阅卷结案包、质证材料包）；区块化渲染器保留默认导出兼容；模板 CRUD（自定义模板仅 manage，内置模板不可改删）；`template_id`/`final=true` 结案端点（export 权限）；必选区块缺失返回明确 400；清单包含模板快照/渲染器版本/最终状态；结案审计记录操作人与包哈希；前端导出页加载模板选择器、普通导出与结案打包两个动作。
