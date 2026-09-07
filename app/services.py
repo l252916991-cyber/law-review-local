@@ -28,6 +28,7 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
+from .bank_transactions import PARSER_VERSION, parse_csv
 
 
 LOCAL_LLM_URL = LLMConfig.from_env().base_url
@@ -143,6 +144,59 @@ def upload_error_message(exc: Exception) -> str:
     if isinstance(exc, subprocess.TimeoutExpired):
         return "文档解析超时；请拆分文件或检查 OCR 资源"
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"
+
+
+def persist_bank_transactions(case_id: int, document_id: int, source_hash: str, payload: bytes, *, sheet: str = "") -> dict[str, Any]:
+    """Parse and idempotently persist explicit bank CSV rows for one document."""
+    rows = parse_csv(payload, sheet=sheet)
+    with transaction() as conn:
+        document = conn.execute("SELECT case_id FROM documents WHERE id=?", (document_id,)).fetchone()
+        if not document or document["case_id"] != case_id:
+            raise ValueError("流水来源文档不属于当前案件")
+        for item in rows:
+            conn.execute(
+                """INSERT OR IGNORE INTO bank_transactions(case_id,source_document_id,source_document_hash,source_sheet,source_row_number,source_ref_json,account,direction,amount_minor,currency,amount_raw,transaction_time,time_raw,counterparty,memo,raw_row_json,parse_status,parse_warnings_json,parser_version,row_fingerprint,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (case_id, document_id, source_hash, item.source_sheet, item.source_row_number, json.dumps({"document_id": document_id, "sheet": item.source_sheet, "row": item.source_row_number}, ensure_ascii=False), item.account, item.direction, item.amount_minor, item.currency, item.amount_raw, item.transaction_time, item.time_raw, item.counterparty, item.memo, item.raw_row_json, item.parse_status, json.dumps(item.warnings, ensure_ascii=False), PARSER_VERSION, item.row_fingerprint, now()),
+            )
+    return {"rows": len(rows), "parsed": sum(x.parse_status == "parsed" for x in rows), "needs_review": sum(x.parse_status == "needs_review" for x in rows), "parser_version": PARSER_VERSION}
+
+
+def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, account: str | None = None, direction: str | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None) -> dict[str, Any]:
+    limit = max(1, min(limit, 500)); offset = max(0, offset)
+    clauses = ["case_id=?"]; params: list[Any] = [case_id]
+    for field, value in (("account", account), ("counterparty", counterparty)):
+        if value: clauses.append(f"{field} LIKE ?"); params.append(f"%{value}%")
+    if direction: clauses.append("direction=?"); params.append(direction)
+    if date_from: clauses.append("transaction_time>=?"); params.append(date_from)
+    if date_to: clauses.append("transaction_time<=?"); params.append(date_to)
+    where = " AND ".join(clauses); conn = connect()
+    try:
+        total = conn.execute(f"SELECT COUNT(*) FROM bank_transactions WHERE {where}", params).fetchone()[0]
+        rows = [rowdict(row) for row in conn.execute(f"SELECT * FROM bank_transactions WHERE {where} ORDER BY transaction_time, id LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()]
+    finally: conn.close()
+    return {"transactions": rows, "pagination": {"total": total, "limit": limit, "offset": offset}}
+
+
+def summarize_bank_transactions(case_id: int, **filters: Any) -> dict[str, Any]:
+    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]
+    inflow = [r for r in rows if r["direction"] == "inflow" and r["amount_minor"] is not None]; outflow = [r for r in rows if r["direction"] == "outflow" and r["amount_minor"] is not None]
+    def group(key: str) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for row in rows:
+            if row["amount_minor"] is not None: result[row[key] or "(空)"] = result.get(row[key] or "(空)", 0) + row["amount_minor"]
+        return result
+    by_period: dict[str, int] = {}
+    for row in rows:
+        if row["amount_minor"] is not None and row["transaction_time"]: by_period[row["transaction_time"][:7]] = by_period.get(row["transaction_time"][:7], 0) + row["amount_minor"]
+    return {"transaction_count": len(rows), "inflow_count": len(inflow), "outflow_count": len(outflow), "inflow_minor": sum(r["amount_minor"] for r in inflow), "outflow_minor": sum(r["amount_minor"] for r in outflow), "net_minor": sum(r["amount_minor"] for r in inflow) - sum(r["amount_minor"] for r in outflow), "currency": rows[0]["currency"] if rows else "CNY", "by_account": group("account"), "by_counterparty": group("counterparty"), "by_period": by_period, "filters": filters}
+
+
+def bank_transaction_graph(case_id: int, **filters: Any) -> dict[str, Any]:
+    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]; nodes: dict[str, dict[str, Any]] = {}; edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        account = f"account:{row['account'] or '(空)'}"; party = f"party:{row['counterparty'] or '(空)'}"; nodes.setdefault(account, {"id": account, "label": row["account"] or "(空)", "kind": "account"}); nodes.setdefault(party, {"id": party, "label": row["counterparty"] or "(空)", "kind": "party"})
+        source, target = (party, account) if row["direction"] == "inflow" else (account, party); key = (source, target, row["currency"]); edge = edges.setdefault(key, {"from": source, "to": target, "relation_type": "资金链路", "currency": row["currency"], "count": 0, "amount_minor": 0, "transaction_ids": [], "unknown_direction": row["direction"] == "unknown"}); edge["count"] += 1; edge["transaction_ids"].append(row["id"]); edge["amount_minor"] += row["amount_minor"] or 0
+    return {"nodes": list(nodes.values()), "edges": list(edges.values()), "transaction_count": len(rows)}
 
 
 def _file_sha256(path: Path) -> str:
@@ -975,6 +1029,14 @@ def build_export_package(
     if not messages:
         chats.append("\n[待补充：暂无问答记录]")
 
+    transactions = list_bank_transactions(case_id, limit=500, offset=0)["transactions"]
+    transaction_csv = io.StringIO()
+    transaction_writer = csv.writer(transaction_csv)
+    transaction_writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
+    for row in transactions:
+        transaction_writer.writerow([csv_safe_cell(row[key]) for key in ("transaction_time", "account", "direction", "amount_minor", "currency", "counterparty", "memo", "source_row_number", "parse_status")])
+    transaction_bytes = ("\ufeff" + transaction_csv.getvalue()).encode("utf-8")
+    transaction_sha = hashlib.sha256(transaction_bytes).hexdigest()
     block_renderers = {
         "case_summary": lambda block: summary,
         "catalog_csv": lambda block: "\ufeff" + directory_csv.getvalue(),
@@ -1003,9 +1065,11 @@ def build_export_package(
             for item in evidence
         ],
         "files": [],
+        "artifacts": [{"archive_name": "资金流水.csv", "sha256": transaction_sha, "transaction_count": len(transactions)}],
     }
 
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("资金流水.csv", transaction_bytes)
         for block in blocks:
             kind = block["type"]
             if kind == "attachments":

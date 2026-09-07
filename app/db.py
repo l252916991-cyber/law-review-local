@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -550,6 +550,52 @@ def purge_expired_sessions(conn: sqlite3.Connection, current_epoch: int | None =
     return conn.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (current_epoch,)).rowcount
 
 
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS bank_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    source_document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+    source_document_hash TEXT NOT NULL DEFAULT '',
+    source_sheet TEXT NOT NULL DEFAULT '',
+    source_row_number INTEGER NOT NULL,
+    source_page_start INTEGER,
+    source_page_end INTEGER,
+    source_ref_json TEXT NOT NULL DEFAULT '{}',
+    account TEXT NOT NULL DEFAULT '',
+    direction TEXT NOT NULL DEFAULT 'unknown' CHECK(direction IN ('inflow','outflow','unknown')),
+    amount_minor INTEGER,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    amount_raw TEXT NOT NULL DEFAULT '',
+    transaction_time TEXT,
+    time_raw TEXT NOT NULL DEFAULT '',
+    counterparty TEXT NOT NULL DEFAULT '',
+    memo TEXT NOT NULL DEFAULT '',
+    raw_row_json TEXT NOT NULL DEFAULT '{}',
+    parse_status TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','needs_review')),
+    parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+    parser_version TEXT NOT NULL,
+    row_fingerprint TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(source_document_id, source_sheet, source_row_number, row_fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_time ON bank_transactions(case_id, transaction_time);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_account ON bank_transactions(case_id, account);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_counterparty ON bank_transactions(case_id, counterparty);
+CREATE TABLE IF NOT EXISTS bank_transaction_relations (
+    transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+    evidence_id INTEGER NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+    relation_type TEXT NOT NULL DEFAULT '资金链路',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(transaction_id, evidence_id, relation_type)
+);
+""",
+    )
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -557,7 +603,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")

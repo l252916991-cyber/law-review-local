@@ -26,15 +26,19 @@ from .services import (
     auto_analyze_case,
     build_export,
     build_export_package,
+    bank_transaction_graph,
     chat,
-    get_export_template,
     contained_path,
+    get_export_template,
     get_document,
     index_upload,
+    list_bank_transactions,
     local_llm_available,
+    persist_bank_transactions,
     rowdict,
     safe_filename,
     search_pages,
+    summarize_bank_transactions,
     upload_error_message,
 )
 from .security import actor_name, allowed_case_ids, require_case_access, require_permission
@@ -1289,6 +1293,43 @@ def case_platform_metrics(case_id: int):
     from .evaluation import platform_metrics
 
     return platform_metrics(case_id)
+
+
+@app.post("/api/cases/{case_id}/bank-transactions/import", status_code=201)
+async def import_bank_transactions(case_id: int, file: UploadFile = File(...)):
+    require_case(case_id)
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(400, "首期流水解析仅支持 CSV；XLS/XLSX 将在明确依赖后开放")
+    payload = await file.read(config.max_upload_size + 1)
+    await file.close()
+    if len(payload) > config.max_upload_size:
+        raise HTTPException(413, "流水文件超过单文件大小限制")
+    try:
+        result = index_upload(case_id, file.filename or "bank-transactions.csv", payload, "text/csv")
+        persisted = persist_bank_transactions(case_id, result["id"], result.get("content_hash", ""), payload)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(400, upload_error_message(exc)) from exc
+    record_security_event("bank_import", "success", actor=actor_name(), case_id=case_id,
+                          detail=f"document:{result['id']} rows:{persisted['rows']}", request_path="/api/cases/%s/bank-transactions/import" % case_id)
+    return {"document": result, "transactions": persisted}
+
+
+@app.get("/api/cases/{case_id}/bank-transactions")
+def get_bank_transactions(case_id: int, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), account: str | None = None, direction: Literal["inflow", "outflow", "unknown"] | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    require_case(case_id)
+    return list_bank_transactions(case_id, limit=limit, offset=offset, account=account, direction=direction, counterparty=counterparty, date_from=date_from, date_to=date_to)
+
+
+@app.get("/api/cases/{case_id}/bank-transactions/summary")
+def get_bank_transaction_summary(case_id: int, account: str | None = None, direction: Literal["inflow", "outflow", "unknown"] | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    require_case(case_id)
+    return summarize_bank_transactions(case_id, account=account, direction=direction, counterparty=counterparty, date_from=date_from, date_to=date_to)
+
+
+@app.get("/api/cases/{case_id}/bank-transactions/graph")
+def get_bank_transaction_graph(case_id: int):
+    require_case(case_id)
+    return bank_transaction_graph(case_id)
 
 
 @app.get("/api/cases/{case_id}/export")

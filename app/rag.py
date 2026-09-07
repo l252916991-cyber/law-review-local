@@ -266,7 +266,7 @@ class HybridRetriever:
         self.keyword_diagnostics = {"fts_available": True}
         terms = [term for term in query_terms(query) if len(term) >= 2][:12]
         if not terms:
-            return search_pages(self.case_id, query, limit)
+            return search_pages(self.case_id, query, limit, allow_fallback=any(term in query for term in ("本案", "证据", "疏漏", "缺失", "待补", "卷宗")))
         match = " OR ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
         conn = connect()
         try:
@@ -289,7 +289,7 @@ class HybridRetriever:
         # unicode61 does not segment every Chinese legal phrase consistently.
         # Fuse FTS5's BM25 rank with the application's Chinese bigram lexical
         # rank so exact entities and longer concepts both remain recallable.
-        lexical = search_pages(self.case_id, query, max(limit, 20))
+        lexical = search_pages(self.case_id, query, max(limit, 20), allow_fallback=any(term in query for term in ("本案", "证据", "疏漏", "缺失", "待补", "卷宗")))
         fused: dict[tuple[int, int], dict[str, Any]] = {}
         for channel, weight, candidates in (("fts5", 1.0, results), ("legal-bigram", 0.75, lexical)):
             for rank, item in enumerate(candidates, 1):
