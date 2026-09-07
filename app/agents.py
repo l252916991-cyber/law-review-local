@@ -90,6 +90,55 @@ class PlanNode:
     role: str
     depends_on: tuple[str, ...]
     objective: str
+    input_scope: str = "case_context"
+    output_schema: str = "specialist-v1"
+
+
+@dataclass(frozen=True)
+class SubAgentSpec:
+    name: str
+    role: str
+    input_scope: str
+    output_schema: str
+    depends_on: tuple[str, ...]
+    runner: Callable[[str, list[dict[str, Any]]], dict[str, Any]]
+
+
+def validate_specialist_output(
+    output: dict[str, Any], contexts: list[dict[str, Any]], *, schema: str = "specialist-v1"
+) -> dict[str, Any]:
+    """Validate specialist structure and bound source indexes to retrieval context."""
+    if not isinstance(output, dict):
+        raise ValueError("specialist output must be an object")
+    normalized = dict(output)
+    normalized.setdefault("schema_version", schema)
+    normalized.setdefault("status", "ok")
+    normalized.setdefault("summary", "")
+    if normalized["status"] not in {"ok", "needs_review", "failed"}:
+        raise ValueError("invalid specialist status")
+    max_index = len(contexts)
+    for key in ("facts", "sources", "conflicts", "gaps", "items"):
+        values = normalized.get(key)
+        if values is None:
+            continue
+        if not isinstance(values, list):
+            raise ValueError(f"specialist field {key} must be a list")
+        for item in values:
+            if not isinstance(item, dict):
+                raise ValueError(f"specialist field {key} contains a non-object")
+            source_index = item.get("source_index", item.get("index"))
+            if source_index is not None and (type(source_index) is not int or not 1 <= source_index <= max_index):
+                raise ValueError(f"specialist source index out of bounds: {source_index}")
+    return normalized
+
+
+def specialist_specs(coordinator: Any) -> dict[str, SubAgentSpec]:
+    return {
+        "facts": SubAgentSpec("facts", "事实 Agent", "all_case_pages", "facts-v1", ("retrieve",), coordinator.fact_agent.run),
+        "evidence": SubAgentSpec("evidence", "证据 Agent", "case_pages_and_evidence_catalog", "evidence-v1", ("retrieve",), coordinator.evidence_agent.run),
+        "contradiction": SubAgentSpec("contradiction", "矛盾 Agent", "case_pages_and_evidence_catalog", "contradiction-v1", ("retrieve",), coordinator.contradiction_agent.run),
+        "gap_detection": SubAgentSpec("gap_detection", "疏漏 Agent", "case_pages_and_evidence_catalog", "gap-v1", ("retrieve", "facts", "evidence"), coordinator.gap_detection_agent.run),
+    }
 
 
 class PlannerAgent:
@@ -660,7 +709,8 @@ class LawReviewCoordinator:
             plan_output = {
                 "summary": f"生成 {len(plan)} 节点 DAG",
                 "nodes": [
-                    {"name": node.name, "role": node.role, "depends_on": list(node.depends_on), "objective": node.objective}
+                            {"name": node.name, "role": node.role, "depends_on": list(node.depends_on), "objective": node.objective,
+                             "input_scope": node.input_scope, "output_schema": node.output_schema}
                     for node in plan
                 ],
             }
@@ -680,14 +730,8 @@ class LawReviewCoordinator:
             retrieval["summary"] = f"双路召回后融合 {len(contexts)} 条页级证据"
             steps.append(self._record_step(run_id, "retrieve", "检索 Agent", "completed", {"query": question}, retrieval, retrieval_started, retrieval_ms))
 
-            specialists: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
-                "facts": ("事实 Agent", lambda: self.fact_agent.run(question, contexts)),
-                "evidence": ("证据 Agent", lambda: self.evidence_agent.run(question, contexts)),
-            }
-            if any(node.name == "contradiction" for node in plan):
-                specialists["contradiction"] = ("矛盾 Agent", lambda: self.contradiction_agent.run(question, contexts))
-            if any(node.name == "gap_detection" for node in plan):
-                specialists["gap_detection"] = ("疏漏 Agent", lambda: self.gap_detection_agent.run(question, contexts))
+            specialists: dict[str, SubAgentSpec] = specialist_specs(self)
+            specialists = {name: spec for name, spec in specialists.items() if name in {node.name for node in plan}}
             specialist_outputs: dict[str, dict[str, Any]] = {}
             pending = set(specialists)
             dependencies = {node.name: set(node.depends_on) for node in plan}
@@ -701,14 +745,17 @@ class LawReviewCoordinator:
                         raise RuntimeError("Invalid or cyclic specialist dependencies")
                     futures = {}
                     for name in ready:
-                        role, function = specialists[name]
-                        futures[pool.submit(copy_context().run, self._timed, function)] = (name, role, now(), time.perf_counter())
+                        spec = specialists[name]
+                        function = lambda spec=spec: spec.runner(question, contexts)
+                        futures[pool.submit(copy_context().run, self._timed, function)] = (name, spec, now(), time.perf_counter())
                     failures = []
                     for future in as_completed(futures):
-                        name, role, submitted_at, submitted_clock = futures[future]
+                        name, spec, submitted_at, submitted_clock = futures[future]
+                        role = spec.role
                         active_node, active_role, active_started = name, role, submitted_at
                         try:
                             output, latency, started_at = future.result()
+                            output = validate_specialist_output(output, contexts, schema=spec.output_schema)
                         except Exception as exc:
                             diagnostic = failure_diagnostic(exc, name)
                             steps.append(self._record_step(
@@ -801,7 +848,7 @@ class LawReviewCoordinator:
                 "agent_type": "DAG Multi-Agent",
                 "plan": plan_output["nodes"],
                 "steps": steps,
-                "tools_used": ["BM25", "Local Embedding", "RRF", *[role for role, _ in specialists.values()], "Critic", "Vector Memory"],
+                "tools_used": ["BM25", "Local Embedding", "RRF", *[spec.role for spec in specialists.values()], "Critic", "Vector Memory"],
                 "citations": citations,
                 "retrieval_metrics": retrieval["metrics"],
                 "memory_hits": memories["items"],

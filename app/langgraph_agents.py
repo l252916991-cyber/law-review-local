@@ -30,6 +30,7 @@ from .agents import (
     _citation,
     answer_contract,
     failure_diagnostic,
+    validate_specialist_output,
 )
 from .db import connect, db_scope, get_db_path, now, transaction
 from .rag import recall_memories, remember
@@ -261,8 +262,8 @@ class LangGraphCoordinator:
             state,
             "facts",
             "事实 Agent",
-            {"context_count": len(state.get("contexts", []))},
-            lambda: FactAgent().run(state["question"], state.get("contexts", [])),
+            {"context_count": len(state.get("contexts", [])), "input_scope": "all_case_pages", "output_schema": "facts-v1"},
+            lambda: validate_specialist_output(FactAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="facts-v1"),
         )
         return {"specialist_outputs": {"facts": output}}
 
@@ -271,8 +272,8 @@ class LangGraphCoordinator:
             state,
             "evidence",
             "证据 Agent",
-            {"context_count": len(state.get("contexts", []))},
-            lambda: EvidenceAgent().run(state["question"], state.get("contexts", [])),
+            {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "evidence-v1"},
+            lambda: validate_specialist_output(EvidenceAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="evidence-v1"),
         )
         return {"specialist_outputs": {"evidence": output}}
 
@@ -283,8 +284,8 @@ class LangGraphCoordinator:
             state,
             "contradiction",
             "矛盾 Agent",
-            {"context_count": len(state.get("contexts", []))},
-            lambda: ContradictionAgent().run(state["question"], state.get("contexts", [])),
+            {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "contradiction-v1"},
+            lambda: validate_specialist_output(ContradictionAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="contradiction-v1"),
         )
         return {"specialist_outputs": {"contradiction": output}}
 
@@ -299,9 +300,9 @@ class LangGraphCoordinator:
                 "context_count": len(state.get("contexts", [])),
                 "dependencies": sorted(state.get("specialist_outputs", {})),
             },
-            lambda: GapDetectionAgent(state["case_id"]).run(
+            lambda: validate_specialist_output(GapDetectionAgent(state["case_id"]).run(
                 state["question"], state.get("contexts", [])
-            ),
+            ), state.get("contexts", []), schema="gap-v1"),
         )
         return {"specialist_outputs": {"gap_detection": output}}
 

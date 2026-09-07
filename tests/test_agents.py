@@ -69,6 +69,21 @@ class MultiAgentRuntimeTest(IsolatedDatabaseTestCase):
     def setUpClass(cls):
         init_db(seed=True)
 
+    def test_subagent_registry_and_structured_output_contract(self):
+        from app.agents import specialist_specs, validate_specialist_output
+        coordinator = create_coordinator(1, False)
+        specs = specialist_specs(coordinator)
+        self.assertEqual(specs["facts"].input_scope, "all_case_pages")
+        self.assertEqual(specs["evidence"].output_schema, "evidence-v1")
+        contexts = [{"document_id": 1, "page_no": 1, "name": "证据.txt", "quote": "事实"}]
+        normalized = validate_specialist_output({"facts": [{"index": 1}], "summary": "ok"}, contexts, schema="facts-v1")
+        self.assertEqual(normalized["schema_version"], "facts-v1")
+        self.assertEqual(normalized["status"], "ok")
+        with self.assertRaises(ValueError):
+            validate_specialist_output({"facts": [{"index": 2}]}, contexts)
+        with self.assertRaises(ValueError):
+            validate_specialist_output({"status": "invalid"}, contexts)
+
     def test_planner_builds_dependency_graph(self):
         route, plan = PlannerAgent().build_plan("张某和李某的陈述是否矛盾？")
         nodes = {node.name: node for node in plan}
