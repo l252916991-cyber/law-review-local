@@ -41,7 +41,7 @@
 
       <div class="sidebar-footer">
         <div class="model-dot" id="model-dot"></div>
-        <div><strong id="model-state">检测本地模型…</strong><span id="model-name">数据不会离开本机</span></div>
+        <button id="model-settings-btn" class="model-settings" type="button" aria-label="配置本地模型"><div><strong id="model-state">检测本地模型…</strong><span id="model-name">数据不会离开本机</span></div><span aria-hidden="true">⚙</span></button>
       </div>
     </aside>
 
@@ -462,6 +462,19 @@
       <div class="form-grid"><label>案号<input id="new-case-no" /></label><label>案件类型<select id="new-case-type"><option>刑事</option><option>金融犯罪</option><option>民商事</option><option>行政</option></select></label><label>当事人<input id="new-case-client" /></label></div>
       <label>案件说明<textarea id="new-case-description" rows="4"></textarea></label>
       <div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog>取消</button><button type="submit" class="primary-button">创建案件</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="model-settings-dialog" class="dialog model-settings-dialog" aria-labelledby="model-settings-title">
+    <form id="model-settings-form">
+      <div class="dialog-header"><div><span class="section-label">本机私有模式</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
+      <p class="model-settings-hint">填写本机模型服务的 OpenAI 兼容地址。模型名称必须与服务端已下载并加载的名称一致。</p>
+      <label>模型服务地址<input id="model-base-url" type="url" required placeholder="http://127.0.0.1:8000/v1" /></label>
+      <label>对话模型<input id="model-chat-name" required placeholder="Qwythos-9B-v2-8bit-mlx" /></label>
+      <label>嵌入模型<input id="model-embedding-name" required placeholder="Qwen3-Embedding-4B-4bit-DWQ" /></label>
+      <label>重排模型<input id="model-rerank-name" required placeholder="bge-reranker-v2-m3-mlx" /></label>
+      <div id="model-settings-status" class="model-settings-status" role="status"></div>
+      <div class="dialog-actions"><button type="button" class="secondary-button" id="model-test-btn">测试连接</button><button type="submit" class="primary-button">保存配置</button></div>
     </form>
   </dialog>
 

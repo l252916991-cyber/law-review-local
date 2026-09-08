@@ -51,6 +51,8 @@ button { cursor: pointer; }
 .sidebar-footer strong, .sidebar-footer span { display: block; }
 .sidebar-footer strong { font-size: 13px; color: #c6dad4; }
 .sidebar-footer span { font-size: 12px; color: #57736b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.model-settings { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; padding: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.model-settings > span { color: #8b978e; font-size: 15px; }
 .model-dot { width: 9px; height: 9px; border-radius: 50%; background: #d89f4a; box-shadow: 0 0 10px rgba(216,159,74,.65); flex: 0 0 auto; }
 .model-dot.online { background: #45c795; box-shadow: 0 0 10px rgba(69,199,149,.8); }
 
@@ -513,3 +515,8 @@ td { line-height: 1.7; }
 .storage-row > div { min-width: 0; overflow-wrap: anywhere; }
 .storage-row small { display: block; color: #747b72; margin-top: 6px; }
 .storage-row button { flex-shrink: 0; padding: 6px 12px; min-height: 32px; border-radius: 10px; }
+.model-settings-dialog { width: min(520px, calc(100vw - 32px)); padding: 24px; border-radius: 24px; }
+.model-settings-dialog label { display: block; margin: 14px 0; }
+.model-settings-dialog input { width: 100%; margin-top: 6px; }
+.model-settings-hint { color: #747b72; font-size: 13px; line-height: 1.6; }
+.model-settings-status { min-height: 22px; color: #65736b; font-size: 13px; }

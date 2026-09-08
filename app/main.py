@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 import time
 import uuid
+import urllib.request
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -249,6 +250,10 @@ class CaseCreate(BaseModel):
     description: str = ""
 
 
+class ModelConfigTest(BaseModel):
+    base_url: str = Field(min_length=8, max_length=500)
+
+
 class DirectoryUpdate(BaseModel):
     doc_type: str | None = None
     people: str | None = None
@@ -379,6 +384,24 @@ def health():
         return {"status": "ok"}
     available, model = local_llm_available()
     return {"status": "ok", "private_mode": True, "local_llm": available, "model": model}
+
+
+@app.post("/api/model-config/test")
+def test_model_config(payload: ModelConfigTest):
+    """Check an OpenAI-compatible local model service without exposing its response body."""
+    require_permission("view")
+    base_url = payload.base_url.rstrip("/")
+    if not base_url.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]")):
+        raise HTTPException(400, "模型服务地址必须是本机地址")
+    try:
+        request = urllib.request.Request(f"{base_url}/models", headers={"Accept": "application/json"})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=5) as response:
+            body = json.loads(response.read())
+        models = [item.get("id") for item in body.get("data", []) if item.get("id")]
+        return {"reachable": True, "models": models}
+    except Exception as exc:
+        raise HTTPException(502, f"无法连接本地模型服务（{type(exc).__name__}）") from exc
 
 
 @app.get("/api/benchmarks/lawbench")

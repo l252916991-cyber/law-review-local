@@ -984,6 +984,9 @@ function showView(name) {
 }
 
 function bindEvents() {
+  $("#model-settings-btn").addEventListener("click", openModelSettings);
+  $("#model-test-btn").addEventListener("click", testModelSettings);
+  $("#model-settings-form").addEventListener("submit", saveModelSettings);
   $$("[data-case-storage]").forEach((button) => button.addEventListener("click", () => openCaseStorage(button.dataset.caseStorage)));
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   $("#auth-dialog").addEventListener("cancel", (event) => event.preventDefault());
@@ -1079,6 +1082,37 @@ function bindEvents() {
     batchDropArea.classList.remove("dragging");
     handleBatchUpload(event.dataTransfer.files);
   });
+}
+
+function modelSettings() {
+  return JSON.parse(localStorage.getItem("lexvault-model-settings") || "{}");
+}
+
+function openModelSettings() {
+  const settings = modelSettings();
+  $("#model-base-url").value = settings.baseUrl || "http://127.0.0.1:8000/v1";
+  $("#model-chat-name").value = settings.chatModel || "";
+  $("#model-embedding-name").value = settings.embeddingModel || "Qwen3-Embedding-4B-4bit-DWQ";
+  $("#model-rerank-name").value = settings.rerankModel || "bge-reranker-v2-m3-mlx";
+  $("#model-settings-status").textContent = "";
+  $("#model-settings-dialog").showModal();
+}
+
+async function testModelSettings() {
+  const status = $("#model-settings-status");
+  status.textContent = "正在检查模型服务…";
+  try {
+    const result = await api("/api/model-config/test", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({base_url: $("#model-base-url").value})});
+    const models = result.models || [];
+    status.textContent = models.length ? `连接成功：发现 ${models.length} 个模型。` : "服务已连接，但没有返回模型。";
+  } catch (error) { status.textContent = `连接失败：${error.message}`; }
+}
+
+function saveModelSettings(event) {
+  event.preventDefault();
+  localStorage.setItem("lexvault-model-settings", JSON.stringify({baseUrl: $("#model-base-url").value.replace(/\/$/, ""), chatModel: $("#model-chat-name").value.trim(), embeddingModel: $("#model-embedding-name").value.trim(), rerankModel: $("#model-rerank-name").value.trim()}));
+  $("#model-settings-status").textContent = "配置已保存。重启本地阅卷服务后生效。";
+  toast("模型配置已保存");
 }
 
 async function createCase(event) {
