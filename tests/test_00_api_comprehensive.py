@@ -31,6 +31,20 @@ class APIContractTest(IsolatedDatabaseTestCase):
             conn.commit()
         cls.client_context.__exit__(None, None, None)
 
+    def test_model_dependency_errors_are_actionable_and_redacted(self):
+        for path, target, payload in [
+            ("vector-index", "app.rag.HybridRetriever.ensure_vector_index", None),
+            ("evaluate-rag", "app.evaluation.evaluate_case", None),
+            ("agent-compare", "app.rag.recall_memories", {"question": "固定回报是否存在矛盾？"}),
+        ]:
+            for code in ("embedding_model_unavailable", "rerank_model_unavailable"):
+                with self.subTest(path=path, code=code), patch(target, side_effect=RuntimeError(code + ":SECRET_TOKEN")):
+                    response = self.client.post(f"/api/cases/1/{path}", json=payload)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()["detail"]["code"], code)
+                self.assertIn("模型", response.json()["detail"]["message"])
+                self.assertNotIn("SECRET_TOKEN", response.text)
+
     def test_health_contract(self):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)

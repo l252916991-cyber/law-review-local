@@ -937,6 +937,7 @@ function showView(name) {
 }
 
 function bindEvents() {
+  $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   $("#auth-dialog").addEventListener("cancel", (event) => event.preventDefault());
   $("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();

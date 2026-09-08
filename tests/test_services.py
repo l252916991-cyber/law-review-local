@@ -297,14 +297,13 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
                 call_local_llm("案件问题", "事实检索", [])
         self.assertIn("未获批准", str(ctx.exception))
 
-    def test_embedding_client_falls_back_instead_of_unapproved_egress(self):
+    def test_embedding_client_fails_without_unapproved_egress(self):
         from app.rag import EmbeddingClient
         with patch.dict(os.environ, {"LAW_REVIEW_EMBEDDING_URL": "http://203.0.113.9:8000/v1"}), \
                 patch("app.rag.urllib.request.build_opener", side_effect=AssertionError("egress attempted")):
             client = EmbeddingClient(prefer_remote=True)
-            vectors, backend = client.embed(["卷宗文本"])
-        self.assertEqual(backend, "hashed-local")
-        self.assertEqual(len(vectors), 1)
+            with self.assertRaisesRegex(RuntimeError, "embedding_model_unavailable:ValueError"):
+                client.embed(["卷宗文本"])
         self.assertEqual(client.last_failure, "ValueError")
 
     def test_egress_opener_refuses_redirects(self):

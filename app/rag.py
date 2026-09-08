@@ -164,6 +164,8 @@ class EmbeddingClient:
                 self.last_failure = type(exc).__name__
                 # Exception text may include a URL, document text or response body.
                 logger.warning("embedding_fallback error_type=%s", self.last_failure)
+        if not self.prefer_remote:
+            return [hashed_embedding(text) for text in texts], "hashed-local"
         raise RuntimeError(f"embedding_model_unavailable:{self.last_failure or 'unknown'}")
 
 
@@ -507,7 +509,8 @@ class HybridRetriever:
             item["rerank_components"] = {key: round(value, 6) for key, value in components.items()}
             item["quote"] = best_quote(item["text"], query_terms(query))
         rerank_items = list(fused.values())
-        rerank_scores = self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
+        rerank_scores = (self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
+                         if self.embedding_client.prefer_remote else None)
         if rerank_scores is not None:
             for item, score in zip(rerank_items, rerank_scores):
                 item["neural_rerank_score"] = round(score, 6)

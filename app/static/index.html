@@ -334,7 +334,7 @@
   </dialog>
 
   <dialog id="annotations-dialog" class="dialog" aria-labelledby="annotations-title">
-    <div class="dialog-header"><h3 id="annotations-title">证据标注</h3><button class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+    <div class="dialog-header"><h3 id="annotations-title">证据标注</h3><button class="close-button" data-close-dialog>×</button></div>
     <div id="annotations-list"></div>
     <form id="annotation-form">
       <input id="annotation-id" type="hidden" />
@@ -346,7 +346,7 @@
   </dialog>
 
   <dialog id="page-dialog" class="dialog page-dialog">
-    <div class="dialog-header"><div><span class="section-label">原页溯源</span><h3 id="page-dialog-title">卷宗原文</h3></div><button class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+    <div class="dialog-header"><div><span class="section-label">原页溯源</span><h3 id="page-dialog-title">卷宗原文</h3></div><button class="close-button" data-close-dialog>×</button></div>
     <div id="page-dialog-meta" class="page-meta"></div><pre id="page-dialog-text"></pre>
   </dialog>
 
@@ -429,12 +429,12 @@
         <span class="section-label">确认删除</span>
         <h3>删除证据</h3>
       </div>
-      <button class="close-button" onclick="this.closest('dialog').close()">×</button>
+      <button class="close-button" data-close-dialog>×</button>
     </div>
     <div style="padding: 24px;">
       <p id="delete-confirm-message" style="margin: 0 0 20px; color: var(--ink);"></p>
       <div class="dialog-actions" style="margin: 0;">
-        <button class="secondary-button" onclick="this.closest('dialog').close()">取消</button>
+        <button class="secondary-button" data-close-dialog>取消</button>
         <button id="confirm-delete-evidence" class="primary-button" style="background: #dc6a58;">确认删除</button>
       </div>
     </div>
@@ -447,11 +447,11 @@
 
   <dialog id="case-dialog" class="dialog">
     <form id="case-form">
-      <div class="dialog-header"><div><span class="section-label">案件空间</span><h3>新建案件</h3></div><button type="button" class="close-button" onclick="this.closest('dialog').close()">×</button></div>
+      <div class="dialog-header"><div><span class="section-label">案件空间</span><h3>新建案件</h3></div><button type="button" class="close-button" data-close-dialog>×</button></div>
       <label>案件名称<input id="new-case-title" required placeholder="例如：某公司合同纠纷案" /></label>
       <div class="form-grid"><label>案号<input id="new-case-no" /></label><label>案件类型<select id="new-case-type"><option>刑事</option><option>金融犯罪</option><option>民商事</option><option>行政</option></select></label><label>当事人<input id="new-case-client" /></label></div>
       <label>案件说明<textarea id="new-case-description" rows="4"></textarea></label>
-      <div class="dialog-actions"><button type="button" class="secondary-button" onclick="this.closest('dialog').close()">取消</button><button type="submit" class="primary-button">创建案件</button></div>
+      <div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog>取消</button><button type="submit" class="primary-button">创建案件</button></div>
     </form>
   </dialog>
 

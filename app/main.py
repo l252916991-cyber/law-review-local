@@ -436,7 +436,7 @@ def list_cases():
                    (SELECT COALESCE(SUM(pages), 0) FROM documents d WHERE d.case_id = c.id) AS page_count,
                    (SELECT COUNT(*) FROM evidence e WHERE e.case_id = c.id) AS evidence_count
             FROM cases c
-            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (where[6:] if where else "")) + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
+            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (" AND " + where[7:] if where else "")) + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
         ).fetchall()
         return [rowdict(x) for x in rows]
     finally:
@@ -1309,6 +1309,19 @@ def resume_agent_run(run_id: int):
         raise HTTPException(500, "恢复失败，请查看服务端诊断事件") from exc
 
 
+def model_operation_error(exc: Exception, fallback: str) -> HTTPException:
+    code = str(exc).split(":", 1)[0]
+    messages = {
+        "embedding_model_unavailable": "嵌入模型不可用，请检查本地模型服务及嵌入模型配置后重试。",
+        "rerank_model_unavailable": "重排模型不可用，请检查本地模型服务及重排模型配置后重试。",
+        "embedding_backend_changed_during_index": "嵌入模型在索引期间发生变化，请确认模型配置后重新构建索引。",
+        "embedding_backend_changed_during_query": "嵌入模型与索引不一致，请重新构建索引。",
+    }
+    if code in messages:
+        return HTTPException(503, {"code": code, "message": messages[code]})
+    return HTTPException(500, fallback)
+
+
 @app.post("/api/cases/{case_id}/agent-compare")
 def compare_agent_runtimes(case_id: int, payload: AgentChatRequest):
     require_case(case_id)
@@ -1355,7 +1368,7 @@ def compare_agent_runtimes(case_id: int, payload: AgentChatRequest):
                     "resume_count": getattr(exc, "resume_count", 0),
                 },
             ) from exc
-        raise HTTPException(500, "双运行时对比失败，请查看服务端诊断事件") from exc
+        raise model_operation_error(exc, "双运行时对比失败，请查看服务端诊断事件") from exc
 
 
 @app.post("/api/cases/{case_id}/vector-index")
@@ -1388,7 +1401,7 @@ def build_vector_index(case_id: int):
     except ImportError as exc:
         raise HTTPException(503, "向量检索依赖不可用；请按锁文件重新安装依赖") from exc
     except Exception as exc:
-        raise HTTPException(500, "索引失败，请查看服务端诊断事件") from exc
+        raise model_operation_error(exc, "索引失败，请查看服务端诊断事件") from exc
 
 
 @app.get("/api/agent-runs/{run_id}")
@@ -1410,6 +1423,8 @@ def evaluate_rag(case_id: int, ground_truth: list[dict[str, Any]] | None = Body(
         return evaluate_case(case_id, prefer_remote_embeddings=True, k=5, ground_truth=ground_truth)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise model_operation_error(exc, "评测失败，请查看服务端诊断事件") from exc
 
 
 @app.get("/api/cases/{case_id}/platform-metrics")
