@@ -204,6 +204,7 @@ function renderCaseList() {
     const id = Number(button.dataset.archiveCase);
     if (!window.confirm("归档后案卷会长期保留，可随时恢复。确认归档？")) return;
     try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
+  }));
   $$('[data-trash-case]').forEach((button) => button.addEventListener("click", async (event) => {
     event.stopPropagation();
     const id = Number(button.dataset.trashCase);
