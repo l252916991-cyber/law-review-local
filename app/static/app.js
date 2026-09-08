@@ -459,7 +459,7 @@ function renderOverview(activity = []) {
   $("#metric-docs").textContent = m.documents;
   $("#metric-pages").textContent = m.pages;
   $("#metric-evidence").textContent = m.evidence;
-  $("#metric-confirmed").textContent = `${m.confirmed} 条已确认`;
+  $("#metric-confirmed").textContent = m.confirmed;
   $("#activity-list").innerHTML = activity.slice(0, 6).map((item) => `
     <div class="activity"><div class="activity-mark">${activityIcon(item.action)}</div><div><strong>${escapeHtml(item.action)}</strong><small>${escapeHtml(item.detail)}</small></div><time>${formatDate(item.created_at)}</time></div>
   `).join("") || '<div class="empty-state">尚无操作记录</div>';

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
   <title>LexVault · 本地阅卷系统</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c765d'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/assets/styles.css" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
@@ -16,19 +16,19 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">律</div>
-        <div><strong>LexVault</strong><span>私有化阅卷系统</span></div>
+        <div class="brand-mark"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M32 10v42M15 54h34M11 22h42M17 22 8 39h18L17 22Zm30 0-9 17h18L47 22Z"/><path d="M8 39c2 8 16 8 18 0m12 0c2 8 16 8 18 0"/><circle cx="32" cy="15" r="3" fill="currentColor" stroke="none"/></svg></div>
+        <div><strong>LexVault</strong><span>律师阅卷工作台</span></div>
       </div>
 
       <div class="privacy-chip"><i></i>本机私有模式</div>
 
       <nav class="main-nav" aria-label="主导航">
-        <button class="nav-item active" data-view="overview" aria-current="page"><span>⌂</span>案件总览</button>
-        <button class="nav-item" data-view="directory"><span>▤</span>双层目录</button>
-        <button class="nav-item" data-view="evidence"><span>⌘</span>证据关系</button>
-        <button class="nav-item" data-view="assistant"><span>✦</span>AI 阅卷</button>
-        <button class="nav-item" data-view="lab"><span>◇</span>Agent 实验室</button>
-        <button class="nav-item" data-view="export"><span>⇩</span>成果导出</button>
+        <button class="nav-item active" data-view="overview" aria-current="page"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>案件总览</button>
+        <button class="nav-item" data-view="directory"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6Z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg></span>双层目录</button>
+        <button class="nav-item" data-view="evidence"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="m7 9 4 6m6-6-4 6M9 6h6"/></svg></span>证据关系</button>
+        <button class="nav-item" data-view="assistant"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H9l-5 4V4Z"/><path d="M8 9h8M8 13h5"/></svg></span>AI 阅卷</button>
+        <button class="nav-item" data-view="lab"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6m-5 0v7L4 20h16l-6-10V3M8 14h8"/></svg></span>Agent 实验室</button>
+        <button class="nav-item" data-view="export"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></span>成果导出</button>
       </nav>
 
       <div class="sidebar-section-title">案件空间</div>
@@ -51,63 +51,61 @@
           <label class="global-search">
             <span>⌕</span><input id="global-search" aria-label="搜索卷宗、人名、金额" placeholder="搜索卷宗、人名、金额…" />
           </label>
-          <button class="icon-button" title="全程留痕">◎</button>
+
           <button id="sign-out" class="text-button" hidden>退出登录</button>
-          <div class="avatar">律</div>
+          <div class="avatar" aria-label="律师工作空间">律</div>
         </div>
       </header>
 
       <section class="content">
         <div id="overview-view" class="view active">
           <div class="hero-card">
-            <div>
-              <div class="hero-kicker"><span></span>全链路本地处理</div>
-              <h2>读懂卷宗，让每条证据有据可查</h2>
-              <p id="case-description">自动拆页建目、提取证据、保留原文定位，并把律师校准结果沉淀回检索链路。</p>
+            <div class="hero-copy">
+              <div class="hero-kicker">案件工作台 <span></span> CASE WORKSPACE</div>
+              <h2>以事实为据，<br />以法律为准。</h2>
+              <p id="case-description">梳理案件材料，核对证据来源，让每一步判断都有据可循。</p>
               <div class="hero-actions">
-                <button class="primary-button" data-go="assistant">开始 AI 阅卷 <b>→</b></button>
+                <button class="primary-button" data-go="assistant">开始阅卷 <b>→</b></button>
                 <button class="secondary-button" id="hero-upload">上传卷宗</button>
               </div>
             </div>
-            <div class="hero-visual" aria-hidden="true">
-              <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
-              <div class="vault-core"><span>PRIVATE</span><strong>本地</strong><small>证据知识库</small></div>
-              <div class="floating-tag tag-one">原页溯源</div>
-              <div class="floating-tag tag-two">目录校准</div>
-              <div class="floating-tag tag-three">多步推理</div>
+            <div class="justice-statement">
+              <div class="justice-symbol"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M32 10v42M15 54h34M11 22h42M17 22 8 39h18L17 22Zm30 0-9 17h18L47 22Z"/><path d="M8 39c2 8 16 8 18 0m12 0c2 8 16 8 18 0"/><circle cx="32" cy="15" r="3" fill="currentColor" stroke="none"/></svg></div>
+              <p>审慎 · 独立 · 公正</p>
+              <span>尊重事实，审视每一份证据</span>
             </div>
           </div>
 
           <div class="metric-grid">
             <article><div class="metric-icon blue">▤</div><div><span>卷宗文件</span><strong id="metric-docs">0</strong><small>已进入双层目录</small></div></article>
             <article><div class="metric-icon violet">◫</div><div><span>内容页</span><strong id="metric-pages">0</strong><small>支持页级引用</small></div></article>
-            <article><div class="metric-icon amber">⌘</div><div><span>证据事项</span><strong id="metric-evidence">0</strong><small id="metric-confirmed">0 条已确认</small></div></article>
-            <article><div class="metric-icon green">✓</div><div><span>数据出域</span><strong>0</strong><small>全部在本机处理</small></div></article>
+            <article><div class="metric-icon amber">⌘</div><div><span>证据事项</span><strong id="metric-evidence">0</strong><small>形成证据清单</small></div></article>
+            <article><div class="metric-icon green">✓</div><div><span>已确认证据</span><strong id="metric-confirmed">0</strong><small>经律师人工复核</small></div></article>
           </div>
 
           <div class="two-column">
             <article class="panel workflow-panel">
-              <div class="panel-heading"><div><span class="section-label">阅卷工作流</span><h3>卷宗处理闭环</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
+              <div class="panel-heading"><div><span class="section-label">阅卷工作流</span><h3>阅卷流程</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
               <div class="workflow">
-                <div class="workflow-step done"><span>01</span><div><strong>文档解析与 OCR</strong><small>影印 PDF 自动切页并识别中文</small></div></div>
+                <div class="workflow-step done"><span>01</span><div><strong>整理卷宗</strong><small>影印 PDF 自动切页并识别中文</small></div></div>
                 <div class="workflow-line"></div>
-                <div class="workflow-step active"><span>02</span><div><strong>文件级 + 内容级目录</strong><small>人员、日期、页码和摘要可人工校准</small></div></div>
+                <div class="workflow-step active"><span>02</span><div><strong>核对目录</strong><small>人员、日期、页码和摘要可人工校准</small></div></div>
                 <div class="workflow-line"></div>
-                <div class="workflow-step"><span>03</span><div><strong>多路检索与证据关联</strong><small>统计、事实、对比分路处理</small></div></div>
+                <div class="workflow-step"><span>03</span><div><strong>关联证据</strong><small>统计、事实、对比分路处理</small></div></div>
                 <div class="workflow-line"></div>
-                <div class="workflow-step"><span>04</span><div><strong>律师复核与资产沉淀</strong><small>引用原页，结果回写并打包输出</small></div></div>
+                <div class="workflow-step"><span>04</span><div><strong>复核与归档</strong><small>核实原文，留存审阅结论</small></div></div>
               </div>
             </article>
 
             <article class="panel">
-              <div class="panel-heading"><div><span class="section-label">审计记录</span><h3>最近活动</h3></div><span class="live-pill">● LIVE</span></div>
+              <div class="panel-heading"><div><span class="section-label">审计记录</span><h3>最近活动</h3></div><span class="live-pill">操作留痕</span></div>
               <div id="activity-list" class="activity-list"></div>
             </article>
           </div>
 
           <article class="panel upload-panel" id="upload-zone">
             <div class="upload-icon">⇧</div>
-            <div><h3>投递卷宗材料</h3><p>支持 PDF、DOCX、TXT、图片；扫描件会调用本机中文 OCR。</p></div>
+            <div><h3>添加案件材料</h3><p>支持 PDF、DOCX、TXT、图片；扫描件会调用本机中文 OCR。</p></div>
             <button class="secondary-button">选择文件</button>
             <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.tif,.tiff,.webp" hidden />
           </article>
@@ -115,14 +113,14 @@
 
         <div id="directory-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">内容级目录数据库</span><h2>双层卷宗目录</h2><p>文件级信息与页级内容同步索引，人工修改会回写检索链路。</p></div>
+            <div><span class="section-label">卷宗管理</span><h2>双层卷宗目录</h2><p>文件级信息与页级内容同步索引，人工修改会回写检索链路。</p></div>
             <button class="primary-button" id="directory-upload">＋ 上传卷宗</button>
           </div>
 
           <!-- 批量上传区域 -->
           <div class="batch-upload-zone panel" id="batch-upload-zone" style="display: none;">
             <div class="batch-upload-header">
-              <h3>📦 批量导入</h3>
+              <h3>批量导入</h3>
               <button class="close-btn" id="batch-upload-close">×</button>
             </div>
             <div class="batch-drop-area" id="batch-drop-area">
@@ -153,7 +151,7 @@
           <div class="toolbar panel-lite">
             <label class="table-search"><span>⌕</span><input id="directory-search" placeholder="搜索文件、人员、日期、摘要" /></label>
             <div class="filter-chips" id="directory-filters"><button class="active" data-filter="全部">全部</button><button data-filter="询问笔录">笔录</button><button data-filter="银行流水">流水</button><button data-filter="电子数据">电子数据</button></div>
-            <button class="secondary-button" id="batch-upload-btn" style="margin-left: auto;">📦 批量导入</button>
+            <button class="secondary-button" id="batch-upload-btn" style="margin-left: auto;">批量导入</button>
             <span class="record-count" id="directory-count">0 条记录</span>
           </div>
           <div class="table-card">
@@ -166,9 +164,9 @@
 
         <div id="evidence-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">关系数据库</span><h2>证据事项与关联</h2><p>把事实结论、证据来源、矛盾与资金链路放在同一张可信网络中。</p></div>
+            <div><span class="section-label">证据审查</span><h2>证据事项与关联</h2><p>把事实结论、证据来源、矛盾与资金链路放在同一张可信网络中。</p></div>
             <div style="display: flex; gap: 9px;">
-              <button class="secondary-button" id="create-evidence-btn">➕ 添加证据</button>
+              <button class="secondary-button" id="create-evidence-btn">＋ 添加证据</button>
               <button class="primary-button" id="analyze-btn">✦ 运行本地证据分析</button>
             </div>
           </div>
@@ -198,7 +196,7 @@
           <div class="gap-dashboard-panel panel" style="margin-bottom: 18px;">
             <div class="panel-heading">
               <div><span class="section-label">疏漏检测</span><h3>证据完整性分析</h3></div>
-              <button class="secondary-button" id="run-gap-detection-btn">🔍 运行疏漏检测</button>
+              <button class="secondary-button" id="run-gap-detection-btn">运行疏漏检测</button>
             </div>
             <div id="gap-dashboard">
               <div class="gap-summary-grid" id="gap-summary-grid"></div>
@@ -248,7 +246,7 @@
 
         <div id="lab-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">INTERVIEW RUNTIME</span><h2>Agent 实验室</h2><p>把任务规划、混合检索、并行专家、审校与长期记忆变成可运行、可追踪、可评测的工程链路。</p></div>
+            <div><span class="section-label">运行与评测</span><h2>Agent 实验室</h2><p>把任务规划、混合检索、并行专家、审校与长期记忆变成可运行、可追踪、可评测的工程链路。</p></div>
             <div class="lab-actions"><button class="secondary-button" id="build-index-btn">构建 Hybrid 索引</button><button class="primary-button" id="evaluate-btn">运行 RAG 评测</button></div>
           </div>
 
@@ -292,10 +290,10 @@
         </div>
 
         <div id="export-view" class="view">
-          <div class="view-heading"><div><span class="section-label">预设模板</span><h2>结案成果打包</h2><p>将目录、证据清单、问答记录和原始卷宗按统一结构一次性输出。</p></div></div>
+          <div class="view-heading"><div><span class="section-label">预设模板</span><h2>成果归档</h2><p>将目录、证据清单、问答记录和原始卷宗按统一结构一次性输出。</p></div></div>
           <div class="export-card">
-            <div class="export-art"><div class="box-lid"></div><div class="box-body">ZIP</div></div>
-            <div class="export-copy"><span class="privacy-chip inline"><i></i>本地生成</span><h2>案件数字资产包</h2><p>适合内部归档、团队交接和结案复盘。所有 AI 结论均保留来源列，便于后续复核。</p>
+            <div class="export-art" aria-hidden="true"><div class="archive-cover"><span>LEXVAULT / ARCHIVE</span><strong>案件审阅档案</strong><i></i><small>目录 · 证据 · 审阅记录</small></div></div>
+            <div class="export-copy"><span class="privacy-chip inline"><i></i>本地生成</span><h2>案件审阅档案</h2><p>适合内部归档、团队交接和结案复盘。所有 AI 结论均保留来源列，便于后续复核。</p>
               <ul><li><b>案件摘要.md</b><span>案件概况与处理说明</span></li><li><b>内容级目录.csv</b><span>文件、人员、时间、页码与摘要</span></li><li><b>证据目录.csv</b><span>待证事实、可信度、原文及状态</span></li><li><b>阅卷问答记录.md</b><span>按用户与会话归档</span></li><li><b>原始卷宗/</b><span>已上传的原文件</span></li></ul>
               <div class="export-template-row">
                 <label for="export-template">结案模板</label>
