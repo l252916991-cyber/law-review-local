@@ -47,7 +47,7 @@ button { cursor: pointer; }
 .case-item.active { background: rgba(255,255,255,.055); color: #e8f5f0; }
 .new-case-btn { margin: 10px 5px 0; border: 1px dashed rgba(130,172,160,.24); color: #75938b; background: transparent; border-radius: 10px; padding: 9px; }
 .new-case-btn:hover { color: #c7ded7; border-color: #527f73; }
-.sidebar-footer { margin-top: auto; border-top: 1px solid rgba(255,255,255,.06); padding: 16px 8px 0; display: flex; align-items: center; gap: 10px; }
+.sidebar-footer { margin-top: 0; border-top: 1px solid rgba(255,255,255,.06); padding: 16px 8px 0; display: flex; align-items: center; gap: 10px; }
 .sidebar-footer strong, .sidebar-footer span { display: block; }
 .sidebar-footer strong { font-size: 13px; color: #c6dad4; }
 .sidebar-footer span { font-size: 12px; color: #57736b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
@@ -499,8 +499,8 @@ td { line-height: 1.7; }
 .lifecycle-dialog .close-button { width: 26px; height: 26px; flex-shrink: 0; border-radius: 9px; background: transparent; }
 .danger-action { background: #a9574d !important; }
 
-.case-storage-links { display: grid; gap: 2px; padding: 8px 4px 10px; }
-.case-storage-links .text-button { display: block; width: 100%; padding: 8px 10px; text-align: left; border-radius: 8px; color: #65736b; }
+.case-storage-links { display: grid; gap: 2px; margin-top: auto; padding: 8px 4px 10px; }
+.case-storage-links .text-button { display: block; width: 100%; padding: 8px 10px; text-align: center; border-radius: 8px; color: #65736b; }
 .case-storage-links .text-button:hover { background: #e9ece4; color: #354844; }
 .case-menu { position: relative; align-self: center; }
 .case-menu summary { cursor: pointer; list-style: none; padding: 8px; border-radius: 8px; }
