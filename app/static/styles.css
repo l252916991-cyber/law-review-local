@@ -480,3 +480,6 @@ td { line-height: 1.7; }
 .case-row .case-item { flex: 1; min-width: 0; }
 .case-more { border: 0; background: transparent; color: #818878; width: 48px; border-radius: 4px; font-size: 11px; }
 .case-more:hover { background: #e3e6de; color: #354844; }
+
+.case-delete { border: 0; background: transparent; color: #a15e52; width: 48px; border-radius: 4px; font-size: 11px; }
+.case-delete:hover { background: #f7e9e5; color: #8c3f35; }

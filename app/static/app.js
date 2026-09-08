@@ -196,6 +196,7 @@ function renderCaseList() {
         <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
       </button>
       <button class="case-more" data-archive-case="${item.id}" title="归档案卷" aria-label="归档案卷">归档</button>
+      <button class="case-delete" data-trash-case="${item.id}" title="移入回收站" aria-label="移入回收站">删除</button>
     </div>`).join("") || '<div class="empty-state">暂无案件</div>';
   $$(".case-item").forEach((button) => button.addEventListener("click", () => selectCase(Number(button.dataset.caseId))));
   $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
@@ -203,6 +204,14 @@ function renderCaseList() {
     const id = Number(button.dataset.archiveCase);
     if (!window.confirm("归档后案卷会长期保留，可随时恢复。确认归档？")) return;
     try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
+  $$('[data-trash-case]').forEach((button) => button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const id = Number(button.dataset.trashCase);
+    const item = state.cases.find((candidate) => candidate.id === id);
+    if (!item) return;
+    const message = `删除案卷？\n\n案卷名称：${item.title}\n\n删除后将移入回收站并保留 30 天，在此期间可以恢复。\n\n影响：${item.document_count} 份卷宗、${item.evidence_count} 条证据。`;
+    if (!window.confirm(message)) return;
+    try { await api(`/api/cases/${id}/trash`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已移入回收站，保留 30 天"); } catch (error) { toast(error.message, "error"); }
   }));
 }
 
