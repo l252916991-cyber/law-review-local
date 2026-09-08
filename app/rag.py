@@ -32,6 +32,7 @@ from .services import (
 
 
 EMBEDDING_MODEL = "Qwen3-Embedding-4B-4bit-DWQ"
+RERANK_MODEL = "bge-reranker-v2-m3-mlx"
 EMBEDDING_TEXT_VERSION = "raw-text-v1"
 HASHED_MODEL = "hashed-bigram-v1"
 MAX_RETRIEVAL_CANDIDATES = 48
@@ -166,12 +167,44 @@ class EmbeddingClient:
         return [hashed_embedding(text) for text in texts], "hashed-local"
 
 
+class RerankClient:
+    def __init__(self) -> None:
+        self.model = os.getenv("LAW_REVIEW_RERANK_MODEL", RERANK_MODEL)
+        self.base_url = os.getenv("LAW_REVIEW_RERANK_URL", os.getenv("LAW_REVIEW_EMBEDDING_URL", LOCAL_LLM_URL)).rstrip("/")
+        self.last_failure: str | None = None
+
+    def score(self, query: str, documents: list[str]) -> list[float] | None:
+        if not documents:
+            return []
+        self.last_failure = None
+        try:
+            assert_model_endpoint_allowed(self.base_url)
+            payload = json.dumps({"model": self.model, "query": query, "documents": documents}, ensure_ascii=False).encode("utf-8")
+            request = urllib.request.Request(f"{self.base_url}/rerank", data=payload,
+                                              headers={"Content-Type": "application/json"}, method="POST")
+            with egress_opener().open(request, timeout=120) as response:
+                body = json.load(response)
+            results = body["results"]
+            scores = [0.0] * len(documents)
+            for item in results:
+                index = int(item["index"])
+                scores[index] = float(item["relevance_score"])
+            if len(scores) != len(documents) or not all(math.isfinite(value) for value in scores):
+                raise ValueError("invalid_rerank_response")
+            return scores
+        except (urllib.error.URLError, OSError, KeyError, TypeError, ValueError, IndexError) as exc:
+            self.last_failure = type(exc).__name__
+            logger.warning("rerank_fallback error_type=%s", self.last_failure)
+            return None
+
+
 class HybridRetriever:
     def __init__(self, case_id: int, prefer_remote_embeddings: bool = True):
         self.case_id = case_id
         self.embedding_client = EmbeddingClient(prefer_remote_embeddings)
         self.vector_diagnostics: dict[str, Any] = {}
         self.keyword_diagnostics: dict[str, Any] = {}
+        self.rerank_client = RerankClient()
 
     def ensure_vector_index(
         self, force: bool = False, *, backend: str | None = None, dimensions: int | None = None,
@@ -479,6 +512,12 @@ class HybridRetriever:
             item["rerank_score"] = round(rerank, 6)
             item["rerank_components"] = {key: round(value, 6) for key, value in components.items()}
             item["quote"] = best_quote(item["text"], query_terms(query))
+        rerank_items = list(fused.values())
+        rerank_scores = self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
+        if rerank_scores is not None:
+            for item, score in zip(rerank_items, rerank_scores):
+                item["neural_rerank_score"] = round(score, 6)
+                item["rerank_score"] = round(float(item["rerank_score"]) + 0.35 * score, 6)
         ranked = sorted(fused.values(), key=lambda item: (-item["rerank_score"], item["document_id"], item["page_no"]))
         selected = self._select_diverse(ranked, limit)
         for rank, item in enumerate(selected, 1):
@@ -524,6 +563,8 @@ class HybridRetriever:
             "degraded": bool(self.vector_diagnostics.get("degraded")) or not self.keyword_diagnostics.get("fts_available", True),
             "embedding": dict(self.vector_diagnostics),
             "keyword": dict(self.keyword_diagnostics),
+            "reranker": {"model": self.rerank_client.model, "enabled": rerank_scores is not None,
+                         "fallback_reason": self.rerank_client.last_failure},
         }
         return selected, metrics
 
