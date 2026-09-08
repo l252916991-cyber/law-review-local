@@ -786,16 +786,12 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
-                    fallback_reason = "模型输出未通过格式/来源校验，已返回原文检索摘要"
                     logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
-                    answer = fallback_answer(question, route, contexts)
-                    provenance = {"mode": "rule-retrieval", "llm_attempted": True}
+                    raise RuntimeError("model_output_failed_validation")
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
                 diagnostic = failure_diagnostic(exc, "chat_llm")
-                fallback_reason = "本地模型调用失败，已返回原文检索摘要"
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
-                answer = fallback_answer(question, route, contexts)
-                provenance = {"mode": "rule-retrieval", "llm_attempted": True}
+                raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
         else:
             answer = fallback_answer(question, route, contexts)
             provenance = {"mode": "rule-retrieval", "llm_attempted": False}

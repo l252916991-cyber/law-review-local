@@ -164,7 +164,7 @@ class EmbeddingClient:
                 self.last_failure = type(exc).__name__
                 # Exception text may include a URL, document text or response body.
                 logger.warning("embedding_fallback error_type=%s", self.last_failure)
-        return [hashed_embedding(text) for text in texts], "hashed-local"
+        raise RuntimeError(f"embedding_model_unavailable:{self.last_failure or 'unknown'}")
 
 
 class RerankClient:
@@ -195,7 +195,7 @@ class RerankClient:
         except (urllib.error.URLError, OSError, KeyError, TypeError, ValueError, IndexError) as exc:
             self.last_failure = type(exc).__name__
             logger.warning("rerank_fallback error_type=%s", self.last_failure)
-            return None
+            raise RuntimeError(f"rerank_model_unavailable:{self.last_failure or 'unknown'}")
 
 
 class HybridRetriever:
@@ -259,12 +259,7 @@ class HybridRetriever:
                         or not all(valid_vector(vector, dimensions) for vector in vectors)):
                     # A backend outage/model reload between query and page
                     # embedding must not leave a mixed index or compare spaces.
-                    space_changed = True
-                    backend, dimensions = "hashed-local", 384
-                    model = embedding_identity(self.embedding_client.model, backend)
-                    pending = [{**page, "content_hash": hashlib.sha256(page["text"].encode("utf-8")).hexdigest()}
-                               for page in pages]
-                    vectors = [hashed_embedding(item["text"]) for item in pending]
+                    raise RuntimeError("embedding_backend_changed_during_index")
             with transaction() as conn:
                 for item, vector in zip(pending, vectors):
                     conn.execute(
@@ -423,8 +418,7 @@ class HybridRetriever:
         query_failure = self.embedding_client.last_failure
         index = self.ensure_vector_index(backend=backend, dimensions=len(query_vector))
         if index["backend"] != backend:
-            backend = "hashed-local"
-            query_vector = hashed_embedding(query)
+            raise RuntimeError("embedding_backend_changed_during_query")
         model = embedding_identity(self.embedding_client.model, backend)
         self.vector_diagnostics = {
             "backend": backend, "model": model, "dimensions": len(query_vector),
