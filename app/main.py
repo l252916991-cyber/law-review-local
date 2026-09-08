@@ -504,7 +504,17 @@ def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
     require_permission("view")
     conn = connect()
     try:
-        return [rowdict(r) for r in conn.execute("SELECT * FROM cases WHERE lifecycle_status=? ORDER BY updated_at DESC", (lifecycle_status,)).fetchall()]
+        permitted = allowed_case_ids()
+        if permitted == ():
+            return []
+        clause = ""
+        parameters: tuple = (lifecycle_status,)
+        if permitted is not None:
+            clause = " AND id IN (" + ",".join("?" for _ in permitted) + ")"
+            parameters += tuple(permitted)
+        return [rowdict(r) for r in conn.execute(
+            "SELECT * FROM cases WHERE lifecycle_status=?" + clause + " ORDER BY updated_at DESC", parameters
+        ).fetchall()]
     finally: conn.close()
 
 

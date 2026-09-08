@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light" />
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20260909-lifecycle2" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
@@ -33,6 +33,7 @@
 
       <div class="sidebar-section-title">案件空间</div>
       <div id="case-list" class="case-list"></div>
+      <div class="case-storage-links"><button class="text-button" data-case-storage="archived">已归档</button><button class="text-button" data-case-storage="trash">回收站</button></div>
       <button id="new-case-btn" class="new-case-btn">＋ 新建案件</button>
 
       <div class="sidebar-footer">
@@ -58,6 +59,7 @@
       </header>
 
       <section class="content">
+        <div id="no-case-state" class="empty-state" hidden>暂无工作区案件。可新建案件，或从已归档、回收站恢复。</div>
         <div id="overview-view" class="view active">
           <div class="hero-card">
             <div class="hero-copy">
@@ -440,6 +442,11 @@
     </div>
   </dialog>
 
+  <dialog id="case-storage-dialog" class="dialog" aria-labelledby="case-storage-title">
+    <div class="dialog-header"><h3 id="case-storage-title">已归档案卷</h3><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
+    <p id="case-storage-description"></p>
+    <div id="case-storage-list"></div>
+  </dialog>
   <dialog id="case-lifecycle-dialog" class="dialog lifecycle-dialog">
     <div class="dialog-header"><div><span id="lifecycle-kicker" class="section-label">案卷生命周期</span><h3 id="lifecycle-title">确认操作</h3></div><button class="close-button" type="button" id="lifecycle-cancel">×</button></div>
     <div class="lifecycle-body"><p id="lifecycle-message"></p><div class="lifecycle-impact" id="lifecycle-impact"></div><div class="dialog-actions"><button class="secondary-button" type="button" id="lifecycle-cancel-action">取消</button><button class="primary-button" type="button" id="lifecycle-confirm">确认</button></div></div>
@@ -455,6 +462,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js" defer></script>
+  <script src="/assets/app.js?v=20260909-lifecycle2" defer></script>
 </body>
 </html>

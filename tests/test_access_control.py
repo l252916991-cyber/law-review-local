@@ -38,6 +38,33 @@ class AccessControlTests(unittest.TestCase):
         self.addCleanup(self.client.close)
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
+    def test_app_assets_revalidate_after_updates(self):
+        for path in ("/", "/assets/app.js", "/assets/styles.css"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["cache-control"], "no-cache")
+                self.assertIn("script-src 'self'", response.headers["content-security-policy"])
+
+    def test_lifecycle_lists_and_restore_preserve_case_scope(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        for case_id in self.cases:
+            self.assertEqual(self.client.post(f"/api/cases/{case_id}/archive", headers=admin).status_code, 200)
+        listed = self.client.get("/api/cases/lifecycle/archived", headers=self.headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual([row["id"] for row in listed.json()], [self.cases[0]])
+        self.assertIsNone(listed.json()[0]["purge_after"])
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[1]}/restore", headers=self.headers).status_code, 404)
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[0]}/restore", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get("/api/cases/lifecycle/archived", headers=self.headers).json(), [])
+        for case_id in self.cases:
+            self.assertEqual(self.client.post(f"/api/cases/{case_id}/trash", headers=admin).status_code, 200)
+        listed = self.client.get("/api/cases/lifecycle/trash", headers=self.headers)
+        self.assertEqual([row["id"] for row in listed.json()], [self.cases[0]])
+        self.assertIsNotNone(listed.json()[0]["purge_after"])
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[0]}/restore", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get("/api/cases", headers=self.headers).json()[0]["id"], self.cases[0])
+
     def test_anonymous_denied_and_invalid_token_does_not_leak(self):
         for headers in ({}, {"Authorization": "Bearer invalid"}):
             result = self.client.get("/api/cases", headers=headers)

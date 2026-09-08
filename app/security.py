@@ -223,6 +223,7 @@ def apply_security_headers(response: Response, path: str) -> Response:
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if path == "/" or path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "no-cache"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
@@ -281,7 +282,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                 if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
                         raise HTTPException(403, "仅管理员可以创建案件")
-                    if case_id is None and request.url.path not in {"/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates"}:
+                    if case_id is None and request.url.path not in {"/api/cases/lifecycle/archived", "/api/cases/lifecycle/trash", "/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates"}:
                         raise HTTPException(403, "需要管理员权限")
             response = await call_next(request)
             if principal and not principal.local and response.status_code < 400 and (

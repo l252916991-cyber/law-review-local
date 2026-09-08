@@ -157,7 +157,7 @@ async function bootstrap() {
     $("#model-name").textContent = health.local_llm ? health.model : "仍可使用检索与溯源";
     await loadCases();
     if (state.cases.length) await selectCase(state.cases[0].id);
-    else $("#case-title").textContent = "暂无可访问案件";
+    else clearCaseWorkspace();
     const activeJob = sessionStorage.getItem("lexvault-active-job");
     if (activeJob) {
       const job = await api(`/api/agent-jobs/${activeJob}`);
@@ -203,21 +203,65 @@ function openLifecycleDialog(options) {
   });
 }
 
+function clearCaseWorkspace() {
+  Object.assign(state, {caseId: null, case: null, documents: [], evidence: [], relations: [], conversations: [], conversationId: null, recoverableAgentRunId: null});
+  $("#case-title").textContent = "暂无工作区案件";
+  $("#case-type").textContent = "案件空间";
+  $$(".view").forEach((view) => view.classList.remove("active"));
+  $("#no-case-state").hidden = false;
+}
+
+async function refreshAfterCaseRemoval(id) {
+  await loadCases();
+  if (state.caseId === id) {
+    if (state.cases[0]) await selectCase(state.cases[0].id);
+    else clearCaseWorkspace();
+  }
+}
+
+async function openCaseStorage(status) {
+  const dialog = $("#case-storage-dialog");
+  $("#case-storage-title").textContent = status === "archived" ? "已归档案卷" : "回收站";
+  $("#case-storage-description").textContent = status === "archived" ? "长期保留，可随时恢复到案件空间。" : "删除的案卷保留 30 天，可在清理前恢复。";
+  $("#case-storage-list").textContent = "正在加载…";
+  if (!dialog.open) dialog.showModal();
+  try {
+    const items = await api(`/api/cases/lifecycle/${status}`);
+    $("#case-storage-list").innerHTML = items.map((item) => `<div class="storage-row"><div><strong>${escapeHtml(item.title)}</strong><small>${status === "archived" ? "长期保留" : `保留至 ${escapeHtml((item.purge_after || "").slice(0,10))}`}</small></div><button type="button" class="secondary-button" data-restore-case="${item.id}">恢复案卷</button></div>`).join("") || '<div class="empty-state">暂无案卷</div>';
+    $$("[data-restore-case]", dialog).forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const id = Number(button.dataset.restoreCase);
+        await api(`/api/cases/${id}/restore`, {method: "POST"});
+        await loadCases(); await selectCase(id); showView("overview");
+        await openCaseStorage(status); toast("案卷已恢复到案件空间");
+      } catch (error) { toast(error.message, "error"); button.disabled = false; }
+    }));
+  } catch (error) { $("#case-storage-list").textContent = error.message; }
+}
+
 function renderCaseList() {
   $("#case-list").innerHTML = state.cases.map((item) => `
     <div class="case-row">
       <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
         <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
       </button>
-      <button class="case-more" data-archive-case="${item.id}" title="归档案卷" aria-label="归档案卷">归档</button>
-      <button class="case-delete" data-trash-case="${item.id}" title="移入回收站" aria-label="移入回收站">删除</button>
+      <details class="case-menu"><summary aria-label="案卷操作">···</summary><div><button data-archive-case="${item.id}">归档案卷</button><button class="case-delete" data-trash-case="${item.id}">移入回收站</button></div></details>
     </div>`).join("") || '<div class="empty-state">暂无案件</div>';
+  $$(".case-menu").forEach((menu) => menu.addEventListener("toggle", () => {
+    if (!menu.open) return;
+    const rect = menu.querySelector("summary").getBoundingClientRect();
+    const panel = menu.querySelector("div");
+    panel.style.left = `${Math.max(8, rect.right - 144)}px`;
+    panel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 100)}px`;
+    $$(".case-menu").forEach((other) => { if (other !== menu) other.open = false; });
+  }));
   $$(".case-item").forEach((button) => button.addEventListener("click", () => selectCase(Number(button.dataset.caseId))));
   $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
     event.stopPropagation();
     const id = Number(button.dataset.archiveCase);
     if (!(await openLifecycleDialog({ title: "归档案卷？", kicker: "长期保留", message: "归档后案卷会从日常工作区移出，但会长期保留并可随时恢复。", action: "归档案卷" }))) return;
-    try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
+    try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await refreshAfterCaseRemoval(id); toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
   }));
   $$('[data-trash-case]').forEach((button) => button.addEventListener("click", async (event) => {
     event.stopPropagation();
@@ -225,7 +269,7 @@ function renderCaseList() {
     const item = state.cases.find((candidate) => candidate.id === id);
     if (!item) return;
     if (!(await openLifecycleDialog({ title: "移入回收站？", kicker: "可恢复删除", message: `案卷「${item.title}」将移入回收站，保留 30 天。`, impact: `将影响 ${item.document_count} 份卷宗、${item.evidence_count} 条证据。`, action: "移入回收站", danger: true }))) return;
-    try { await api(`/api/cases/${id}/trash`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已移入回收站，保留 30 天"); } catch (error) { toast(error.message, "error"); }
+    try { await api(`/api/cases/${id}/trash`, { method: "POST" }); await refreshAfterCaseRemoval(id); toast("案卷已移入回收站，保留 30 天"); } catch (error) { toast(error.message, "error"); }
   }));
 }
 
@@ -234,7 +278,9 @@ function renderCaseList() {
  * @param {number} caseId - 案件 ID
  */
 async function selectCase(caseId) {
+  $("#no-case-state").hidden = true;
   state.caseId = caseId;
+  if (!$(".view.active")) showView("overview");
   state.conversationId = null;
 
   // 显示加载状态
@@ -926,6 +972,7 @@ async function uploadFiles(fileList) {
 }
 
 function showView(name) {
+  if (!state.caseId) { clearCaseWorkspace(); return; }
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `${name}-view`));
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === name;
@@ -937,6 +984,7 @@ function showView(name) {
 }
 
 function bindEvents() {
+  $$("[data-case-storage]").forEach((button) => button.addEventListener("click", () => openCaseStorage(button.dataset.caseStorage)));
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   $("#auth-dialog").addEventListener("cancel", (event) => event.preventDefault());
   $("#auth-form").addEventListener("submit", async (event) => {

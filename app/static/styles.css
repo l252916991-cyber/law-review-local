@@ -498,3 +498,16 @@ td { line-height: 1.7; }
 .lifecycle-dialog .dialog-actions .secondary-button:hover { background: #f3f3ee; }
 .lifecycle-dialog .close-button { width: 26px; height: 26px; flex-shrink: 0; border-radius: 9px; background: transparent; }
 .danger-action { background: #a9574d !important; }
+
+.case-storage-links { display: flex; justify-content: space-around; padding: 10px 0; }
+.case-menu { position: relative; align-self: center; }
+.case-menu summary { cursor: pointer; list-style: none; padding: 8px; border-radius: 8px; }
+.case-menu[open] > div { position: fixed; z-index: 20; min-width: 132px; padding: 6px; background: white; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 18px #25382e20; }
+.case-menu button { display: block; width: 100%; border: 0; border-radius: 6px; background: transparent; padding: 10px; text-align: left; }
+.case-menu button:hover { background: #f3f3ee; }
+.case-menu .case-delete { color: #a44242; border-top: 1px solid #eee; }
+#case-storage-dialog { width: min(620px, calc(100vw - 32px)); padding: 24px; border-radius: 24px; }
+.storage-row { display: flex; gap: 16px; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #eee; }
+.storage-row > div { min-width: 0; overflow-wrap: anywhere; }
+.storage-row small { display: block; color: #747b72; margin-top: 6px; }
+.storage-row button { flex-shrink: 0; padding: 6px 12px; min-height: 32px; border-radius: 10px; }
