@@ -195,7 +195,7 @@ function renderCaseList() {
       <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
         <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
       </button>
-      <button class="case-more" data-archive-case="${item.id}" title="归档案卷" aria-label="归档案卷">···</button>
+      <button class="case-more" data-archive-case="${item.id}" title="归档案卷" aria-label="归档案卷">归档</button>
     </div>`).join("") || '<div class="empty-state">暂无案件</div>';
   $$(".case-item").forEach((button) => button.addEventListener("click", () => selectCase(Number(button.dataset.caseId))));
   $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
