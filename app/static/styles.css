@@ -52,7 +52,8 @@ button { cursor: pointer; }
 .sidebar-footer strong { font-size: 13px; color: #c6dad4; }
 .sidebar-footer span { font-size: 12px; color: #57736b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .model-settings { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; padding: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.model-settings > span { color: #8b978e; font-size: 15px; }
+.model-settings > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; color: #65736b; font-size: 19px; }
+.model-settings:hover > span { background: #e9ece4; color: #354844; }
 .model-dot { width: 9px; height: 9px; border-radius: 50%; background: #d89f4a; box-shadow: 0 0 10px rgba(216,159,74,.65); flex: 0 0 auto; }
 .model-dot.online { background: #45c795; box-shadow: 0 0 10px rgba(69,199,149,.8); }
 
@@ -520,3 +521,5 @@ td { line-height: 1.7; }
 .model-settings-dialog input { width: 100%; margin-top: 6px; }
 .model-settings-hint { color: #747b72; font-size: 13px; line-height: 1.6; }
 .model-settings-status { min-height: 22px; color: #65736b; font-size: 13px; }
+.detect-model-button { margin: 4px 0 8px; padding: 7px 14px; border-radius: 10px; }
+.model-settings-dialog select { width: 100%; margin-top: 6px; }

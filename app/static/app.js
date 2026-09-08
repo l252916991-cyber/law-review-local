@@ -1091,9 +1091,7 @@ function modelSettings() {
 function openModelSettings() {
   const settings = modelSettings();
   $("#model-base-url").value = settings.baseUrl || "http://127.0.0.1:8000/v1";
-  $("#model-chat-name").value = settings.chatModel || "";
-  $("#model-embedding-name").value = settings.embeddingModel || "Qwen3-Embedding-4B-4bit-DWQ";
-  $("#model-rerank-name").value = settings.rerankModel || "bge-reranker-v2-m3-mlx";
+  ["#model-chat-name", "#model-embedding-name", "#model-rerank-name"].forEach((selector) => { $(selector).disabled = true; $(selector).innerHTML = "<option>请先检测模型</option>"; });
   $("#model-settings-status").textContent = "";
   $("#model-settings-dialog").showModal();
 }
@@ -1104,12 +1102,31 @@ async function testModelSettings() {
   try {
     const result = await api("/api/model-config/test", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({base_url: $("#model-base-url").value})});
     const models = result.models || [];
-    status.textContent = models.length ? `连接成功：发现 ${models.length} 个模型。` : "服务已连接，但没有返回模型。";
+    const groups = classifyModels(models);
+    populateModelSelect("#model-chat-name", groups.chat, "未检测到对话模型");
+    populateModelSelect("#model-embedding-name", groups.embedding, "未检测到嵌入模型");
+    populateModelSelect("#model-rerank-name", groups.rerank, "未检测到重排模型");
+    localStorage.setItem("lexvault-model-discovery", JSON.stringify({models, detectedAt: new Date().toISOString()}));
+    status.textContent = models.length ? `服务连接正常 · 已发现 ${models.length} 个模型 · 刚刚检测` : "服务已连接，但没有返回模型。";
   } catch (error) { status.textContent = `连接失败：${error.message}`; }
+}
+
+function classifyModels(models) {
+  const embedding = models.filter((name) => /embed|bge-m3|e5-|nomic/i.test(name));
+  const rerank = models.filter((name) => /rerank|cross[-_]?encoder/i.test(name));
+  const special = new Set([...embedding, ...rerank]);
+  return {chat: models.filter((name) => !special.has(name)), embedding, rerank};
+}
+
+function populateModelSelect(selector, models, emptyLabel) {
+  const select = $(selector);
+  select.innerHTML = models.length ? models.map((name) => `<option value="${escapeHtml(name)}">● ${escapeHtml(name)}</option>`).join("") : `<option value="">${emptyLabel}</option>`;
+  select.disabled = !models.length;
 }
 
 function saveModelSettings(event) {
   event.preventDefault();
+  if (["#model-chat-name", "#model-embedding-name", "#model-rerank-name"].some((selector) => $(selector).disabled)) { $("#model-settings-status").textContent = "请先检测模型，再保存配置。"; return; }
   localStorage.setItem("lexvault-model-settings", JSON.stringify({baseUrl: $("#model-base-url").value.replace(/\/$/, ""), chatModel: $("#model-chat-name").value.trim(), embeddingModel: $("#model-embedding-name").value.trim(), rerankModel: $("#model-rerank-name").value.trim()}));
   $("#model-settings-status").textContent = "配置已保存。重启本地阅卷服务后生效。";
   toast("模型配置已保存");

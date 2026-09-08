@@ -470,11 +470,12 @@
       <div class="dialog-header"><div><span class="section-label">本机私有模式</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
       <p class="model-settings-hint">填写本机模型服务的 OpenAI 兼容地址。模型名称必须与服务端已下载并加载的名称一致。</p>
       <label>模型服务地址<input id="model-base-url" type="url" required placeholder="http://127.0.0.1:8000/v1" /></label>
-      <label>对话模型<input id="model-chat-name" required placeholder="Qwythos-9B-v2-8bit-mlx" /></label>
-      <label>嵌入模型<input id="model-embedding-name" required placeholder="Qwen3-Embedding-4B-4bit-DWQ" /></label>
-      <label>重排模型<input id="model-rerank-name" required placeholder="bge-reranker-v2-m3-mlx" /></label>
+      <button type="button" class="secondary-button detect-model-button" id="model-test-btn">检测模型</button>
       <div id="model-settings-status" class="model-settings-status" role="status"></div>
-      <div class="dialog-actions"><button type="button" class="secondary-button" id="model-test-btn">测试连接</button><button type="submit" class="primary-button">保存配置</button></div>
+      <label>对话模型<select id="model-chat-name" required disabled><option>请先检测模型</option></select></label>
+      <label>嵌入模型<select id="model-embedding-name" required disabled><option>请先检测模型</option></select></label>
+      <label>重排模型<select id="model-rerank-name" required disabled><option>请先检测模型</option></select></label>
+      <div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog>取消</button><button type="submit" class="primary-button">保存配置</button></div>
     </form>
   </dialog>
 
