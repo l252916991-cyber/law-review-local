@@ -12,6 +12,7 @@
   <script src="/assets/vendor/echarts.min.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">跳至主要内容</a>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
@@ -22,7 +23,7 @@
       <div class="privacy-chip"><i></i>本机私有模式</div>
 
       <nav class="main-nav" aria-label="主导航">
-        <button class="nav-item active" data-view="overview"><span>⌂</span>案件总览</button>
+        <button class="nav-item active" data-view="overview" aria-current="page"><span>⌂</span>案件总览</button>
         <button class="nav-item" data-view="directory"><span>▤</span>双层目录</button>
         <button class="nav-item" data-view="evidence"><span>⌘</span>证据关系</button>
         <button class="nav-item" data-view="assistant"><span>✦</span>AI 阅卷</button>
@@ -40,7 +41,7 @@
       </div>
     </aside>
 
-    <main class="main">
+    <main class="main" id="main-content" tabindex="-1">
       <header class="topbar">
         <div>
           <div class="eyebrow" id="case-type">金融犯罪 · 阅卷空间</div>
@@ -48,7 +49,7 @@
         </div>
         <div class="top-actions">
           <label class="global-search">
-            <span>⌕</span><input id="global-search" placeholder="搜索卷宗、人名、金额…" />
+            <span>⌕</span><input id="global-search" aria-label="搜索卷宗、人名、金额" placeholder="搜索卷宗、人名、金额…" />
           </label>
           <button class="icon-button" title="全程留痕">◎</button>
           <button id="sign-out" class="text-button" hidden>退出登录</button>
@@ -61,7 +62,7 @@
           <div class="hero-card">
             <div>
               <div class="hero-kicker"><span></span>全链路本地处理</div>
-              <h2>从散装卷宗，到可检索、可关联、可溯源的案件资产</h2>
+              <h2>读懂卷宗，让每条证据有据可查</h2>
               <p id="case-description">自动拆页建目、提取证据、保留原文定位，并把律师校准结果沉淀回检索链路。</p>
               <div class="hero-actions">
                 <button class="primary-button" data-go="assistant">开始 AI 阅卷 <b>→</b></button>
@@ -86,7 +87,7 @@
 
           <div class="two-column">
             <article class="panel workflow-panel">
-              <div class="panel-heading"><div><span class="section-label">复刻工作流</span><h3>卷宗处理闭环</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
+              <div class="panel-heading"><div><span class="section-label">阅卷工作流</span><h3>卷宗处理闭环</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
               <div class="workflow">
                 <div class="workflow-step done"><span>01</span><div><strong>文档解析与 OCR</strong><small>影印 PDF 自动切页并识别中文</small></div></div>
                 <div class="workflow-line"></div>

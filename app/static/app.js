@@ -895,7 +895,12 @@ async function uploadFiles(fileList) {
 
 function showView(name) {
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `${name}-view`));
-  $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === name));
+  $$(".nav-item").forEach((item) => {
+    const active = item.dataset.view === name;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   if (name === "lab") loadLabMetrics();
 }
 
