@@ -475,3 +475,8 @@ td { line-height: 1.7; }
   .export-copy { padding: 26px; }
   .export-art { min-height: 330px; }
 }
+
+.case-row { display: flex; align-items: stretch; gap: 4px; }
+.case-row .case-item { flex: 1; min-width: 0; }
+.case-more { border: 0; background: transparent; color: #818878; width: 30px; border-radius: 4px; }
+.case-more:hover { background: #e3e6de; color: #354844; }

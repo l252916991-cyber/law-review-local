@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -608,6 +608,20 @@ CREATE INDEX IF NOT EXISTS idx_conversations_archive_expiry ON conversations(arc
     )
 
 
+def _migrate_v10(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(cases)")}
+    for name, definition in {
+        "lifecycle_status": "ALTER TABLE cases ADD COLUMN lifecycle_status TEXT NOT NULL DEFAULT 'active'",
+        "archived_at": "ALTER TABLE cases ADD COLUMN archived_at TEXT",
+        "archived_by": "ALTER TABLE cases ADD COLUMN archived_by TEXT",
+        "trashed_at": "ALTER TABLE cases ADD COLUMN trashed_at TEXT",
+        "purge_after": "ALTER TABLE cases ADD COLUMN purge_after TEXT",
+    }.items():
+        if name not in columns:
+            conn.execute(definition)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_lifecycle ON cases(lifecycle_status, purge_after)")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -626,7 +640,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")

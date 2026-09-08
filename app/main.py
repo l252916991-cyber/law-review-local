@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 import time
 import uuid
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
@@ -435,7 +436,7 @@ def list_cases():
                    (SELECT COALESCE(SUM(pages), 0) FROM documents d WHERE d.case_id = c.id) AS page_count,
                    (SELECT COUNT(*) FROM evidence e WHERE e.case_id = c.id) AS evidence_count
             FROM cases c
-            """ + where + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
+            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (where[6:] if where else "")) + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
         ).fetchall()
         return [rowdict(x) for x in rows]
     finally:
@@ -458,6 +459,53 @@ def create_case(payload: CaseCreate):
             (case_id, payload.title, ts),
         )
     return require_case(case_id)
+
+
+@app.post("/api/cases/{case_id}/archive")
+def archive_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") != "active":
+        raise HTTPException(409, "案件当前不在正常工作区")
+    ts = now()
+    actor = identity().get("name")
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='archived', archived_at=?, archived_by=?, updated_at=? WHERE id=?", (ts, actor, ts, case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "归档案卷", "长期保留", ts))
+    return require_case(case_id)
+
+@app.post("/api/cases/{case_id}/restore")
+def restore_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") not in {"archived", "trash"}:
+        raise HTTPException(409, "案件当前不可恢复")
+    ts = now()
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='active', archived_at=NULL, archived_by=NULL, trashed_at=NULL, purge_after=NULL, updated_at=? WHERE id=?", (ts, case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "恢复案卷", "恢复到正常工作区", ts))
+    return require_case(case_id)
+
+@app.post("/api/cases/{case_id}/trash")
+def trash_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") not in {"active", "archived"}:
+        raise HTTPException(409, "案件已在回收站")
+    ts = datetime.now().astimezone(); purge = (ts + timedelta(days=30)).isoformat(timespec="seconds")
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='trash', trashed_at=?, purge_after=?, updated_at=? WHERE id=?", (ts.isoformat(timespec="seconds"), purge, ts.isoformat(timespec="seconds"), case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "移入回收站", "30天后可永久清理", ts.isoformat(timespec="seconds")))
+    record_security_event("case_trash", "success", actor=identity().get("name"), case_id=case_id, detail="retention_days=30", request_path=f"/api/cases/{case_id}/trash")
+    return require_case(case_id)
+
+@app.get("/api/cases/lifecycle/{lifecycle_status}")
+def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
+    require_permission("view")
+    conn = connect()
+    try:
+        return [rowdict(r) for r in conn.execute("SELECT * FROM cases WHERE lifecycle_status=? ORDER BY updated_at DESC", (lifecycle_status,)).fetchall()]
+    finally: conn.close()
 
 
 @app.get("/api/cases/{case_id}")

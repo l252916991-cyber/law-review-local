@@ -191,10 +191,19 @@ async function loadCases() {
  */
 function renderCaseList() {
   $("#case-list").innerHTML = state.cases.map((item) => `
-    <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
-      <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
-    </button>`).join("") || '<div class="empty-state">暂无案件</div>';
+    <div class="case-row">
+      <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
+        <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
+      </button>
+      <button class="case-more" data-archive-case="${item.id}" title="归档案卷" aria-label="归档案卷">···</button>
+    </div>`).join("") || '<div class="empty-state">暂无案件</div>';
   $$(".case-item").forEach((button) => button.addEventListener("click", () => selectCase(Number(button.dataset.caseId))));
+  $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const id = Number(button.dataset.archiveCase);
+    if (!window.confirm("归档后案卷会长期保留，可随时恢复。确认归档？")) return;
+    try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
+  }));
 }
 
 /**
