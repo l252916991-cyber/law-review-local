@@ -189,6 +189,20 @@ async function loadCases() {
 /**
  * 渲染案件列表
  */
+function openLifecycleDialog(options) {
+  return new Promise((resolve) => {
+    const dialog = $("#case-lifecycle-dialog");
+    $("#lifecycle-kicker").textContent = options.kicker || "案卷生命周期";
+    $("#lifecycle-title").textContent = options.title;
+    $("#lifecycle-message").textContent = options.message;
+    $("#lifecycle-impact").textContent = options.impact || "操作会写入审计记录。";
+    const confirm = $("#lifecycle-confirm"); confirm.textContent = options.action || "确认"; confirm.classList.toggle("danger-action", Boolean(options.danger));
+    const finish = (value) => { dialog.close(); resolve(value); };
+    $("#lifecycle-cancel").onclick = () => finish(false); $("#lifecycle-cancel-action").onclick = () => finish(false); confirm.onclick = () => finish(true);
+    dialog.addEventListener("cancel", () => resolve(false), { once: true }); dialog.showModal();
+  });
+}
+
 function renderCaseList() {
   $("#case-list").innerHTML = state.cases.map((item) => `
     <div class="case-row">
@@ -202,7 +216,7 @@ function renderCaseList() {
   $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
     event.stopPropagation();
     const id = Number(button.dataset.archiveCase);
-    if (!window.confirm("归档后案卷会长期保留，可随时恢复。确认归档？")) return;
+    if (!(await openLifecycleDialog({ title: "归档案卷？", kicker: "长期保留", message: "归档后案卷会从日常工作区移出，但会长期保留并可随时恢复。", action: "归档案卷" }))) return;
     try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
   }));
   $$('[data-trash-case]').forEach((button) => button.addEventListener("click", async (event) => {
@@ -210,8 +224,7 @@ function renderCaseList() {
     const id = Number(button.dataset.trashCase);
     const item = state.cases.find((candidate) => candidate.id === id);
     if (!item) return;
-    const message = `删除案卷？\n\n案卷名称：${item.title}\n\n删除后将移入回收站并保留 30 天，在此期间可以恢复。\n\n影响：${item.document_count} 份卷宗、${item.evidence_count} 条证据。`;
-    if (!window.confirm(message)) return;
+    if (!(await openLifecycleDialog({ title: "移入回收站？", kicker: "可恢复删除", message: `案卷「${item.title}」将移入回收站，保留 30 天。`, impact: `将影响 ${item.document_count} 份卷宗、${item.evidence_count} 条证据。`, action: "移入回收站", danger: true }))) return;
     try { await api(`/api/cases/${id}/trash`, { method: "POST" }); await loadCases(); if (state.caseId === id) { state.caseId = null; if (state.cases[0]) await selectCase(state.cases[0].id); } toast("案卷已移入回收站，保留 30 天"); } catch (error) { toast(error.message, "error"); }
   }));
 }

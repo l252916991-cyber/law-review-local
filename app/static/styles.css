@@ -483,3 +483,11 @@ td { line-height: 1.7; }
 
 .case-delete { border: 0; background: transparent; color: #a15e52; width: 48px; border-radius: 4px; font-size: 11px; }
 .case-delete:hover { background: #f7e9e5; color: #8c3f35; }
+
+.lifecycle-dialog { width: min(520px, calc(100vw - 32px)); border-radius: 16px; }
+.lifecycle-dialog::backdrop { background: rgba(25, 30, 28, .42); backdrop-filter: blur(3px); }
+.lifecycle-body { padding: 0 26px 26px; }
+.lifecycle-body p { font-size: 15px; line-height: 1.8; margin: 0 0 14px; }
+.lifecycle-impact { color: #747b72; background: #f4f4ef; padding: 12px 14px; border-radius: 6px; font-size: 12px; line-height: 1.6; }
+.lifecycle-dialog .dialog-actions { margin-top: 22px; }
+.danger-action { background: #a9574d !important; }

@@ -440,6 +440,11 @@
     </div>
   </dialog>
 
+  <dialog id="case-lifecycle-dialog" class="dialog lifecycle-dialog">
+    <div class="dialog-header"><div><span id="lifecycle-kicker" class="section-label">案卷生命周期</span><h3 id="lifecycle-title">确认操作</h3></div><button class="close-button" type="button" id="lifecycle-cancel">×</button></div>
+    <div class="lifecycle-body"><p id="lifecycle-message"></p><div class="lifecycle-impact" id="lifecycle-impact"></div><div class="dialog-actions"><button class="secondary-button" type="button" id="lifecycle-cancel-action">取消</button><button class="primary-button" type="button" id="lifecycle-confirm">确认</button></div></div>
+  </dialog>
+
   <dialog id="case-dialog" class="dialog">
     <form id="case-form">
       <div class="dialog-header"><div><span class="section-label">案件空间</span><h3>新建案件</h3></div><button type="button" class="close-button" onclick="this.closest('dialog').close()">×</button></div>
