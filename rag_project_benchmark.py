@@ -18,7 +18,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
-SOURCE_PATHS = ("rag_project_benchmark.py", "app/rag.py", "app/rag_benchmark_dataset.py")
+SOURCE_PATHS = ("rag_project_benchmark.py", "app/rag.py", "app/rag_chunks.py", "app/rag_benchmark_dataset.py")
 
 
 def _mean(rows: list[dict[str, Any]], field: str) -> float | None:
@@ -188,12 +188,14 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--suite", choices=("classic", "challenges"), default="classic")
+    parser.add_argument("--page-children", action="store_true")
     parser.add_argument("--embedding-mode", choices=("hashed-local", "model"), default="hashed-local")
     parser.add_argument("--reranker", choices=("off", "on"), default="off")
     args = parser.parse_args()
     output_dir = args.output_dir or Path("output") / "test-runs" / datetime.now().strftime("%Y%m%d-%H%M%S") / "rag-240"
     output_dir.mkdir(parents=True, exist_ok=True)
-    configuration = {"embedding_mode": args.embedding_mode, "reranker": args.reranker}
+    configuration = {"embedding_mode": args.embedding_mode, "reranker": args.reranker,
+                     "page_children": str(args.page_children)}
     with tempfile.TemporaryDirectory(prefix="lexvault-rag240-") as data_dir:
         os.environ["LAW_REVIEW_DATA_DIR"] = data_dir
         from app.db import init_db, now, transaction
@@ -241,6 +243,7 @@ def main() -> int:
                 value,
                 prefer_remote_embeddings=prefer_remote,
                 use_neural_reranker=use_reranker,
+                use_page_children=args.page_children,
             )
             for key, value in case_ids.items()
         }

@@ -208,8 +208,10 @@ class HybridRetriever:
         prefer_remote_embeddings: bool = True,
         *,
         use_neural_reranker: bool | None = None,
+        use_page_children: bool = False,
     ):
         self.case_id = case_id
+        self.use_page_children = use_page_children
         self.embedding_client = EmbeddingClient(prefer_remote_embeddings)
         self.use_neural_reranker = (
             prefer_remote_embeddings if use_neural_reranker is None else use_neural_reranker
@@ -468,6 +470,8 @@ class HybridRetriever:
         return output
 
     def retrieve(self, query: str, limit: int = 6) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if self.use_page_children and query.strip():
+            return self._retrieve_children(query, limit)
         if not isinstance(query, str) or not query.strip():
             return [], {
                 "mode": "FTS5/BM25 + Legal Lexical + Vector + RRF",
@@ -567,6 +571,93 @@ class HybridRetriever:
                          "fallback_reason": self.rerank_client.last_failure},
         }
         return selected, metrics
+
+    def _retrieve_children(self, query: str, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Experimental bounded full-scan child recall; page indexes stay untouched."""
+        from .rag_chunks import CHUNK_VERSION, page_chunks
+        from .legal_corpus import _terms
+        from collections import Counter
+
+        if limit < 1:
+            raise ValueError("Positive retrieval limit required")
+        conn = connect()
+        try:
+            pages = [rowdict(row) for row in conn.execute(
+                "SELECT p.id AS page_id,p.page_no,p.text,d.id AS document_id,d.name "
+                "FROM pages p JOIN documents d ON d.id=p.document_id WHERE d.case_id=? ORDER BY p.id",
+                (self.case_id,),
+            )]
+        finally:
+            conn.close()
+        children = [{**page, **chunk} for page in pages for chunk in page_chunks(page["text"])]
+        if len(children) > 10000:
+            raise ValueError("Experimental child scan exceeds 10000 chunks")
+        if not children:
+            return [], {"retrieval_mode": CHUNK_VERSION, "source_count": 0, "degraded": False}
+        query_vectors, backend = self.embedding_client.embed([query])
+        dimensions = len(query_vectors[0])
+        vectors = []
+        for start in range(0, len(children), 32):
+            batch = children[start:start + 32]
+            embedded, actual_backend = self.embedding_client.embed([child["text"] for child in batch])
+            if actual_backend != backend or len(embedded) != len(batch) or not all(valid_vector(v, dimensions) for v in embedded):
+                raise RuntimeError("embedding_backend_changed_during_index")
+            vectors.extend(embedded)
+        terms = [_terms(child["text"]) for child in children]
+        df = Counter(term for bag in terms for term in bag)
+        query_terms_set = _terms(query)
+        average_length = sum(sum(bag.values()) for bag in terms) / len(terms) or 1
+        lexical = []
+        semantic = []
+        for index, (bag, vector) in enumerate(zip(terms, vectors)):
+            length = sum(bag.values())
+            score = sum(
+                math.log(1 + (len(terms) - df[t] + 0.5) / (df[t] + 0.5))
+                * bag[t] * 2.2 / (bag[t] + 1.2 * (0.25 + 0.75 * length / average_length))
+                for t in query_terms_set if bag[t]
+            )
+            if score > 0:
+                lexical.append((score, index))
+            similarity = cosine_similarity(query_vectors[0], vector)
+            if similarity > 0:
+                semantic.append((similarity, index))
+        scores: dict[int, float] = {}
+        for channel in (lexical, semantic):
+            for rank, (_, index) in enumerate(sorted(channel, key=lambda x: (-x[0], x[1]))[:50], 1):
+                scores[index] = scores.get(index, 0) + 1 / (60 + rank)
+        indices = sorted(scores, key=lambda i: (-scores[i], i))
+        neural = self.rerank_client.score(query, [children[i]["text"] for i in indices]) if self.use_neural_reranker and indices else None
+        if neural is not None:
+            if len(neural) != len(indices):
+                raise RuntimeError("rerank_result_count_mismatch")
+            final_scores = dict(zip(indices, neural))
+            indices.sort(key=lambda i: (-final_scores[i], i))
+        else:
+            final_scores = scores
+        selected = []
+        seen = set()
+        parent_text = {page["page_id"]: page["text"] for page in pages}
+        for index in indices:
+            child = children[index]
+            if child["page_id"] in seen:
+                continue
+            seen.add(child["page_id"])
+            selected.append({
+                **child, "text": parent_text[child["page_id"]],
+                "quote": child["text"], "rank": len(selected) + 1,
+                "rrf_score": scores[index], "rerank_score": final_scores[index],
+                "retrieval_explain": f"{CHUNK_VERSION}; chars=[{child['char_start']},{child['char_end']}); RRF={scores[index]}",
+            })
+            if len(selected) == limit:
+                break
+        return selected, {
+            "retrieval_mode": CHUNK_VERSION, "source_count": len(selected),
+            "child_count": len(children), "fused_candidates": len(indices),
+            "degraded": backend == "hashed-local", "index_storage": "ephemeral_full_scan",
+            "embedding": {"backend": backend, "dimensions": dimensions,
+                          "model": embedding_identity(self.embedding_client.model, backend) + "|" + CHUNK_VERSION},
+            "reranker": {"enabled": neural is not None, "requested": self.use_neural_reranker},
+        }
 
 
 def remember(
