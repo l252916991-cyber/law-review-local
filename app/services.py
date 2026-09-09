@@ -99,6 +99,7 @@ def _check_parse_budget(path: Path) -> None:
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 REMOTE_MODEL_APPROVAL_ENV = "LAW_REVIEW_ALLOW_REMOTE_MODELS"
+LOCAL_MODEL_HOSTS_ENV = "LAW_REVIEW_LOCAL_MODEL_HOSTS"
 
 
 def assert_model_endpoint_allowed(base_url: str) -> None:
@@ -112,7 +113,12 @@ def assert_model_endpoint_allowed(base_url: str) -> None:
     host = (parsed.hostname or "").lower()
     if not parsed.scheme or not host:
         raise ValueError("模型服务地址无效")
-    if host in LOOPBACK_HOSTS and parsed.scheme in {"http", "https"}:
+    configured_local_hosts = {
+        item.strip().lower()
+        for item in os.getenv(LOCAL_MODEL_HOSTS_ENV, "").split(",")
+        if item.strip()
+    }
+    if host in LOOPBACK_HOSTS | configured_local_hosts and parsed.scheme in {"http", "https"}:
         return
     if os.getenv(REMOTE_MODEL_APPROVAL_ENV) != "1":
         raise ValueError("外发模型服务未获批准：仅允许本机回环地址，或显式配置 LAW_REVIEW_ALLOW_REMOTE_MODELS=1")

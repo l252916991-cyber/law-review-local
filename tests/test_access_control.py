@@ -597,3 +597,14 @@ class AccessControlTests(unittest.TestCase):
                 self.assertEqual(remote.get("/api/auth/me").status_code, 403)
             finally:
                 remote.close()
+
+    def test_local_mode_accepts_only_explicit_trusted_container_peer(self):
+        with patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "local", "LAW_REVIEW_TRUSTED_LOCAL_PEERS": "172.18.0.1"}):
+            trusted = TestClient(app, client=("172.18.0.1", 5000))
+            untrusted = TestClient(app, client=("172.18.0.2", 5000))
+            try:
+                self.assertEqual(trusted.get("/api/auth/me").status_code, 200)
+                self.assertEqual(untrusted.get("/api/auth/me").status_code, 403)
+            finally:
+                trusted.close()
+                untrusted.close()

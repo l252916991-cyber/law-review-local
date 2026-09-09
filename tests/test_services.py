@@ -289,6 +289,11 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
             with self.assertRaises(ValueError):
                 assert_model_endpoint_allowed("http://models.internal.example/v1")
 
+    def test_explicit_container_host_is_treated_as_local(self):
+        from app.services import assert_model_endpoint_allowed
+        with patch.dict(os.environ, {"LAW_REVIEW_LOCAL_MODEL_HOSTS": "host.docker.internal"}):
+            assert_model_endpoint_allowed("http://host.docker.internal:8000/v1")
+
     def test_call_local_llm_refuses_unapproved_remote_endpoint_before_any_io(self):
         from app.services import call_local_llm
         with patch.dict(os.environ, {"LAW_REVIEW_LLM_URL": "http://203.0.113.9:8000/v1"}), \

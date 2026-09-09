@@ -258,6 +258,12 @@ class AccessMiddleware(BaseHTTPMiddleware):
                     local_peer = ipaddress.ip_address(peer).is_loopback
                 except ValueError:
                     local_peer = peer == "testclient"
+                trusted_local_peers = {
+                    item.strip()
+                    for item in os.getenv("LAW_REVIEW_TRUSTED_LOCAL_PEERS", "").split(",")
+                    if item.strip()
+                }
+                local_peer = local_peer or peer in trusted_local_peers
                 if not local_peer:
                     raise HTTPException(403, "本机模式不接受远程访问，请配置 token 模式")
                 principal = Principal("本机律师", True, local=True, permissions=ALL_PERMISSIONS)
