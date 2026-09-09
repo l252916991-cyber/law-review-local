@@ -4,6 +4,15 @@
 
 已完成实验的评分修正入口为 `python scripts/audit_benchmark.py <原运行目录> <新的审计目录>`。它不调用模型、不覆盖旧产物，对新旧同题回答统一重评，记录逐题变化、源文件哈希与分层配对 bootstrap 区间。默认 `verify_benchmark_run.py` 同时要求源码版本和评分复算一致；源码升级后，可使用 `--artifacts-only` 验证历史文件完整性，但该模式不验证历史评分正确性，不能冒充完整评分复算。
 
+离线重放确定性后处理的入口为 `python scripts/postprocess_audit.py <原运行目录> <新的审计目录> [--charge-canonicalization]`：
+在已保存回答上应用 `app/benchmark_postprocess.py` 的无参考答案规则后重新评分，逐题保留原预测与原分数。
+`--charge-canonicalization` 是诊断选项，会把 3-3 本体外罪名按唯一超串映射回本体，属评分口径放宽，须与严格分分列。
+
+法条库覆盖与补库工作单入口为 `python scripts/lawbench_coverage.py --run <运行目录> --corpus-dir <法条库> ...`：
+只读题面统计 1-1 的精确命中率，并把未覆盖题写成 `scripts/build_npc_corpus.py --campaign` 可直接消费的 `inputs.jsonl`。
+
+实测收益、已证伪手段与剩余差距见[均分提升实测与路线图](score-uplift-20260909.md)。
+
 pytest 的 LawBench 装载、抽样和评分协议回归使用临时合成数据，避免 CI 依赖未提交的本地题库。真实模型测试仍严格加载固定上游题库；合成协议测试的题数不计入真实测试成绩。
 
 ## 三层结果不得混称
