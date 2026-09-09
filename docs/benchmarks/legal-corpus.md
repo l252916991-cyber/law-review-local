@@ -67,4 +67,19 @@ uv run --locked python scripts/build_legal_corpus.py \
   --output output/score85/legal_corpus_supplement_ministry_v1 --verify
 ```
 
-该补充集只增加来源无关的语料覆盖，不改生成模型，也不把评测参考答案写入查询或语料。未纳入《交通警察道路执勤执法工作规范》：找到的官方转载页将条号与正文紧连，当前通用解析器无法完整识别；在增加可审计的来源特定解析规则前保持显式缺失。
+该补充集只增加来源无关的语料覆盖，不改生成模型，也不把评测参考答案写入查询或语料。
+
+## 交通警察执勤规范正文补充
+
+常州市旧链接已重定向到首页。改用[昌都市公安局正文](https://gaj.changdu.gov.cn/cdsgaj/c102212/202005/cd0d15663c3d42019d8c2309991a3c1f.shtml)，现有解析器可直接识别完整的第1至86条。
+[湖南省公安厅发布说明](https://gat.hunan.gov.cn/gat/jwgk/zfxxgk/xxgkml/ghjh/200812/t20081230_14734998.html)确认修订发布日期为2008-11-15；正文末条确认2009-01-01施行并废止2005年版。
+版本日期补充来源写入文书元数据。页面只刊载部分附件，因此索引范围明确为86条正文，附件全部排除；原始网页完整保留。
+
+```sh
+uv run --locked python scripts/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --source traffic-police-duty-2008
+uv run --locked python scripts/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --verify
+```
+
+构建与离线复验通过：1份文书、86条、valid=true。实验配置为 `benchmarks/score85/qwythos8bit-statutory-police-v9.json`。
+
+固定模型复测：`dev20-statutory-police-v9` 为47.64分，上一版47.30分，1升19平0降；执法偏差题第79条召回排名第一，单题21.13→27.88。`confirm10-statutory-police-v9` 为47.96分，10题均与上一版相同；30次调用无错误、空答或截断。按已保留方案直接接入的要求，`weak4-candidate-v1.json` 已加入该库。小样本结果不代表200/1000题验收完成。

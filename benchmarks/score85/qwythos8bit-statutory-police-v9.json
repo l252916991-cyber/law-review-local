@@ -5,7 +5,7 @@
   "max_tokens": 1600,
   "timeout": 240,
   "enable_thinking": false,
-  "strategy": "weak_tasks",
+  "strategy": "statutory_rag",
   "corpus_directories": [
     "output/score85/legal_corpus",
     "output/score85/legal_corpus_supplement_v1",

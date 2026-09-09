@@ -25,6 +25,19 @@ from app.legal_corpus import LegalCorpus, SCHEMA_VERSION, html_to_text, split_ar
 
 SOURCES: list[dict[str, Any]] = [
     {
+        "document_id": "traffic-police-duty-2008", "law_name": "交通警察道路执勤执法工作规范",
+        "aliases": ["交通警察道路执勤执法工作规范"],
+        "source_url": "https://gaj.changdu.gov.cn/cdsgaj/c102212/202005/cd0d15663c3d42019d8c2309991a3c1f.shtml",
+        "publisher": "昌都市公安局", "version_date": "2008-11-15", "effective_date": "2009-01-01",
+        "version_status": "dated_revised_publication; currentness_not_asserted",
+        "version_date_source_url": "https://gat.hunan.gov.cn/gat/jwgk/zfxxgk/xxgkml/ghjh/200812/t20081230_14734998.html",
+        "expected_max": 86,
+        "version_evidence": "本规范自2009年1月1 日起实施。2005年11月14日公安部印发的《交通警察道路执勤执法工作规范》同时废止。",
+        "last_sentence": "2005年11月14日公安部印发的《交通警察道路执勤执法工作规范》同时废止。",
+        "note": "86条正文完整；发布日期由湖南省公安厅发布说明核实，正文以施行及废止旧版条款识别版本。附件仅部分刊载，全部排除于条文索引；原始网页保留。",
+        "content_scope": "main_text_articles_1_to_86; annexes_excluded",
+    },
+    {
         "document_id": "disabled-protection-2018", "law_name": "中华人民共和国残疾人保障法",
         "aliases": ["中华人民共和国残疾人保障法", "残疾人保障法"],
         "source_url": "https://policy.mofcom.gov.cn/claw/clawContent.shtml?id=102336",
