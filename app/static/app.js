@@ -30,6 +30,22 @@ const state = {
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const toggle = $("#theme-toggle");
+  if (!toggle) return;
+  const dark = theme === "dark";
+  toggle.querySelector("span").textContent = dark ? "☀" : "☾";
+  toggle.setAttribute("aria-label", dark ? "切换到白天主题" : "切换到黑夜主题");
+  toggle.title = dark ? "切换到白天主题" : "切换到黑夜主题";
+}
+
+function initializeTheme() {
+  const saved = localStorage.getItem("lexvault-theme");
+  const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(saved === "dark" || saved === "light" ? saved : preferred);
+}
+
 /**
  * API 请求封装
  * @param {string} path - API 路径
@@ -984,6 +1000,11 @@ function showView(name) {
 }
 
 function bindEvents() {
+  $("#theme-toggle").addEventListener("click", () => {
+    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    localStorage.setItem("lexvault-theme", theme);
+    applyTheme(theme);
+  });
   $("#model-settings-btn").addEventListener("click", openModelSettings);
   $("#model-test-btn").addEventListener("click", testModelSettings);
   $("#model-settings-form").addEventListener("submit", saveModelSettings);
@@ -1737,6 +1758,7 @@ function registerKeyboardShortcuts() {
 // ========================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  initializeTheme();
   bootstrap();
   registerKeyboardShortcuts();
 });
