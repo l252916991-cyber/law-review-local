@@ -51,3 +51,20 @@ matches = corpus.search("盈余 分配 成员 交易量", law_name="农民专业
 - 山东法院一个 2020 年刑法页面在本机 TLS 握手超时。以上下载失败没有通过补写法条或拼接基准答案掩盖。
 
 完整性检查证明所登记的基础条号齐全且不重复，逐字法律准确性仍依赖来源文本；官方域名本身不等于转载绝无错误。
+
+## 2026-09-09 部门规章补充集
+
+为覆盖场景到法条任务中缺失的公开部门规章，构建器新增四个独立官方来源：国务院公报公开的《道路交通安全违法行为记分管理办法》，以及国家市场监督管理总局公开的《医疗器械注册与备案管理办法》《医疗器械经营监督管理办法》《化妆品生产经营监督管理办法》。它们合计 300 个基础条文；每份文书仍执行版本证据、连续条号、法定收尾句和哈希校验。
+
+```sh
+uv run --locked python scripts/build_legal_corpus.py \
+  --output output/score85/legal_corpus_supplement_ministry_v1 \
+  --source traffic-points-2021 \
+  --source medical-device-registration-2021 \
+  --source medical-device-operation-2022 \
+  --source cosmetics-operation-2021
+uv run --locked python scripts/build_legal_corpus.py \
+  --output output/score85/legal_corpus_supplement_ministry_v1 --verify
+```
+
+该补充集只增加来源无关的语料覆盖，不改生成模型，也不把评测参考答案写入查询或语料。未纳入《交通警察道路执勤执法工作规范》：找到的官方转载页将条号与正文紧连，当前通用解析器无法完整识别；在增加可审计的来源特定解析规则前保持显式缺失。
