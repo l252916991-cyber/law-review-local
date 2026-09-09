@@ -345,9 +345,9 @@ tbody tr:last-child td { border-bottom: 0; } tbody tr:hover { background: #fbfdf
 }
 .app-shell { grid-template-columns: 236px minmax(0, 1fr); }
 .sidebar { background: #f2f2ed; color: var(--ink); border-right: 1px solid var(--line); padding: 32px 18px 24px; }
-.brand { gap: 10px; padding: 0 8px; }
-.brand-mark { width: 38px; height: 42px; background: transparent; box-shadow: none; border-radius: 0; color: #766548; }
-.brand-mark svg { width: 38px; height: 38px; }
+.brand { gap: 12px; padding: 0 8px; }
+.brand-mark { flex: 0 0 56px; width: 56px; height: 58px; background: transparent; box-shadow: none; border-radius: 0; color: #766548; }
+.brand-mark svg { width: 56px; height: 56px; }
 .brand strong { font-family: Georgia, serif; font-size: 23px; font-weight: 500; letter-spacing: -.04em; }
 .brand span { color: #71756f; font-size: 11px; letter-spacing: .06em; margin-top: 6px; }
 .privacy-chip { color: #626b63; background: transparent; border: 0; padding: 0; font-size: 11px; margin: 28px 12px; letter-spacing: .02em; }
