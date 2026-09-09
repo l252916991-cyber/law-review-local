@@ -7,6 +7,7 @@ from typing import Any
 
 SURNAMES = ["赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈", "褚", "卫"]
 INDUSTRIES = ["新能源", "医疗器械", "物流", "教育", "软件", "农业", "建筑", "传媒", "环保", "零售", "制造", "旅游"]
+DATASET_VERSION = "lexvault-rag-240-v2"
 
 
 def build_rag_benchmark() -> list[dict[str, Any]]:
@@ -83,20 +84,22 @@ def build_rag_benchmark() -> list[dict[str, Any]]:
             ("不知情辩解可由哪些客观记录反驳？", [(2, 1), (2, 2), (4, 1)]),
             ("已经退款多少万元？", [(5, 1)]),
             ("退款通过什么账户支付？", [(5, 2)]),
-            ("材料是否记载境外加密货币账户？", []),
-            ("材料能否证明负责人持有火星采矿许可证？", []),
+            ("是否有记录证明负责人要求删除批准固定回报的电子邮件？", []),
+            ("材料能否证明募集资金已经全部退还给所有参与人？", []),
         ]
         for question_index, (query, expected) in enumerate(specs, 1):
             questions.append(
                 {
                     "id": f"{case_key}-Q{question_index:02d}",
+                    "template_id": f"Q{question_index:02d}",
                     "case_key": case_key,
-                    "query": f"{case_key}：{query}",
+                    "query": query,
                     "expected": [
                         {"document": documents[doc_index]["name"], "page": page_no}
                         for doc_index, page_no in expected
                     ],
                     "answerable": bool(expected),
+                    "challenge": "multi_source" if len(expected) > 1 else "single_page" if expected else "hard_unanswerable",
                     "documents": documents,
                 }
             )

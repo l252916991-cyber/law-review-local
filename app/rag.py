@@ -78,7 +78,8 @@ def expand_retrieval_query(query: str) -> str:
 
 def query_signals(query: str) -> dict[str, Any]:
     """Extract auditable retrieval constraints without inventing case facts."""
-    amounts = re.findall(r"\d[\d,]*(?:\.\d+)?\s*(?:万|亿)?\s*元?", query)
+    # A unit is required: bare identifiers such as ``RAG-01`` are not amounts.
+    amounts = re.findall(r"(?<![\dA-Za-z-])\d[\d,]*(?:\.\d+)?\s*(?:(?:万|亿)\s*元?|元)", query)
     dates = re.findall(r"(?:19|20)\d{2}(?:[-年/.]\d{1,2}(?:[-月/.]\d{1,2})?)?", query)
     articles = re.findall(r"第[零〇一二三四五六七八九十百千万两0-9]+条(?:之[一二三四五六七八九十0-9]+)?", query)
     evidence_types = [
@@ -201,9 +202,18 @@ class RerankClient:
 
 
 class HybridRetriever:
-    def __init__(self, case_id: int, prefer_remote_embeddings: bool = True):
+    def __init__(
+        self,
+        case_id: int,
+        prefer_remote_embeddings: bool = True,
+        *,
+        use_neural_reranker: bool | None = None,
+    ):
         self.case_id = case_id
         self.embedding_client = EmbeddingClient(prefer_remote_embeddings)
+        self.use_neural_reranker = (
+            prefer_remote_embeddings if use_neural_reranker is None else use_neural_reranker
+        )
         self.vector_diagnostics: dict[str, Any] = {}
         self.keyword_diagnostics: dict[str, Any] = {}
         self.rerank_client = RerankClient()
@@ -394,16 +404,6 @@ class HybridRetriever:
         counts: dict[int, int] = {}
         for item in items:
             document_id = int(item["document_id"])
-            if document_id in counts:
-                continue
-            selected.append(item)
-            counts[document_id] = 1
-            if len(selected) >= limit:
-                return selected
-        for item in items:
-            if item in selected:
-                continue
-            document_id = int(item["document_id"])
             if counts.get(document_id, 0) >= max_per_document:
                 continue
             selected.append(item)
@@ -509,8 +509,10 @@ class HybridRetriever:
             item["rerank_components"] = {key: round(value, 6) for key, value in components.items()}
             item["quote"] = best_quote(item["text"], query_terms(query))
         rerank_items = list(fused.values())
-        rerank_scores = (self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
-                         if self.embedding_client.prefer_remote else None)
+        rerank_scores = (
+            self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
+            if self.use_neural_reranker else None
+        )
         if rerank_scores is not None:
             for item, score in zip(rerank_items, rerank_scores):
                 item["neural_rerank_score"] = round(score, 6)
@@ -560,7 +562,8 @@ class HybridRetriever:
             "degraded": bool(self.vector_diagnostics.get("degraded")) or not self.keyword_diagnostics.get("fts_available", True),
             "embedding": dict(self.vector_diagnostics),
             "keyword": dict(self.keyword_diagnostics),
-            "reranker": {"model": self.rerank_client.model, "enabled": rerank_scores is not None,
+            "reranker": {"model": self.rerank_client.model, "requested": self.use_neural_reranker,
+                         "enabled": rerank_scores is not None,
                          "fallback_reason": self.rerank_client.last_failure},
         }
         return selected, metrics
