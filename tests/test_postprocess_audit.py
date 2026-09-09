@@ -68,6 +68,24 @@ def test_replay_changes_charge_scores_only_with_the_diagnostic_flag(tmp_path):
     assert relaxed["score_delta"] > strict["score_delta"]
 
 
+def test_retrieval_replay_is_opt_in_and_uses_only_the_question(tmp_path):
+    from unittest.mock import Mock
+
+    source = _run(tmp_path, ["1-1"], "模型幻觉条文")
+    context = {"mode": "exact_article", "hits": [{"document_id": "law", "article_id": "1", "text": "第一条 官方正文。"}]}
+    fake = Mock(return_value=context)
+    with patch("scripts.postprocess_audit.retrieve", fake):
+        replay(source, tmp_path / "without-corpus")
+    fake.assert_not_called()
+    with patch("scripts.postprocess_audit.retrieve", fake):
+        result = replay(source, tmp_path / "with-corpus", corpus_directories=["/frozen/corpus"])
+    assert result["corpus_directories"] == ["/frozen/corpus"]
+    audited = [json.loads(line) for line in (tmp_path / "with-corpus" / "detailed_results.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert all(row["prediction"] == "官方正文。" for row in audited)
+    assert all(row["postprocess"]["policy"].startswith("exact-retrieved-article-content") for row in audited)
+    assert all(call.args[1] == row["question"] for call, row in zip(fake.call_args_list, audited))
+
+
 def test_replay_rejects_overwrite_and_nesting(tmp_path):
     source = _run(tmp_path, ["2-1"], "合成问题 2-1/0：用于测试装载、抽样及协议,不评估法律知识。")
     destination = tmp_path / "audit"

@@ -6,9 +6,10 @@ gold-blind output repairs (``app/benchmark_postprocess.py``) and then re-scores.
 The source run is never modified; every row keeps its original prediction and
 score, and ``audit.json`` records per-task and per-policy deltas.
 
-Only branches that need no retrieval context are replayed. Task 1-1 depends on an
-official statutory hit recorded at inference time, so it is deliberately out of
-scope here and must be measured by a real run with the statutory corpus.
+Only branches that need no retrieval context are replayed by default. Task 1-1
+depends on an exact official-article hit, so it is replayed only when the caller
+supplies the frozen statutory corpus directories with ``--corpus-dir``; the
+retrieval itself is still question-only and never reads a reference answer.
 """
 from __future__ import annotations
 
@@ -26,13 +27,15 @@ sys.path.insert(0, str(ROOT))
 from app.benchmark_metrics import SCORER_VERSION, parse_label_answer, score_lawbench_item, task_label_space
 from app.benchmark_postprocess import POSTPROCESS_VERSION, postprocess
 from app.benchmark_reporting import atomic_json, source_hashes, write_report
+from app.benchmark_retrieval import RETRIEVAL_VERSION, retrieve
 from scripts.audit_benchmark import paired_interval, sha256
 from verify_benchmark_run import verify
 
 # Post-processing branches that are pure functions of the question and the saved
-# prediction. 1-1 is excluded: it needs the exact-article retrieval recorded at
-# inference time and cannot be replayed offline.
+# prediction. 1-1 additionally needs the exact-article retrieval, which is only
+# replayed when the caller supplies the frozen statutory corpus directories.
 REPLAY_TASKS = frozenset({"2-1", "2-7", "2-9", "2-10"})
+RETRIEVAL_TASK = "1-1"
 CHARGE_TASK = "3-3"
 CHARGE_POLICY = "charge-ontology-unique-superstring; no reference access"
 UNCHANGED_POLICY = "unchanged"
@@ -81,7 +84,13 @@ def _aggregate(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def replay(source: Path, destination: Path, *, charge_canonicalization: bool = False) -> dict[str, Any]:
+def replay(
+    source: Path,
+    destination: Path,
+    *,
+    charge_canonicalization: bool = False,
+    corpus_directories: list[str] | None = None,
+) -> dict[str, Any]:
     """Apply gold-blind post-processing to stored answers and re-score them."""
     source = source.resolve()
     destination = destination.resolve()
@@ -113,6 +122,10 @@ def replay(source: Path, destination: Path, *, charge_canonicalization: bool = F
         if not original.get("error"):
             if task in REPLAY_TASKS:
                 revised, audit = postprocess(task, original["question"], revised, None)
+            if task == RETRIEVAL_TASK and corpus_directories:
+                context = retrieve(task, original["question"], corpus_directories)
+                revised, audit = postprocess(task, original["question"], revised, context)
+                audit = {**audit, "retrieval_version": RETRIEVAL_VERSION, "retrieval_mode": context["mode"]}
             if task == CHARGE_TASK and charge_canonicalization:
                 revised, mapped = canonicalize_charges(revised)
                 if mapped:
@@ -158,6 +171,9 @@ def replay(source: Path, destination: Path, *, charge_canonicalization: bool = F
             "source_run": str(source), "rescore_only": True, "new_model_calls": 0,
             "postprocess_version": POSTPROCESS_VERSION,
             "replayed_tasks": sorted(REPLAY_TASKS),
+            "retrieval_task": RETRIEVAL_TASK if corpus_directories else None,
+            "retrieval_version": RETRIEVAL_VERSION if corpus_directories else None,
+            "corpus_directories": corpus_directories,
             "charge_canonicalization": charge_canonicalization,
             "original_scorer_version": manifest["scorer_version"], "input_hashes": input_hashes,
             "script_sha256": sha256(Path(__file__)), "source_integrity": integrity,
@@ -188,6 +204,7 @@ def replay(source: Path, destination: Path, *, charge_canonicalization: bool = F
     result = {
         "source_run": str(source), "rescore_only": True, "new_model_calls": 0,
         "postprocess_version": POSTPROCESS_VERSION, "charge_canonicalization": charge_canonicalization,
+        "corpus_directories": corpus_directories,
         "original_scorer": manifest["scorer_version"], "audited_scorer": SCORER_VERSION,
         "original_mean": original_summary["mean_score_all"], "audited_mean": summary["mean_score_all"],
         "score_delta": summary["mean_score_all"] - original_summary["mean_score_all"],
@@ -209,9 +226,10 @@ def replay(source: Path, destination: Path, *, charge_canonicalization: bool = F
     atomic_json(destination / "audit.json", result)
 
     report = destination / "REPORT.md"
+    replayed = sorted(REPLAY_TASKS) + ([RETRIEVAL_TASK] if corpus_directories else [])
     banner = [
         f"> 离线后处理审计：复用 {source.name} 的原始回答，新增模型调用 0 次；原运行文件未改动。",
-        f"> 后处理版本 `{POSTPROCESS_VERSION}`；重放任务 {', '.join(sorted(REPLAY_TASKS))}；"
+        f"> 后处理版本 `{POSTPROCESS_VERSION}`；重放任务 {', '.join(replayed)}；"
         f"罪名本体归一化 {'开启' if charge_canonicalization else '关闭'}。",
         f"> 均分 {original_summary['mean_score_all']:.2%} → {summary['mean_score_all']:.2%}"
         f"（{result['score_delta'] * 100:+.2f} 个百分点），{len(changes)} 题变化。",
@@ -232,8 +250,16 @@ def main() -> int:
         "--charge-canonicalization", action="store_true",
         help="诊断选项：把 3-3 的本体外罪名按唯一超串映射回本体；属于评分口径放宽，须与严格分分列",
     )
+    parser.add_argument(
+        "--corpus-dir", type=Path, action="append", default=None,
+        help="可重复：法条库目录；提供后才会离线重放 1-1 的精确条文策略",
+    )
     args = parser.parse_args()
-    result = replay(args.source, args.destination, charge_canonicalization=args.charge_canonicalization)
+    directories = [str(directory) for directory in args.corpus_dir] if args.corpus_dir else None
+    result = replay(
+        args.source, args.destination,
+        charge_canonicalization=args.charge_canonicalization, corpus_directories=directories,
+    )
     print(json.dumps(
         {key: value for key, value in result.items() if key not in {"changes", "verification"}},
         ensure_ascii=False, indent=2,
