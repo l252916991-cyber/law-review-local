@@ -100,6 +100,25 @@ def _summarize_group(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def paired_comparison(baseline: list[dict[str, Any]], candidate: list[dict[str, Any]]) -> dict[str, Any]:
+    """Reject mismatched questions before computing paired cluster deltas."""
+    old = {row["id"]: row for row in baseline}
+    new = {row["id"]: row for row in candidate}
+    if len(old) != len(baseline) or len(new) != len(candidate) or old.keys() != new.keys():
+        raise ValueError("Paired comparison requires unique identical question IDs")
+    fields = ("recall_at_k", "mrr", "page_precision_at_k", "complete_recall")
+    deltas = []
+    for key, row in new.items():
+        previous = old[key]
+        if any(row[field] != previous[field] for field in ("query", "expected", "template_id", "case_key")):
+            raise ValueError("Paired comparison inputs or labels differ")
+        delta = {"template_id": row["template_id"]}
+        for field in fields:
+            delta[field] = float(row[field]) - float(previous[field]) if row[field] is not None and previous[field] is not None else None
+        deltas.append(delta)
+    return {field: {"delta": _mean(deltas, field), "cluster_bootstrap_95ci": _template_bootstrap_ci(deltas, field)} for field in fields}
+
+
 def summarize(
     results: list[dict[str, Any]], *, dataset_version: str, k: int, configuration: dict[str, str],
     dataset_sha256: str,
@@ -153,7 +172,7 @@ def summarize(
         },
         "average_latency_ms": round(sum(row["latency_ms"] for row in results) / len(results)),
         "metric_notes": {
-            "unanswerable_empty_rate": "hard unanswerable queries pass only when retrieval returns no pages",
+            "unanswerable_empty_rate": "retrieval-empty diagnostic only; related evidence may support an answer of insufficient evidence; not answer abstention accuracy",
             "quote_presence_rate": "presence only; not citation grounding or entailment",
             "confidence_interval": "template-cluster bootstrap; repeated case variants are not independent samples",
         },
@@ -168,6 +187,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="LexVault 240题项目专用RAG评测")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--suite", choices=("classic", "challenges"), default="classic")
     parser.add_argument("--embedding-mode", choices=("hashed-local", "model"), default="hashed-local")
     parser.add_argument("--reranker", choices=("off", "on"), default="off")
     args = parser.parse_args()
@@ -178,10 +198,12 @@ def main() -> int:
         os.environ["LAW_REVIEW_DATA_DIR"] = data_dir
         from app.db import init_db, now, transaction
         from app.rag import HybridRetriever
-        from app.rag_benchmark_dataset import DATASET_VERSION, build_rag_benchmark
+        from app.rag_benchmark_dataset import (
+            DATASET_VERSION, CHALLENGE_VERSION, build_rag_benchmark, build_challenge_benchmark,
+        )
 
         init_db(seed=False)
-        dataset = build_rag_benchmark()
+        dataset = build_challenge_benchmark() if args.suite == "challenges" else build_rag_benchmark()
         dataset_sha256 = hashlib.sha256(
             json.dumps(dataset, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
@@ -232,7 +254,7 @@ def main() -> int:
             print(f"[{position}/{total}] {item['id']} {'PASS' if record['passed'] else 'MISS'}", flush=True)
         summary = summarize(
             results,
-            dataset_version=DATASET_VERSION,
+            dataset_version=CHALLENGE_VERSION if args.suite == "challenges" else DATASET_VERSION,
             k=args.k,
             configuration=configuration,
             dataset_sha256=dataset_sha256,

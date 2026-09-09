@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from rag_project_benchmark import score_query, summarize
+from rag_project_benchmark import paired_comparison
+import pytest
 
 
 def item(expected):
@@ -32,6 +34,15 @@ def test_answerable_pass_requires_complete_page_recall():
     assert record["page_precision_at_k"] == 1.0
     assert record["complete_recall"] is False
     assert record["passed"] is False
+
+
+def test_paired_comparison_rejects_changed_labels():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    assert paired_comparison([row], [row])["recall_at_k"]["delta"] == 0
+    with pytest.raises(ValueError, match="labels differ"):
+        paired_comparison([row], [{**row, "expected": []}])
+    with pytest.raises(ValueError, match="unique identical"):
+        paired_comparison([row, row], [row])
 
 
 def test_hard_unanswerable_requires_empty_retrieval():

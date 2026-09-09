@@ -8,6 +8,48 @@ from typing import Any
 SURNAMES = ["赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈", "褚", "卫"]
 INDUSTRIES = ["新能源", "医疗器械", "物流", "教育", "软件", "农业", "建筑", "传媒", "环保", "零售", "制造", "旅游"]
 DATASET_VERSION = "lexvault-rag-240-v2"
+CHALLENGE_VERSION = "lexvault-rag-challenges-v1"
+
+
+def build_challenge_benchmark() -> list[dict[str, Any]]:
+    """Independent domain fixtures; explicit case scope is not an entity hint."""
+    fixtures = [
+        ("labor", "劳动合同.txt", [
+            "劳动合同约定工作地点为南京。双方未就变更工作地点达成书面协议。",
+            "员工曾到苏州出差三天。出差安排不改变劳动合同约定的工作地点。",
+            "工资支付记录载明五月工资为8200元，六月工资尚未支付。",
+        ], "劳动合同约定的工作地点在哪里？", "勞動合同約定的工作地點在哪裡？", "工作地点约定和六月欠薪分别有哪些记录？"),
+        ("ip", "许可协议.txt", [
+            "商标许可协议授权范围仅限华东地区，许可期限截至2025年12月31日。",
+            "双方讨论过华南市场合作，但未签署华南地区的商标许可协议。",
+            "产品检验报告记载被诉产品使用了相同商标，销售发票显示交货地点为广州。",
+        ], "已经签署的商标许可覆盖哪个地区？", "已签署的商标许可能覆盖哪个地 区？", "许可地域限制与广州销售分别有哪些证据？"),
+        ("construction", "施工记录.txt", [
+            "工程验收记录载明三号楼屋面渗漏，施工单位确认需返工修复。",
+            "二号楼屋面通过淋水试验，未发现渗漏；三号楼尚待返工验收。",
+            "付款凭证显示建设单位已支付工程进度款340万元，质保金20万元暂未支付。",
+        ], "哪条记录确认三号楼屋面渗漏需返工？", "三号楼屋面渗 漏需要返工的记录是什么？", "屋面缺陷和已付工程款分别由哪些记录证明？"),
+        ("injury", "调查记录.txt", [
+            "现场录像记录甲于20时15分击打乙，乙随后倒地。录像未显示乙持械。",
+            "证人丙称听说乙曾持械，但未亲眼看到当晚冲突。该陈述并非现场目击记录。",
+            "医院检查记录显示乙左侧肋骨骨折，检查日期为事发次日。",
+        ], "直接记录甲击打乙的材料是什么？", "直接记录甲击 打乙的材料是什么？", "击打行为和伤情分别由哪些客观记录证明？"),
+    ]
+    rows = []
+    for domain, name, pages, query, noisy, multi in fixtures:
+        documents = [{"name": name, "pages": pages}]
+        for kind, question, gold in (
+            ("similar_page", query, [1]),
+            ("ocr_variant", noisy, [1]),
+            ("multi_source", multi, [1, 3]),
+        ):
+            rows.append({
+                "id": f"{domain}-{kind}", "template_id": domain,
+                "case_key": domain, "query": question, "documents": documents,
+                "expected": [{"document": name, "page": page} for page in gold],
+                "answerable": True, "challenge": kind,
+            })
+    return rows
 
 
 def build_rag_benchmark() -> list[dict[str, Any]]:
