@@ -29,6 +29,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       LAW_REVIEW_ALLOWED_HOSTS: ${LAW_REVIEW_ALLOWED_HOSTS:-localhost,127.0.0.1}
       LAW_REVIEW_LOCAL_MODEL_HOSTS: host.docker.internal
+      LAW_REVIEW_MODEL_LOOPBACK_HOST: host.docker.internal
       LAW_REVIEW_TRUSTED_LOCAL_PEERS: ${LAW_REVIEW_TRUSTED_LOCAL_PEERS:-172.18.0.1}
     volumes:
       - web-data:/data

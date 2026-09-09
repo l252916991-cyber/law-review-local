@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -608,3 +608,35 @@ class AccessControlTests(unittest.TestCase):
             finally:
                 trusted.close()
                 untrusted.close()
+
+    def test_model_detection_maps_loopback_to_configured_container_host(self):
+        response_body = json.dumps({"data": [{"id": "local-chat-model"}]}).encode()
+        response = MagicMock()
+        response.read.return_value = response_body
+        response.__enter__.return_value = response
+        opener = MagicMock()
+        opener.open.return_value = response
+        with patch.dict(os.environ, {"LAW_REVIEW_MODEL_LOOPBACK_HOST": "host.docker.internal"}), patch(
+            "app.main.urllib.request.build_opener", return_value=opener
+        ):
+            result = self.client.post(
+                "/api/model-config/test",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={"base_url": "http://127.0.0.1:8000/v1"},
+            )
+
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json(), {"reachable": True, "models": ["local-chat-model"]})
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, "http://host.docker.internal:8000/v1/models")
+
+    def test_model_detection_rejects_loopback_prefix_hostname(self):
+        with patch("app.main.urllib.request.build_opener") as build_opener:
+            result = self.client.post(
+                "/api/model-config/test",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={"base_url": "http://localhost.attacker.example/v1"},
+            )
+
+        self.assertEqual(result.status_code, 400)
+        build_opener.assert_not_called()

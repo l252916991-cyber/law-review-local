@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 import time
 import uuid
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -391,10 +392,22 @@ def test_model_config(payload: ModelConfigTest):
     """Check an OpenAI-compatible local model service without exposing its response body."""
     require_permission("view")
     base_url = payload.base_url.rstrip("/")
-    if not base_url.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]")):
-        raise HTTPException(400, "模型服务地址必须是本机地址")
     try:
-        request = urllib.request.Request(f"{base_url}/models", headers={"Accept": "application/json"})
+        parsed = urllib.parse.urlsplit(base_url)
+        port = parsed.port
+    except ValueError as exc:
+        raise HTTPException(400, "模型服务地址无效") from exc
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise HTTPException(400, "模型服务地址必须是本机地址")
+    connection_url = base_url
+    loopback_host = os.getenv("LAW_REVIEW_MODEL_LOOPBACK_HOST", "").strip()
+    if loopback_host:
+        port_suffix = f":{port}" if port is not None else ""
+        connection_url = urllib.parse.urlunsplit(
+            (parsed.scheme, f"{loopback_host}{port_suffix}", parsed.path, parsed.query, parsed.fragment)
+        )
+    try:
+        request = urllib.request.Request(f"{connection_url}/models", headers={"Accept": "application/json"})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(request, timeout=5) as response:
             body = json.loads(response.read())
