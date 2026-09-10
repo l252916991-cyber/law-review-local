@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light" />
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css?v=20260910-enterprise-login" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20260910-workspace-cleanup" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
@@ -35,7 +35,6 @@
       <div class="auth-help"><p>仅限获授权人员使用</p><p>无法登录？<span id="auth-support">请联系律所管理员</span></p></div>
       <noscript><p class="auth-error">请启用 JavaScript 后使用工作空间。</p></noscript>
     </main>
-    <footer class="auth-footer"><span>LexVault</span><span>专业阅卷 · 有据可循</span></footer>
   </section>
   <a class="skip-link" href="#main-content">跳至主要内容</a>
   <div class="app-shell">
@@ -45,14 +44,14 @@
         <div><strong>LexVault</strong><span>律师阅卷工作台</span></div>
       </div>
 
-      <div class="privacy-chip"><i></i>本机私有模式</div>
+      <div id="workspace-access" class="workspace-access">案件工作空间</div>
 
       <nav class="main-nav" aria-label="主导航">
         <button class="nav-item active" data-view="overview" aria-current="page"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>案件总览</button>
         <button class="nav-item" data-view="directory"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6Z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg></span>双层目录</button>
         <button class="nav-item" data-view="evidence"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="m7 9 4 6m6-6-4 6M9 6h6"/></svg></span>证据关系</button>
         <button class="nav-item" data-view="assistant"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H9l-5 4V4Z"/><path d="M8 9h8M8 13h5"/></svg></span>AI 阅卷</button>
-        <button class="nav-item" data-view="lab"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6m-5 0v7L4 20h16l-6-10V3M8 14h8"/></svg></span>Agent 实验室</button>
+        <button class="nav-item" data-view="lab"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6m-5 0v7L4 20h16l-6-10V3M8 14h8"/></svg></span>阅卷任务</button>
         <button class="nav-item" data-view="export"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></span>成果导出</button>
       </nav>
 
@@ -66,14 +65,14 @@
 
       <div class="sidebar-footer">
         <div class="model-dot" id="model-dot"></div>
-        <button id="model-settings-btn" class="model-settings" type="button" aria-label="配置本地模型"><div><strong id="model-state">检测本地模型…</strong><span id="model-name">数据不会离开本机</span></div><span aria-hidden="true">⚙</span></button>
+        <div class="model-status" role="status"><strong id="model-state">正在检查模型服务…</strong><span id="model-name"></span><p>模型服务由律所管理员配置。</p></div>
       </div>
     </aside>
 
     <main class="main" id="main-content" tabindex="-1">
       <header class="topbar">
         <div>
-          <div class="eyebrow" id="case-type">金融犯罪 · 阅卷空间</div>
+          <div class="eyebrow" id="case-type">案件空间</div>
           <h1 id="case-title">正在载入案件…</h1>
         </div>
         <div class="top-actions">
@@ -90,53 +89,23 @@
       <section class="content">
         <div id="no-case-state" class="empty-state" hidden>暂无工作区案件。可新建案件，或从已归档、回收站恢复。</div>
         <div id="overview-view" class="view active">
-          <div class="hero-card">
-            <div class="hero-copy">
-              <div class="hero-kicker">案件工作台 <span></span> CASE WORKSPACE</div>
-              <h2>以事实为据，<br />以法律为准。</h2>
-              <p id="case-description">梳理案件材料，核对证据来源，让每一步判断都有据可循。</p>
-              <div class="hero-actions">
-                <button class="primary-button" data-go="assistant">开始阅卷 <b>→</b></button>
-                <button class="secondary-button" id="hero-upload">上传卷宗</button>
-              </div>
-            </div>
-            <div class="justice-statement">
-              <div class="justice-symbol"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M32 10v42M15 54h34M11 22h42M17 22 8 39h18L17 22Zm30 0-9 17h18L47 22Z"/><path d="M8 39c2 8 16 8 18 0m12 0c2 8 16 8 18 0"/><circle cx="32" cy="15" r="3" fill="currentColor" stroke="none"/></svg></div>
-              <p>审慎 · 独立 · 公正</p>
-              <span>尊重事实，审视每一份证据</span>
-            </div>
-          </div>
+          <p id="case-description" class="case-description" hidden></p>
 
           <div class="metric-grid">
-            <article><div class="metric-icon blue">▤</div><div><span>卷宗文件</span><strong id="metric-docs">0</strong><small>已进入双层目录</small></div></article>
-            <article><div class="metric-icon violet">◫</div><div><span>内容页</span><strong id="metric-pages">0</strong><small>支持页级引用</small></div></article>
-            <article><div class="metric-icon amber">⌘</div><div><span>证据事项</span><strong id="metric-evidence">0</strong><small>形成证据清单</small></div></article>
-            <article><div class="metric-icon green">✓</div><div><span>已确认证据</span><strong id="metric-confirmed">0</strong><small>经律师人工复核</small></div></article>
+            <article><div><span>卷宗文件</span><strong id="metric-docs">0</strong></div></article>
+            <article><div><span>内容页</span><strong id="metric-pages">0</strong></div></article>
+            <article><div><span>证据事项</span><strong id="metric-evidence">0</strong></div></article>
+            <article><div><span>已确认证据</span><strong id="metric-confirmed">0</strong></div></article>
           </div>
 
-          <div class="two-column">
-            <article class="panel workflow-panel">
-              <div class="panel-heading"><div><span class="section-label">阅卷工作流</span><h3>阅卷流程</h3></div><button class="text-button" data-go="directory">查看目录 →</button></div>
-              <div class="workflow">
-                <div class="workflow-step done"><span>01</span><div><strong>整理卷宗</strong><small>影印 PDF 自动切页并识别中文</small></div></div>
-                <div class="workflow-line"></div>
-                <div class="workflow-step active"><span>02</span><div><strong>核对目录</strong><small>人员、日期、页码和摘要可人工校准</small></div></div>
-                <div class="workflow-line"></div>
-                <div class="workflow-step"><span>03</span><div><strong>关联证据</strong><small>统计、事实、对比分路处理</small></div></div>
-                <div class="workflow-line"></div>
-                <div class="workflow-step"><span>04</span><div><strong>复核与归档</strong><small>核实原文，留存审阅结论</small></div></div>
-              </div>
-            </article>
-
-            <article class="panel">
+<article class="panel">
               <div class="panel-heading"><div><span class="section-label">审计记录</span><h3>最近活动</h3></div><span class="live-pill">操作留痕</span></div>
               <div id="activity-list" class="activity-list"></div>
             </article>
-          </div>
 
           <article class="panel upload-panel" id="upload-zone">
             <div class="upload-icon">⇧</div>
-            <div><h3>添加案件材料</h3><p>支持 PDF、DOCX、TXT、图片；扫描件会调用本机中文 OCR。</p></div>
+            <div><h3>添加案件材料</h3><p>支持 PDF、DOCX、TXT、图片；扫描件需文字识别服务支持。</p></div>
             <button class="secondary-button">选择文件</button>
             <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.tif,.tiff,.webp" hidden />
           </article>
@@ -144,7 +113,7 @@
 
         <div id="directory-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">卷宗管理</span><h2>双层卷宗目录</h2><p>文件级信息与页级内容同步索引，人工修改会回写检索链路。</p></div>
+            <div><span class="section-label">卷宗管理</span><h2>双层卷宗目录</h2><p>查看文件与页级内容，校准类型、人员、日期和摘要。</p></div>
             <button class="primary-button" id="directory-upload">＋ 上传卷宗</button>
           </div>
 
@@ -157,7 +126,7 @@
             <div class="batch-drop-area" id="batch-drop-area">
               <div class="batch-drop-content">
                 <span class="upload-icon-large">⇧</span>
-                <p><strong>拖拽文件或文件夹到此处</strong></p>
+                <p><strong>拖拽文件到此处</strong></p>
                 <p class="hint">或点击下方按钮选择文件（最多 200 个）</p>
                 <button class="secondary-button" id="batch-file-select">选择文件</button>
                 <input type="file" id="batch-file-input" multiple hidden />
@@ -195,10 +164,10 @@
 
         <div id="evidence-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">证据审查</span><h2>证据事项与关联</h2><p>把事实结论、证据来源、矛盾与资金链路放在同一张可信网络中。</p></div>
+            <div><span class="section-label">证据审查</span><h2>证据事项与关联</h2><p>查看证据来源、关联关系与待复核事项。</p></div>
             <div style="display: flex; gap: 9px;">
               <button class="secondary-button" id="create-evidence-btn">＋ 添加证据</button>
-              <button class="primary-button" id="analyze-btn">✦ 运行本地证据分析</button>
+              <button class="primary-button" id="analyze-btn">分析证据</button>
             </div>
           </div>
           <div class="evidence-summary" id="evidence-summary"></div>
@@ -248,25 +217,14 @@
               <label class="user-field"><span>当前使用人</span><input id="user-name" value="本机律师" /></label>
               <div class="conversation-title">会话记录</div>
               <div id="conversation-list"></div>
-              <div class="isolation-note"><strong>会话隔离</strong><span>不同律师、不同会话的上下文互不交叉。</span></div>
+
             </aside>
             <section class="chat-panel">
               <div class="chat-header">
-                <div><span class="assistant-avatar">AI</span><div><strong>卷宗分析助手</strong><small><i></i> 仅访问当前案件资料</small></div></div>
-                <label class="toggle"><input type="checkbox" id="llm-toggle" checked /><span></span>调用本地大模型</label>
+                <div><span class="assistant-avatar">AI</span><div><strong>卷宗分析助手</strong><small><i></i> 当前案件问答</small></div></div>
+                <label class="toggle"><input type="checkbox" id="llm-toggle" checked /><span></span>使用模型生成答复</label>
               </div>
-              <div id="chat-messages" class="chat-messages">
-                <div class="welcome-message">
-                  <div class="welcome-icon">✦</div><h2>从卷宗中获得可复核的答案</h2>
-                  <p>系统会自动判断统计、事实或对比检索路径，每条关键结论都附原文件与页码。</p>
-                  <div class="prompt-grid">
-                    <button>这个案件涉及多少份卷宗和相关人员？</button>
-                    <button>张某关于固定回报的陈述是否存在矛盾？</button>
-                    <button>梳理募集资金的主要流向</button>
-                    <button>哪些材料体现了“不知情”的口供语义？</button>
-                  </div>
-                </div>
-              </div>
+              <div id="chat-messages" class="chat-messages"></div>
               <form id="chat-form" class="chat-composer">
                 <textarea id="chat-input" rows="2" placeholder="询问当前案件，例如：对比张某与李某关于收益率审批的陈述…"></textarea>
                 <div class="composer-footer"><span>↵ Enter 发送 · Shift+Enter 换行</span><button type="submit" class="send-button">发送 <b>↑</b></button></div>
@@ -277,54 +235,42 @@
 
         <div id="lab-view" class="view">
           <div class="view-heading">
-            <div><span class="section-label">运行与评测</span><h2>Agent 实验室</h2><p>把任务规划、混合检索、并行专家、审校与长期记忆变成可运行、可追踪、可评测的工程链路。</p></div>
-            <div class="lab-actions"><button class="secondary-button" id="build-index-btn">构建 Hybrid 索引</button><button class="primary-button" id="evaluate-btn">运行 RAG 评测</button></div>
+            <div><span class="section-label">案件分析</span><h2>阅卷任务</h2><p>提交阅卷问题，查看执行记录、引用来源和检索质量。</p></div>
+            <div class="lab-actions"><button class="secondary-button" id="build-index-btn">更新检索索引</button><button class="primary-button" id="evaluate-btn">检查检索质量</button></div>
           </div>
 
           <div class="metric-grid lab-metrics">
-            <article><div class="metric-icon blue">R</div><div><span>Agent Runs</span><strong id="lab-run-count">0</strong><small id="lab-run-success">尚未运行</small></div></article>
-            <article><div class="metric-icon violet">V</div><div><span>Vector Index</span><strong id="lab-vector-pages">0</strong><small id="lab-vector-meta">等待构建</small></div></article>
-            <article><div class="metric-icon amber">M</div><div><span>Long-term Memory</span><strong id="lab-memory-count">0</strong><small>案件级语义记忆</small></div></article>
-            <article><div class="metric-icon green">@5</div><div><span>Recall@5</span><strong id="lab-recall">—</strong><small id="lab-mrr">运行离线评测</small></div></article>
+            <article><div><span>阅卷任务数</span><strong id="lab-run-count">0</strong><small id="lab-run-success">尚未运行</small></div></article>
+            <article><div><span>已索引页数</span><strong id="lab-vector-pages">0</strong><small id="lab-vector-meta">等待构建</small></div></article>
+            <article><div><span>案件记忆条数</span><strong id="lab-memory-count">0</strong><small>已保存的分析记录</small></div></article>
+            <article><div><span>前五项召回率</span><strong id="lab-recall">—</strong><small id="lab-mrr">等待质量检查</small></div></article>
           </div>
-
-          <article class="panel agent-architecture">
-            <div class="panel-heading"><div><span class="section-label">EXPLICIT DAG</span><h3>可解释的执行图</h3></div><span class="live-pill">● TRACE ON</span></div>
-            <div class="agent-pipeline">
-              <div><b>01</b><strong>Planner</strong><small>意图 / DAG</small></div><i>→</i>
-              <div><b>02</b><strong>Hybrid RAG</strong><small>BM25 + Legal Lexical + Vector + RRF</small></div><i>→</i>
-              <div class="parallel-node"><b>03</b><strong>Parallel Experts</strong><small>事实 / 证据 / 矛盾</small></div><i>→</i>
-              <div><b>04</b><strong>Critic</strong><small>引用与冲突审校</small></div><i>→</i>
-              <div><b>05</b><strong>Memory</strong><small>向量长期记忆</small></div>
-            </div>
-          </article>
 
           <div class="lab-layout">
             <article class="panel lab-console">
-              <div class="panel-heading"><div><span class="section-label">MULTI-AGENT RUN</span><h3>运行一次完整链路</h3></div><div class="runtime-controls"><label class="runtime-select">运行时<select id="agent-runtime"><option value="multi_agent">原生 DAG</option><option value="langgraph">LangGraph</option></select></label><label class="toggle"><input type="checkbox" id="lab-llm-toggle" /><span></span>最终节点调用 LLM</label></div></div>
-              <textarea id="lab-question" rows="3">张某关于固定回报审批的陈述是否存在矛盾？</textarea>
-              <div class="lab-run-actions"><button class="primary-button" id="run-agent-btn">运行原生 DAG <b>→</b></button><button class="secondary-button" id="compare-agent-btn">双版本对比</button></div>
+              <div class="panel-heading"><div><h3>提交阅卷任务</h3></div><div class="runtime-controls"><label class="runtime-select">执行方式<select id="agent-runtime"><option value="multi_agent">标准分析</option><option value="langgraph">可恢复分析</option></select></label><label class="toggle"><input type="checkbox" id="lab-llm-toggle" /><span></span>使用模型生成答复</label></div></div>
+              <textarea id="lab-question" rows="3" aria-label="阅卷问题" placeholder="输入需要核查的事实或证据问题"></textarea>
+              <div class="lab-run-actions"><button class="primary-button" id="run-agent-btn">运行标准分析 <b>→</b></button><button class="secondary-button" id="compare-agent-btn">分析方式对比</button></div>
               <div id="lab-resumable-runs" class="resumable-runs" hidden></div>
               <div id="lab-result" class="lab-result"><div class="empty-state">运行后将在这里显示最终答复与来源。</div></div>
             </article>
             <article class="panel evaluation-panel">
-              <div class="panel-heading"><div><span class="section-label">RAG EVALUATION</span><h3>离线评测集</h3></div><span class="dataset-chip" id="benchmark-chip">加载 LawBench…</span></div>
-              <div id="evaluation-result" class="evaluation-result"><div class="empty-state">10,000 道 LawBench 中文法律题用于模型能力测试；案件级标准答案另行衡量 Recall@5、MRR、原文片段提供率与延迟。</div></div>
+              <div class="panel-heading"><div><h3>检索质量检查</h3></div><span class="dataset-chip" id="benchmark-chip">加载 LawBench…</span></div>
+              <div id="evaluation-result" class="evaluation-result"><div class="empty-state">质量检查使用当前案件的标准答案，衡量召回率、排序、原文片段提供率与耗时；不代表法律结论正确率。</div></div>
             </article>
           </div>
 
           <div id="runtime-comparison" class="panel runtime-comparison" hidden></div>
           <article class="panel trace-panel">
-            <div class="panel-heading"><div><span class="section-label">OBSERVABILITY</span><h3>最近一次节点追踪</h3></div><span id="trace-total" class="dataset-chip">等待运行</span></div>
-            <div id="agent-trace" class="agent-trace"><div class="empty-state">每个节点会记录依赖、状态、耗时和输出摘要。</div></div>
+            <div class="panel-heading"><div><h3>最近一次执行记录</h3></div><span id="trace-total" class="dataset-chip">等待运行</span></div>
+            <div id="agent-trace" class="agent-trace"><div class="empty-state">执行后显示各步骤的状态、耗时和摘要。</div></div>
           </article>
         </div>
 
         <div id="export-view" class="view">
           <div class="view-heading"><div><span class="section-label">预设模板</span><h2>成果归档</h2><p>将目录、证据清单、问答记录和原始卷宗按统一结构一次性输出。</p></div></div>
           <div class="export-card">
-            <div class="export-art" aria-hidden="true"><div class="archive-cover"><span>LEXVAULT / ARCHIVE</span><strong>案件审阅档案</strong><i></i><small>目录 · 证据 · 审阅记录</small></div></div>
-            <div class="export-copy"><span class="privacy-chip inline"><i></i>本地生成</span><h2>案件审阅档案</h2><p>适合内部归档、团队交接和结案复盘。所有 AI 结论均保留来源列，便于后续复核。</p>
+            <div class="export-copy"><p>导出后请核对材料与引用，确认归档内容。</p>
               <ul><li><b>案件摘要.md</b><span>案件概况与处理说明</span></li><li><b>内容级目录.csv</b><span>文件、人员、时间、页码与摘要</span></li><li><b>证据目录.csv</b><span>待证事实、可信度、原文及状态</span></li><li><b>阅卷问答记录.md</b><span>按用户与会话归档</span></li><li><b>原始卷宗/</b><span>已上传的原文件</span></li></ul>
               <div class="export-template-row">
                 <label for="export-template">结案模板</label>
@@ -350,7 +296,7 @@
       <input type="hidden" id="edit-document-id" />
       <div class="form-grid"><label>文书类型<input id="edit-doc-type" /></label><label>涉及人员<input id="edit-people" /></label><label>时间范围<input id="edit-date-range" /></label><label>处理状态<select id="edit-status"><option>已索引</option><option>待复核</option><option>已校准</option></select></label></div>
       <label>内容摘要<textarea id="edit-summary" rows="5"></textarea></label>
-      <div class="dialog-actions"><button value="cancel" class="secondary-button">取消</button><button type="button" id="save-directory" class="primary-button">保存并回写检索链路</button></div>
+      <div class="dialog-actions"><button value="cancel" class="secondary-button">取消</button><button type="button" id="save-directory" class="primary-button">保存目录</button></div>
     </form>
   </dialog>
 
@@ -481,20 +427,6 @@
     </form>
   </dialog>
 
-  <dialog id="model-settings-dialog" class="dialog model-settings-dialog" aria-labelledby="model-settings-title">
-    <form id="model-settings-form">
-      <div class="dialog-header"><div><span class="section-label">本机私有模式</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
-      <p class="model-settings-hint">填写本机模型服务的 OpenAI 兼容地址。模型名称必须与服务端已下载并加载的名称一致。</p>
-      <label>模型服务地址<input id="model-base-url" type="url" required placeholder="http://127.0.0.1:8000/v1" /></label>
-      <button type="button" class="secondary-button detect-model-button" id="model-test-btn">检测模型</button>
-      <div id="model-settings-status" class="model-settings-status" role="status"></div>
-      <label>对话模型<select id="model-chat-name" required disabled><option>请先检测模型</option></select></label>
-      <label>嵌入模型<select id="model-embedding-name" required disabled><option>请先检测模型</option></select></label>
-      <label>重排模型<select id="model-rerank-name" required disabled><option>请先检测模型</option></select></label>
-      <div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog>取消</button><button type="submit" class="primary-button">保存配置</button></div>
-    </form>
-  </dialog>
-
-  <script src="/assets/app.js?v=20260910-enterprise-login" defer></script>
+  <script src="/assets/app.js?v=20260910-workspace-cleanup" defer></script>
 </body>
 </html>

@@ -206,11 +206,10 @@ async function bootstrap() {
   document.body.classList.remove("auth-pending");
   try {
     if (identity.mode === "token") {
-      $(".privacy-chip").textContent = "律所授权空间";
+      $("#workspace-access").textContent = "律所授权空间";
       $("#user-name").value = identity.name;
       $("#user-name").readOnly = true;
       $("#new-case-btn").hidden = !identity.permissions.includes("manage") && !identity.admin;
-      $("#model-settings-btn").disabled = !identity.permissions.includes("manage") && !identity.admin;
       $("#sign-out").hidden = false;
     }
     const health = await api("/api/health");
@@ -369,7 +368,8 @@ async function selectCase(caseId) {
     state.conversations = conversations;
     $("#case-title").textContent = caseData.title;
     $("#case-type").textContent = `${caseData.case_type} · ${caseData.status}`;
-    $("#case-description").textContent = caseData.description || "本地案件阅卷空间";
+    $("#case-description").textContent = caseData.description || "";
+    $("#case-description").hidden = !caseData.description;
     renderCaseList();
     renderOverview(activity);
     renderDirectory();
@@ -412,15 +412,15 @@ async function loadLabMetrics() {
     $("#lab-run-count").textContent = runs.total || 0;
     $("#lab-run-success").textContent = `${runs.completed || 0} 成功 · ${runs.failed || 0} 失败 · 均值 ${Math.round(runs.avg_ms || 0)}ms`;
     $("#lab-vector-pages").textContent = vectors.pages || 0;
-    $("#lab-vector-meta").textContent = vectors.pages ? `${vectors.dimensions} 维 · ${vectors.backend}` : "等待构建";
+    $("#lab-vector-meta").textContent = vectors.pages ? `${vectors.pages} 页可用于检索` : "等待构建";
     $("#lab-memory-count").textContent = metrics.memory_count || 0;
     $("#lab-recall").textContent = evaluation?.recall_at_k != null ? `${Math.round(evaluation.recall_at_k * 100)}%` : "—";
-    $("#lab-mrr").textContent = evaluation ? `MRR ${evaluation.mrr == null ? "—" : evaluation.mrr.toFixed(2)} · 原文片段提供率 ${Math.round((evaluation.quote_presence_rate || 0) * 100)}%` : "运行离线评测";
+    $("#lab-mrr").textContent = evaluation ? `排序得分 ${evaluation.mrr == null ? "—" : evaluation.mrr.toFixed(2)} · 原文片段提供率 ${Math.round((evaluation.quote_presence_rate || 0) * 100)}%` : "等待质量检查";
     $("#benchmark-chip").textContent = `LawBench ${benchmark.total_questions.toLocaleString("zh-CN")} 题`;
     const resumable = (metrics.recent_runs || []).filter((run) => run.resumable);
     const recoveryTarget = $("#lab-resumable-runs");
     recoveryTarget.hidden = resumable.length === 0;
-    recoveryTarget.innerHTML = resumable.map((run) => `<button class="secondary-button resume-button" data-resume-run="${run.id}">继续执行 Run #${run.id} · ${escapeHtml(run.question.slice(0, 24))}</button>`).join("");
+    recoveryTarget.innerHTML = resumable.map((run) => `<button class="secondary-button resume-button" data-resume-run="${run.id}">继续执行 任务 #${run.id} · ${escapeHtml(run.question.slice(0, 24))}</button>`).join("");
     $$('[data-resume-run]', recoveryTarget).forEach((button) => button.addEventListener("click", resumeAgentRun));
   } catch (error) { console.warn("Agent metrics unavailable", error); }
 }
@@ -431,44 +431,44 @@ function renderAgentResult(result) {
   const citationHtml = result.citations?.length ? `<div class="citations">${result.citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small><em>${escapeHtml(item.retrieval_explain || "")}</em></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
   const modelBadge = result.llm_model ? `<span class="route-badge secondary">${escapeHtml(result.llm_model)}</span>` : "";
   const fallbackBadge = result.fallback_reason ? '<span class="route-badge secondary">规则降级</span>' : "";
-  const checkpointBadge = result.runtime === "langgraph" ? `<span class="route-badge secondary">Checkpoint 库 ${Number(result.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B · 恢复 ${result.resume_count || 0} 次</span>` : "";
+  const checkpointBadge = result.runtime === "langgraph" ? `<span class="route-badge secondary">恢复记录 ${Number(result.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B · 恢复 ${result.resume_count || 0} 次</span>` : "";
   $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
   $$('[data-preview]', $("#lab-result")).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
-  $("#trace-total").textContent = `Run #${result.run_id} · ${result.total_ms}ms`;
+  $("#trace-total").textContent = `任务 #${result.run_id} · ${result.total_ms}ms`;
   $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
 
 function comparisonCard(label, result) {
   const nodes = (result.steps || []).map((step) => `${step.role} ${step.latency_ms}ms`).join(" · ");
   const citations = (result.citations || []).map((item) => `<button class="comparison-citation" data-preview="${item.document_id}" data-page="${item.page}">[资料${item.index}] ${escapeHtml(item.document_name)} · 第 ${item.page} 页 →</button>`).join("");
-  return `<article class="comparison-card"><header><strong>${escapeHtml(label)}</strong><span>Run #${result.run_id} · ${result.total_ms}ms</span></header><div class="answer-text">${markdown(result.answer)}</div><div class="comparison-citations">${citations || "暂无引用"}</div><div class="comparison-nodes">${escapeHtml(nodes)}</div></article>`;
+  return `<article class="comparison-card"><header><strong>${escapeHtml(label)}</strong><span>任务 #${result.run_id} · ${result.total_ms}ms</span></header><div class="answer-text">${markdown(result.answer)}</div><div class="comparison-citations">${citations || "暂无引用"}</div><div class="comparison-nodes">${escapeHtml(nodes)}</div></article>`;
 }
 
 function renderComparisonResult(result) {
   const target = $("#runtime-comparison");
   const checks = [
-    ["核心结构", result.comparison.structurally_equivalent],
-    ["完整验收", result.comparison.equivalent],
-    ["路由", result.comparison.route_match],
+    ["分析结构", result.comparison.structurally_equivalent],
+    ["全部检查项", result.comparison.equivalent],
+    ["检索路径", result.comparison.route_match],
     ["引用", result.comparison.citation_match],
-    ["节点", result.comparison.node_match],
+    ["分析步骤", result.comparison.node_match],
     ["专家输出", result.comparison.specialist_output_match],
-    ["答案契约", result.comparison.answer_contract_match],
+    ["答复结构", result.comparison.answer_contract_match],
   ];
-  target.innerHTML = `<div class="comparison-summary">${checks.map(([label, pass]) => `<span class="dataset-chip ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"} ${label}</span>`).join("")}<span class="dataset-chip">LangGraph 差值 ${result.comparison.latency_delta_ms >= 0 ? "+" : ""}${result.comparison.latency_delta_ms}ms</span></div><div class="comparison-grid">${comparisonCard("原生 DAG", result.native)}${comparisonCard("LangGraph", result.langgraph)}</div>`;
+  target.innerHTML = `<div class="comparison-summary">${checks.map(([label, pass]) => `<span class="dataset-chip ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"} ${label}</span>`).join("")}<span class="dataset-chip">可恢复分析耗时差 ${result.comparison.latency_delta_ms >= 0 ? "+" : ""}${result.comparison.latency_delta_ms}ms</span></div><div class="comparison-grid">${comparisonCard("标准分析", result.native)}${comparisonCard("可恢复分析", result.langgraph)}</div>`;
   const overhead = result.comparison.langgraph_overhead_percent;
-  $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">Checkpoint 库 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
+  $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">恢复记录 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
   $$('[data-preview]', target).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   target.hidden = false;
-  $("#lab-result").innerHTML = '<div class="empty-state">双版本已使用相同输入完成；正文允许因模型采样而不同，等价性按路由、引用、节点与结构化专家输出判断。</div>';
-  $("#trace-total").textContent = `Native #${result.native.run_id} ↔ LangGraph #${result.langgraph.run_id}`;
+  $("#lab-result").innerHTML = '<div class="empty-state">两种分析方式已使用相同问题完成。请对比答复、引用和各项检查结果。</div>';
+  $("#trace-total").textContent = `标准分析 #${result.native.run_id} ↔ 可恢复分析 #${result.langgraph.run_id}`;
   $("#agent-trace").innerHTML = [...result.native.steps, ...result.langgraph.steps].map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
 
 function renderRecoverableFailure(error) {
   $("#runtime-comparison").hidden = true;
   state.recoverableAgentRunId = error.resumable ? error.runId : null;
-  const resume = error.resumable && error.runId ? `<button class="secondary-button resume-button" id="resume-agent-btn">继续执行 Run #${error.runId}</button>` : "";
+  const resume = error.resumable && error.runId ? `<button class="secondary-button resume-button" id="resume-agent-btn">继续执行 任务 #${error.runId}</button>` : "";
   $("#lab-result").innerHTML = `<div class="empty-state">运行失败：${escapeHtml(error.message)}${resume}</div>`;
   if (resume) $("#resume-agent-btn").addEventListener("click", resumeAgentRun);
 }
@@ -478,12 +478,12 @@ async function resumeAgentRun(event) {
   const runId = Number(button?.dataset.resumeRun) || state.recoverableAgentRunId;
   if (!runId) return;
   state.recoverableAgentRunId = runId;
-  button.disabled = true; button.textContent = "从 checkpoint 恢复中…";
+  button.disabled = true; button.textContent = "从保存的进度恢复中…";
   try {
     const result = await api(`/api/agent-runs/${runId}/resume`, { method: "POST" });
     renderAgentResult(result);
     await loadLabMetrics();
-    toast(`Run #${runId} 已从 checkpoint 恢复`, "success");
+    toast(`任务 #${runId} 已从保存的进度恢复`, "success");
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -498,9 +498,9 @@ async function runAgentLab() {
   const mode = $("#agent-runtime").value;
   $("#compare-agent-btn").disabled = true;
   $("#agent-runtime").disabled = true;
-  button.disabled = true; button.textContent = `${mode === "langgraph" ? "LangGraph" : "原生 DAG"} 执行中…`;
+  button.disabled = true; button.textContent = `${mode === "langgraph" ? "可恢复分析" : "标准分析"} 执行中…`;
   setLabBusy(true);
-  $("#lab-result").innerHTML = '<div class="empty-state">Planner 正在生成执行图，专家节点随后并行运行…</div>';
+  $("#lab-result").innerHTML = '<div class="empty-state">正在安排分析步骤，请稍候…</div>';
   $("#runtime-comparison").hidden = true;
   try {
     const submitted = await api(`/api/cases/${state.caseId}/agent-jobs`, {
@@ -511,7 +511,7 @@ async function runAgentLab() {
     const result = await pollReviewJob(submitted.job_id);
     renderAgentResult(result);
     await loadLabMetrics();
-    toast(`Run #${result.run_id} 完成：${result.steps.length} 个节点，${result.total_ms}ms`);
+    toast(`任务 #${result.run_id} 完成：${result.steps.length} 个步骤，${result.total_ms}ms`);
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -520,14 +520,14 @@ async function runAgentLab() {
     button.disabled = false;
     $("#compare-agent-btn").disabled = false;
     $("#agent-runtime").disabled = false;
-    button.innerHTML = `运行${mode === "langgraph" ? " LangGraph" : "原生 DAG"} <b>→</b>`;
+    button.innerHTML = `运行${mode === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   }
 }
 
 async function pollReviewJob(jobId) {
   for (;;) {
     const job = await api(`/api/agent-jobs/${jobId}`);
-    $("#trace-total").textContent = `后台任务 ${job.status}${job.run_id ? ` · Run #${job.run_id}` : ""}`;
+    $("#trace-total").textContent = `后台任务 ${job.status}${job.run_id ? ` · 任务 #${job.run_id}` : ""}`;
     $("#agent-trace").innerHTML = (job.steps || []).map((step, index) => `<div class="trace-step"><span>${index + 1}</span><div><strong>${escapeHtml(step.agent_role || step.node_name)}</strong><small>${escapeHtml(step.output?.summary || step.node_name)}</small></div><b>${Number(step.latency_ms || 0)}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
     if (job.status === "completed") {
       sessionStorage.removeItem("lexvault-active-job");
@@ -557,7 +557,7 @@ async function compareAgentRuntimes() {
   $("#agent-runtime").disabled = true;
   button.disabled = true; button.textContent = "依次运行两版中…";
   $("#runtime-comparison").hidden = true;
-  $("#lab-result").innerHTML = '<div class="empty-state">先运行原生 DAG，再运行 LangGraph；两版均不会在对比模式写入长期记忆。</div>';
+  $("#lab-result").innerHTML = '<div class="empty-state">依次运行两种分析方式；对比结果不会写入案件记忆。</div>';
   try {
     const result = await api(`/api/cases/${state.caseId}/agent-compare`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -565,7 +565,7 @@ async function compareAgentRuntimes() {
     });
     renderComparisonResult(result);
     await loadLabMetrics();
-    toast(result.comparison.equivalent ? "双运行时结构等价" : "双运行时存在差异", result.comparison.equivalent ? "success" : "error");
+    toast(result.comparison.equivalent ? "两种分析方式的检查项一致" : "两种分析方式的检查项存在差异", result.comparison.equivalent ? "success" : "error");
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -573,7 +573,7 @@ async function compareAgentRuntimes() {
     button.disabled = false;
     $("#run-agent-btn").disabled = false;
     $("#agent-runtime").disabled = false;
-    button.textContent = "双版本对比";
+    button.textContent = "分析方式对比";
   }
 }
 
@@ -582,10 +582,10 @@ async function buildHybridIndex() {
   button.disabled = true; button.textContent = "索引构建中…";
   try {
     const result = await api(`/api/cases/${state.caseId}/vector-index`, { method: "POST" });
-    toast(`Hybrid 索引就绪：${result.indexed.pages} 页，${result.indexed.dimensions} 维，新增 ${result.indexed.embedded} 页`);
+    toast(`检索索引已更新：${result.indexed.pages} 页，新增 ${result.indexed.embedded} 页`);
     await loadLabMetrics();
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "构建 Hybrid 索引"; }
+  finally { button.disabled = false; button.textContent = "更新检索索引"; }
 }
 
 async function runEvaluation() {
@@ -594,10 +594,10 @@ async function runEvaluation() {
   try {
     const report = await api(`/api/cases/${state.caseId}/evaluate-rag`, { method: "POST" });
     const metric = (value) => value == null ? "—" : Number(value).toFixed(2);
-    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>Recall@${report.k}</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small>MRR</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>Ground Truth</small></div></div><p>片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "PASS" : "MISS"}</span><p>${escapeHtml(item.query)}</p><b>R@${report.k} ${metric(item.recall_at_k)} · MRR ${metric(item.mrr)}</b></div>`).join("")}</div>`;
-    await loadLabMetrics(); toast("RAG 离线评测完成");
+    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>前 ${report.k} 项召回率</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small title="标准答案首次出现位置的倒数均值">排序得分</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>标准答案题数</small></div></div><p>片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "达标" : "未达标"}</span><p>${escapeHtml(item.query)}</p><b>召回率 ${metric(item.recall_at_k)} · 排序得分 ${metric(item.mrr)}</b></div>`).join("")}</div>`;
+    await loadLabMetrics(); toast("检索质量检查完成");
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "运行 RAG 评测"; }
+  finally { button.disabled = false; button.textContent = "检查检索质量"; }
 }
 
 function renderOverview(activity = []) {
@@ -664,7 +664,7 @@ async function saveDirectory() {
   try {
     await api(`/api/documents/${id}/directory`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     $("#directory-dialog").close();
-    toast("目录已校准，并回写检索链路");
+    toast("目录已保存，检索内容已更新");
     await selectCase(state.caseId);
   } catch (error) { toast(error.message, "error"); }
 }
@@ -958,7 +958,7 @@ async function runAnalysis() {
     toast(`扫描 ${result.scanned_pages} 页，新增 ${result.created} 条待复核事项`);
     await selectCase(state.caseId);
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "✦ 运行本地证据分析"; }
+  finally { button.disabled = false; button.textContent = "分析证据"; }
 }
 
 function renderConversations() {
@@ -971,12 +971,7 @@ function renderConversations() {
 function resetChat() {
   state.conversationId = null;
   renderConversations();
-  $("#chat-messages").innerHTML = `<div class="welcome-message"><div class="welcome-icon">✦</div><h2>从卷宗中获得可复核的答案</h2><p>系统会自动判断统计、事实或对比检索路径，每条关键结论都附原文件与页码。</p><div class="prompt-grid"><button>这个案件涉及多少份卷宗和相关人员？</button><button>张某关于固定回报的陈述是否存在矛盾？</button><button>梳理募集资金的主要流向</button><button>哪些材料体现了"不知情"的口供语义？</button></div></div>`;
-  bindPromptButtons();
-}
-
-function bindPromptButtons() {
-  $$(".prompt-grid button").forEach((button) => button.addEventListener("click", () => { $("#chat-input").value = button.textContent; sendChat(); }));
+  $("#chat-messages").innerHTML = '<div class="welcome-message"><h2>案件问答</h2><p>输入需要核查的问题。请结合引用原文复核答复。</p></div>';
 }
 
 async function loadConversation(id) {
@@ -997,7 +992,7 @@ function appendMessage(role, content, route = "", citations = [], semantic = [],
   else {
     const citationHtml = citations.length ? `<div class="citations">${citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
     const semanticBadge = semantic?.length ? `<span class="route-badge secondary">语义扩展 ${semantic.length}</span>` : "";
-    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">本地LLM</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}</div>`;
+    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}</div>`;
   }
   $("#chat-messages").append(node);
   $$('[data-preview]', node).forEach((button) => button.addEventListener("click", () => openPage(Number(button.dataset.preview), Number(button.dataset.page))));
@@ -1029,7 +1024,7 @@ async function sendChat(event) {
 async function uploadFiles(fileList) {
   const files = [...fileList]; if (!files.length || !state.caseId) return;
   const form = new FormData(); files.forEach((file) => form.append("files", file));
-  toast(`正在本机解析 ${files.length} 个文件…`);
+  toast(`正在解析 ${files.length} 个文件…`);
   try {
     const result = await api(`/api/cases/${state.caseId}/documents`, { method: "POST", body: form });
     if (result.failures.length) toast(`${result.failures.length} 个文件失败：${result.failures[0].error}`, "error");
@@ -1057,9 +1052,6 @@ function bindEvents() {
     localStorage.setItem("lexvault-theme", theme);
     applyTheme(theme);
   });
-  $("#model-settings-btn").addEventListener("click", openModelSettings);
-  $("#model-test-btn").addEventListener("click", testModelSettings);
-  $("#model-settings-form").addEventListener("submit", saveModelSettings);
   $$("[data-case-storage]").forEach((button) => button.addEventListener("click", () => openCaseStorage(button.dataset.caseStorage)));
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   $("#auth-retry").addEventListener("click", () => location.reload());
@@ -1104,9 +1096,8 @@ function bindEvents() {
   $("#annotation-form").addEventListener("submit", saveAnnotation);
   $("#annotation-reset").addEventListener("click", () => $("#annotation-form").reset());
   $$(".nav-item").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
-  $$('[data-go]').forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
   $("#file-input").addEventListener("change", (event) => uploadFiles(event.target.files));
-  [$("#hero-upload"), $("#directory-upload")].forEach((button) => button.addEventListener("click", () => $("#file-input").click()));
+  $("#directory-upload").addEventListener("click", () => $("#file-input").click());
   const zone = $("#upload-zone"); zone.addEventListener("click", () => $("#file-input").click());
   zone.addEventListener("dragover", (event) => { event.preventDefault(); zone.classList.add("dragging"); });
   zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
@@ -1119,7 +1110,7 @@ function bindEvents() {
   $("#run-agent-btn").addEventListener("click", runAgentLab);
   $("#compare-agent-btn").addEventListener("click", compareAgentRuntimes);
   $("#agent-runtime").addEventListener("change", (event) => {
-    $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? " LangGraph" : "原生 DAG"} <b>→</b>`;
+    $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   });
   $("#build-index-btn").addEventListener("click", buildHybridIndex);
   $("#evaluate-btn").addEventListener("click", runEvaluation);
@@ -1130,7 +1121,7 @@ function bindEvents() {
     const templateId = $("#export-template").value;
     const query = templateId ? `?template_id=${encodeURIComponent(templateId)}` : "";
     window.location.href = `/api/cases/${state.caseId}/export${query}`;
-    toast("正在本机生成案件审阅包");
+    toast("正在生成案件审阅包");
   });
   $("#export-final-btn").addEventListener("click", async () => {
     const templateId = $("#export-template").value;
@@ -1174,54 +1165,6 @@ function bindEvents() {
     batchDropArea.classList.remove("dragging");
     handleBatchUpload(event.dataTransfer.files);
   });
-}
-
-function modelSettings() {
-  return JSON.parse(localStorage.getItem("lexvault-model-settings") || "{}");
-}
-
-function openModelSettings() {
-  const settings = modelSettings();
-  $("#model-base-url").value = settings.baseUrl || "http://127.0.0.1:8000/v1";
-  ["#model-chat-name", "#model-embedding-name", "#model-rerank-name"].forEach((selector) => { $(selector).disabled = true; $(selector).innerHTML = "<option>请先检测模型</option>"; });
-  $("#model-settings-status").textContent = "";
-  $("#model-settings-dialog").showModal();
-}
-
-async function testModelSettings() {
-  const status = $("#model-settings-status");
-  status.textContent = "正在检查模型服务…";
-  try {
-    const result = await api("/api/model-config/test", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({base_url: $("#model-base-url").value})});
-    const models = result.models || [];
-    const groups = classifyModels(models);
-    populateModelSelect("#model-chat-name", groups.chat, "未检测到对话模型");
-    populateModelSelect("#model-embedding-name", groups.embedding, "未检测到嵌入模型");
-    populateModelSelect("#model-rerank-name", groups.rerank, "未检测到重排模型");
-    localStorage.setItem("lexvault-model-discovery", JSON.stringify({models, detectedAt: new Date().toISOString()}));
-    status.textContent = models.length ? `服务连接正常 · 已发现 ${models.length} 个模型 · 刚刚检测` : "服务已连接，但没有返回模型。";
-  } catch (error) { status.textContent = `连接失败：${error.message}`; }
-}
-
-function classifyModels(models) {
-  const embedding = models.filter((name) => /embed|bge-m3|e5-|nomic/i.test(name));
-  const rerank = models.filter((name) => /rerank|cross[-_]?encoder/i.test(name));
-  const special = new Set([...embedding, ...rerank]);
-  return {chat: models.filter((name) => !special.has(name)), embedding, rerank};
-}
-
-function populateModelSelect(selector, models, emptyLabel) {
-  const select = $(selector);
-  select.innerHTML = models.length ? models.map((name) => `<option value="${escapeHtml(name)}">● ${escapeHtml(name)}</option>`).join("") : `<option value="">${emptyLabel}</option>`;
-  select.disabled = !models.length;
-}
-
-function saveModelSettings(event) {
-  event.preventDefault();
-  if (["#model-chat-name", "#model-embedding-name", "#model-rerank-name"].some((selector) => $(selector).disabled)) { $("#model-settings-status").textContent = "请先检测模型，再保存配置。"; return; }
-  localStorage.setItem("lexvault-model-settings", JSON.stringify({baseUrl: $("#model-base-url").value.replace(/\/$/, ""), chatModel: $("#model-chat-name").value.trim(), embeddingModel: $("#model-embedding-name").value.trim(), rerankModel: $("#model-rerank-name").value.trim()}));
-  $("#model-settings-status").textContent = "配置已保存。重启本地阅卷服务后生效。";
-  toast("模型配置已保存");
 }
 
 async function createCase(event) {
@@ -1474,11 +1417,6 @@ async function renderGapDashboard() {
       <strong class="gap-count">-</strong>
       <span class="gap-label">建议优化</span>
     </div>
-    <div class="gap-summary-card">
-      <span class="gap-label">完整度</span>
-      <strong class="gap-count">-</strong>
-      <span class="gap-label">评分</span>
-    </div>
   `;
 
   $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #9ba5a2;">点击"🔍 运行疏漏检测"开始分析</div>';
@@ -1517,7 +1455,6 @@ async function runGapDetection() {
     };
 
     const totalGaps = stats.total || gaps.length;
-    const completeness = Math.max(0, 100 - totalGaps * 5); // 简单计算完整度分数
 
     // 更新汇总卡片
     $('#gap-summary-grid').innerHTML = `
@@ -1541,16 +1478,11 @@ async function runGapDetection() {
         <strong class="gap-count">${severityCounts['低']}</strong>
         <span class="gap-label">建议优化</span>
       </div>
-      <div class="gap-summary-card ${completeness >= 80 ? 'severity-low' : completeness >= 60 ? 'severity-medium' : 'severity-high'}">
-        <span class="gap-label">完整度</span>
-        <strong class="gap-count">${completeness}%</strong>
-        <span class="gap-label">评分</span>
-      </div>
     `;
 
     // 渲染详细列表
     if (gaps.length === 0) {
-      $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">✓ 未发现明显疏漏，证据链较为完整</div>';
+      $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">本次检测未发现疏漏，仍需结合案情人工复核。</div>';
     } else {
       $('#gap-details-list').innerHTML = gaps.map(gap => `
         <div class="gap-item severity-${escapeHtml(gap.severity)}">
