@@ -71,14 +71,14 @@ button { cursor: pointer; }
 .nav-item.active { color: #f7fffc; background: linear-gradient(90deg, rgba(28,143,109,.28), rgba(24,113,88,.13)); box-shadow: inset 3px 0 #4bc9a0; }
 .nav-item.active span { color: #65d7b2; }
 .sidebar-section-title { margin: 25px 12px 10px; color: #58736c; font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
-.case-list { display: grid; gap: 7px; overflow: auto; padding-right: 3px; }
+.case-list { display: grid; gap: 7px; overflow: auto; min-height: 0; padding-right: 3px; }
 .case-item { border: 0; background: transparent; color: #809a93; padding: 10px 12px; border-radius: 10px; text-align: left; display: grid; gap: 3px; }
 .case-item strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .case-item small { color: #526e67; }
 .case-item.active { background: rgba(255,255,255,.055); color: #e8f5f0; }
 .new-case-btn { margin: 10px 5px 0; border: 1px dashed rgba(130,172,160,.24); color: #75938b; background: transparent; border-radius: 10px; padding: 9px; }
 .new-case-btn:hover { color: #c7ded7; border-color: #527f73; }
-.sidebar-footer { margin-top: 0; border-top: 1px solid rgba(255,255,255,.06); padding: 16px 8px 0; display: flex; align-items: center; gap: 10px; }
+.sidebar-footer { margin-top: auto; border-top: 1px solid rgba(255,255,255,.06); padding: 16px 8px 0; display: flex; align-items: center; gap: 10px; }
 .sidebar-footer strong, .sidebar-footer span { display: block; }
 .sidebar-footer strong { font-size: 13px; color: #c6dad4; }
 .sidebar-footer span { font-size: 12px; color: #57736b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }

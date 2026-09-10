@@ -122,7 +122,27 @@ def auth_mode() -> str:
     return mode
 
 
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "testserver"})
+
+
+def allowed_hosts() -> set[str]:
+    return {item.strip() for item in os.getenv("LAW_REVIEW_ALLOWED_HOSTS", "localhost,127.0.0.1,::1,testserver").split(",") if item.strip()}
+
+
+def _min_token_length() -> int:
+    """Token length floor; a short token is a deliberate loopback-only escape hatch."""
+    raw = os.getenv("LAW_REVIEW_ALLOW_INSECURE_LOCAL_TOKEN", "").strip().lower()
+    if raw not in {"1", "true", "yes", "on"}:
+        return 32
+    if not allowed_hosts() <= _LOOPBACK_HOSTS:
+        # Refuse instead of silently weakening: a reachable host would let a
+        # guessable token be attacked from the network.
+        raise AccessConfigurationError("LAW_REVIEW_ALLOW_INSECURE_LOCAL_TOKEN requires loopback-only LAW_REVIEW_ALLOWED_HOSTS")
+    return 1
+
+
 def configured_tokens() -> dict[str, Principal]:
+    min_length = _min_token_length()
     try:
         raw = json.loads(os.getenv("LAW_REVIEW_API_TOKENS_JSON", "{}"))
         if not isinstance(raw, dict) or not raw:
@@ -130,7 +150,7 @@ def configured_tokens() -> dict[str, Principal]:
         tokens = {}
         names = set()
         for token, value in raw.items():
-            if len(token) < 32 or not isinstance(value, dict):
+            if len(token) < min_length or not isinstance(value, dict):
                 raise ValueError("Invalid token configuration")
             name = value["name"]
             admin = value.get("admin", False)
