@@ -44,7 +44,7 @@ def source_hashes() -> dict:
     root = Path(__file__).resolve().parent.parent
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
         "unified_benchmark_runner.py", "app/benchmark_metrics.py", "app/benchmark_reporting.py", "app/lawbench.py",
-        "app/benchmark_solver.py",
+        "app/benchmark_solver.py", "app/benchmark_postprocess.py",
     )}
 
 
