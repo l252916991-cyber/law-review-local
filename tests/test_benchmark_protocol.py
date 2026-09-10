@@ -238,9 +238,12 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 verify.assert_not_called()
                 call.assert_not_called()
 
-    def test_correction_surface_leaves_errors_and_other_tasks_untouched(self):
-        for task, raw, error in (("2-1", "原文， 100。", "timeout"), ("2-7", "原文， 100。", None),
-                                 ("2-1", "", None), ("2-1", "原文", None)):
+    def test_postprocess_applies_to_its_tasks_and_leaves_errors_and_others_untouched(self):
+        # A task outside POSTPROCESS_TASKS stays byte-for-byte untouched.
+        for task, raw, error in (("2-1", "原文， 100。", "timeout"), ("1-2", "原文， 100。", None),
+                                 ("2-1", "", None), ("2-1", "原文", None),
+                                 ("2-7", "第一句事实。第二句事实。", None),
+                                 ("2-9", "被告通过微信购买药品", None)):
             with self.subTest(task=task, raw=raw, error=error), tempfile.TemporaryDirectory() as directory:
                 args = argparse.Namespace(dataset="lawbench", tasks=[task], limit_per_task=1,
                                           run_dir=directory, output_dir=directory, resume=False, retry=0)
@@ -248,15 +251,34 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         patch.object(runner, "call_model", return_value=(raw, 1, error)):
                     runner.run_benchmark(args)
                 row = json.loads((Path(directory) / "detailed_results.jsonl").read_text())
-                self.assertEqual(row["prediction"], raw)
-                if task == "2-1" and not error:
+                if task in runner.POSTPROCESS_TASKS and not error:
                     self.assertEqual(row["original_prediction"], raw)
-                    self.assertFalse(row["postprocess"]["applied"])
+                    self.assertEqual(row["postprocess"]["version"], runner.POSTPROCESS_VERSION)
                 else:
+                    self.assertEqual(row["prediction"], raw)
                     self.assertNotIn("postprocess", row)
                     self.assertNotIn("original_prediction", row)
                 if error:
                     self.assertEqual(row["score"], 0)
+
+    def test_postprocess_repairs_are_scored_not_just_recorded(self):
+        # 2-9 maps explicit source language to the public ontology; scoring must see the repair.
+        record = runner.load_lawbench_dataset(["2-9"], 1)[0]
+        record.update(question="被告人通过微信购买药品", reference="买入;联络")
+        record["question_hash"] = runner.hash_text(record["question"])
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(dataset="lawbench", tasks=["2-9"], limit_per_task=1,
+                                      run_dir=directory, output_dir=directory, resume=False, retry=0)
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=("买入", 1, None)):
+                runner.run_benchmark(args)
+            row = json.loads((Path(directory) / "detailed_results.jsonl").read_text())
+            self.assertEqual(row["original_prediction"], "买入")
+            self.assertEqual(row["prediction"], "买入;联络")
+            self.assertTrue(row["postprocess"]["applied"])
+            expected = score_lawbench_item("2-9", row["prediction"], row["reference"], question=row["question"]).score
+            self.assertEqual(row["score"], expected)
 
     def test_resume_requires_original_directory(self):
         args = argparse.Namespace(dataset="lawbench", tasks=["1-2"], limit_per_task=1, resume=True)

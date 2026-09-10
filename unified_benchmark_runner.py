@@ -49,6 +49,9 @@ LEXEVAL_TASKS = {
 LEXEVAL_CACHE = Path(__file__).resolve().parent / "benchmarks" / "lexeval"
 CURRENT_LAW_PATH = Path(__file__).resolve().parent / "benchmarks" / "current_law" / "current_law_300.json"
 RAG_PROJECT_PATH = Path(__file__).resolve().parent / "benchmarks" / "rag_project" / "rag_240.json"
+# Tasks whose gold-blind deterministic output repair is applied before scoring.
+# 2-10 is deliberately excluded: the measured gain was noise (15 up, 16 down).
+POSTPROCESS_TASKS = ("2-1", "2-7", "2-9")
 
 
 def hash_text(text: str) -> str:
@@ -285,7 +288,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 raise ValueError(f"Baseline missing/mismatched: {r['question_id']}")
     manifest = {
         "protocol_version": PROMPT_VERSION, "scorer_version": SCORER_VERSION,
-        "postprocess": {"version": POSTPROCESS_VERSION, "tasks": ["2-1"]},
+        "postprocess": {"version": POSTPROCESS_VERSION, "tasks": list(POSTPROCESS_TASKS)},
         "prompt_strategy": getattr(args, "prompt_strategy", "task_guided"),
         "model_config": dict(MODEL_CONFIG), "sample_seed": getattr(args, "sample_seed", None),
         "retry": args.retry, "planned_questions": len(records), "source_hashes": source_hashes(),
@@ -332,11 +335,11 @@ def run_benchmark(args: argparse.Namespace) -> None:
             expected = planned[key]
             if any(row.get(k) != v for k, v in expected.items()) or row.get("scorer_version") != SCORER_VERSION:
                 raise ValueError(f"Checkpoint mismatch: {key}")
-            if row["task"] == "2-1" and not row.get("error"):
+            if row["task"] in POSTPROCESS_TASKS and not row.get("error"):
                 raw = row.get("original_prediction")
                 if not isinstance(raw, str):
                     raise ValueError(f"Checkpoint missing original prediction: {key}")
-                prediction, metadata = postprocess("2-1", row["question"], raw)
+                prediction, metadata = postprocess(row["task"], row["question"], raw)
                 if row["prediction"] != prediction or row.get("postprocess") != metadata:
                     raise ValueError(f"Checkpoint postprocess mismatch: {key}")
             completed[key] = row
@@ -360,9 +363,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 system, prompt = prompt_for({**record, "prompt_strategy": strategy})
                 response_metadata = {}
                 prediction, latency, error = call_model(prompt, system, MODEL_CONFIG, retry=args.retry, metadata=response_metadata)
-                if record["task"] == "2-1" and not error:
+                if record["task"] in POSTPROCESS_TASKS and not error:
                     response_metadata["original_prediction"] = prediction
-                    prediction, response_metadata["postprocess"] = postprocess("2-1", record["question"], prediction)
+                    prediction, response_metadata["postprocess"] = postprocess(record["task"], record["question"], prediction)
                 scored = score_lawbench_item(record["task"], prediction, record["reference"], question=record["question"]).to_dict() if not error else {
                     "score": 0.0, "metric": "error", "abstained": False, "parse_failed": False,
                     "parsed_prediction": None, "parsed_reference": None,
