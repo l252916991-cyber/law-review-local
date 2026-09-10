@@ -1,0 +1,15 @@
+{
+  "notice": "Preset thresholds only; no measured model benefit is asserted. Freeze before confirm.",
+  "direction": "candidate_minus_lexical",
+  "bootstrap_samples": 2000,
+  "seed": 20260910,
+  "min_dev_queries": 20,
+  "min_confirm_queries": 10,
+  "min_dev_hit_delta": 0.05,
+  "min_dev_hit_ci_lower": 0.0,
+  "min_ndcg_delta": 0.0,
+  "min_mrr_delta": 0.0,
+  "max_p95_ms": 2000,
+  "max_embedding_calls_per_query": 1,
+  "max_rerank_candidates_per_query": 48
+}
