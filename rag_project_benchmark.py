@@ -54,10 +54,20 @@ def score_query(
     returned = set(returned_pairs)
     expected = {(str(gold["document"]), int(gold["page"])) for gold in item["expected"]}
     relevant = returned & expected
+    expected_documents = {document for document, _ in expected}
+    returned_expected_document_pages = [
+        pair for pair in returned_pairs if pair[0] in expected_documents
+    ]
     ranks = [rank for rank, pair in enumerate(returned_pairs, 1) if pair in expected]
     answerable = bool(expected)
     recall = len(relevant) / len(expected) if answerable else None
     precision = len(relevant) / len(returned_pairs) if answerable and returned_pairs else 0.0 if answerable else None
+    within_document_precision = (
+        sum(pair in expected for pair in returned_expected_document_pages)
+        / len(returned_expected_document_pages)
+        if answerable and returned_expected_document_pages
+        else None
+    )
     reciprocal_rank = 1 / min(ranks) if answerable and ranks else 0.0 if answerable else None
     complete_recall = recall == 1.0 if answerable else None
     correctly_empty = not hits if not answerable else None
@@ -77,6 +87,9 @@ def score_query(
         "recall_at_k": round(recall, 4) if recall is not None else None,
         "mrr": round(reciprocal_rank, 4) if reciprocal_rank is not None else None,
         "page_precision_at_k": round(precision, 4) if precision is not None else None,
+        "within_document_page_precision": (
+            round(within_document_precision, 4) if within_document_precision is not None else None
+        ),
         "complete_recall": complete_recall,
         "unanswerable_correctly_empty": correctly_empty,
         "passed": complete_recall if answerable else correctly_empty,
@@ -95,6 +108,10 @@ def _summarize_group(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "recall_at_k": _mean(answerable, "recall_at_k"),
         "mrr": _mean(answerable, "mrr"),
         "page_precision_at_k": _mean(answerable, "page_precision_at_k"),
+        "within_document_page_precision": _mean(answerable, "within_document_page_precision"),
+        "within_document_page_precision_query_count": sum(
+            row.get("within_document_page_precision") is not None for row in answerable
+        ),
         "complete_recall_rate": _mean(answerable, "complete_recall"),
         "unanswerable_empty_rate": _mean(unanswerable, "unanswerable_correctly_empty"),
     }
@@ -106,7 +123,13 @@ def paired_comparison(baseline: list[dict[str, Any]], candidate: list[dict[str, 
     new = {row["id"]: row for row in candidate}
     if len(old) != len(baseline) or len(new) != len(candidate) or old.keys() != new.keys():
         raise ValueError("Paired comparison requires unique identical question IDs")
-    fields = ("recall_at_k", "mrr", "page_precision_at_k", "complete_recall")
+    fields = (
+        "recall_at_k",
+        "mrr",
+        "page_precision_at_k",
+        "within_document_page_precision",
+        "complete_recall",
+    )
     deltas = []
     for key, row in new.items():
         previous = old[key]
@@ -114,20 +137,76 @@ def paired_comparison(baseline: list[dict[str, Any]], candidate: list[dict[str, 
             raise ValueError("Paired comparison inputs or labels differ")
         delta = {"template_id": row["template_id"]}
         for field in fields:
-            delta[field] = float(row[field]) - float(previous[field]) if row[field] is not None and previous[field] is not None else None
+            current_value = row.get(field)
+            previous_value = previous.get(field)
+            delta[field] = (
+                float(current_value) - float(previous_value)
+                if current_value is not None and previous_value is not None
+                else None
+            )
         deltas.append(delta)
-    return {field: {"delta": _mean(deltas, field), "cluster_bootstrap_95ci": _template_bootstrap_ci(deltas, field)} for field in fields}
+    return {
+        field: {
+            "delta": _mean(deltas, field),
+            "cluster_bootstrap_95ci": _template_bootstrap_ci(deltas, field),
+            "paired_query_count": sum(delta.get(field) is not None for delta in deltas),
+        }
+        for field in fields
+    }
+
+
+def _runtime_dimensions(row: dict[str, Any]) -> dict[str, Any]:
+    retrieval = row["retrieval"]
+    embedding = retrieval.get("embedding")
+    reranker = retrieval.get("reranker")
+    embedding_backend = embedding.get("backend") if isinstance(embedding, dict) else None
+    degraded = retrieval.get("degraded")
+    reranker_enabled = reranker.get("enabled") if isinstance(reranker, dict) else None
+    return {
+        "embedding_backend": str(embedding_backend or "unknown"),
+        "degraded": degraded if isinstance(degraded, bool) else None,
+        "reranker_enabled": reranker_enabled if isinstance(reranker_enabled, bool) else None,
+    }
+
+
+def _runtime_group_name(dimensions: dict[str, Any]) -> str:
+    degraded = "unknown" if dimensions["degraded"] is None else str(dimensions["degraded"]).lower()
+    reranker = (
+        "unknown"
+        if dimensions["reranker_enabled"] is None
+        else str(dimensions["reranker_enabled"]).lower()
+    )
+    return (
+        f"embedding={dimensions['embedding_backend']}|"
+        f"degraded={degraded}|"
+        f"reranker={reranker}"
+    )
 
 
 def summarize(
     results: list[dict[str, Any]], *, dataset_version: str, k: int, configuration: dict[str, str],
     dataset_sha256: str,
 ) -> dict[str, Any]:
+    if not results:
+        raise ValueError("results must not be empty")
+    if k <= 0:
+        raise ValueError("k must be greater than zero")
     answerable = [row for row in results if row["answerable"]]
     unanswerable = [row for row in results if not row["answerable"]]
     by_challenge = {
         challenge: _summarize_group([row for row in results if row["challenge"] == challenge])
         for challenge in sorted({str(row["challenge"]) for row in results})
+    }
+    runtime_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    runtime_dimensions: dict[str, dict[str, Any]] = {}
+    for row in results:
+        dimensions = _runtime_dimensions(row)
+        name = _runtime_group_name(dimensions)
+        runtime_rows[name].append(row)
+        runtime_dimensions[name] = dimensions
+    by_runtime = {
+        name: {**runtime_dimensions[name], **_summarize_group(runtime_rows[name])}
+        for name in sorted(runtime_rows)
     }
     backends = Counter(
         str(row["retrieval"].get("embedding", {}).get("backend") or "unknown") for row in results
@@ -155,15 +234,26 @@ def summarize(
         "recall_at_k": _mean(answerable, "recall_at_k"),
         "mrr": _mean(answerable, "mrr"),
         "page_precision_at_k": _mean(answerable, "page_precision_at_k"),
+        "within_document_page_precision": _mean(answerable, "within_document_page_precision"),
+        "within_document_page_precision_query_count": sum(
+            row.get("within_document_page_precision") is not None for row in answerable
+        ),
         "complete_recall_rate": _mean(answerable, "complete_recall"),
         "unanswerable_empty_rate": _mean(unanswerable, "unanswerable_correctly_empty"),
         "quote_presence_rate": _mean(results, "quote_presence_rate"),
         "answer_citation_faithfulness": None,
         "template_cluster_bootstrap_95ci": {
             field: _template_bootstrap_ci(answerable, field)
-            for field in ("recall_at_k", "mrr", "page_precision_at_k", "complete_recall")
+            for field in (
+                "recall_at_k",
+                "mrr",
+                "page_precision_at_k",
+                "within_document_page_precision",
+                "complete_recall",
+            )
         },
         "by_challenge": by_challenge,
+        "by_runtime": by_runtime,
         "configuration": configuration,
         "observed": {
             "embedding_backends": dict(sorted(backends.items())),
@@ -172,6 +262,7 @@ def summarize(
         },
         "average_latency_ms": round(sum(row["latency_ms"] for row in results) / len(results)),
         "metric_notes": {
+            "within_document_page_precision": "conditional on retrieving a gold document; report with recall because cross-document misses are excluded and no retrieved gold-document page is null",
             "unanswerable_empty_rate": "retrieval-empty diagnostic only; related evidence may support an answer of insufficient evidence; not answer abstention accuracy",
             "quote_presence_rate": "presence only; not citation grounding or entailment",
             "confidence_interval": "template-cluster bootstrap; repeated case variants are not independent samples",
@@ -192,6 +283,8 @@ def main() -> int:
     parser.add_argument("--embedding-mode", choices=("hashed-local", "model"), default="hashed-local")
     parser.add_argument("--reranker", choices=("off", "on"), default="off")
     args = parser.parse_args()
+    if args.k <= 0:
+        parser.error("--k must be greater than zero")
     output_dir = args.output_dir or Path("output") / "test-runs" / datetime.now().strftime("%Y%m%d-%H%M%S") / "rag-240"
     output_dir.mkdir(parents=True, exist_ok=True)
     configuration = {"embedding_mode": args.embedding_mode, "reranker": args.reranker,
