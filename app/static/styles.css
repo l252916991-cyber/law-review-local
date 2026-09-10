@@ -30,8 +30,7 @@ body:not(.auth-pending) > #auth-page { display: none; }
 .auth-mark { width: 42px; height: 46px; display: grid; place-items: center; background: #293b34; color: #faf9f6; font: 24px Georgia, 'Songti SC', serif; border-radius: 4px; }
 .auth-brand strong { display: block; font: 26px Georgia, serif; letter-spacing: 0; }
 .auth-brand small { display: block; margin-top: 4px; color: #626966; font-size: 11px; letter-spacing: 2px; }
-.auth-panel { width: 100%; max-width: 420px; margin: auto; padding: 64px 0 48px; }
-.auth-organization { margin: 0 0 18px; color: #626966; font-size: 12px; letter-spacing: 2px; overflow-wrap: anywhere; }
+.auth-panel { width: 100%; max-width: 460px; margin: auto; padding: 48px 0; }
 .auth-panel h1 { margin: 0; font: 600 32px/1.4 'Songti SC', 'Noto Serif CJK SC', Georgia, serif; letter-spacing: 1px; }
 .auth-description { margin: 14px 0 32px; color: #626966; line-height: 1.8; }
 .auth-status { color: #536458; line-height: 1.7; }

@@ -175,7 +175,6 @@ async function checkIdentity() {
   $("#auth-status").textContent = "正在检查登录状态…";
   try {
     const identity = await api("/api/auth/me");
-    $("#auth-organization").textContent = identity.organization_name || "律所工作空间";
     $("#auth-support").textContent = identity.support_contact || "请联系律所管理员";
     $("#auth-status").textContent = "";
     if (!identity.authenticated) {
