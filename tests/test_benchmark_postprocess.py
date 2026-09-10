@@ -27,6 +27,15 @@ def test_exact_article_uses_retrieved_content_without_heading():
     assert audit["applied"] and audit["document_articles"] == ["law-2020/42"]
 
 
+def test_exact_article_repairs_archived_page_markup_surface():
+    retrieval = {"mode": "exact_article", "hits": [{
+        "document_id": "law", "article_id": "1", "text": "第一条 公司成立后,股东不得抽 逃出资。",
+    }]}
+    prediction, audit = postprocess("1-1", "某法第一条", "幻觉", retrieval)
+    assert prediction == "公司成立后，股东不得抽逃出资。"
+    assert audit["applied"] and audit["policy"] == "exact-retrieved-article-content; no reference access"
+
+
 def test_trigger_words_are_deduplicated_and_follow_source_order():
     prediction, audit = postprocess("2-10", "补助款随后转账", "转账;补助款;转账")
     assert prediction == "补助款;转账" and audit["applied"]

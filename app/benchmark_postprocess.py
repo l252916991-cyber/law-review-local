@@ -7,8 +7,24 @@ from typing import Any
 from app.benchmark_event_tools import event_labels
 from app.benchmark_summary_tools import extractive_news_summary
 
-POSTPROCESS_VERSION = "benchmark-postprocess-v5"
+POSTPROCESS_VERSION = "benchmark-postprocess-v6"
 ARTICLE_HEADING = re.compile(r"^第[零〇一二三四五六七八九十百千万两0-9]+条(?:之[零〇一二三四五六七八九十百千万两0-9]+)?\s*")
+
+
+def normalize_article_surface(text: str) -> str:
+    """Repair archived-page markup artifacts in a retrieved statute article.
+
+    The corpus keeps source text verbatim, so half-width punctuation and spaces
+    that the archived HTML inserted between Chinese characters survive in the
+    article body. They are markup artifacts rather than statute text; repair them
+    only on the emitted answer surface.
+    """
+    value = text
+    for ascii_mark, chinese_mark in ((",", "，"), (":", "："), (";", "；"), ("!", "！"), ("?", "？"),
+                                     ("(", "（"), (")", "）")):
+        value = value.replace(ascii_mark, chinese_mark)
+    value = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", value)
+    return re.sub(r"[ \t]+", " ", value).strip()
 
 
 def _origin_sentence(question: str) -> str:
@@ -60,7 +76,8 @@ def postprocess(task_id: str, question: str, prediction: str,
     policy = "unchanged"
     details: dict[str, object] = {}
     if task_id == "1-1" and retrieval and retrieval.get("mode") == "exact_article" and retrieval.get("hits"):
-        revised = "\n".join(ARTICLE_HEADING.sub("", hit["text"], count=1) for hit in retrieval["hits"])
+        revised = "\n".join(normalize_article_surface(ARTICLE_HEADING.sub("", hit["text"], count=1))
+                            for hit in retrieval["hits"])
         policy = "exact-retrieved-article-content; no reference access"
         details["document_articles"] = [f"{hit['document_id']}/{hit['article_id']}" for hit in retrieval["hits"]]
     elif task_id == "2-1" and prediction:
