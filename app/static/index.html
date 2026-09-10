@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
+  <script src="/assets/entry.js?v=20260910-mobile-workspace"></script>
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/assets/styles.css?v=20260910-workspace-menu" />
@@ -32,7 +33,7 @@
       </div>
       <p id="auth-error" class="auth-error" role="alert"></p>
       <button id="auth-retry" type="button" class="auth-retry" hidden>重新检查</button>
-      <div class="auth-help"><p>仅限获授权人员使用</p><p>无法登录？<span id="auth-support">请联系律所管理员</span></p></div>
+      <div class="auth-help"><p>仅限获授权人员使用</p><p>无法登录？<span id="auth-support">请联系律所管理员</span></p><p><a href="/mobile?ui=mobile">切换手机版</a></p></div>
       <noscript><p class="auth-error">请启用 JavaScript 后使用工作空间。</p></noscript>
     </main>
   </section>
@@ -77,6 +78,7 @@
             <span>⌕</span><input id="global-search" aria-label="搜索卷宗、人名、金额" placeholder="搜索卷宗、人名、金额…" />
           </label>
 
+          <a class="text-button" href="/mobile?ui=mobile">手机版</a>
           <div class="workspace-menu">
             <button id="workspace-menu-toggle" class="avatar" type="button" aria-label="律师工作空间菜单" aria-expanded="false" aria-controls="workspace-menu" aria-haspopup="menu">律</button>
             <div id="workspace-menu" class="workspace-menu-panel" role="menu" aria-label="律师工作空间" hidden>
@@ -453,6 +455,7 @@
     </form>
   </dialog>
 
+  <script src="/assets/shared.js?v=20260910-mobile-workspace" defer></script>
   <script src="/assets/app.js?v=20260910-mobile-workspace-menu" defer></script>
 </body>
 </html>

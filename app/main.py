@@ -1686,3 +1686,8 @@ app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/mobile", include_in_schema=False)
+def mobile():
+    return FileResponse(STATIC_DIR / "mobile.html")

@@ -227,7 +227,7 @@ def apply_security_headers(response: Response, path: str) -> Response:
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if path == "/" or path.startswith("/assets/"):
+    if path in {"/", "/mobile"} or path.startswith("/assets/"):
         response.headers["Cache-Control"] = "no-cache"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "

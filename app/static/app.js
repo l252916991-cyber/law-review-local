@@ -11,6 +11,7 @@ const CONSTANTS = {
 // 全局状态
 // ========================================
 const state = {
+  caseRequestId: 0,
   cases: [],
   caseId: null,
   case: null,
@@ -46,71 +47,8 @@ function initializeTheme() {
   applyTheme(saved === "dark" || saved === "light" ? saved : preferred);
 }
 
-/**
- * API 请求封装
- * @param {string} path - API 路径
- * @param {object} options - fetch 选项
- * @returns {Promise} JSON 响应或 Response 对象
- */
-async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  if (response.status === 401 && (!path.startsWith("/api/auth/") || options.method === "DELETE")) expireSession();
-  if (!response.ok) {
-    let message = `请求失败(${response.status})`;
-    let detail = null;
-    try {
-      const body = await response.json();
-      detail = body.detail;
-      message = typeof detail === "object" ? (detail.message || message) : (detail || message);
-    } catch (e) {
-      console.warn('Failed to parse error response:', e);
-    }
-    const error = new Error(message);
-    error.status = response.status;
-    if (typeof detail === "object" && detail) {
-      error.runId = detail.run_id;
-      error.resumable = Boolean(detail.resumable);
-    }
-    throw error;
-  }
-  const type = response.headers.get("content-type") || "";
-  return type.includes("application/json") ? response.json() : response;
-}
-
-/**
- * HTML 转义，防止 XSS 攻击
- * @param {string} value - 需要转义的字符串
- * @returns {string} 转义后的安全字符串
- */
-function escapeHtml(value = "") {
-  return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
-}
-
-/**
- * Markdown 渲染(支持有限的语法)
- * @param {string} value - Markdown 文本
- * @returns {string} HTML 字符串
- */
-function markdown(value = "") {
-  const safe = escapeHtml(value);
-  const lines = safe.split("\n");
-  let inList = false;
-  const output = [];
-  for (const raw of lines) {
-    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\[\s*资料\s*(\d+)\s*\]/g, '<span class="route-badge">资料$1</span>');
-    if (line.startsWith("- ")) {
-      if (!inList) { output.push("<ul>"); inList = true; }
-      output.push(`<li>${line.slice(2)}</li>`);
-    } else {
-      if (inList) { output.push("</ul>"); inList = false; }
-      if (line.startsWith("## ")) output.push(`<h4>${line.slice(3)}</h4>`);
-      else if (line.startsWith("&gt; ")) output.push(`<p class="model-note">${line.slice(5)}</p>`);
-      else if (line.trim()) output.push(`<p>${line}</p>`);
-    }
-  }
-  if (inList) output.push("</ul>");
-  return output.join("");
-}
+const { api, escapeHtml, markdown, formatDate } = window.LexVault;
+window.addEventListener("lexvault:unauthorized", expireSession);
 
 /**
  * 显示 Toast 通知
@@ -123,17 +61,6 @@ function toast(message, tone = "success") {
   node.textContent = message;
   $("#toast-stack").append(node);
   setTimeout(() => node.remove(), CONSTANTS.TOAST_DURATION);
-}
-
-/**
- * 格式化日期
- * @param {string} value - ISO 日期字符串
- * @returns {string} 格式化后的日期
- */
-function formatDate(value) {
-  if (!value) return "刚刚";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -271,6 +198,7 @@ function openLifecycleDialog(options) {
 }
 
 function clearCaseWorkspace() {
+  state.caseRequestId++;
   Object.assign(state, {caseId: null, case: null, documents: [], evidence: [], relations: [], conversations: [], conversationId: null, recoverableAgentRunId: null});
   $("#case-title").textContent = "暂无工作区案件";
   $("#case-type").textContent = "案件空间";
@@ -345,6 +273,7 @@ function renderCaseList() {
  * @param {number} caseId - 案件 ID
  */
 async function selectCase(caseId) {
+  const requestId = ++state.caseRequestId;
   $("#no-case-state").hidden = true;
   state.caseId = caseId;
   if (!$(".view.active")) showView("overview");
@@ -361,6 +290,7 @@ async function selectCase(caseId) {
       api(`/api/cases/${caseId}/conversations`),
       api(`/api/cases/${caseId}/audit`),
     ]);
+    if (requestId !== state.caseRequestId) return;
     state.case = caseData;
     state.documents = documents;
     state.evidence = evidenceData.evidence;
@@ -378,9 +308,9 @@ async function selectCase(caseId) {
     resetChat();
     await loadLabMetrics();
   } catch (error) {
-    toast(`加载案件失败: ${error.message}`, "error");
+    if (requestId === state.caseRequestId) toast(`加载案件失败: ${error.message}`, "error");
   } finally {
-    hideLoadingState();
+    if (requestId === state.caseRequestId) hideLoadingState();
   }
 }
 
@@ -401,11 +331,13 @@ function hideLoadingState() {
 
 async function loadLabMetrics() {
   if (!state.caseId) return;
+  const requestId = state.caseRequestId;
   try {
     const [metrics, benchmark] = await Promise.all([
       api(`/api/cases/${state.caseId}/platform-metrics`),
       api("/api/benchmarks/lawbench?limit=0"),
     ]);
+    if (requestId !== state.caseRequestId) return;
     const runs = metrics.agent_runs || {};
     const vectors = metrics.vector_index || {};
     const evaluation = metrics.evaluation;
