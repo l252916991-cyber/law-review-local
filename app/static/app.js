@@ -1047,6 +1047,73 @@ function showView(name) {
 }
 
 function bindEvents() {
+  const menu = $("#workspace-menu");
+  const toggle = $("#workspace-menu-toggle");
+  const items = () => $$("[role=menuitem]", menu).filter((item) => !item.hidden && !item.disabled);
+  const closeMenu = (restore = false) => {
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    if (restore) toggle.focus();
+  };
+  const openMenu = (last = false) => {
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    const available = items();
+    available[last ? available.length - 1 : 0]?.focus();
+  };
+  toggle.addEventListener("click", () => menu.hidden ? openMenu() : closeMenu(true));
+  toggle.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      openMenu(event.key === "ArrowUp");
+    }
+  });
+  menu.addEventListener("keydown", (event) => {
+    const available = items();
+    const index = available.indexOf(document.activeElement);
+    let next;
+    if (event.key === "ArrowDown") next = (index + 1) % available.length;
+    if (event.key === "ArrowUp") next = (index - 1 + available.length) % available.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = available.length - 1;
+    if (next !== undefined) { event.preventDefault(); available[next]?.focus(); }
+    if (event.key === "Tab") closeMenu(true);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) { event.preventDefault(); closeMenu(true); }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".workspace-menu")) closeMenu();
+  });
+  document.addEventListener("focusin", (event) => {
+    if (!event.target.closest(".workspace-menu")) closeMenu();
+  });
+  // Close before opening a dialog so its focus returns to the avatar.
+  menu.addEventListener("click", (event) => {
+    if (event.target.closest("[role=menuitem]")) closeMenu(true);
+  }, true);
+  $("#model-settings-btn").addEventListener("click", async () => {
+    $("#model-dialog-state").textContent = "正在检查模型服务…";
+    $("#model-dialog-name").textContent = "";
+    $("#model-dialog-dot").classList.remove("online");
+    $("#model-settings-dialog").showModal();
+    try {
+      const health = await api("/api/health");
+      $("#model-dialog-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
+      $("#model-dialog-name").textContent = health.model || "未返回模型名称";
+      $("#model-dialog-dot").classList.toggle("online", Boolean(health.local_llm));
+    } catch (error) {
+      $("#model-dialog-state").textContent = "无法检查模型服务";
+      $("#model-dialog-name").textContent = error.message;
+    }
+  });
+  $("#model-settings-dialog").addEventListener("click", (event) => {
+    const dialog = event.currentTarget;
+    const bounds = dialog.getBoundingClientRect();
+    if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
+  });
+  $("#hero-review").addEventListener("click", () => showView("assistant"));
+  $("#hero-upload").addEventListener("click", () => $("#file-input").click());
   $("#theme-toggle").addEventListener("click", () => {
     const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     localStorage.setItem("lexvault-theme", theme);

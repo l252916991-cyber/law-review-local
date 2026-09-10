@@ -547,3 +547,33 @@ html[data-theme="dark"] td,
 html[data-theme="dark"] .lifecycle-impact { background: #202825; border-color: var(--line); color: var(--muted); }
 html[data-theme="dark"] .avatar { background: #294039; color: #7bd8ba; }
 html[data-theme="dark"] ::backdrop { background: rgba(0, 0, 0, .62); }
+
+.workspace-menu { position: relative; flex-shrink: 0; }
+.workspace-menu > .avatar { border: 1px solid var(--line); cursor: pointer; }
+.workspace-menu-panel { position: absolute; right: 0; top: calc(100% + 10px); width: 200px; max-width: calc(100vw - 32px); padding: 6px; background: var(--white); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+.workspace-menu-panel button { display: block; width: 100%; padding: 11px 14px; border: 0; background: transparent; color: var(--ink); text-align: left; border-radius: 3px; }
+.workspace-menu-panel button:hover, .workspace-menu-panel button:focus-visible { background: var(--soft); outline: 2px solid var(--green); outline-offset: -2px; }
+.workspace-menu-panel[hidden], .workspace-menu-panel button[hidden] { display: none; }
+.model-settings-dialog { width: min(520px, calc(100vw - 32px)); color: var(--ink); overflow-wrap: anywhere; }
+.model-settings-dialog p { color: var(--muted); line-height: 1.8; }
+.model-settings-status { display: flex; align-items: center; gap: 12px; margin: 22px 0; }
+.model-settings-status small { display: block; margin-top: 5px; color: var(--muted); }
+.model-config-list > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.model-config-list dd { margin: 6px 0 0; }
+.hero-card { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); min-height: 300px; padding: 10px 0 34px; border-bottom: 1px solid var(--line); gap: 36px; }
+.hero-kicker { color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 12px; }
+.hero-kicker span { background: var(--line); width: 24px; height: 1px; }
+.hero-card h2 { font-family: "Songti SC", "Noto Serif CJK SC", SimSun, serif; font-size: clamp(34px, 3vw, 46px); font-weight: 500; line-height: 1.5; letter-spacing: .1em; margin: 22px 0 14px; }
+.hero-card p { color: var(--muted); max-width: 560px; font-size: 13px; line-height: 1.9; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.hero-actions button { min-width: 112px; }
+.justice-statement { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 18px; text-align: center; }
+.justice-symbol { color: #98896c; width: 126px; height: 126px; }
+.justice-symbol svg { width: 100%; height: 100%; }
+.justice-statement p { font-family: "Songti SC", SimSun, serif; font-size: 17px; letter-spacing: .24em; margin: 20px 0 10px; }
+.justice-statement > span { color: var(--muted); font-size: 11px; }
+@media (max-width: 760px) {
+  .hero-card { grid-template-columns: 1fr; min-height: 0; padding: 4px 0 26px; gap: 0; }
+  .hero-card h2 { font-size: 34px; }
+  .justice-statement { display: none; }
+}

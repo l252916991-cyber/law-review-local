@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light" />
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css?v=20260910-workspace-cleanup" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20260910-workspace-menu" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
@@ -58,10 +58,6 @@
       <div class="sidebar-section-title">案件空间</div>
       <div id="case-list" class="case-list"></div>
       <button id="new-case-btn" class="new-case-btn">＋ 新建案件</button>
-      <div class="case-storage-links">
-        <button class="text-button" data-case-storage="archived">已归档</button>
-        <button class="text-button" data-case-storage="trash">回收站</button>
-      </div>
 
       <div class="sidebar-footer">
         <div class="model-dot" id="model-dot"></div>
@@ -81,15 +77,37 @@
             <span>⌕</span><input id="global-search" aria-label="搜索卷宗、人名、金额" placeholder="搜索卷宗、人名、金额…" />
           </label>
 
-          <button id="sign-out" class="text-button" hidden>退出登录</button>
-          <div class="avatar" aria-label="律师工作空间">律</div>
+          <div class="workspace-menu">
+            <button id="workspace-menu-toggle" class="avatar" type="button" aria-label="律师工作空间菜单" aria-expanded="false" aria-controls="workspace-menu" aria-haspopup="menu">律</button>
+            <div id="workspace-menu" class="workspace-menu-panel" role="menu" aria-label="律师工作空间" hidden>
+              <button type="button" role="menuitem" tabindex="-1" data-case-storage="archived">已归档</button>
+              <button type="button" role="menuitem" tabindex="-1" data-case-storage="trash">回收站</button>
+              <button id="model-settings-btn" type="button" role="menuitem" tabindex="-1">配置本地模型</button>
+              <button id="sign-out" type="button" role="menuitem" tabindex="-1" hidden>退出登录</button>
+            </div>
+          </div>
         </div>
       </header>
 
       <section class="content">
         <div id="no-case-state" class="empty-state" hidden>暂无工作区案件。可新建案件，或从已归档、回收站恢复。</div>
         <div id="overview-view" class="view active">
-          <p id="case-description" class="case-description" hidden></p>
+          <div class="hero-card">
+            <div class="hero-copy">
+              <div class="hero-kicker">案件工作台 <span></span> CASE WORKSPACE</div>
+              <h2>以事实为据，<br />以法律为准。</h2>
+              <p id="case-description">梳理案件材料，核对证据来源，让每一步判断都有据可循。</p>
+              <div class="hero-actions">
+                <button class="primary-button" id="hero-review" type="button">开始阅卷 <b>→</b></button>
+                <button class="secondary-button" id="hero-upload" type="button">上传卷宗</button>
+              </div>
+            </div>
+            <div class="justice-statement">
+              <div class="justice-symbol"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M32 10v42M15 54h34M11 22h42M17 22 8 39h18L17 22Zm30 0-9 17h18L47 22Z"/><path d="M8 39c2 8 16 8 18 0m12 0c2 8 16 8 18 0"/><circle cx="32" cy="15" r="3" fill="currentColor" stroke="none"/></svg></div>
+              <p>审慎 · 独立 · 公正</p>
+              <span>尊重事实，审视每一份证据</span>
+            </div>
+          </div>
 
           <div class="metric-grid">
             <article><div><span>卷宗文件</span><strong id="metric-docs">0</strong></div></article>
@@ -417,6 +435,14 @@
     <div class="lifecycle-body"><p id="lifecycle-message"></p><div class="lifecycle-impact" id="lifecycle-impact"></div><div class="dialog-actions"><button class="secondary-button" type="button" id="lifecycle-cancel-action">取消</button><button class="primary-button" type="button" id="lifecycle-confirm">确认</button></div></div>
   </dialog>
 
+  <dialog id="model-settings-dialog" class="dialog model-settings-dialog" aria-labelledby="model-settings-title">
+    <div class="dialog-header"><div><span class="section-label">只读配置</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
+    <div class="model-settings-status" role="status"><span class="model-dot" id="model-dialog-dot"></span><div><strong id="model-dialog-state">正在检查模型服务…</strong><small id="model-dialog-name"></small></div></div>
+    <p>模型服务由律所管理员在部署环境中配置，本页面不会保存或修改配置。</p>
+    <dl class="model-config-list"><div><dt>服务地址</dt><dd><code>LAW_REVIEW_LLM_URL</code></dd></div><div><dt>模型名称</dt><dd><code>LAW_REVIEW_LLM_MODEL</code></dd></div></dl>
+    <p class="model-settings-note">修改部署环境后需重建或重启 Web 与 Worker 服务；当前状态来自 <code>/api/health</code>。</p>
+  </dialog>
+
   <dialog id="case-dialog" class="dialog">
     <form id="case-form">
       <div class="dialog-header"><div><span class="section-label">案件空间</span><h3>新建案件</h3></div><button type="button" class="close-button" data-close-dialog>×</button></div>
@@ -427,6 +453,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=20260910-workspace-cleanup" defer></script>
+  <script src="/assets/app.js?v=20260910-mobile-workspace-menu" defer></script>
 </body>
 </html>
