@@ -6,12 +6,38 @@
   <meta name="color-scheme" content="light" />
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css?v=20260909-lifecycle2" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20260910-enterprise-login" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
 </head>
-<body>
+<body class="auth-pending">
+  <section id="auth-page" class="auth-page" aria-labelledby="auth-title">
+    <header class="auth-brand"><span class="auth-mark" aria-hidden="true">律</span><span><strong>LexVault</strong><small>律师阅卷工作台</small></span></header>
+    <main class="auth-panel">
+      <p id="auth-organization" class="auth-organization">律所工作空间</p>
+      <h1 id="auth-title" tabindex="-1">登录律所工作空间</h1>
+      <p class="auth-description">使用律所授权身份访问案件与卷宗</p>
+      <p id="auth-status" class="auth-status" role="status">正在检查登录状态…</p>
+      <div id="auth-methods" hidden>
+        <a id="auth-sso" class="auth-primary" href="/api/auth/oidc/login" hidden>使用律所账号登录 <span aria-hidden="true">→</span></a>
+        <details id="auth-token-details" open>
+          <summary>使用访问令牌登录</summary>
+          <form id="auth-form">
+            <label for="auth-token">访问令牌</label>
+            <div class="auth-input-wrap"><input id="auth-token" type="password" required autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="512" aria-describedby="auth-token-hint auth-error" /><button id="auth-reveal" type="button" aria-label="显示访问令牌" aria-pressed="false">显示</button></div>
+            <p id="auth-token-hint" class="auth-hint">请输入律所管理员提供的访问令牌。</p>
+            <button id="auth-submit" class="auth-primary" type="submit">登录工作空间 <span aria-hidden="true">→</span></button>
+          </form>
+        </details>
+      </div>
+      <p id="auth-error" class="auth-error" role="alert"></p>
+      <button id="auth-retry" type="button" class="auth-retry" hidden>重新检查</button>
+      <div class="auth-help"><p>仅限获授权人员使用</p><p>无法登录？<span id="auth-support">请联系律所管理员</span></p></div>
+      <noscript><p class="auth-error">请启用 JavaScript 后使用工作空间。</p></noscript>
+    </main>
+    <footer class="auth-footer"><span>LexVault</span><span>专业阅卷 · 有据可循</span></footer>
+  </section>
   <a class="skip-link" href="#main-content">跳至主要内容</a>
   <div class="app-shell">
     <aside class="sidebar">
@@ -329,16 +355,6 @@
     </form>
   </dialog>
 
-  <dialog id="auth-dialog" class="dialog" aria-labelledby="auth-title">
-    <form id="auth-form">
-      <div class="dialog-header"><h3 id="auth-title">登录案件空间</h3></div>
-      <p>请输入管理员配置的访问令牌。令牌仅用于建立 HttpOnly 会话，不存入浏览器本地存储。</p>
-      <label>访问令牌<input id="auth-token" type="password" required autocomplete="off" maxlength="512" /></label>
-      <p id="auth-error" role="alert"></p>
-      <button class="primary-button" type="submit">登录</button>
-    </form>
-  </dialog>
-
   <dialog id="annotations-dialog" class="dialog" aria-labelledby="annotations-title">
     <div class="dialog-header"><h3 id="annotations-title">证据标注</h3><button class="close-button" data-close-dialog>×</button></div>
     <div id="annotations-list"></div>
@@ -480,6 +496,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=20260909-lifecycle2" defer></script>
+  <script src="/assets/app.js?v=20260910-enterprise-login" defer></script>
 </body>
 </html>

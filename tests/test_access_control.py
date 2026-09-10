@@ -371,15 +371,21 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/cases", headers=self.headers, json={"title": "x"}).status_code, 403)
 
     def test_oidc_unconfigured_is_disabled_and_partial_config_fails_closed(self):
-        self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 404)
+        response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
         for partial in ({"LAW_REVIEW_OIDC_ISSUER": "https://idp.example"},
                         {"LAW_REVIEW_OIDC_CLIENT_ID": "app"}):
             with self.subTest(partial=partial), patch.dict(os.environ, partial):
-                self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+                response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
         with patch.dict(os.environ, {"LAW_REVIEW_OIDC_ISSUER": "http://idp.example",
                                      "LAW_REVIEW_OIDC_CLIENT_ID": "app",
                                      "LAW_REVIEW_OIDC_CLIENT_SECRET": "s"}):
-            self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+            response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
 
     def test_oidc_login_flow_with_mock_provider(self):
         import jwt as pyjwt
@@ -407,9 +413,8 @@ class AccessControlTests(unittest.TestCase):
                 return {}
             if url.endswith("/token"):
                 self.assertEqual(data["grant_type"], "authorization_code")
-                code = data["code"]
-                flows = security_module._oidc_flows
-                claims = {"iss": "https://idp.example", "aud": "lexvault-client", "nonce": flows[code][0] if code in flows else "stale",
+                self.assertTrue(data["code_verifier"])
+                claims = {"iss": "https://idp.example", "aud": "lexvault-client", "nonce": nonce,
                           "sub": "user-001", "email": "lv@example.com", "exp": 9999999999}
                 token = pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "test-key"})
                 return {"id_token": token, "access_token": "at"}
@@ -434,8 +439,7 @@ class AccessControlTests(unittest.TestCase):
             self.assertEqual(query["client_id"], ["lexvault-client"])
             self.assertIn("openid", query["scope"][0])
             state, nonce = query["state"][0], query["nonce"][0]
-            # register a fake authorization code bound to that flow nonce
-            security_module._oidc_flows["auth-code-1"] = (nonce, security_module.time.monotonic() + 60)
+            # Provider returns the nonce captured from the real authorization request.
             with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
                 callback = self.client.get(f"/api/auth/oidc/callback?code=auth-code-1&state={state}", follow_redirects=False)
         self.assertEqual(callback.status_code, 302, callback.text)
@@ -448,7 +452,8 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/cases/{self.cases[1]}").status_code, 404)
         # State is single use: replay is rejected.
         replay = self.client.get("/api/auth/oidc/callback?code=auth-code-2&state=" + state, follow_redirects=False)
-        self.assertEqual(replay.status_code, 400)
+        self.assertEqual(replay.status_code, 302)
+        self.assertEqual(replay.headers["location"], "/?auth_error=state")
 
     def test_oidc_unmapped_identity_and_bad_audience_rejected(self):
         import jwt as pyjwt
@@ -484,18 +489,16 @@ class AccessControlTests(unittest.TestCase):
             if url.endswith("/token"):
                 return {"id_token": token_for(base_claims)}
             raise AssertionError(url)
-        with patch.object(security_module, "fetch_json", side_effect=lambda url, **kw: discovery if url.endswith("openid-configuration") else {}):
-            self.client.get("/api/auth/oidc/login", follow_redirects=False)
+        from urllib.parse import parse_qs, urlparse
         with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
-            with transaction() as conn:
-                state = "manual-state"
-                conn.execute("SELECT 1")
-            security_module._oidc_flows["flow-stranger"] = ("nonce-x", security_module.time.monotonic() + 60)
-            stranger = self.client.get("/api/auth/oidc/callback?code=c&state=flow-stranger", follow_redirects=False)
-        self.assertEqual(stranger.status_code, 403)
+            started = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            query = parse_qs(urlparse(started.headers["location"]).query)
+            base_claims["nonce"] = query["nonce"][0]
+            stranger = self.client.get("/api/auth/oidc/callback", params={"code": "c", "state": query["state"][0]}, follow_redirects=False)
+        self.assertEqual(stranger.status_code, 302)
+        self.assertEqual(stranger.headers["location"], "/?auth_error=denied")
         self.assertNotIn("lexvault_session", stranger.headers.get("set-cookie", ""))
-        # Wrong audience fails validation with a sanitized message.
-        security_module._oidc_flows["flow-badaud"] = ("nonce-y", security_module.time.monotonic() + 60)
+        # Wrong audience fails signature-backed validation with a fixed error code.
         bad_claims = dict(base_claims, sub="known-user", aud="someone-else", nonce="nonce-y")
         def bad_fetch(url, *, data=None, timeout=5):
             if url.endswith("openid-configuration"):
@@ -504,8 +507,12 @@ class AccessControlTests(unittest.TestCase):
                 return jwks
             return {"id_token": token_for(bad_claims)}
         with patch.object(security_module, "fetch_json", side_effect=bad_fetch):
-            bad = self.client.get("/api/auth/oidc/callback?code=c&state=flow-badaud", follow_redirects=False)
-        self.assertEqual(bad.status_code, 401)
+            started = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            query = parse_qs(urlparse(started.headers["location"]).query)
+            bad_claims["nonce"] = query["nonce"][0]
+            bad = self.client.get("/api/auth/oidc/callback", params={"code": "c", "state": query["state"][0]}, follow_redirects=False)
+        self.assertEqual(bad.status_code, 302)
+        self.assertEqual(bad.headers["location"], "/?auth_error=failed")
         self.assertNotIn("lexvault-client", bad.text)
         with closing(connect()) as conn:
             failures = conn.execute("SELECT COUNT(*) FROM security_events WHERE event_type='auth' AND outcome='login_failed' AND detail LIKE '%OIDC%'").fetchone()[0]

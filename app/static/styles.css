@@ -21,6 +21,40 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
 body { overflow: hidden; }
+body.auth-pending { overflow: auto; background: #f6f5f1; }
+body.auth-pending > :not(#auth-page) { display: none !important; }
+body:not(.auth-pending) > #auth-page { display: none; }
+#auth-page [hidden] { display: none !important; }
+.auth-page { min-height: 100svh; display: flex; flex-direction: column; align-items: center; padding: 40px 48px 24px; color: #293034; background: #f6f5f1; font-size: 14px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; align-self: flex-start; }
+.auth-mark { width: 42px; height: 46px; display: grid; place-items: center; background: #293b34; color: #faf9f6; font: 24px Georgia, 'Songti SC', serif; border-radius: 4px; }
+.auth-brand strong { display: block; font: 26px Georgia, serif; letter-spacing: 0; }
+.auth-brand small { display: block; margin-top: 4px; color: #626966; font-size: 11px; letter-spacing: 2px; }
+.auth-panel { width: 100%; max-width: 420px; margin: auto; padding: 64px 0 48px; }
+.auth-organization { margin: 0 0 18px; color: #626966; font-size: 12px; letter-spacing: 2px; overflow-wrap: anywhere; }
+.auth-panel h1 { margin: 0; font: 600 32px/1.4 'Songti SC', 'Noto Serif CJK SC', Georgia, serif; letter-spacing: 1px; }
+.auth-description { margin: 14px 0 32px; color: #626966; line-height: 1.8; }
+.auth-status { color: #536458; line-height: 1.7; }
+.auth-primary { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 48px; padding: 13px 18px; border: 1px solid #354b40; border-radius: 4px; background: #354b40; color: #fff; text-decoration: none; font: inherit; font-weight: 600; cursor: pointer; }
+.auth-primary:hover { background: #273c31; }
+.auth-primary:disabled { opacity: .65; cursor: wait; }
+.auth-page :focus-visible { outline: 3px solid #89632b; outline-offset: 4px; }
+#auth-token-details { margin-top: 22px; }
+#auth-token-details summary { color: #465b4d; cursor: pointer; padding: 12px 0; }
+#auth-form { margin-top: 12px; }
+#auth-form label { display: block; margin-bottom: 10px; font-weight: 600; }
+.auth-input-wrap { display: flex; border: 1px solid #969f97; border-radius: 4px; background: #fff; }
+.auth-input-wrap:focus-within { outline: 2px solid #536f5d; outline-offset: 2px; }
+#auth-token { width: 100%; min-width: 0; height: 48px; margin: 0; padding: 12px; border: 0; background: transparent; color: #293034; outline: none; box-shadow: none; }
+#auth-reveal { min-width: 60px; border: 0; background: transparent; color: #465b4d; font-size: 13px; }
+.auth-hint { color: #626966; font-size: 12px; line-height: 1.7; margin: 10px 0 22px; }
+.auth-error { color: #a02f2f; font-size: 13px; line-height: 1.7; min-height: 22px; margin: 16px 0 0; overflow-wrap: anywhere; }
+.auth-retry { min-height: 44px; color: #354b40; background: transparent; border: 1px solid #969f97; border-radius: 4px; padding: 8px 18px; }
+.auth-help { margin-top: 28px; border-top: 1px solid #d9ddd5; padding-top: 20px; color: #626966; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.auth-help p { margin: 4px 0; }
+.auth-footer { width: 100%; display: flex; justify-content: space-between; color: #626966; font-size: 11px; letter-spacing: 1px; }
+@media (max-width: 600px) { .auth-page { padding: 24px; } .auth-panel { padding: 48px 0 32px; } .auth-panel h1 { font-size: 28px; } }
+
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 .theme-toggle { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; background: var(--white); color: var(--ink); font-size: 20px; transition: background .18s ease, color .18s ease, transform .18s ease; }

@@ -54,6 +54,7 @@ function initializeTheme() {
  */
 async function api(path, options = {}) {
   const response = await fetch(path, options);
+  if (response.status === 401 && (!path.startsWith("/api/auth/") || options.method === "DELETE")) expireSession();
   if (!response.ok) {
     let message = `请求失败(${response.status})`;
     let detail = null;
@@ -151,20 +152,66 @@ function statusClass(status = "") {
 /**
  * 应用启动入口
  */
-async function bootstrap() {
-  bindEvents();
+function expireSession() {
+  if (document.body.classList.contains("auth-pending")) return;
+  document.body.classList.add("auth-pending");
+  sessionStorage.removeItem("lexvault-active-job");
+  const view = $(".nav-item.active")?.dataset.view || "overview";
+  if (state.caseId) sessionStorage.setItem("lexvault-return", JSON.stringify({ caseId: state.caseId, view }));
+  location.replace("/?auth_error=expired");
+}
+
+const authErrors = {
+  expired: "登录状态已过期，请重新登录。",
+  state: "登录会话已过期或无效，请重新发起登录。",
+  unavailable: "律所身份服务暂不可用，请稍后重试。",
+  denied: "你的账号尚未获得此工作空间的访问权限，请联系律所管理员。",
+  failed: "组织登录验证失败，请重新登录。",
+};
+
+async function checkIdentity() {
+  $("#auth-error").textContent = "";
+  $("#auth-retry").hidden = true;
+  $("#auth-status").textContent = "正在检查登录状态…";
   try {
     const identity = await api("/api/auth/me");
+    $("#auth-organization").textContent = identity.organization_name || "律所工作空间";
+    $("#auth-support").textContent = identity.support_contact || "请联系律所管理员";
+    $("#auth-status").textContent = "";
+    if (!identity.authenticated) {
+      $("#auth-methods").hidden = false;
+      $("#auth-sso").hidden = !identity.oidc_enabled;
+      $("#auth-token-details").open = !identity.oidc_enabled;
+      $("#auth-token-details summary").hidden = !identity.oidc_enabled;
+      const url = new URL(location.href);
+      const reason = url.searchParams.get("auth_error");
+      $("#auth-error").textContent = reason ? (authErrors[reason] || authErrors.failed) : "";
+      if (reason) { url.searchParams.delete("auth_error"); history.replaceState(null, "", url.pathname + url.search + url.hash); }
+      $(identity.oidc_enabled ? "#auth-sso" : "#auth-token").focus();
+      return null;
+    }
+    return identity;
+  } catch (error) {
+    $("#auth-status").textContent = "暂时无法进入工作空间";
+    $("#auth-error").textContent = error.status ? error.message : "无法连接工作空间，请检查网络后重试。";
+    $("#auth-methods").hidden = true;
+    $("#auth-retry").hidden = false;
+    return null;
+  }
+}
+
+async function bootstrap() {
+  bindEvents();
+  const identity = await checkIdentity();
+  if (!identity) return;
+  document.body.classList.remove("auth-pending");
+  try {
     if (identity.mode === "token") {
-      $(".privacy-chip").textContent = "令牌权限模式";
-      if (!identity.authenticated) {
-        $("#case-title").textContent = "请先登录";
-        $("#auth-dialog").showModal();
-        return;
-      }
+      $(".privacy-chip").textContent = "律所授权空间";
       $("#user-name").value = identity.name;
       $("#user-name").readOnly = true;
-      $("#new-case-btn").hidden = !identity.admin;
+      $("#new-case-btn").hidden = !identity.permissions.includes("manage") && !identity.admin;
+      $("#model-settings-btn").disabled = !identity.permissions.includes("manage") && !identity.admin;
       $("#sign-out").hidden = false;
     }
     const health = await api("/api/health");
@@ -172,8 +219,14 @@ async function bootstrap() {
     $("#model-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
     $("#model-name").textContent = health.local_llm ? health.model : "仍可使用检索与溯源";
     await loadCases();
-    if (state.cases.length) await selectCase(state.cases[0].id);
-    else clearCaseWorkspace();
+    let returnTo = null;
+    try { returnTo = JSON.parse(sessionStorage.getItem("lexvault-return")); } catch { /* Ignore invalid navigation state. */ }
+    sessionStorage.removeItem("lexvault-return");
+    const restoredCase = state.cases.find((item) => item.id === returnTo?.caseId);
+    if (state.cases.length) {
+      await selectCase(restoredCase ? restoredCase.id : state.cases[0].id);
+      if (restoredCase && $$(".nav-item").some((item) => item.dataset.view === returnTo.view)) showView(returnTo.view);
+    } else clearCaseWorkspace();
     const activeJob = sessionStorage.getItem("lexvault-active-job");
     if (activeJob) {
       const job = await api(`/api/agent-jobs/${activeJob}`);
@@ -1010,15 +1063,40 @@ function bindEvents() {
   $("#model-settings-form").addEventListener("submit", saveModelSettings);
   $$("[data-case-storage]").forEach((button) => button.addEventListener("click", () => openCaseStorage(button.dataset.caseStorage)));
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
-  $("#auth-dialog").addEventListener("cancel", (event) => event.preventDefault());
+  $("#auth-retry").addEventListener("click", () => location.reload());
+  $("#auth-reveal").addEventListener("click", () => {
+    const visible = $("#auth-token").type === "password";
+    $("#auth-token").type = visible ? "text" : "password";
+    $("#auth-reveal").textContent = visible ? "隐藏" : "显示";
+    $("#auth-reveal").setAttribute("aria-label", visible ? "隐藏访问令牌" : "显示访问令牌");
+    $("#auth-reveal").setAttribute("aria-pressed", String(visible));
+  });
   $("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const submit = $("#auth-submit");
+    if (submit.disabled) return;
     const token = $("#auth-token").value;
-    $("#auth-token").value = "";
+    submit.disabled = true;
+    submit.textContent = "正在登录…";
+    $("#auth-form").setAttribute("aria-busy", "true");
+    $("#auth-error").textContent = "";
+    $("#auth-token").removeAttribute("aria-invalid");
     try {
       await api("/api/auth/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      $("#auth-token").value = "";
       location.reload();
-    } catch (error) { $("#auth-error").textContent = error.message; }
+    } catch (error) {
+      $("#auth-error").textContent = error.status ? error.message : "连接失败，请检查网络后重试。";
+      if (error.status === 401) {
+        $("#auth-token").value = "";
+        $("#auth-token").setAttribute("aria-invalid", "true");
+      }
+      $("#auth-token").focus();
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "登录工作空间 →";
+      $("#auth-form").removeAttribute("aria-busy");
+    }
   });
   $("#sign-out").addEventListener("click", async () => {
     try { await api("/api/auth/session", { method: "DELETE" }); sessionStorage.removeItem("lexvault-active-job"); location.reload(); }
@@ -1059,13 +1137,7 @@ function bindEvents() {
     const templateId = $("#export-template").value;
     const query = templateId ? `?template_id=${encodeURIComponent(templateId)}&final=true` : "?final=true";
     try {
-      const response = await fetch(`/api/cases/${state.caseId}/export${query}`);
-      if (!response.ok) {
-        let message = `结案打包失败(${response.status})`;
-        try { const body = await response.json(); if (typeof body.detail === "string") message = body.detail; } catch (e) { /* binary or empty body */ }
-        toast(message, "error");
-        return;
-      }
+      const response = await api(`/api/cases/${state.caseId}/export${query}`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");

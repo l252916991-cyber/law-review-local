@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 12
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -622,6 +622,41 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_lifecycle ON cases(lifecycle_status, purge_after)")
 
 
+def _migrate_v11(conn: sqlite3.Connection) -> None:
+    _execute_script(conn, """
+ALTER TABLE auth_sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE oidc_flows (
+    state_hash TEXT PRIMARY KEY,
+    browser_hash TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    verifier TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    settings_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX idx_oidc_flows_expiry ON oidc_flows(expires_at);
+CREATE TABLE auth_login_limits (
+    bucket TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX idx_auth_login_limits_expiry ON auth_login_limits(expires_at);
+""")
+    # Existing sessions start their idle window at migration; absolute expiry
+    # remains unchanged, so upgrading never extends their original lifetime.
+    conn.execute("UPDATE auth_sessions SET last_seen_at=?", (int(time.time()),))
+
+
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    # In-flight v11 flows cannot safely rotate their originating session.
+    conn.execute("DELETE FROM oidc_flows")
+    _execute_script(conn, """
+ALTER TABLE oidc_flows ADD COLUMN previous_session_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE oidc_flows ADD COLUMN limit_bucket TEXT NOT NULL DEFAULT '';
+ALTER TABLE oidc_flows ADD COLUMN limit_expires_at INTEGER NOT NULL DEFAULT 0;
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -640,7 +675,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")

@@ -1,14 +1,14 @@
 """Local-only default; optional token principals with explicit case scopes.
 
 Tokens come from deployment configuration, not request-supplied user names.
-This is a small single-process deployment boundary, not a full identity provider.
+Authentication state is durable; deployment lifecycle constraints remain separate.
 """
 from __future__ import annotations
 
 import hmac
 import hashlib
 import secrets
-import threading
+import base64
 import time
 import asyncio
 import ipaddress
@@ -29,10 +29,14 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from .db import connect, get_db_path, now, record_security_event, transaction
+from .db import connect, now, record_security_event, transaction
 from .services import egress_opener
 
 SESSION_TTL = 8 * 3600
+SESSION_IDLE_TTL = 30 * 60
+LOGIN_WINDOW = 15 * 60
+LOGIN_LIMIT = 10
+OIDC_START_LIMIT = 100
 
 
 def _session_hash(value: str) -> str:
@@ -57,8 +61,9 @@ def session_principal(value: str) -> Principal | None:
             from .db import purge_expired_sessions
             purge_expired_sessions(conn)
             row = conn.execute(
-                "SELECT kind, credential_fingerprint, oidc_subject FROM auth_sessions WHERE session_hash=? AND expires_at > ?",
-                (_session_hash(value), int(time.time())),
+                "UPDATE auth_sessions SET last_seen_at=? WHERE session_hash=? AND expires_at > ? "
+                "AND last_seen_at > ? RETURNING kind, credential_fingerprint, oidc_subject",
+                (int(time.time()), _session_hash(value), int(time.time()), int(time.time()) - SESSION_IDLE_TTL),
             ).fetchone()
     except Exception as exc:
         logger.error("Session lookup failed (%s)", type(exc).__name__)
@@ -245,7 +250,9 @@ class AccessMiddleware(BaseHTTPMiddleware):
             if host not in allowed_hosts:
                 raise HTTPException(400, "不允许的 Host")
             # Block cross-origin state changes, including localhost CSRF.
-            if request.method not in {"GET", "HEAD", "OPTIONS"} or request.url.path.startswith("/api/"):
+            oidc_callback_get = (mode == "token" and request.method == "GET"
+                                 and request.url.path == "/api/auth/oidc/callback")
+            if not oidc_callback_get and (request.method not in {"GET", "HEAD", "OPTIONS"} or request.url.path.startswith("/api/")):
                 origin = request.headers.get("origin")
                 expected_origin = f"{request.url.scheme}://{request.url.netloc}"
                 if (origin and origin.rstrip("/") != expected_origin) or request.headers.get("sec-fetch-site") == "cross-site":
@@ -335,8 +342,8 @@ def _register_session(fingerprint: str) -> str:
             if count >= 4096:
                 raise HTTPException(503, "会话容量已满，请稍后重试")
             conn.execute(
-                "INSERT INTO auth_sessions(session_hash,kind,credential_fingerprint,expires_at,created_at) VALUES (?, 'token', ?, ?, ?)",
-                (_session_hash(session), fingerprint, int(time.time()) + SESSION_TTL, now()),
+                "INSERT INTO auth_sessions(session_hash,kind,credential_fingerprint,expires_at,created_at,last_seen_at) VALUES (?, 'token', ?, ?, ?, ?)",
+                (_session_hash(session), fingerprint, int(time.time()) + SESSION_TTL, now(), int(time.time())),
             )
     except HTTPException:
         raise
@@ -346,20 +353,30 @@ def _register_session(fingerprint: str) -> str:
     return session
 
 
-def _register_oidc_session(subject: str) -> str:
+def _register_oidc_session(subject: str, flow=None) -> str:
     """Create one opaque durable session bound to a verified OIDC subject."""
     session = secrets.token_urlsafe(32)
     try:
         with transaction() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if flow is not None:
+                conn.execute("DELETE FROM auth_sessions WHERE session_hash=?", (flow["previous_session_hash"],))
             from .db import purge_expired_sessions
             purge_expired_sessions(conn)
             count = conn.execute("SELECT COUNT(*) FROM auth_sessions").fetchone()[0]
             if count >= 4096:
                 raise HTTPException(503, "会话容量已满，请稍后重试")
             conn.execute(
-                "INSERT INTO auth_sessions(session_hash,kind,oidc_subject,expires_at,created_at) VALUES (?, 'oidc', ?, ?, ?)",
-                (_session_hash(session), subject, int(time.time()) + SESSION_TTL, now()),
+                "INSERT INTO auth_sessions(session_hash,kind,oidc_subject,expires_at,created_at,last_seen_at) VALUES (?, 'oidc', ?, ?, ?, ?)",
+                (_session_hash(session), subject, int(time.time()) + SESSION_TTL, now(), int(time.time())),
             )
+            if flow is not None:
+                # Refund only this flow's reservation in its original window.
+                # A late callback must not decrement a newer window's count.
+                conn.execute(
+                    "UPDATE auth_login_limits SET attempts=MAX(0,attempts-1) WHERE bucket=? AND expires_at=?",
+                    (flow["limit_bucket"], flow["limit_expires_at"]),
+                )
     except HTTPException:
         raise
     except Exception as exc:
@@ -376,6 +393,7 @@ def _revoke_session(value: str) -> None:
             conn.execute("DELETE FROM auth_sessions WHERE session_hash=?", (_session_hash(value),))
     except Exception as exc:
         logger.error("Session revocation failed (%s)", type(exc).__name__)
+        raise HTTPException(503, "会话服务暂不可用") from exc
 
 
 def _issue_session_cookie(response: Response, request: Request, session: str) -> None:
@@ -389,7 +407,7 @@ def _issue_session_cookie(response: Response, request: Request, session: str) ->
 def login(body: Login, request: Request, response: Response):
     if auth_mode() != "token":
         raise HTTPException(409, "本机模式无需登录")
-    principal = token_principal(body.token)
+    principal = _limited_token_principal(body.token, request)
     if principal is None:
         record_security_event("auth", "login_failed", detail="无效访问令牌", request_path=request.url.path)
         raise HTTPException(401, "无效访问令牌")
@@ -414,7 +432,10 @@ def logout(request: Request, response: Response):
 def identity():
     value = _principal.get()
     return {"mode": auth_mode(), "authenticated": value is not None, "name": value.name if value else None, "admin": value.admin if value else False,
-            "permissions": sorted(value.permissions) if value else []}
+            "permissions": sorted(value.permissions) if value else [],
+            "organization_name": os.getenv("LAW_REVIEW_ORGANIZATION_NAME", "").strip(),
+            "support_contact": os.getenv("LAW_REVIEW_SUPPORT_CONTACT", "").strip(),
+            "oidc_enabled": auth_mode() == "token" and oidc_settings() is not None}
 
 
 # --- Optional organizational login (OIDC authorization-code flow). ---
@@ -423,8 +444,8 @@ def identity():
 # provider at the HTTP-fetch layer.
 
 OIDC_FLOW_TTL = 600
-_oidc_flows: dict[str, tuple[str, float]] = {}
-_oidc_flow_lock = threading.Lock()
+OIDC_FLOW_COOKIE = "lexvault_oidc_flow"
+OIDC_CALLBACK_PATH = "/api/auth/oidc/callback"
 _oidc_discovery_cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -493,8 +514,8 @@ def oidc_verify_id_token(id_token: str, settings: dict[str, Any], discovery: dic
             raise ValueError("no matching JWK for token")
         from jwt import PyJWK
         claims = pyjwt.decode(
-            id_token, PyJWK.from_dict(key).key, algorithms=[header.get("alg", "RS256")],
-            audience=settings["client_id"], issuer=settings["issuer"],
+            id_token, PyJWK.from_dict(key).key, algorithms=["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"],
+            audience=settings["client_id"], issuer=settings["issuer"], options={"require": ["exp", "iss", "aud", "sub"]},
         )
     except pyjwt.PyJWTError as exc:
         # Signature, audience, issuer and expiry problems all land here so the
@@ -505,71 +526,153 @@ def oidc_verify_id_token(id_token: str, settings: dict[str, Any], discovery: dic
     return claims
 
 
-def _register_oidc_flow() -> tuple[str, str]:
-    state = secrets.token_urlsafe(16)
-    nonce = secrets.token_urlsafe(16)
-    with _oidc_flow_lock:
-        current = time.monotonic()
-        for key, (_, expires) in list(_oidc_flows.items()):
-            if expires <= current:
-                del _oidc_flows[key]
-        if len(_oidc_flows) >= 1024:
+def _login_bucket(request: Request, kind: str) -> str:
+    # Use the ASGI peer, never client-controlled forwarding headers. A trusted
+    # proxy must normalize the ASGI client address or shares one rate bucket.
+    return _session_hash(kind + ":" + (request.client.host if request.client else "unknown"))
+
+
+def _check_login_limit(conn, bucket: str, limit: int = LOGIN_LIMIT) -> None:
+    conn.execute("DELETE FROM auth_login_limits WHERE expires_at <= ?", (int(time.time()),))
+    row = conn.execute("SELECT attempts FROM auth_login_limits WHERE bucket=?", (bucket,)).fetchone()
+    if row and row[0] >= limit:
+        raise HTTPException(429, "登录尝试过多，请稍后重试")
+
+
+def _count_login_attempt(conn, bucket: str) -> None:
+    conn.execute(
+        "INSERT INTO auth_login_limits(bucket,attempts,expires_at) VALUES (?,1,?) "
+        "ON CONFLICT(bucket) DO UPDATE SET attempts=attempts+1",
+        (bucket, int(time.time()) + LOGIN_WINDOW),
+    )
+
+
+def _limited_token_principal(token: str, request: Request) -> Principal | None:
+    try:
+        with transaction() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            bucket = _login_bucket(request, "token")
+            _check_login_limit(conn, bucket)
+            principal = token_principal(token)
+            if principal is None:
+                _count_login_attempt(conn, bucket)
+            return principal
+    except (HTTPException, AccessConfigurationError):
+        raise
+    except Exception as exc:
+        logger.error("Login limit storage failed (%s)", type(exc).__name__)
+        raise HTTPException(503, "登录服务暂不可用") from exc
+
+
+def _oidc_settings_hash(settings: dict) -> str:
+    return _session_hash(json.dumps([settings["issuer"], settings["client_id"], settings["client_secret"]]))
+
+
+def _register_oidc_flow(request: Request, settings: dict, redirect_uri: str) -> tuple[str, str, str, str]:
+    state, nonce, browser, verifier = (secrets.token_urlsafe(32) for _ in range(4))
+    with transaction() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        bucket = _login_bucket(request, "oidc-start")
+        _check_login_limit(conn, bucket, OIDC_START_LIMIT)
+        conn.execute("DELETE FROM oidc_flows WHERE expires_at <= ?", (int(time.time()),))
+        if conn.execute("SELECT COUNT(*) FROM oidc_flows").fetchone()[0] >= 1024:
             raise HTTPException(503, "登录请求过多，请稍后重试")
-        _oidc_flows[state] = (nonce, current + OIDC_FLOW_TTL)
-    return state, nonce
+        _count_login_attempt(conn, bucket)
+        conn.execute(
+            "INSERT INTO oidc_flows VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (_session_hash(state), _session_hash(browser), nonce, verifier, redirect_uri,
+             _oidc_settings_hash(settings), int(time.time()) + OIDC_FLOW_TTL,
+             _session_hash(request.cookies["lexvault_session"]) if request.cookies.get("lexvault_session") else "",
+             bucket, conn.execute("SELECT expires_at FROM auth_login_limits WHERE bucket=?", (bucket,)).fetchone()[0]),
+        )
+    return state, nonce, browser, verifier
+
+
+def _consume_oidc_flow(state: str, browser: str):
+    if not state or not browser or len(state) > 128 or len(browser) > 128:
+        return None
+    with transaction() as conn:
+        # One statement claims and deletes the flow across independent workers.
+        return conn.execute(
+            "DELETE FROM oidc_flows WHERE state_hash=? AND browser_hash=? AND expires_at > ? RETURNING *",
+            (_session_hash(state), _session_hash(browser), int(time.time())),
+        ).fetchone()
+
+
+def _clear_oidc_cookie(response: Response) -> None:
+    response.delete_cookie(OIDC_FLOW_COOKIE, path=OIDC_CALLBACK_PATH, httponly=True, samesite="lax")
+
+
+def _oidc_failure(request: Request, error: str) -> Response:
+    record_security_event("auth", "login_failed", detail="OIDC " + error, request_path=request.url.path)
+    redirect = RedirectResponse(url="/?auth_error=" + error, status_code=302)
+    _clear_oidc_cookie(redirect)
+    return redirect
 
 
 @router.get("/oidc/login")
 def oidc_login(request: Request):
-    settings = oidc_settings()
-    if settings is None:
-        raise HTTPException(404, "未配置组织登录")
     try:
+        settings = oidc_settings()
+        if auth_mode() != "token" or settings is None:
+            return _oidc_failure(request, "unavailable")
+        redirect_uri = str(request.base_url).rstrip("/") + OIDC_CALLBACK_PATH
+        state, nonce, browser, verifier = _register_oidc_flow(request, settings, redirect_uri)
         discovery = oidc_discovery(settings["issuer"])
-    except (ValueError, urllib.error.URLError, OSError) as exc:
-        logger.warning("OIDC discovery failed (%s)", type(exc).__name__)
-        raise HTTPException(502, "组织登录服务不可用") from exc
-    state, nonce = _register_oidc_flow()
-    redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/oidc/callback"
-    query = urllib.parse.urlencode({
-        "response_type": "code", "client_id": settings["client_id"], "redirect_uri": redirect_uri,
-        "scope": os.getenv("LAW_REVIEW_OIDC_SCOPES", "openid profile"), "state": state, "nonce": nonce,
-    })
-    return RedirectResponse(url=f"{discovery['authorization_endpoint']}?{query}", status_code=302)
+        query = urllib.parse.urlencode({
+            "response_type": "code", "client_id": settings["client_id"], "redirect_uri": redirect_uri,
+            "scope": os.getenv("LAW_REVIEW_OIDC_SCOPES", "openid profile"), "state": state, "nonce": nonce,
+            "code_challenge": base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode(),
+            "code_challenge_method": "S256",
+        })
+        redirect = RedirectResponse(url=f"{discovery['authorization_endpoint']}?{query}", status_code=302)
+        redirect.set_cookie(OIDC_FLOW_COOKIE, browser, max_age=OIDC_FLOW_TTL, httponly=True,
+                            secure=request.url.scheme == "https" or request.url.hostname not in {"localhost", "127.0.0.1", "::1", "testserver"},
+                            samesite="lax", path=OIDC_CALLBACK_PATH)
+        return redirect
+    except HTTPException:
+        return _oidc_failure(request, "unavailable")
+    except Exception as exc:
+        logger.warning("OIDC login failed (%s)", type(exc).__name__)
+        return _oidc_failure(request, "unavailable")
 
 
 @router.get("/oidc/callback")
-def oidc_callback(request: Request, response: Response, code: str = "", state: str = ""):
-    settings = oidc_settings()
-    if settings is None:
-        raise HTTPException(404, "未配置组织登录")
-    with _oidc_flow_lock:
-        flow = _oidc_flows.pop(state, None)
-    if not code or flow is None or flow[1] <= time.monotonic():
-        record_security_event("auth", "login_failed", detail="OIDC 会话状态无效", request_path=request.url.path)
-        raise HTTPException(400, "登录会话已过期，请重新发起登录")
+def oidc_callback(request: Request, code: str = "", state: str = "", error: str = ""):
     try:
+        flow = _consume_oidc_flow(state, request.cookies.get(OIDC_FLOW_COOKIE, ""))
+        settings = oidc_settings()
+        if auth_mode() != "token" or settings is None:
+            return _oidc_failure(request, "unavailable")
+        if flow is None or flow["settings_hash"] != _oidc_settings_hash(settings):
+            return _oidc_failure(request, "state")
+        if error or not code or len(code) > 4096:
+            return _oidc_failure(request, "failed")
         discovery = oidc_discovery(settings["issuer"])
-        redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/oidc/callback"
         token_response = fetch_json(discovery["token_endpoint"], data={
-            "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code", "code": code, "redirect_uri": flow["redirect_uri"],
             "client_id": settings["client_id"], "client_secret": settings["client_secret"],
+            "code_verifier": flow["verifier"],
         })
         id_token = token_response.get("id_token")
         if not id_token:
-            raise ValueError("token response without id_token")
-        claims = oidc_verify_id_token(id_token, settings, discovery, flow[0])
-    except (ValueError, urllib.error.URLError, OSError, KeyError) as exc:
-        logger.warning("OIDC token exchange failed (%s)", type(exc).__name__)
-        record_security_event("auth", "login_failed", detail="OIDC 验证失败", request_path=request.url.path)
-        raise HTTPException(401, "组织登录验证失败，请重新登录") from exc
-    subject = claims.get("sub") or claims.get("email") or ""
-    principal = settings["principals"].get(subject)
-    if principal is None:
-        record_security_event("auth", "login_failed", detail="OIDC 身份未授权访问", request_path=request.url.path)
-        raise HTTPException(403, "该账号未被授权使用本系统")
-    session = _register_oidc_session(subject)
+            raise ValueError("missing id token")
+        claims = oidc_verify_id_token(id_token, settings, discovery, flow["nonce"])
+        subject = claims.get("sub")
+        principal = settings["principals"].get(subject) if isinstance(subject, str) else None
+        if principal is None:
+            return _oidc_failure(request, "denied")
+        session = _register_oidc_session(subject, flow)
+    except HTTPException:
+        # Revocation/storage failures must remain 503, never a successful login.
+        response = JSONResponse({"detail": "会话服务暂不可用"}, status_code=503)
+        _clear_oidc_cookie(response)
+        return response
+    except Exception as exc:
+        logger.warning("OIDC callback failed (%s)", type(exc).__name__)
+        return _oidc_failure(request, "failed")
     record_security_event("auth", "login_success", actor=principal.name, request_path=request.url.path)
     redirect = RedirectResponse(url="/", status_code=302)
     _issue_session_cookie(redirect, request, session)
+    _clear_oidc_cookie(redirect)
     return redirect
