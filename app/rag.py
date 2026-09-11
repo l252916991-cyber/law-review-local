@@ -18,9 +18,9 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from .config import LLMConfig
 from .db import connect, now, transaction
 from .services import (
-    LOCAL_LLM_URL,
     assert_model_endpoint_allowed,
     best_quote,
     concise,
@@ -133,7 +133,7 @@ class EmbeddingClient:
     def __init__(self, prefer_remote: bool = True, model: str | None = None):
         self.prefer_remote = prefer_remote
         self.model: str = model or os.getenv("LAW_REVIEW_EMBEDDING_MODEL", EMBEDDING_MODEL)
-        self.base_url = os.getenv("LAW_REVIEW_EMBEDDING_URL", os.getenv("LAW_REVIEW_LLM_URL", LOCAL_LLM_URL)).rstrip("/")
+        self.base_url = os.getenv("LAW_REVIEW_EMBEDDING_URL", LLMConfig.load().base_url).rstrip("/")
         self.last_failure: str | None = None
 
     def embed(self, texts: list[str]) -> tuple[list[list[float]], str]:
@@ -173,7 +173,7 @@ class EmbeddingClient:
 class RerankClient:
     def __init__(self) -> None:
         self.model = os.getenv("LAW_REVIEW_RERANK_MODEL", RERANK_MODEL)
-        self.base_url = os.getenv("LAW_REVIEW_RERANK_URL", os.getenv("LAW_REVIEW_EMBEDDING_URL", LOCAL_LLM_URL)).rstrip("/")
+        self.base_url = os.getenv("LAW_REVIEW_RERANK_URL", os.getenv("LAW_REVIEW_EMBEDDING_URL", LLMConfig.load().base_url)).rstrip("/")
         self.last_failure: str | None = None
 
     def score(self, query: str, documents: list[str]) -> list[float] | None:
