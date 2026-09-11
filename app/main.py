@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
-from .config import config
+from .config import LLMConfig, clear_model_override, config, load_model_override, save_model_override
 from .db import (
     CONVERSATION_ARCHIVE_RETENTION_SECONDS,
     connect,
@@ -38,6 +38,7 @@ from .db import (
 from .logger import request_id as logger_request_id
 from .services import (
     ArchivedConversationError,
+    assert_model_endpoint_allowed,
     auto_analyze_case,
     build_export,
     build_export_package,
@@ -264,6 +265,11 @@ class ModelConfigTest(BaseModel):
     base_url: str = Field(min_length=8, max_length=500)
 
 
+class ModelConfigUpdate(BaseModel):
+    base_url: str = Field(min_length=8, max_length=500)
+    model: str = Field(min_length=1, max_length=200)
+
+
 class DirectoryUpdate(BaseModel):
     doc_type: str | None = None
     people: str | None = None
@@ -412,6 +418,43 @@ def ready():
     status = corpus_status()
     return {"status": "ok" if status["available"] else "degraded",
             "legal_verification": "available" if status["available"] else "unavailable"}
+
+
+@app.get("/api/model-config")
+def read_model_config():
+    """Effective model endpoint and chat model, so the UI can prefill its form."""
+    llm = LLMConfig.load()
+    return {"base_url": llm.base_url, "model": llm.model, "overridden": bool(load_model_override())}
+
+
+@app.put("/api/model-config")
+def update_model_config(payload: ModelConfigUpdate):
+    """Persist an operator override for the local model endpoint and chat model.
+
+    The endpoint must satisfy the same egress policy the model call sites enforce,
+    so the UI cannot point case text at an unapproved destination.
+    """
+    base_url = payload.base_url.strip().rstrip("/")
+    model = payload.model.strip()
+    try:
+        assert_model_endpoint_allowed(base_url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if any(ord(char) < 32 for char in model):
+        raise HTTPException(400, "模型名称包含无效字符")
+    save_model_override({"base_url": base_url, "model": model})
+    record_security_event("config", "model_config_updated", actor=actor_name(),
+                          detail=f"{base_url} · {model}", request_path="/api/model-config")
+    return {"base_url": base_url, "model": model, "overridden": True}
+
+
+@app.delete("/api/model-config")
+def reset_model_config():
+    """Drop the in-app override and fall back to the deployment environment."""
+    clear_model_override()
+    llm = LLMConfig.load()
+    record_security_event("config", "model_config_reset", actor=actor_name(), request_path="/api/model-config")
+    return {"base_url": llm.base_url, "model": llm.model, "overridden": False}
 
 
 @app.post("/api/model-config/test")

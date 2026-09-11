@@ -572,7 +572,7 @@ class CriticAgent:
     def __init__(self):
         from .config import LLMConfig
 
-        config = LLMConfig.from_env()
+        config = LLMConfig.load()
         self.model = os.getenv("LAW_REVIEW_AGENT_CRITIC_MODEL", config.model)
         self.timeout = int(os.getenv("LAW_REVIEW_AGENT_CRITIC_TIMEOUT", str(config.timeout)))
 

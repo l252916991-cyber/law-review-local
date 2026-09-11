@@ -616,7 +616,7 @@ def statistics_answer(case_id: int, question: str) -> tuple[str, list[dict[str, 
 
 
 def local_llm_available(model_name: str | None = None) -> tuple[bool, str]:
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     desired_model = model_name or llm.model
     try:
         assert_model_endpoint_allowed(llm.base_url)
@@ -687,7 +687,7 @@ def call_local_llm(
     timeout: int | None = None,
     model_override: str | None = None,
 ) -> str:
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     timeout = llm.timeout if timeout is None else timeout
     try:
         assert_model_endpoint_allowed(llm.base_url)
@@ -750,7 +750,7 @@ _last_llm_provenance: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_l
 
 def llm_provenance(route: str, model: str) -> dict[str, Any]:
     """Identity of the exact inference setup behind one answer (E23)."""
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     prompt_digest = hashlib.sha256(
         f"{PROMPT_VERSION}|{route}|{CHAT_SYSTEM_PROMPT}".encode()
     ).hexdigest()[:16]
@@ -826,7 +826,7 @@ def chat(
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:
                     llm_used = True
-                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.from_env().model))
+                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}

@@ -167,6 +167,7 @@ docker compose up -d
 | `LAW_REVIEW_API_TOKENS_JSON` | principal 定义：名称、admin、case_ids、可选 `permissions` |
 | `LAW_REVIEW_ALLOWED_HOSTS` | 允许的 Host 列表 |
 | `LAW_REVIEW_LLM_URL` / `LAW_REVIEW_EMBEDDING_URL` | 模型/embedding 端点（默认回环；远端需 `LAW_REVIEW_ALLOW_REMOTE_MODELS=1` + https） |
+| 界面「配置本地模型」 | 管理员可覆盖端点与对话模型，写入 `LAW_REVIEW_DATA_DIR/model_settings.json`，下次调用即生效，无需重启；「恢复部署默认」删除覆盖 |
 | `LAW_REVIEW_OIDC_*` | 组织登录（保持为空即禁用） |
 | `LAW_REVIEW_JSON_LOGS` / `LAW_REVIEW_LOG_LEVEL` | 结构化日志开关与级别 |
 
@@ -198,6 +199,8 @@ node --check app/static/app.js
 | 项目 RAG | 页级召回和排序，不等于答案事实正确率 | `rag_project_benchmark.py` |
 | 法条检索 | 冻结 gold 上的配对排序评测（hit@5 / MRR@10 / nDCG@10），衡量是否检索到正确法条与条号，不等于法条现行有效性 | `scripts/statutory_hybrid_experiment.py`、`scripts/statutory_gold_report.py` |
 | 运行时对比 | 双运行时结构、契约、性能与恢复 | `compare_agent_runtimes.py` |
+
+- **应用内评测**：页面「检查检索质量」仅对内置演示案件使用演示答案（`demo-legal-rag-v1`）；其他案件必须提供本案 `ground_truth`，否则拒绝评测，绝不回退到演示答案，并校验每个来源页确属本案。本案答案按案件保存在浏览器本地（`lexvault:ground-truth:<案件id>`），不随案件上传；造数脚本同时产出 `ground-truth-case-<id>.json`，可直接作为 `POST /api/cases/<id>/evaluate-rag` 的请求体。
 
 - **数据口径警示**：2026-09-05 的 1,000 题结果见[验收记录](docs/runbook/validation-20260905.md)；更早的历史万题报告存在漏传任务说明等缺陷，其结论已由[优化编年史](docs/history/optimization-chronicle.md)第 9 节裁决，不得引用。`current_law` 占位集与 RAG 合成数据不构成已验证法律知识或人工标注。独立人工验收集（律师标注）尚未建立，属 G1 试点门槛。
 

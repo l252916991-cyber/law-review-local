@@ -101,6 +101,24 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertTrue(available)
         self.assertEqual(model, "Qwythos-9B-v2-4bit-mlx")
 
+    def test_model_override_layers_over_environment_defaults(self):
+        from app.config import LLMConfig, clear_model_override, save_model_override
+        save_model_override({"base_url": "http://127.0.0.1:9100/v1", "model": "ui-model"})
+        self.addCleanup(clear_model_override)
+
+        effective = LLMConfig.load()
+        self.assertEqual((effective.base_url, effective.model), ("http://127.0.0.1:9100/v1", "ui-model"))
+        # Non-editable fields keep coming from the deployment environment.
+        self.assertEqual(effective.timeout, LLMConfig.from_env().timeout)
+        clear_model_override()
+        self.assertEqual(LLMConfig.load().base_url, LLMConfig.from_env().base_url)
+
+    def test_malformed_model_override_falls_back_to_environment(self):
+        from app.config import LLMConfig, clear_model_override, model_override_path
+        model_override_path().write_text("{ not json", encoding="utf-8")
+        self.addCleanup(clear_model_override)
+        self.assertEqual(LLMConfig.load().base_url, LLMConfig.from_env().base_url)
+
     def test_keepalive_reader_enforces_wall_clock_deadline(self):
         from app.services import read_json_with_deadline
         response = Mock()
