@@ -43,7 +43,7 @@ def test_ambiguous_charge_is_left_untouched():
 
 def test_replay_repairs_output_and_preserves_every_original(tmp_path):
     # Simulate a historical run whose runner did not yet repair correction output.
-    with patch.object(runner, "postprocess", side_effect=lambda task, question, prediction: (prediction, {})):
+    with patch.object(runner, "postprocess", side_effect=lambda task, question, prediction, retrieval=None: (prediction, {})):
         source = _run(tmp_path, ["2-1"], "合成问题 2-1/0：用于测试装载、抽样及协议,不评估法律知识。")
     destination = tmp_path / "audit"
     originals = [json.loads(line) for line in (source / "detailed_results.jsonl").read_text(encoding="utf-8").splitlines()]

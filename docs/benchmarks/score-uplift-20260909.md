@@ -33,7 +33,8 @@
 
 ## 3. 离线后处理复算（P0：立刻可拿的分）
 
-`app/benchmark_postprocess.py` 已实现这些规则，但 `unified_benchmark_runner.py` 管线未启用。
+`app/benchmark_postprocess.py` 已实现这些规则；截至 2026-09-11，统一 runner 已对 2-1/2-7/2-9/3-8 启用，
+1-1 需传 `--corpus-dir` 才启用（见 [BENCHMARK_TEST_PLAN.md](../../BENCHMARK_TEST_PLAN.md)）。
 `scripts/postprocess_audit.py` 在已保存回答上重放后处理并重新评分，不修改原运行、不调用模型：
 
 ```sh
