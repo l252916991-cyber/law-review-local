@@ -134,11 +134,11 @@ docker compose up -d
 - **健康检查**：`GET /api/health`（存活）；`GET /api/system/health`（就绪：启动完成 + 数据库可读才 200，Redis 状态单独报告，批量导入能力随之启停）。
 - **备份恢复**：`scripts/data_snapshot.py` 基于停写快照，含完整性/外键校验、清单哈希与恢复工具；Redis 与 `.env` 不在默认备份内。恢复演练流程见[发布手册](docs/runbook/release.md)。
 - **日志与排查**：`LAW_REVIEW_JSON_LOGS=1` 输出结构化日志；日志不含原始卷宗内容、令牌或连接串。批量导入问题按运维手册的 503/排队排查节处理。
-- **升级**：SQLite schema 有序迁移（当前 v5），拒绝未来版本；跨版本升级前先做备份，迁移失败自动回滚。
+- **升级**：SQLite schema 有序迁移（当前 v12），拒绝未来版本；跨版本升级前先做备份，迁移失败自动回滚。
 
 ## 8. 质量保障与评测
 
-- **测试**：390 项离线测试 + 分支覆盖率 86.73%（门槛 70%），CI 禁网运行，JUnit/覆盖率报告随构建产出。本地复现：
+- **测试**：603 项离线测试（另有 8 项跳过）+ 分支覆盖率 86.6%（门槛 70%），CI 禁网运行，JUnit/覆盖率报告随构建产出。本地复现：
 
 ```bash
 uv run --locked ruff check app tests scripts
