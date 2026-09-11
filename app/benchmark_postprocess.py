@@ -7,7 +7,7 @@ from typing import Any
 from app.benchmark_event_tools import event_labels
 from app.benchmark_summary_tools import extractive_news_summary
 
-POSTPROCESS_VERSION = "benchmark-postprocess-v6"
+POSTPROCESS_VERSION = "benchmark-postprocess-v7"
 ARTICLE_HEADING = re.compile(r"^第[零〇一二三四五六七八九十百千万两0-9]+条(?:之[零〇一二三四五六七八九十百千万两0-9]+)?\s*")
 
 
@@ -70,6 +70,28 @@ def _source_order_triggers(question: str, prediction: str) -> str:
     return ";".join(parts)
 
 
+def normalize_consultation_surface(prediction: str) -> str:
+    """Enforce the consultation task's stated structure: reply first, then legal basis.
+
+    The instruction asks for the answer followed by its legal basis. Models add
+    Markdown emphasis, headings and list markers that carry no legal content, and
+    sometimes omit the leading section label. Strip the markup and restore the
+    required ``回答``/``法律依据`` framing. No reference answer is read.
+    """
+    value = prediction
+    value = re.sub(r"\*\*|__|`+", "", value)
+    value = re.sub(r"(?m)^#{1,6}\s*", "", value)
+    value = re.sub(r"(?m)^\s*(?:[-*•]|\d+[.、)])\s*", "", value)
+    value = re.sub(r"^\s*(?:法律责任依据|法律依据)\s*[:：]\s*", "法律依据:", value, flags=re.M)
+    value = re.sub(r"^\s*(?:回答|答复)\s*[:：]\s*", "回答:", value, flags=re.M)
+    value = re.sub(r"(回答:|法律依据:)\s*\n\s*", r"\1", value)
+    value = re.sub(r"[ \t]+", " ", value)
+    value = re.sub(r"\n{2,}", "\n", value).strip()
+    if not value.startswith("回答:"):
+        value = "回答:" + value.lstrip(":：")
+    return value
+
+
 def postprocess(task_id: str, question: str, prediction: str,
                 retrieval: dict[str, Any] | None = None) -> tuple[str, dict[str, object]]:
     revised = prediction
@@ -97,6 +119,9 @@ def postprocess(task_id: str, question: str, prediction: str,
     elif task_id == "2-10" and prediction:
         revised = _source_order_triggers(question, prediction)
         policy = "deduplicate-and-order-verbatim-triggers-by-source; no reference access"
+    elif task_id == "3-8" and prediction:
+        revised = normalize_consultation_surface(prediction)
+        policy = "stated-reply-then-basis-structure; no reference access"
     applied = revised != prediction
     return revised, {"version": POSTPROCESS_VERSION, "applied": applied,
                      "original_prediction": prediction if applied else None, "policy": policy, **details}

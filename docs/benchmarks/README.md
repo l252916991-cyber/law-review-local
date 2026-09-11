@@ -2,7 +2,7 @@
 
 统一模型评测入口是 `unified_benchmark_runner.py --help`。旧 `simple_benchmark.py`、`model_benchmark.py`、`comprehensive_benchmark.py`、各 `run_*test*`/`rescore_*` 属于历史实验，保留原件，不作为新实验推荐入口。2026-09-05 的 1,000 题已按[测试计划](../../BENCHMARK_TEST_PLAN.md)完成，原始记录和评分审计分目录保存。
 
-统一 runner 在评分前对 2-1/2-7/2-9 的成功响应应用 `app/benchmark_postprocess.py` 的无参考答案规则（2-1 恢复源句标点与句尾形式；2-7 取有界导语摘要；2-9 按公开事件本体词表标注）；2-10 因实测增益为噪声（15 升 16 降）未启用。`prediction` 是评分文本，`original_prediction` 始终保留该任务的模型返回文本，`postprocess` 保存处理版本、策略与是否变更。manifest 冻结任务范围、版本和后处理源码哈希；旧 manifest 或缺失处理溯源的检查点不能续跑为新配置，请使用新运行目录。评分器与提示词未改变，离线回放收益不代表新模型运行或官方 LawBench 成绩。
+统一 runner 在评分前对 2-1/2-7/2-9/3-8 的成功响应应用 `app/benchmark_postprocess.py` 的无参考答案规则（2-1 恢复源句标点与句尾形式；2-7 取有界导语摘要；2-9 按公开事件本体词表标注；3-8 去除 Markdown 标记并恢复题面要求的「回答→法律依据」结构）；2-10 因实测增益为噪声（15 升 16 降）未启用。`prediction` 是评分文本，`original_prediction` 始终保留该任务的模型返回文本，`postprocess` 保存处理版本、策略与是否变更。manifest 冻结任务范围、版本和后处理源码哈希；旧 manifest 或缺失处理溯源的检查点不能续跑为新配置，请使用新运行目录。评分器与提示词未改变，离线回放收益不代表新模型运行或官方 LawBench 成绩。
 
 已完成实验的评分修正入口为 `python scripts/audit_benchmark.py <原运行目录> <新的审计目录>`。它不调用模型、不覆盖旧产物，对新旧同题回答统一重评，记录逐题变化、源文件哈希与分层配对 bootstrap 区间。默认 `verify_benchmark_run.py` 同时要求源码版本和评分复算一致；源码升级后，可使用 `--artifacts-only` 验证历史文件完整性，但该模式不验证历史评分正确性，不能冒充完整评分复算。
 

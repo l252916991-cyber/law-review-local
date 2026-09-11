@@ -51,7 +51,7 @@ CURRENT_LAW_PATH = Path(__file__).resolve().parent / "benchmarks" / "current_law
 RAG_PROJECT_PATH = Path(__file__).resolve().parent / "benchmarks" / "rag_project" / "rag_240.json"
 # Tasks whose gold-blind deterministic output repair is applied before scoring.
 # 2-10 is deliberately excluded: the measured gain was noise (15 up, 16 down).
-POSTPROCESS_TASKS = ("2-1", "2-7", "2-9")
+POSTPROCESS_TASKS = ("2-1", "2-7", "2-9", "3-8")
 
 
 def hash_text(text: str) -> str:
