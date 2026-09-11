@@ -54,12 +54,15 @@ from .services import (
     rowdict,
     safe_filename,
     parse_spreadsheet,
+    preview_gap_analysis,
     search_pages,
+    save_gap_analysis,
     summarize_bank_transactions,
     upload_error_message,
 )
 from .security import actor_name, allowed_case_ids, require_case_access, require_permission
 from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
+from .agent_tools import execute_readonly_tool
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
 
@@ -348,6 +351,12 @@ class ChatRequest(BaseModel):
     user_name: str = "本机律师"
     conversation_id: int | None = None
     use_llm: bool = True
+    use_remote_embeddings: bool = True
+
+
+class ReadonlyToolCall(BaseModel):
+    tool: str = Field(min_length=1, max_length=64)
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class AnnotationCreate(BaseModel):
@@ -1157,6 +1166,38 @@ def get_gap_analysis(case_id: int, severity: str = Query(None)):
         conn.close()
 
 
+@app.get("/api/cases/{case_id}/gap-analysis/preview")
+def preview_case_gap_analysis(case_id: int):
+    require_case(case_id)
+    try:
+        return preview_gap_analysis(case_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/cases/{case_id}/gap-analysis/detect")
+def detect_and_save_case_gaps(case_id: int):
+    require_case(case_id)
+    try:
+        return save_gap_analysis(case_id, actor_name())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/cases/{case_id}/agent-tools/call")
+def call_readonly_agent_tool(case_id: int, payload: ReadonlyToolCall):
+    """Call one bounded view-only tool; returned case content is untrusted data."""
+    require_case(case_id)
+    try:
+        return execute_readonly_tool(case_id, payload.tool, payload.params)
+    except KeyError as exc:
+        raise HTTPException(404, "只读工具不存在") from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise model_operation_error(exc, "只读检索工具失败，请查看服务端诊断事件") from exc
+
+
 @app.post("/api/cases/{case_id}/analyze")
 def analyze(case_id: int):
     require_case(case_id)
@@ -1262,11 +1303,20 @@ def conversation_messages(conversation_id: int):
 def case_chat(case_id: int, payload: ChatRequest):
     require_case(case_id)
     try:
-        return chat(case_id, payload.question, actor_name(payload.user_name), payload.conversation_id, payload.use_llm)
+        return chat(
+            case_id,
+            payload.question,
+            actor_name(payload.user_name),
+            payload.conversation_id,
+            payload.use_llm,
+            payload.use_remote_embeddings,
+        )
     except ArchivedConversationError as exc:
         raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise model_operation_error(exc, "问答失败，请查看服务端诊断事件") from exc
 
 
 class AgentChatRequest(BaseModel):

@@ -212,6 +212,8 @@ def require_permission(permission: str) -> None:
 def _required_case_permission(method: str, path: str) -> str:
     if path.endswith("/export"):
         return "export"
+    if method == "POST" and re.fullmatch(r"/api/cases/\d+/agent-tools/call", path):
+        return "view"
     if method in {"POST", "PATCH", "PUT", "DELETE"}:
         return "edit"
     return "view"

@@ -178,11 +178,27 @@ class PlannerAgent:
 class RetrievalAgent:
     def __init__(self, case_id: int, prefer_remote_embeddings: bool = True):
         self.case_id = case_id
+        self.prefer_remote_embeddings = prefer_remote_embeddings
         self.retriever = HybridRetriever(case_id, prefer_remote_embeddings)
 
     def retrieve(self, query: str, limit: int = 6) -> dict[str, Any]:
-        contexts, metrics = self.retriever.retrieve(query, limit)
-        return {"contexts": contexts, "metrics": metrics}
+        from .agent_tools import execute_readonly_tool
+
+        result = execute_readonly_tool(
+            self.case_id,
+            "search",
+            {
+                "query": query,
+                "limit": limit,
+            },
+            use_remote_embeddings=self.prefer_remote_embeddings,
+        )
+        return {
+            "contexts": result["items"],
+            "metrics": result["retrieval_metrics"],
+            "tool": result["tool"],
+            "data_notice": result["data_notice"],
+        }
 
     def retrieve_evidence(self, query: str, method: str = "hybrid") -> str:
         if method == "keyword":
