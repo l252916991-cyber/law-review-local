@@ -132,7 +132,7 @@ def hashed_embedding(text: str, dimensions: int = 384) -> list[float]:
 class EmbeddingClient:
     def __init__(self, prefer_remote: bool = True, model: str | None = None):
         self.prefer_remote = prefer_remote
-        self.model = model or os.getenv("LAW_REVIEW_EMBEDDING_MODEL", EMBEDDING_MODEL)
+        self.model: str = model or os.getenv("LAW_REVIEW_EMBEDDING_MODEL", EMBEDDING_MODEL)
         self.base_url = os.getenv("LAW_REVIEW_EMBEDDING_URL", os.getenv("LAW_REVIEW_LLM_URL", LOCAL_LLM_URL)).rstrip("/")
         self.last_failure: str | None = None
 
