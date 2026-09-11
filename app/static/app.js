@@ -1290,12 +1290,14 @@ function renderEvidenceTimeline() {
     .map(e => {
       const doc = documentMap.get(e.source_document_id);
       if (doc && doc.date_range && doc.date_range.trim()) {
-        // 尝试解析日期范围(格式如 "2023-01-15" 或 "2023-01-15 至 2023-02-20")
-        const dateMatch = doc.date_range.match(/(\d{4}-\d{2}-\d{2})/);
+        // 日期范围形如 "2023-01-15 至 2023-02-20"；仅到月份时按当月 1 日处理，
+        // 与后端 agents.py 的月份补齐约定保持一致。
+        const dateMatch = doc.date_range.match(/(\d{4}-\d{2}(?:-\d{2})?)/);
         if (dateMatch) {
+          const date = dateMatch[1].length === 7 ? `${dateMatch[1]}-01` : dateMatch[1];
           return {
             title: e.title,
-            date: dateMatch[1],
+            date,
             category: e.category,
             status: e.status,
             docName: doc.name

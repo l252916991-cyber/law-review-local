@@ -381,14 +381,35 @@ def infer_people(text: str) -> str:
     return "、".join(found[:10])
 
 
+_DATE_PATTERN = re.compile(r"(20\d{2})\s*[年./-]\s*(\d{1,2})(?:\s*[月./-]\s*(\d{1,2}))?\s*日?")
+
+
+def _iso_date(match: re.Match[str]) -> str | None:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    if not 1 <= month <= 12:
+        return None
+    day = match.group(3)
+    if day is None or not 1 <= int(day) <= 31:
+        return f"{year:04d}-{month:02d}"
+    return f"{year:04d}-{month:02d}-{int(day):02d}"
+
+
 def infer_dates(text: str) -> str:
-    # Match the longest valid month/day alternatives first so values such as
-    # “12月” and “31日” are not accepted prematurely as “1月” / “3日”.
-    dates = re.findall(
-        r"(?:20\d{2})[年./-](?:1[0-2]|0?[1-9])(?:[月./-](?:3[01]|[12]\d|0?[1-9])日?)?",
-        text[:12000],
-    )
-    return " 至 ".join([dates[0], dates[-1]]) if len(dates) > 1 else (dates[0] if dates else "")
+    """Earliest and latest date as YYYY-MM-DD (or YYYY-MM when no day is present).
+
+    Source material mixes 年月日, 2024-01-05 and 2024.01.05, and the timeline,
+    gap analysis and mobile sorter all parse one ISO shape, so normalise here.
+    """
+    values = [
+        value
+        for value in (_iso_date(match) for match in _DATE_PATTERN.finditer(text[:12000]))
+        if value
+    ]
+    if not values:
+        return ""
+    earliest, latest = min(values), max(values)
+    return earliest if earliest == latest else f"{earliest} 至 {latest}"
 
 
 def concise(text: str, limit: int = 180) -> str:
