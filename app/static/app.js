@@ -126,6 +126,12 @@ async function checkIdentity() {
   }
 }
 
+function renderModelStatus(health) {
+  $("#model-dot").classList.toggle("online", Boolean(health.local_llm));
+  $("#model-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
+  $("#model-name").textContent = health.local_llm ? health.model : "仍可使用检索与溯源";
+}
+
 async function bootstrap() {
   bindEvents();
   const identity = await checkIdentity();
@@ -139,10 +145,9 @@ async function bootstrap() {
       $("#new-case-btn").hidden = !identity.permissions.includes("manage") && !identity.admin;
       $("#sign-out").hidden = false;
     }
+    $("#model-settings-btn").hidden = !identity.admin && !identity.permissions.includes("manage");
     const health = await api("/api/health");
-    $("#model-dot").classList.toggle("online", health.local_llm);
-    $("#model-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
-    $("#model-name").textContent = health.local_llm ? health.model : "仍可使用检索与溯源";
+    renderModelStatus(health);
     await loadCases();
     let returnTo = null;
     try { returnTo = JSON.parse(sessionStorage.getItem("lexvault-return")); } catch { /* Ignore invalid navigation state. */ }
@@ -278,6 +283,8 @@ async function selectCase(caseId) {
   state.caseId = caseId;
   if (!$(".view.active")) showView("overview");
   state.conversationId = null;
+  // 评测结果属于上一个案件的 ground truth，切案后必须清空，避免被误读为本案结果。
+  $("#evaluation-result").innerHTML = "";
 
   // 显示加载状态
   showLoadingState();
@@ -516,15 +523,61 @@ async function buildHybridIndex() {
   finally { button.disabled = false; button.textContent = "更新检索索引"; }
 }
 
-async function runEvaluation() {
+const groundTruthKey = (caseId) => `lexvault:ground-truth:${caseId}`;
+
+function storedGroundTruth(caseId) {
+  try {
+    const raw = localStorage.getItem(groundTruthKey(caseId));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function openGroundTruthDialog() {
+  const textarea = $("#ground-truth-json");
+  const saved = storedGroundTruth(state.caseId);
+  textarea.value = JSON.stringify(saved || [{ query: "在此填写问题", expected: [["卷宗文件名.txt", 1]] }], null, 2);
+  $("#ground-truth-error").hidden = true;
+  const dialog = $("#ground-truth-dialog");
+  if (!dialog.open) dialog.showModal();
+  textarea.focus();
+  textarea.select();
+}
+
+async function submitGroundTruth(event) {
+  event.preventDefault();
+  const error = $("#ground-truth-error");
+  let payload;
+  try {
+    payload = JSON.parse($("#ground-truth-json").value);
+  } catch (parseError) {
+    error.textContent = `JSON 解析失败：${parseError.message}`; error.hidden = false; return;
+  }
+  if (!Array.isArray(payload) || !payload.length) {
+    error.textContent = "标准答案必须是非空数组，且每项包含 query 与 expected。"; error.hidden = false; return;
+  }
+  localStorage.setItem(groundTruthKey(state.caseId), JSON.stringify(payload));
+  $("#ground-truth-dialog").close();
+  await runEvaluation(payload);
+}
+
+async function runEvaluation(groundTruth) {
   const button = $("#evaluate-btn");
+  const truth = groundTruth ?? storedGroundTruth(state.caseId);
   button.disabled = true; button.textContent = "评测运行中…";
   try {
-    const report = await api(`/api/cases/${state.caseId}/evaluate-rag`, { method: "POST" });
+    const options = { method: "POST" };
+    if (truth) { options.headers = { "Content-Type": "application/json" }; options.body = JSON.stringify(truth); }
+    const report = await api(`/api/cases/${state.caseId}/evaluate-rag`, options);
     const metric = (value) => value == null ? "—" : Number(value).toFixed(2);
-    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>前 ${report.k} 项召回率</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small title="标准答案首次出现位置的倒数均值">排序得分</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>标准答案题数</small></div></div><p>片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "达标" : "未达标"}</span><p>${escapeHtml(item.query)}</p><b>召回率 ${metric(item.recall_at_k)} · 排序得分 ${metric(item.mrr)}</b></div>`).join("")}</div>`;
+    const isDemo = report.dataset === "demo-legal-rag-v1";
+    // 只有本案录入的标准答案才提供修改入口；内置演示答案不属于本案。
+    const editButton = isDemo ? "" : '<button type="button" class="secondary-button" data-edit-ground-truth>修改本案标准答案</button>';
+    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>前 ${report.k} 项召回率</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small title="标准答案首次出现位置的倒数均值">排序得分</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>标准答案题数</small></div></div><p>标准答案来源：${escapeHtml(report.dataset || "未知")}${isDemo ? "（内置演示答案，不属于本案）" : "（本案录入）"}。片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "达标" : "未达标"}</span><p>${escapeHtml(item.query)}</p><b>召回率 ${metric(item.recall_at_k)} · 排序得分 ${metric(item.mrr)}</b></div>`).join("")}</div>${editButton}`;
     await loadLabMetrics(); toast("检索质量检查完成");
-  } catch (error) { toast(error.message, "error"); }
+  } catch (error) {
+    if (error.status === 422) { toast("请先录入本案标准答案", "error"); openGroundTruthDialog(); }
+    else toast(error.message, "error");
+  }
   finally { button.disabled = false; button.textContent = "检查检索质量"; }
 }
 
@@ -974,6 +1027,85 @@ function showView(name) {
   if (name === "lab") loadLabMetrics();
 }
 
+async function refreshModelDialogStatus() {
+  $("#model-dialog-state").textContent = "正在检查模型服务…";
+  $("#model-dialog-name").textContent = "";
+  $("#model-dialog-dot").classList.remove("online");
+  try {
+    const health = await api("/api/health");
+    $("#model-dialog-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
+    $("#model-dialog-name").textContent = health.model || "未返回模型名称";
+    $("#model-dialog-dot").classList.toggle("online", Boolean(health.local_llm));
+    renderModelStatus(health);
+  } catch (error) {
+    $("#model-dialog-state").textContent = "无法检查模型服务";
+    $("#model-dialog-name").textContent = error.message;
+  }
+}
+
+function fillModelForm(settings) {
+  $("#model-base-url").value = settings.base_url || "";
+  $("#model-chat-name").value = settings.model || "";
+}
+
+async function openModelSettings() {
+  const dialog = $("#model-settings-dialog");
+  dialog.showModal();
+  $("#model-dialog-state").textContent = "正在检查模型服务…";
+  $("#model-dialog-name").textContent = "";
+  $("#model-dialog-dot").classList.remove("online");
+  await Promise.all([refreshModelDialogStatus(), (async () => {
+    try { fillModelForm(await api("/api/model-config")); }
+    catch (error) { toast(error.message, "error"); }
+  })()]);
+}
+
+async function testModelConnection() {
+  const state = $("#model-dialog-state");
+  state.textContent = "正在检测连接…";
+  $("#model-dialog-name").textContent = "";
+  try {
+    const result = await api("/api/model-config/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base_url: $("#model-base-url").value.trim() }),
+    });
+    const models = result.models || [];
+    state.textContent = models.length ? `连接成功：发现 ${models.length} 个模型` : "服务已连接，但没有返回模型";
+    $("#model-dialog-name").textContent = models.slice(0, 3).join(" · ");
+  } catch (error) {
+    state.textContent = "连接失败";
+    $("#model-dialog-name").textContent = error.message;
+  }
+}
+
+async function saveModelSettings(event) {
+  event.preventDefault();
+  const button = $("#model-settings-form").querySelector('[type=submit]');
+  button.disabled = true;
+  try {
+    fillModelForm(await api("/api/model-config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base_url: $("#model-base-url").value.trim(), model: $("#model-chat-name").value.trim() }),
+    }));
+    toast("模型配置已保存，新的模型调用立即生效");
+    await refreshModelDialogStatus();
+  } catch (error) {
+    toast(error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function resetModelSettings() {
+  try {
+    fillModelForm(await api("/api/model-config", { method: "DELETE" }));
+    toast("已恢复部署环境的模型配置");
+    await refreshModelDialogStatus();
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
 function bindEvents() {
   const menu = $("#workspace-menu");
   const toggle = $("#workspace-menu-toggle");
@@ -1020,21 +1152,10 @@ function bindEvents() {
   menu.addEventListener("click", (event) => {
     if (event.target.closest("[role=menuitem]")) closeMenu(true);
   }, true);
-  $("#model-settings-btn").addEventListener("click", async () => {
-    $("#model-dialog-state").textContent = "正在检查模型服务…";
-    $("#model-dialog-name").textContent = "";
-    $("#model-dialog-dot").classList.remove("online");
-    $("#model-settings-dialog").showModal();
-    try {
-      const health = await api("/api/health");
-      $("#model-dialog-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
-      $("#model-dialog-name").textContent = health.model || "未返回模型名称";
-      $("#model-dialog-dot").classList.toggle("online", Boolean(health.local_llm));
-    } catch (error) {
-      $("#model-dialog-state").textContent = "无法检查模型服务";
-      $("#model-dialog-name").textContent = error.message;
-    }
-  });
+  $("#model-settings-btn").addEventListener("click", openModelSettings);
+  $("#model-settings-form").addEventListener("submit", saveModelSettings);
+  $("#model-test-btn").addEventListener("click", testModelConnection);
+  $("#model-reset-btn").addEventListener("click", resetModelSettings);
   $("#model-settings-dialog").addEventListener("click", (event) => {
     const dialog = event.currentTarget;
     const bounds = dialog.getBoundingClientRect();
@@ -1108,7 +1229,9 @@ function bindEvents() {
     $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   });
   $("#build-index-btn").addEventListener("click", buildHybridIndex);
-  $("#evaluate-btn").addEventListener("click", runEvaluation);
+  $("#evaluate-btn").addEventListener("click", () => runEvaluation());
+  $("#ground-truth-form").addEventListener("submit", submitGroundTruth);
+  $("#evaluation-result").addEventListener("click", (event) => { if (event.target.closest("[data-edit-ground-truth]")) openGroundTruthDialog(); });
   $("#new-chat").addEventListener("click", resetChat);
   $("#chat-form").addEventListener("submit", sendChat);
   $("#chat-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat(); } });
@@ -1290,12 +1413,14 @@ function renderEvidenceTimeline() {
     .map(e => {
       const doc = documentMap.get(e.source_document_id);
       if (doc && doc.date_range && doc.date_range.trim()) {
-        // 尝试解析日期范围(格式如 "2023-01-15" 或 "2023-01-15 至 2023-02-20")
-        const dateMatch = doc.date_range.match(/(\d{4}-\d{2}-\d{2})/);
+        // 日期范围形如 "2023-01-15 至 2023-02-20"；仅到月份时按当月 1 日处理，
+        // 与后端 agents.py 的月份补齐约定保持一致。
+        const dateMatch = doc.date_range.match(/(\d{4}-\d{2}(?:-\d{2})?)/);
         if (dateMatch) {
+          const date = dateMatch[1].length === 7 ? `${dateMatch[1]}-01` : dateMatch[1];
           return {
             title: e.title,
-            date: dateMatch[1],
+            date,
             category: e.category,
             status: e.status,
             docName: doc.name

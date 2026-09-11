@@ -54,8 +54,24 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
 
     def test_date_extraction_keeps_two_digit_month_and_day(self):
         from app.services import infer_dates
-        self.assertEqual(infer_dates("询问日期：2024年12月31日"), "2024年12月31日")
+        self.assertEqual(infer_dates("询问日期：2024年12月31日"), "2024-12-31")
         self.assertEqual(infer_dates("期间：2024-06-12 至 2024-11-09"), "2024-06-12 至 2024-11-09")
+
+    def test_date_extraction_normalises_to_iso(self):
+        from app.services import infer_dates
+        self.assertEqual(infer_dates("签订时间：2024年1月5日"), "2024-01-05")
+        self.assertEqual(infer_dates("期间：2024/1/5 至 2024.11.9"), "2024-01-05 至 2024-11-09")
+        # Day-less text keeps the month so consumers still get a usable prefix.
+        self.assertEqual(infer_dates("2024年6月起施行"), "2024-06")
+        # A trailing “月起” must not be truncated to a bare year.
+        self.assertEqual(infer_dates("自2025年9月起无法提现"), "2025-09")
+        # Out-of-range months are dropped instead of truncated to a wrong month.
+        self.assertEqual(infer_dates("2025年13月"), "")
+
+    def test_date_range_is_chronological(self):
+        from app.services import infer_dates
+        self.assertEqual(infer_dates("2025年11月17日询问，2025年9月开始无法提现"), "2025-09 至 2025-11-17")
+        self.assertEqual(infer_dates("2025年11月12日"), "2025-11-12")
 
     def test_reasoning_scratchpad_is_never_exposed(self):
         from app.services import strip_reasoning
@@ -84,6 +100,24 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
             available, model = local_llm_available("Qwythos-9B-v2-4bit-mlx")
         self.assertTrue(available)
         self.assertEqual(model, "Qwythos-9B-v2-4bit-mlx")
+
+    def test_model_override_layers_over_environment_defaults(self):
+        from app.config import LLMConfig, clear_model_override, save_model_override
+        save_model_override({"base_url": "http://127.0.0.1:9100/v1", "model": "ui-model"})
+        self.addCleanup(clear_model_override)
+
+        effective = LLMConfig.load()
+        self.assertEqual((effective.base_url, effective.model), ("http://127.0.0.1:9100/v1", "ui-model"))
+        # Non-editable fields keep coming from the deployment environment.
+        self.assertEqual(effective.timeout, LLMConfig.from_env().timeout)
+        clear_model_override()
+        self.assertEqual(LLMConfig.load().base_url, LLMConfig.from_env().base_url)
+
+    def test_malformed_model_override_falls_back_to_environment(self):
+        from app.config import LLMConfig, clear_model_override, model_override_path
+        model_override_path().write_text("{ not json", encoding="utf-8")
+        self.addCleanup(clear_model_override)
+        self.assertEqual(LLMConfig.load().base_url, LLMConfig.from_env().base_url)
 
     def test_keepalive_reader_enforces_wall_clock_deadline(self):
         from app.services import read_json_with_deadline

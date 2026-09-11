@@ -381,14 +381,35 @@ def infer_people(text: str) -> str:
     return "、".join(found[:10])
 
 
+_DATE_PATTERN = re.compile(r"(20\d{2})\s*[年./-]\s*(\d{1,2})(?:\s*[月./-]\s*(\d{1,2}))?\s*日?")
+
+
+def _iso_date(match: re.Match[str]) -> str | None:
+    year = int(match.group(1))
+    month = int(match.group(2))
+    if not 1 <= month <= 12:
+        return None
+    day = match.group(3)
+    if day is None or not 1 <= int(day) <= 31:
+        return f"{year:04d}-{month:02d}"
+    return f"{year:04d}-{month:02d}-{int(day):02d}"
+
+
 def infer_dates(text: str) -> str:
-    # Match the longest valid month/day alternatives first so values such as
-    # “12月” and “31日” are not accepted prematurely as “1月” / “3日”.
-    dates = re.findall(
-        r"(?:20\d{2})[年./-](?:1[0-2]|0?[1-9])(?:[月./-](?:3[01]|[12]\d|0?[1-9])日?)?",
-        text[:12000],
-    )
-    return " 至 ".join([dates[0], dates[-1]]) if len(dates) > 1 else (dates[0] if dates else "")
+    """Earliest and latest date as YYYY-MM-DD (or YYYY-MM when no day is present).
+
+    Source material mixes 年月日, 2024-01-05 and 2024.01.05, and the timeline,
+    gap analysis and mobile sorter all parse one ISO shape, so normalise here.
+    """
+    values = [
+        value
+        for value in (_iso_date(match) for match in _DATE_PATTERN.finditer(text[:12000]))
+        if value
+    ]
+    if not values:
+        return ""
+    earliest, latest = min(values), max(values)
+    return earliest if earliest == latest else f"{earliest} 至 {latest}"
 
 
 def concise(text: str, limit: int = 180) -> str:
@@ -595,7 +616,7 @@ def statistics_answer(case_id: int, question: str) -> tuple[str, list[dict[str, 
 
 
 def local_llm_available(model_name: str | None = None) -> tuple[bool, str]:
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     desired_model = model_name or llm.model
     try:
         assert_model_endpoint_allowed(llm.base_url)
@@ -666,7 +687,7 @@ def call_local_llm(
     timeout: int | None = None,
     model_override: str | None = None,
 ) -> str:
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     timeout = llm.timeout if timeout is None else timeout
     try:
         assert_model_endpoint_allowed(llm.base_url)
@@ -729,7 +750,7 @@ _last_llm_provenance: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_l
 
 def llm_provenance(route: str, model: str) -> dict[str, Any]:
     """Identity of the exact inference setup behind one answer (E23)."""
-    llm = LLMConfig.from_env()
+    llm = LLMConfig.load()
     prompt_digest = hashlib.sha256(
         f"{PROMPT_VERSION}|{route}|{CHAT_SYSTEM_PROMPT}".encode()
     ).hexdigest()[:16]
@@ -805,7 +826,7 @@ def chat(
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:
                     llm_used = True
-                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.from_env().model))
+                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}

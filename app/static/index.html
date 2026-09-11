@@ -84,7 +84,7 @@
             <div id="workspace-menu" class="workspace-menu-panel" role="menu" aria-label="律师工作空间" hidden>
               <button type="button" role="menuitem" tabindex="-1" data-case-storage="archived">已归档</button>
               <button type="button" role="menuitem" tabindex="-1" data-case-storage="trash">回收站</button>
-              <button id="model-settings-btn" type="button" role="menuitem" tabindex="-1">配置本地模型</button>
+              <button id="model-settings-btn" type="button" role="menuitem" tabindex="-1" hidden>配置本地模型</button>
               <button id="sign-out" type="button" role="menuitem" tabindex="-1" hidden>退出登录</button>
             </div>
           </div>
@@ -438,10 +438,14 @@
   </dialog>
 
   <dialog id="model-settings-dialog" class="dialog model-settings-dialog" aria-labelledby="model-settings-title">
-    <div class="dialog-header"><div><span class="section-label">只读配置</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
-    <div class="model-settings-status" role="status"><span class="model-dot" id="model-dialog-dot"></span><div><strong id="model-dialog-state">正在检查模型服务…</strong><small id="model-dialog-name"></small></div></div>
-    <p>模型服务由律所管理员在部署环境中配置，本页面不会保存或修改配置。</p>
-    <p class="model-settings-note">修改部署环境后需重建或重启 Web 与 Worker 服务；当前状态来自 <code>/api/health</code>。</p>
+    <form id="model-settings-form">
+      <div class="dialog-header"><div><span class="section-label">本机私有模式</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
+      <div class="model-settings-status" role="status"><span class="model-dot" id="model-dialog-dot"></span><div><strong id="model-dialog-state">正在检查模型服务…</strong><small id="model-dialog-name"></small></div></div>
+      <label>模型服务地址<input id="model-base-url" type="url" required autocomplete="off" placeholder="http://127.0.0.1:8000/v1" /></label>
+      <label>对话模型<input id="model-chat-name" required autocomplete="off" placeholder="服务端已加载的模型名称" /></label>
+      <p class="model-settings-note">保存后对新的模型调用立即生效，无需重启服务。仅允许本机回环地址；改用远端服务需在部署环境显式批准。</p>
+      <div class="dialog-actions model-settings-actions"><button type="button" class="secondary-button model-settings-reset" id="model-reset-btn">恢复部署默认</button><button type="button" class="secondary-button" id="model-test-btn">检测连接</button><button type="submit" class="primary-button">保存配置</button></div>
+    </form>
   </dialog>
 
   <dialog id="case-dialog" class="dialog">
@@ -454,7 +458,17 @@
     </form>
   </dialog>
 
-  <script src="/assets/shared.js?v=20260911-lab-align" defer></script>
-  <script src="/assets/app.js?v=20260911-lab-align-menu" defer></script>
+  <dialog id="ground-truth-dialog" class="dialog" aria-labelledby="ground-truth-title">
+    <form id="ground-truth-form">
+      <div class="dialog-header"><div><span class="section-label">检索质量检查</span><h3 id="ground-truth-title">录入本案标准答案</h3></div><button type="button" class="close-button" data-close-dialog>×</button></div>
+      <p class="hint">非演示案件必须使用本案标准答案，不能套用演示案件答案。每项包含 <code>query</code> 与 <code>expected</code>，<code>expected</code> 为 <code>[卷宗文件名, 页码]</code> 列表，无答案题填空数组。内容保存在本机浏览器，不随案件上传。</p>
+      <label>标准答案 JSON<textarea id="ground-truth-json" rows="12" spellcheck="false" required aria-label="标准答案 JSON"></textarea></label>
+      <p id="ground-truth-error" class="hint" hidden></p>
+      <div class="dialog-actions"><button type="button" class="secondary-button" data-close-dialog>取消</button><button type="submit" class="primary-button">保存并开始评测</button></div>
+    </form>
+  </dialog>
+
+  <script src="/assets/shared.js?v=20260911-model-config" defer></script>
+  <script src="/assets/app.js?v=20260911-model-config" defer></script>
 </body>
 </html>
