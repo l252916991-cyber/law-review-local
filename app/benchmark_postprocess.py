@@ -1,6 +1,7 @@
 """Deterministic output-contract repairs that never inspect a reference answer."""
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -33,6 +34,38 @@ def _origin_sentence(question: str) -> str:
         if marker in question:
             return question.split(marker, 1)[1].splitlines()[0].strip()
     return question.strip()
+
+
+def apply_located_edits(question: str, raw: str) -> str | None:
+    """Apply a located edit list to the source sentence, or None if absent.
+
+    Only activates when the output is the located JSON contract. A plain
+    rewritten sentence returns None so the caller keeps baseline behaviour.
+    A model asked for only the wrong/corrected fragments cannot rewrite the
+    whole sentence, which removes the gratuitous rephrasing that costs F0.5
+    precision. An empty or unapplicable edit list leaves the sentence unchanged,
+    matching a model that reported no error.
+    """
+    origin = _origin_sentence(question)
+    match = re.search(r"\{.*\}", raw, re.S)
+    if not match:
+        return None
+    try:
+        payload = json.loads(match.group(0))
+    except ValueError:
+        return None
+    if not isinstance(payload, dict) or "edits" not in payload:
+        return None
+    try:
+        pairs = [(str(item["original"]), str(item["corrected"])) for item in payload["edits"]]
+    except (KeyError, TypeError):
+        return None
+    revised, applied = origin, False
+    for original, corrected in pairs:
+        if original and original in revised:
+            revised = revised.replace(original, corrected, 1)
+            applied = True
+    return revised if applied else origin
 
 
 def preserve_correction_surface(question: str, prediction: str) -> str:
@@ -103,8 +136,11 @@ def postprocess(task_id: str, question: str, prediction: str,
         policy = "exact-retrieved-article-content; no reference access"
         details["document_articles"] = [f"{hit['document_id']}/{hit['article_id']}" for hit in retrieval["hits"]]
     elif task_id == "2-1" and prediction:
-        revised = preserve_correction_surface(question, prediction)
-        policy = "source-surface-only; no reference access"
+        # Only the located contract is applied; a plain rewrite keeps baseline
+        # behaviour, so enabling the locate prompt is the sole switch.
+        located = apply_located_edits(question, prediction)
+        revised = preserve_correction_surface(question, prediction if located is None else located)
+        policy = "source-surface-only; no reference access" if located is None else "located-edits; no reference access"
     elif task_id == "2-7":
         revised = extractive_news_summary(question)
         policy = "bounded-source-lead-extraction; no reference access"
