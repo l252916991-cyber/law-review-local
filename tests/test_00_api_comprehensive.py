@@ -80,9 +80,24 @@ class APIContractTest(IsolatedDatabaseTestCase):
         for question in ("", "x" * 3001):
             with self.subTest(length=len(question)):
                 self.assertEqual(self.client.post("/api/cases/1/chat", json={"question": question}).status_code, 422)
-        response = self.client.post("/api/cases/1/chat", json={"question": "募集资金总额？", "use_llm": False})
+        response = self.client.post(
+            "/api/cases/1/chat",
+            json={"question": "募集资金总额？", "use_llm": False, "use_remote_embeddings": False},
+        )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["citations"])
+
+    def test_chat_remote_retrieval_failure_is_actionable_and_redacted(self):
+        with patch(
+            "app.rag.HybridRetriever.retrieve",
+            side_effect=RuntimeError("embedding_model_unavailable:SECRET_TOKEN"),
+        ):
+            response = self.client.post(
+                "/api/cases/1/chat", json={"question": "固定回报是否存在", "use_llm": False}
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "embedding_model_unavailable")
+        self.assertNotIn("SECRET_TOKEN", response.text)
 
     def test_upload_text_and_sanitize_filename(self):
         response = self.client.post(

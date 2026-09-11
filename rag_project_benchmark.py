@@ -155,6 +155,64 @@ def paired_comparison(baseline: list[dict[str, Any]], candidate: list[dict[str, 
     }
 
 
+def paired_run_comparison(
+    baseline_summary: dict[str, Any],
+    candidate_summary: dict[str, Any],
+    baseline: list[dict[str, Any]],
+    candidate: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compare two controlled runs only when page_children is the sole requested difference."""
+    for field in ("dataset", "dataset_sha256", "k"):
+        if field not in baseline_summary or field not in candidate_summary:
+            raise ValueError(f"Paired run comparison requires present {field}")
+        if baseline_summary.get(field) != candidate_summary.get(field):
+            raise ValueError(f"Paired run comparison requires identical {field}")
+    baseline_configuration = dict(baseline_summary.get("configuration", {}))
+    candidate_configuration = dict(candidate_summary.get("configuration", {}))
+    baseline_children = baseline_configuration.pop("page_children", None)
+    candidate_children = candidate_configuration.pop("page_children", None)
+    if baseline_configuration != candidate_configuration:
+        raise ValueError("Paired run comparison requires identical run mode")
+    if (baseline_children, candidate_children) != ("False", "True"):
+        raise ValueError("Paired run comparison requires page-level baseline and page-children candidate")
+    baseline_by_id = {row.get("id"): row for row in baseline}
+    candidate_by_id = {row.get("id"): row for row in candidate}
+    if (
+        len(baseline_by_id) != len(baseline)
+        or len(candidate_by_id) != len(candidate)
+        or baseline_by_id.keys() != candidate_by_id.keys()
+    ):
+        raise ValueError("Paired run comparison requires unique identical question IDs")
+    for question_id, baseline_row in baseline_by_id.items():
+        candidate_row = candidate_by_id[question_id]
+        baseline_runtime = _runtime_dimensions(baseline_row)
+        candidate_runtime = _runtime_dimensions(candidate_row)
+        if (
+            baseline_runtime["embedding_backend"] == "unknown"
+            or baseline_runtime["degraded"] is None
+            or baseline_runtime["reranker_enabled"] is None
+            or candidate_runtime["embedding_backend"] == "unknown"
+            or candidate_runtime["degraded"] is None
+            or candidate_runtime["reranker_enabled"] is None
+        ):
+            raise ValueError("Paired run comparison requires complete per-query runtime telemetry")
+        if baseline_runtime != candidate_runtime:
+            raise ValueError("Paired run comparison requires identical per-query actual runtime")
+    return {
+        "comparison": "two_complete_retrieval_paths_diagnostic",
+        "causal_attribution": "not_a_pure_chunking_ablation",
+        "controls": {
+            "dataset": baseline_summary["dataset"],
+            "dataset_sha256": baseline_summary["dataset_sha256"],
+            "k": baseline_summary["k"],
+            "run_mode": baseline_configuration,
+            "baseline_page_children": False,
+            "candidate_page_children": True,
+        },
+        "metrics": paired_comparison(baseline, candidate),
+    }
+
+
 def _runtime_dimensions(row: dict[str, Any]) -> dict[str, Any]:
     retrieval = row["retrieval"]
     embedding = retrieval.get("embedding")
@@ -275,10 +333,10 @@ def summarize(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="LexVault 240题项目专用RAG评测")
+    parser = argparse.ArgumentParser(description="LexVault项目专用RAG评测")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--k", type=int, default=5)
-    parser.add_argument("--suite", choices=("classic", "challenges"), default="classic")
+    parser.add_argument("--suite", choices=("classic", "challenges", "long-pages"), default="classic")
     parser.add_argument("--page-children", action="store_true")
     parser.add_argument("--embedding-mode", choices=("hashed-local", "model"), default="hashed-local")
     parser.add_argument("--reranker", choices=("off", "on"), default="off")
@@ -294,11 +352,24 @@ def main() -> int:
         from app.db import init_db, now, transaction
         from app.rag import HybridRetriever
         from app.rag_benchmark_dataset import (
-            DATASET_VERSION, CHALLENGE_VERSION, build_rag_benchmark, build_challenge_benchmark,
+            CHALLENGE_VERSION,
+            DATASET_VERSION,
+            LONG_PAGE_VERSION,
+            build_challenge_benchmark,
+            build_long_page_benchmark,
+            build_rag_benchmark,
         )
 
         init_db(seed=False)
-        dataset = build_challenge_benchmark() if args.suite == "challenges" else build_rag_benchmark()
+        if args.suite == "long-pages":
+            dataset = build_long_page_benchmark()
+            dataset_version = LONG_PAGE_VERSION
+        elif args.suite == "challenges":
+            dataset = build_challenge_benchmark()
+            dataset_version = CHALLENGE_VERSION
+        else:
+            dataset = build_rag_benchmark()
+            dataset_version = DATASET_VERSION
         dataset_sha256 = hashlib.sha256(
             json.dumps(dataset, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
@@ -350,7 +421,7 @@ def main() -> int:
             print(f"[{position}/{total}] {item['id']} {'PASS' if record['passed'] else 'MISS'}", flush=True)
         summary = summarize(
             results,
-            dataset_version=CHALLENGE_VERSION if args.suite == "challenges" else DATASET_VERSION,
+            dataset_version=dataset_version,
             k=args.k,
             configuration=configuration,
             dataset_sha256=dataset_sha256,
