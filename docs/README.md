@@ -8,7 +8,8 @@
 - [发布与数据保护](runbook/release.md)：白名单打包、备份与发布门槛。
 - [CI 与质量门禁](runbook/quality.md)：离线测试、覆盖率、锁文件、渐进类型检查。
 - [模型配置](runbook/models.md)：已有模型核查与显式版本下载，不自动替换模型。
-- [评测协议](benchmarks/README.md)：LawBench、项目 RAG、双运行时分别评价。
+- [评测协议](benchmarks/README.md)：LawBench、项目 RAG、法条检索、双运行时分别评价。
+- [独立官方法条语料](benchmarks/legal-corpus.md)：语料构建、版本与来源，以及法条引用安全边界（能保证/不能保证）。
 - [混合均分 85 分实施计划](benchmarks/SCORE_85_PLAN.md)：冻结口径、开发/确认拆分、真实模型初筛和当前执行进展。
 - [均分提升实测与路线图](benchmarks/score-uplift-20260909.md)：10,000 题离线复算、确定性后处理收益、已证伪手段与剩余差距。
 - [历史索引](history/README.md)：旧报告的适用范围与限制。
