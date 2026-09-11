@@ -25,6 +25,9 @@ const state = {
   recoverableAgentRunId: null,
 };
 
+// 证据时间线图表实例；容器隐藏时无法测量尺寸，需在视图显示后重建。
+let evidenceTimelineChart = null;
+
 // ========================================
 // 工具函数
 // ========================================
@@ -972,6 +975,8 @@ function showView(name) {
     else item.removeAttribute("aria-current");
   });
   if (name === "lab") loadLabMetrics();
+  // 证据视图隐藏时无法测量尺寸，显示后重绘一次时间线。
+  if (name === "evidence") renderEvidenceTimeline();
 }
 
 function bindEvents() {
@@ -1108,7 +1113,7 @@ function bindEvents() {
     $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   });
   $("#build-index-btn").addEventListener("click", buildHybridIndex);
-  $("#evaluate-btn").addEventListener("click", runEvaluation);
+  $("#evaluate-btn").addEventListener("click", () => runEvaluation());
   $("#new-chat").addEventListener("click", resetChat);
   $("#chat-form").addEventListener("submit", sendChat);
   $("#chat-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat(); } });
@@ -1159,6 +1164,10 @@ function bindEvents() {
     event.preventDefault();
     batchDropArea.classList.remove("dragging");
     handleBatchUpload(event.dataTransfer.files);
+  });
+  // 只注册一次；时间线实例在渲染时按需重建。
+  window.addEventListener("resize", () => {
+    if (evidenceTimelineChart && !evidenceTimelineChart.isDisposed()) evidenceTimelineChart.resize();
   });
 }
 
@@ -1273,14 +1282,20 @@ async function pollBatchStatus(batchId) {
 }
 
 // 渲染证据时间线
+function clearEvidenceTimeline(message) {
+  if (evidenceTimelineChart && !evidenceTimelineChart.isDisposed()) evidenceTimelineChart.dispose();
+  evidenceTimelineChart = null;
+  $("#evidence-timeline").innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">${message}</div>`;
+}
+
 function renderEvidenceTimeline() {
   if (!state.evidence || state.evidence.length === 0) {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">暂无证据数据</div>';
+    clearEvidenceTimeline("暂无证据数据");
     return;
   }
 
   if (typeof echarts === 'undefined') {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">可视化库加载中...</div>';
+    clearEvidenceTimeline("可视化库加载中...");
     return;
   }
 
@@ -1310,11 +1325,20 @@ function renderEvidenceTimeline() {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (evidenceWithTime.length === 0) {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">证据所在文档缺少时间信息</div>';
+    clearEvidenceTimeline("证据所在文档缺少时间信息");
     return;
   }
 
-  const chart = echarts.init(document.getElementById('evidence-timeline'));
+  // 证据视图初始是隐藏的（display:none），此时初始化量到宽度 0，
+  // 画布会一直是空的。等视图显示后再测量并渲染。
+  const container = document.getElementById('evidence-timeline');
+  if (!container || container.clientWidth === 0) return;
+
+  if (!evidenceTimelineChart || evidenceTimelineChart.isDisposed()) {
+    container.innerHTML = '';
+    evidenceTimelineChart = echarts.init(container);
+  }
+  const chart = evidenceTimelineChart;
 
   // 按日期聚合证据数量
   const dateCountMap = {};
@@ -1383,9 +1407,8 @@ function renderEvidenceTimeline() {
   };
 
   chart.setOption(option);
-
-  // 响应式调整
-  window.addEventListener('resize', () => chart.resize());
+  // 视图切走再切回时容器尺寸会变，渲染后同步一次画布。
+  chart.resize();
 }
 
 // 渲染疏漏检测仪表板
