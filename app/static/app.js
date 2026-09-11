@@ -398,7 +398,8 @@ function renderComparisonResult(result) {
   $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">恢复记录 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
   $$('[data-preview]', target).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   target.hidden = false;
-  $("#lab-result").innerHTML = '<div class="empty-state">两种分析方式已使用相同问题完成。请对比答复、引用和各项检查结果。</div>';
+  // 对比结果就在上方的对比面板里，这里回到单次分析面板的默认空状态。
+  $("#lab-result").innerHTML = '<div class="empty-state">运行后将在这里显示最终答复与来源。</div>';
   $("#trace-total").textContent = `标准分析 #${result.native.run_id} ↔ 可恢复分析 #${result.langgraph.run_id}`;
   $("#agent-trace").innerHTML = [...result.native.steps, ...result.langgraph.steps].map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
