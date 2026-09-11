@@ -75,6 +75,26 @@ class DemoCaseSeedTests(unittest.TestCase):
         for term in ("云启科技股份有限公司", "恒远商贸有限公司", "43,270,000", "非法吸收公众存款"):
             self.assertIn(term, text)
 
+    def test_seed_emits_case_specific_ground_truth(self) -> None:
+        import json
+
+        from app.evaluation import _case_ground_truth
+
+        with tempfile.TemporaryDirectory(prefix="lexvault-demo-gt-") as directory:
+            case_id = self._seed(directory)["case"]["id"]
+            path = Path(directory) / f"ground-truth-case-{case_id}.json"
+            self.assertTrue(path.exists())
+            supplied = json.loads(path.read_text(encoding="utf-8"))
+            with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": directory}):
+                # The demo case must supply its own answers; the built-in demo
+                # dataset is never reused for it.
+                with self.assertRaisesRegex(ValueError, "非演示案件"):
+                    _case_ground_truth(case_id, None)
+                truth, dataset = _case_ground_truth(case_id, supplied)
+            self.assertEqual(dataset, "case-specific-ground-truth")
+            self.assertTrue(truth)
+            self.assertTrue(any(not item["expected"] for item in truth))
+
 
 if __name__ == "__main__":
     unittest.main()

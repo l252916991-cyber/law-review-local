@@ -49,6 +49,39 @@ FIRST_DATE = "2023年3月14日"
 LAST_DATE = "2025年11月6日"
 BANK = "京海银行城中支行"
 
+# Per-case gold pages for this case's own RAG evaluation. Document names and page
+# numbers are verified against the generated volumes; the application refuses to
+# evaluate a non-demo case without its own ground truth, so this is shipped as an
+# artifact rather than any fallback to the built-in demo answers.
+GROUND_TRUTH: list[dict[str, Any]] = [
+    {
+        "query": "本案募集资金总额、投资人人数和未兑付金额分别是多少？",
+        "expected": [("01-起诉意见书-云启科技.txt", 2), ("10-资金归集与流向专项审计报告.txt", 3)],
+    },
+    {
+        "query": "募集资金主要通过哪些账户完成归集和划转？",
+        "expected": [
+            ("01-起诉意见书-云启科技.txt", 3),
+            ("10-资金归集与流向专项审计报告.txt", 2),
+            ("12-司法会计鉴定意见书.txt", 3),
+        ],
+    },
+    {
+        "query": "审计报告认定的资金去向和资金空转情况是什么？",
+        "expected": [("10-资金归集与流向专项审计报告.txt", 4), ("10-资金归集与流向专项审计报告.txt", 5)],
+    },
+    {
+        "query": "业务部对外宣传时使用了哪些与事实不符的表述？",
+        "expected": [("06-王强询问笔录.txt", 3), ("13-微信聊天记录提取报告.txt", 4)],
+    },
+    {
+        "query": "张伟个人及亲属支取的 1260 万元用于什么用途？",
+        "expected": [("10-资金归集与流向专项审计报告.txt", 5), ("12-司法会计鉴定意见书.txt", 5)],
+    },
+    {"query": "本案是否涉及毒品犯罪的资金？", "expected": []},
+    {"query": "本案是否涉及内幕交易？", "expected": []},
+]
+
 
 def _page(document_name: str, page_no: int, total_pages: int, *blocks: str) -> str:
     body = "\n".join(blocks)
@@ -774,6 +807,23 @@ def seed(data_dir: Path, *, seed_value: int = 20260911) -> dict[str, Any]:
             "gap_detections": conn.execute("SELECT COUNT(*) FROM gap_detections WHERE case_id = ?", (case_id,)).fetchone()[0],
             "fts_rows": conn.execute("SELECT COUNT(*) FROM pages_fts").fetchone()[0],
         }
+
+    # Emit this case's own gold pages so the operator can POST them as the
+    # evaluate-rag body. Validated here against the case's real pages.
+    truth_path = data_dir / f"ground-truth-case-{case_id}.json"
+    truth_path.write_text(json.dumps(GROUND_TRUTH, ensure_ascii=False, indent=2), encoding="utf-8")
+    with connect() as conn:
+        available = {
+            (row["name"], row["page_no"])
+            for row in conn.execute(
+                "SELECT d.name, p.page_no FROM pages p JOIN documents d ON d.id=p.document_id WHERE d.case_id=?",
+                (case_id,),
+            )
+        }
+    stale = [pair for item in GROUND_TRUTH for pair in item["expected"] if pair not in available]
+    if stale:
+        raise ValueError(f"ground_truth refers to pages not in case {case_id}: {stale}")
+    summary["ground_truth"] = {"path": str(truth_path), "queries": len(GROUND_TRUTH)}
     return summary
 
 
