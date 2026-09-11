@@ -16,9 +16,32 @@ from scripts.statutory_gold_report import evaluate_task, resolve
     ("根据农民专业合作社法第七十条的规定，登记机关可以责令其改正", [("农民专业合作社法", 70)]),
     ("根据《民法典》第二百零九条不动产物权的设立", [("民法典", 209)]),
     ("根据规定:醉酒驾驶的构成了犯罪，应当以危险驾驶罪定罪处罚", []),
+    # Self-references are back-pointers, not law names.
+    ("用人单位依照本法第四十条规定解除劳动合同的", []),
+    ("当事人对本条例第二十一条不服的", []),
+    ("并依照本办法第十二条办理。", []),
+    # A category label leaking mid-phrase is stripped, keeping the real law name.
+    ("市场监督管理总局类中的医疗器械生产监督管理办法第五条", [("医疗器械生产监督管理办法", 5)]),
+    # 基本法 is a real statute and must survive the 本法 back-reference filter.
+    ("中华人民共和国香港特别行政区基本法第十一条", [("中华人民共和国香港特别行政区基本法", 11)]),
 ])
 def test_citations_extraction(text, expected):
     assert citations(text) == expected
+
+
+def test_self_reference_does_not_hide_a_real_citation():
+    assert citations("依照本法第四十四条终止合同，法律依据:《劳动合同法》第四十六条") == [("劳动合同法", 46)]
+
+
+@pytest.mark.parametrize("task_id", ["3-2", "3-8"])
+def test_pinned_answers_yield_no_self_reference_law_names(task_id):
+    path = Path(__file__).resolve().parents[1] / "benchmarks/lawbench/zero_shot" / f"{task_id}.json"
+    if not path.exists():
+        pytest.skip("pinned LawBench dataset not present")
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        for law, _ in gold_citations(task_id, row["question"], row["answer"]):
+            assert not law.endswith(("本法", "本条例", "本办法", "本规定", "本细则", "本规则"))
+            assert "类中的" not in law
 
 
 def test_one_one_question_strips_category_prefix():
