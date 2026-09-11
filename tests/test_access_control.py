@@ -672,6 +672,36 @@ class AccessControlTests(unittest.TestCase):
                 trusted.close()
                 untrusted.close()
 
+    def test_model_config_override_is_admin_only_and_applies(self):
+        from app.config import LLMConfig
+
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        self.assertEqual(self.client.get("/api/model-config", headers=self.headers).status_code, 403)
+        default = self.client.get("/api/model-config", headers=admin)
+        self.assertEqual(default.status_code, 200, default.text)
+        self.assertFalse(default.json()["overridden"])
+
+        # The egress policy must refuse an unapproved destination before persisting.
+        blocked = self.client.put(
+            "/api/model-config", headers=admin,
+            json={"base_url": "http://192.168.1.9:8000/v1", "model": "ui-model"},
+        )
+        self.assertEqual(blocked.status_code, 400, blocked.text)
+        self.assertFalse(self.client.get("/api/model-config", headers=admin).json()["overridden"])
+
+        saved = self.client.put(
+            "/api/model-config", headers=admin,
+            json={"base_url": "http://127.0.0.1:9000/v1/", "model": "ui-model"},
+        )
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.json(), {"base_url": "http://127.0.0.1:9000/v1", "model": "ui-model", "overridden": True})
+        self.assertEqual((LLMConfig.load().base_url, LLMConfig.load().model), ("http://127.0.0.1:9000/v1", "ui-model"))
+
+        reset = self.client.delete("/api/model-config", headers=admin)
+        self.assertEqual(reset.status_code, 200, reset.text)
+        self.assertFalse(reset.json()["overridden"])
+        self.assertEqual(LLMConfig.load().base_url, LLMConfig.from_env().base_url)
+
     def test_model_detection_maps_loopback_to_configured_container_host(self):
         response_body = json.dumps({"data": [{"id": "local-chat-model"}]}).encode()
         response = MagicMock()
