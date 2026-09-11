@@ -561,8 +561,6 @@ html[data-theme="dark"] ::backdrop { background: rgba(0, 0, 0, .62); }
 .model-settings-dialog p { color: var(--muted); line-height: 1.8; }
 .model-settings-status { display: flex; align-items: center; gap: 12px; margin: 22px 0; }
 .model-settings-status small { display: block; margin-top: 5px; color: var(--muted); }
-.model-config-list > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
-.model-config-list dd { margin: 6px 0 0; }
 .hero-card { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); min-height: 300px; padding: 10px 0 34px; border-bottom: 1px solid var(--line); gap: 36px; }
 .hero-kicker { color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 12px; }
 .hero-kicker span { background: var(--line); width: 24px; height: 1px; }

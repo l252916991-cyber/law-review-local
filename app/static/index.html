@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
-  <script src="/assets/entry.js?v=20260911-result-panel"></script>
+  <script src="/assets/entry.js?v=20260911-model-dialog"></script>
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css?v=20260911-result-panel" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20260911-model-dialog" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
@@ -441,7 +441,6 @@
     <div class="dialog-header"><div><span class="section-label">只读配置</span><h3 id="model-settings-title">本地模型配置</h3></div><button type="button" class="close-button" data-close-dialog aria-label="关闭">×</button></div>
     <div class="model-settings-status" role="status"><span class="model-dot" id="model-dialog-dot"></span><div><strong id="model-dialog-state">正在检查模型服务…</strong><small id="model-dialog-name"></small></div></div>
     <p>模型服务由律所管理员在部署环境中配置，本页面不会保存或修改配置。</p>
-    <dl class="model-config-list"><div><dt>服务地址</dt><dd><code>LAW_REVIEW_LLM_URL</code></dd></div><div><dt>模型名称</dt><dd><code>LAW_REVIEW_LLM_MODEL</code></dd></div></dl>
     <p class="model-settings-note">修改部署环境后需重建或重启 Web 与 Worker 服务；当前状态来自 <code>/api/health</code>。</p>
   </dialog>
 
@@ -455,7 +454,7 @@
     </form>
   </dialog>
 
-  <script src="/assets/shared.js?v=20260911-result-panel" defer></script>
-  <script src="/assets/app.js?v=20260911-result-panel-menu" defer></script>
+  <script src="/assets/shared.js?v=20260911-model-dialog" defer></script>
+  <script src="/assets/app.js?v=20260911-model-dialog-menu" defer></script>
 </body>
 </html>
