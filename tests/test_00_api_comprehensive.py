@@ -51,6 +51,18 @@ class APIContractTest(IsolatedDatabaseTestCase):
         self.assertEqual(response.json()["status"], "ok")
         self.assertTrue(response.json()["private_mode"])
 
+    def test_readiness_reports_statutory_verification_state(self):
+        # Legal verification is an explicit deployment capability: readiness must
+        # say it is unavailable rather than let callers assume citations work.
+        response = self.client.get("/api/ready")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn(body["legal_verification"], {"available", "unavailable"})
+        self.assertEqual(body["status"], "ok" if body["legal_verification"] == "available" else "degraded")
+        self.assertNotIn("directory", body)  # never leak the deployment path
+        corpus = self.client.get("/api/health").json()["corpus"]
+        self.assertIn("available", corpus)
+
     def test_case_crud_validation_matrix(self):
         for payload, expected in [({}, 422), ({"title": "短"}, 422), ({"title": "A" * 121}, 422)]:
             with self.subTest(payload=payload):

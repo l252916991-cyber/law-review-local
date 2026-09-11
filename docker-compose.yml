@@ -33,6 +33,9 @@ services:
       LAW_REVIEW_TRUSTED_LOCAL_PEERS: ${LAW_REVIEW_TRUSTED_LOCAL_PEERS:-172.18.0.1}
     volumes:
       - web-data:/data
+      # Read-only statutory corpus. Set LAW_REVIEW_LEGAL_CORPUS_DIR=/opt/legal_corpus
+      # in .env and place the canonical corpus here; absent, verification stays off.
+      - ./legal_corpus:/opt/legal_corpus:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -49,6 +52,7 @@ services:
       LAW_REVIEW_LOCAL_MODEL_HOSTS: host.docker.internal
     volumes:
       - web-data:/data
+      - ./legal_corpus:/opt/legal_corpus:ro
     depends_on:
       redis:
         condition: service_healthy

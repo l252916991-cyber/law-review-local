@@ -21,6 +21,7 @@ import hashlib
 import json
 import shutil
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
@@ -126,7 +127,34 @@ def _entry(chosen: dict[str, Any], others: list[dict[str, Any]], kind: str, docu
     }
 
 
-def build(directories: Sequence[str | Path], output: str | Path) -> dict[str, Any]:
+def _latest_source_date(directories: Sequence[str | Path]) -> str | None:
+    """The newest recorded data-freshness date across source corpora.
+
+    Falls back to the newest non-null ``version_date`` when a source predates the
+    ``source_as_of`` field, so a fresh law cannot report an older freshness than
+    the publications it contains.
+    """
+    dates: list[str] = []
+    for directory in directories:
+        try:
+            manifest = json.loads((Path(directory) / "manifest.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for key in ("source_as_of", "dataset_cutoff"):
+            if isinstance(manifest.get(key), str):
+                dates.append(manifest[key])
+        # Read the documents themselves: not every builder records version_date in
+        # its manifest entries, and the document is the authoritative publication.
+        try:
+            dates.extend(doc["version_date"] for doc in LegalCorpus(directory).documents
+                         if isinstance(doc.get("version_date"), str))
+        except (OSError, ValueError, KeyError):
+            continue
+    return max(dates) if dates else None
+
+
+def build(directories: Sequence[str | Path], output: str | Path,
+          source_as_of: str | None = None) -> dict[str, Any]:
     """Write a canonical corpus and return its manifest; fail closed on real conflicts."""
     target = Path(output).resolve()
     # Never treat our own output as a source: a --root scan on a rerun would
@@ -160,6 +188,11 @@ def build(directories: Sequence[str | Path], output: str | Path) -> dict[str, An
         raise ValueError("Canonical corpus has duplicate document IDs")
     manifest = {
         "schema_version": SCHEMA_VERSION, "canonical_schema_version": CANONICAL_SCHEMA_VERSION,
+        # ``source_as_of`` is the law's data freshness; ``built_at`` only says when
+        # this run happened. A deployment reads source_as_of as "law current to".
+        "built_at": datetime.now(timezone.utc).isoformat(),
+        "source_as_of": source_as_of or _latest_source_date(sources),
+        "corpus_version": CANONICAL_SCHEMA_VERSION,
         "source_corpora": [str(Path(directory)) for directory in sources],
         "source_policy": [name for name, _ in SOURCE_TIERS],
         "publication_count": len(entries), "duplicate_keys_merged": len(kinds),

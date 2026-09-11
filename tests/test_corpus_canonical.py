@@ -111,6 +111,22 @@ def test_canonical_output_has_zero_duplicates_and_documents_are_unique(tmp_path)
     assert (tmp_path / "out" / "manifest.json").exists()
 
 
+def test_freshness_is_law_data_date_not_build_time(tmp_path):
+    """A deployment must read source_as_of as freshness; built_at only says when we ran.
+
+    The two differ whenever the newest publication predates this build, which is
+    exactly when a lawyer would otherwise be told the law is fresher than it is.
+    """
+    source = write_corpus(tmp_path, "src", [{"law_name": "测试法", "version_date": "2023-12-29",
+                                             "source_url": NPC, "articles": articles(("1", "第一条 内容。"))}])
+    manifest = build([source], tmp_path / "out")
+    assert manifest["source_as_of"] == "2023-12-29"   # newest law data available
+    assert manifest["built_at"][:4] >= "2024"          # this run happened later
+    assert manifest["corpus_version"] == "lexvault-canonical-laws-v1"
+    # An explicit source_as_of wins, so a deployment can pin freshness deliberately.
+    assert build([source], tmp_path / "out2", "2026-01-01")["source_as_of"] == "2026-01-01"
+
+
 def test_build_is_deterministic_across_input_order(tmp_path):
     a = write_corpus(tmp_path, "aaa", [{"law_name": "测试法", "version_date": "2020-01-01",
                                        "source_url": None, "articles": articles(("1", "第一条 内容。"))}])

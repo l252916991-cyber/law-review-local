@@ -235,7 +235,8 @@ def download_law(name: str, aliases: set[str], cutoff: str) -> tuple[dict[str, A
     return bundle, document
 
 
-def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: str = DEFAULT_CUTOFF) -> dict[str, Any]:
+def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: str = DEFAULT_CUTOFF,
+          source_as_of: str | None = None) -> dict[str, Any]:
     if output.exists():
         raise FileExistsError(f"Frozen corpus destination already exists: {output}")
     laws = requested_laws(campaign, existing_corpora)
@@ -257,9 +258,13 @@ def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: st
                               "downloaded_at": document["downloaded_at"]})
         except Exception as error:
             failures.append({"law_name": name, "attempted_at": attempted, "error": f"{type(error).__name__}: {error}"})
-    manifest = {"schema_version": SCHEMA_VERSION, "created_at": datetime.now(timezone.utc).isoformat(),
+    # ``source_as_of`` is the real freshness of the law data; ``built_at`` only says
+    # when this run happened. A deployment must never read the build time as the
+    # law's freshness, so both are recorded and labelled separately.
+    manifest = {"schema_version": SCHEMA_VERSION, "built_at": datetime.now(timezone.utc).isoformat(),
+                "source_as_of": source_as_of or cutoff,
                 "source_policy": "National Laws and Regulations Database complete OFD publications",
-                "selection_policy": "question-law-name only; newest publication no later than dataset cutoff",
+                "selection_policy": "question-law-name only; newest publication no later than source_as_of",
                 "dataset_cutoff": cutoff, "documents": documents, "failures": failures}
     (output / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
     return manifest
@@ -292,10 +297,16 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--campaign", type=Path, default=Path("output/score85/campaign"))
     parser.add_argument("--existing-corpus", type=Path, action="append", default=[])
-    parser.add_argument("--cutoff", default=DEFAULT_CUTOFF)
+    parser.add_argument("--cutoff", default=DEFAULT_CUTOFF,
+                        help=f"限制公布日期；默认 {DEFAULT_CUTOFF} 是 benchmark 冻结日，生产请改用 --source-as-of")
+    # Production law freshness is explicit: never let a deployment inherit the
+    # benchmark freeze date and silently stop at 2023 law.
+    parser.add_argument("--source-as-of", help="生产语料的数据新鲜度（YYYY-MM-DD）；给出时同时作为抓取截止日")
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args()
-    result = verify(args.output) if args.verify else build(args.output, args.campaign, args.existing_corpus, args.cutoff)
+    cutoff = args.source_as_of or args.cutoff
+    result = (verify(args.output) if args.verify
+              else build(args.output, args.campaign, args.existing_corpus, cutoff, args.source_as_of))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("valid", not result.get("failures")) else 1
 
