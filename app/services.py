@@ -26,8 +26,13 @@ from typing import Any
 
 from docx import Document as DocxDocument
 
-from .db import SCHEMA_VERSION, connect, get_db_path, now, transaction
+from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
+from .bank_transactions import PARSER_VERSION, parse_csv, parse_spreadsheet
+
+
+class ArchivedConversationError(ValueError):
+    """Raised when a read-only archived conversation is used for new chat."""
 
 
 LOCAL_LLM_URL = LLMConfig.from_env().base_url
@@ -94,6 +99,7 @@ def _check_parse_budget(path: Path) -> None:
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 REMOTE_MODEL_APPROVAL_ENV = "LAW_REVIEW_ALLOW_REMOTE_MODELS"
+LOCAL_MODEL_HOSTS_ENV = "LAW_REVIEW_LOCAL_MODEL_HOSTS"
 
 
 def assert_model_endpoint_allowed(base_url: str) -> None:
@@ -107,7 +113,12 @@ def assert_model_endpoint_allowed(base_url: str) -> None:
     host = (parsed.hostname or "").lower()
     if not parsed.scheme or not host:
         raise ValueError("模型服务地址无效")
-    if host in LOOPBACK_HOSTS and parsed.scheme in {"http", "https"}:
+    configured_local_hosts = {
+        item.strip().lower()
+        for item in os.getenv(LOCAL_MODEL_HOSTS_ENV, "").split(",")
+        if item.strip()
+    }
+    if host in LOOPBACK_HOSTS | configured_local_hosts and parsed.scheme in {"http", "https"}:
         return
     if os.getenv(REMOTE_MODEL_APPROVAL_ENV) != "1":
         raise ValueError("外发模型服务未获批准：仅允许本机回环地址，或显式配置 LAW_REVIEW_ALLOW_REMOTE_MODELS=1")
@@ -143,6 +154,67 @@ def upload_error_message(exc: Exception) -> str:
     if isinstance(exc, subprocess.TimeoutExpired):
         return "文档解析超时；请拆分文件或检查 OCR 资源"
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"
+
+
+def _persist_parsed_bank_rows(case_id: int, document_id: int, source_hash: str, rows: list[Any]) -> dict[str, Any]:
+    with transaction() as conn:
+        document = conn.execute("SELECT case_id FROM documents WHERE id=?", (document_id,)).fetchone()
+        if not document or document["case_id"] != case_id:
+            raise ValueError("流水来源文档不属于当前案件")
+        for item in rows:
+            conn.execute(
+                """INSERT OR IGNORE INTO bank_transactions(case_id,source_document_id,source_document_hash,source_sheet,source_row_number,source_ref_json,account,direction,amount_minor,currency,amount_raw,transaction_time,time_raw,counterparty,memo,raw_row_json,parse_status,parse_warnings_json,parser_version,row_fingerprint,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (case_id, document_id, source_hash, item.source_sheet, item.source_row_number, json.dumps({"document_id": document_id, "sheet": item.source_sheet, "row": item.source_row_number}, ensure_ascii=False), item.account, item.direction, item.amount_minor, item.currency, item.amount_raw, item.transaction_time, item.time_raw, item.counterparty, item.memo, item.raw_row_json, item.parse_status, json.dumps(item.warnings, ensure_ascii=False), PARSER_VERSION, item.row_fingerprint, now()),
+            )
+    return {"rows": len(rows), "parsed": sum(x.parse_status == "parsed" for x in rows), "needs_review": sum(x.parse_status == "needs_review" for x in rows), "parser_version": PARSER_VERSION}
+
+
+def persist_bank_transactions(case_id: int, document_id: int, source_hash: str, payload: bytes, *, sheet: str = "") -> dict[str, Any]:
+    """Parse and idempotently persist explicit bank CSV rows for one document."""
+    return _persist_parsed_bank_rows(case_id, document_id, source_hash, parse_csv(payload, sheet=sheet))
+
+
+def persist_parsed_bank_rows(case_id: int, document_id: int, source_hash: str, rows: list[Any]) -> dict[str, Any]:
+    """Persist already parsed spreadsheet rows through the CSV-equivalent contract."""
+    return _persist_parsed_bank_rows(case_id, document_id, source_hash, rows)
+
+
+def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, account: str | None = None, direction: str | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None) -> dict[str, Any]:
+    limit = max(1, min(limit, 500)); offset = max(0, offset)
+    clauses = ["case_id=?"]; params: list[Any] = [case_id]
+    for field, value in (("account", account), ("counterparty", counterparty)):
+        if value: clauses.append(f"{field} LIKE ?"); params.append(f"%{value}%")
+    if direction: clauses.append("direction=?"); params.append(direction)
+    if date_from: clauses.append("transaction_time>=?"); params.append(date_from)
+    if date_to: clauses.append("transaction_time<=?"); params.append(date_to)
+    where = " AND ".join(clauses); conn = connect()
+    try:
+        total = conn.execute(f"SELECT COUNT(*) FROM bank_transactions WHERE {where}", params).fetchone()[0]
+        rows = [rowdict(row) for row in conn.execute(f"SELECT * FROM bank_transactions WHERE {where} ORDER BY transaction_time, id LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()]
+    finally: conn.close()
+    return {"transactions": rows, "pagination": {"total": total, "limit": limit, "offset": offset}}
+
+
+def summarize_bank_transactions(case_id: int, **filters: Any) -> dict[str, Any]:
+    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]
+    inflow = [r for r in rows if r["direction"] == "inflow" and r["amount_minor"] is not None]; outflow = [r for r in rows if r["direction"] == "outflow" and r["amount_minor"] is not None]
+    def group(key: str) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for row in rows:
+            if row["amount_minor"] is not None: result[row[key] or "(空)"] = result.get(row[key] or "(空)", 0) + row["amount_minor"]
+        return result
+    by_period: dict[str, int] = {}
+    for row in rows:
+        if row["amount_minor"] is not None and row["transaction_time"]: by_period[row["transaction_time"][:7]] = by_period.get(row["transaction_time"][:7], 0) + row["amount_minor"]
+    return {"transaction_count": len(rows), "inflow_count": len(inflow), "outflow_count": len(outflow), "inflow_minor": sum(r["amount_minor"] for r in inflow), "outflow_minor": sum(r["amount_minor"] for r in outflow), "net_minor": sum(r["amount_minor"] for r in inflow) - sum(r["amount_minor"] for r in outflow), "currency": rows[0]["currency"] if rows else "CNY", "by_account": group("account"), "by_counterparty": group("counterparty"), "by_period": by_period, "filters": filters}
+
+
+def bank_transaction_graph(case_id: int, **filters: Any) -> dict[str, Any]:
+    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]; nodes: dict[str, dict[str, Any]] = {}; edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        account = f"account:{row['account'] or '(空)'}"; party = f"party:{row['counterparty'] or '(空)'}"; nodes.setdefault(account, {"id": account, "label": row["account"] or "(空)", "kind": "account"}); nodes.setdefault(party, {"id": party, "label": row["counterparty"] or "(空)", "kind": "party"})
+        source, target = (party, account) if row["direction"] == "inflow" else (account, party); key = (source, target, row["currency"]); edge = edges.setdefault(key, {"from": source, "to": target, "relation_type": "资金链路", "currency": row["currency"], "count": 0, "amount_minor": 0, "transaction_ids": [], "unknown_direction": row["direction"] == "unknown"}); edge["count"] += 1; edge["transaction_ids"].append(row["id"]); edge["amount_minor"] += row["amount_minor"] or 0
+    return {"nodes": list(nodes.values()), "edges": list(edges.values()), "transaction_count": len(rows)}
 
 
 def _file_sha256(path: Path) -> str:
@@ -256,6 +328,16 @@ def extract_pages(path: Path, mime_type: str) -> list[str]:
         return extract_docx_pages(path)
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}:
         return extract_image_text(path)
+    if suffix in {".xls", ".xlsx"}:
+        _check_parse_budget(path)
+        rows = parse_spreadsheet(path.read_bytes(), path.name)
+        if not rows:
+            return [""]
+        lines = [
+            f"【工作表：{row.source_sheet or '默认'}｜第{row.source_row_number}行】\n{row.raw_row_json}"
+            for row in rows
+        ]
+        return _cap_total_text(["\n\n".join(lines[i : i + 200]) for i in range(0, len(lines), 200)])
     # The client-provided MIME type is not an authorization to parse an
     # arbitrary active format (HTML/SVG) as a trusted text document.
     if suffix in {".txt", ".md", ".csv", ".json", ".log"}:
@@ -432,7 +514,7 @@ def detect_route(question: str) -> str:
     return "事实检索"
 
 
-def search_pages(case_id: int, question: str, limit: int = 8) -> list[dict[str, Any]]:
+def search_pages(case_id: int, question: str, limit: int = 8, *, allow_fallback: bool = True) -> list[dict[str, Any]]:
     terms = query_terms(question)
     conn = connect()
     try:
@@ -464,7 +546,7 @@ def search_pages(case_id: int, question: str, limit: int = 8) -> list[dict[str, 
             item["quote"] = best_quote(item["text"], matches)
             scored.append((score, item))
     scored.sort(key=lambda x: (-x[0], x[1]["document_id"], x[1]["page_no"]))
-    if not scored:
+    if not scored and allow_fallback:
         fallback = [rowdict(x) for x in rows[:limit]]
         for item in fallback:
             item["score"] = 0
@@ -710,16 +792,12 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
-                    fallback_reason = "模型输出未通过格式/来源校验，已返回原文检索摘要"
                     logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
-                    answer = fallback_answer(question, route, contexts)
-                    provenance = {"mode": "rule-retrieval", "llm_attempted": True}
+                    raise RuntimeError("model_output_failed_validation")
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
                 diagnostic = failure_diagnostic(exc, "chat_llm")
-                fallback_reason = "本地模型调用失败，已返回原文检索摘要"
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
-                answer = fallback_answer(question, route, contexts)
-                provenance = {"mode": "rule-retrieval", "llm_attempted": True}
+                raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
         else:
             answer = fallback_answer(question, route, contexts)
             provenance = {"mode": "rule-retrieval", "llm_attempted": False}
@@ -743,10 +821,12 @@ def chat(case_id: int, question: str, user_name: str, conversation_id: int | Non
     with transaction() as conn:
         if conversation_id:
             valid = conn.execute(
-                "SELECT id FROM conversations WHERE id = ? AND case_id = ?", (conversation_id, case_id)
+                "SELECT id, archived_at FROM conversations WHERE id = ? AND case_id = ?", (conversation_id, case_id)
             ).fetchone()
             if not valid:
                 conversation_id = None
+            elif valid["archived_at"] is not None:
+                raise ArchivedConversationError("该会话已归档，只能查看历史记录；如需继续提问，请新建会话")
         if not conversation_id:
             conversation_id = conn.execute(
                 "INSERT INTO conversations(case_id, user_name, title, created_at) VALUES (?, ?, ?, ?)",
@@ -839,7 +919,71 @@ def csv_safe_cell(value: Any) -> Any:
     return value
 
 
-def build_export(case_id: int) -> Path:
+EXPORT_RENDERER_VERSION = "export-blocks-v1"
+DEFAULT_EXPORT_BLOCKS = BUILTIN_EXPORT_TEMPLATES[0]["blocks"]
+EXPORT_BLOCK_TYPES = ("case_summary", "catalog_csv", "evidence_table", "qa_log", "static_markdown", "attachments")
+_TEXT_BLOCK_EXT = {"case_summary": ".md", "qa_log": ".md", "static_markdown": ".md", "catalog_csv": ".csv", "evidence_table": ".csv"}
+
+
+def _export_evidence_rows(evidence: list[dict[str, Any]], status: str | None) -> list[dict[str, Any]]:
+    if not status:
+        return evidence
+    return [item for item in evidence if item["status"] == status]
+
+
+def _evidence_table_csv(rows: list[dict[str, Any]]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["证据事项", "类别", "待证事实", "可信度", "来源文件", "页码", "原文", "状态"])
+    for item in rows:
+        writer.writerow(
+            [csv_safe_cell(value) for value in (item["title"], item["category"], item["fact"], item["credibility"], item.get("source_name", ""), f"{item['source_page_start']}-{item['source_page_end']}", item["quote"], item["status"])]
+        )
+    return buffer.getvalue()
+
+
+def _block_filename(block: dict[str, Any]) -> str:
+    explicit = block.get("filename")
+    if explicit:
+        return safe_filename(explicit)
+    return safe_filename(block.get("title") or block["type"]) + _TEXT_BLOCK_EXT.get(block["type"], "")
+
+
+def _block_has_data(block: dict[str, Any], context: dict[str, Any]) -> bool:
+    kind = block["type"]
+    if kind == "case_summary" or kind == "static_markdown":
+        return True
+    if kind == "catalog_csv":
+        return bool(context["documents"])
+    if kind == "evidence_table":
+        return bool(_export_evidence_rows(context["evidence"], block.get("evidence_status")))
+    if kind == "qa_log":
+        return bool(context["messages"])
+    if kind == "attachments":
+        return any(
+            (Path(doc["stored_path"]) if doc["stored_path"] else None) and Path(doc["stored_path"]).is_file()
+            for doc in context["documents"]
+        )
+    return False
+
+
+def get_export_template(template_id: int) -> dict[str, Any] | None:
+    conn = connect()
+    try:
+        row = conn.execute("SELECT * FROM export_templates WHERE id = ?", (template_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    template = rowdict(row)
+    template["blocks"] = json.loads(template["blocks_json"])
+    template["builtin"] = bool(template["builtin"])
+    return template
+
+
+def build_export_package(
+    case_id: int, template_id: int | None = None, *, final: bool = False, actor: str = ""
+) -> tuple[Path, str]:
     conn = connect()
     try:
         case = rowdict(conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
@@ -871,23 +1015,25 @@ def build_export(case_id: int) -> Path:
     finally:
         conn.close()
 
+    if template_id is None:
+        blocks, template_info = DEFAULT_EXPORT_BLOCKS, {"id": None, "name": "默认结案包", "builtin": True, "version": None}
+    else:
+        template = get_export_template(template_id)
+        if template is None:
+            raise ValueError("结案模板不存在")
+        blocks = template["blocks"]
+        template_info = {"id": template["id"], "name": template["name"], "builtin": template["builtin"], "version": template["updated_at"]}
+    context = {"case": case, "documents": documents, "evidence": evidence, "messages": messages}
+
+    if final:
+        missing = [block.get("title") or block["type"] for block in blocks if block.get("required") and not _block_has_data(block, context)]
+        if missing:
+            raise ValueError("结案包缺少必选内容：" + "、".join(missing))
+
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     export_dir = get_db_path().parent / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     path = export_dir / f"{safe_filename(case['title'])}_{stamp}_{uuid.uuid4().hex[:8]}.zip"
-    directory_csv = io.StringIO()
-    writer = csv.writer(directory_csv)
-    writer.writerow(["文件名", "文书类型", "页数", "涉及人员", "时间范围", "摘要", "状态"])
-    for doc in documents:
-        writer.writerow([csv_safe_cell(doc[key]) for key in ("name", "doc_type", "pages", "people", "date_range", "summary", "status")])
-
-    evidence_csv = io.StringIO()
-    writer = csv.writer(evidence_csv)
-    writer.writerow(["证据事项", "类别", "待证事实", "可信度", "来源文件", "页码", "原文", "状态"])
-    for item in evidence:
-        writer.writerow(
-            [csv_safe_cell(value) for value in (item["title"], item["category"], item["fact"], item["credibility"], item.get("source_name", ""), f"{item['source_page_start']}-{item['source_page_end']}", item["quote"], item["status"])]
-        )
 
     summary = (
         f"# {case['title']}\n\n"
@@ -896,14 +1042,42 @@ def build_export(case_id: int) -> Path:
         f"## 案件说明\n\n{case['description']}\n\n"
         "> 本文件由本地复刻系统生成，所有AI结果均需执业律师复核。\n"
     )
+    directory_csv_rows = []
+    for doc in documents:
+        directory_csv_rows.append([csv_safe_cell(doc[key]) for key in ("name", "doc_type", "pages", "people", "date_range", "summary", "status")])
+    directory_csv = io.StringIO()
+    writer = csv.writer(directory_csv)
+    writer.writerow(["文件名", "文书类型", "页数", "涉及人员", "时间范围", "摘要", "状态"])
+    writer.writerows(directory_csv_rows)
     chats = ["# 阅卷问答记录\n"]
     for message in messages:
         chats.append(f"## {message['conversation_title']} · {message['user_name']}\n\n**{message['role']}**\n\n{message['content']}\n")
+    if not messages:
+        chats.append("\n[待补充：暂无问答记录]")
+
+    transactions = list_bank_transactions(case_id, limit=500, offset=0)["transactions"]
+    transaction_csv = io.StringIO()
+    transaction_writer = csv.writer(transaction_csv)
+    transaction_writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
+    for row in transactions:
+        transaction_writer.writerow([csv_safe_cell(row[key]) for key in ("transaction_time", "account", "direction", "amount_minor", "currency", "counterparty", "memo", "source_row_number", "parse_status")])
+    transaction_bytes = ("\ufeff" + transaction_csv.getvalue()).encode("utf-8")
+    transaction_sha = hashlib.sha256(transaction_bytes).hexdigest()
+    block_renderers = {
+        "case_summary": lambda block: summary,
+        "catalog_csv": lambda block: "\ufeff" + directory_csv.getvalue(),
+        "evidence_table": lambda block: "\ufeff" + _evidence_table_csv(_export_evidence_rows(evidence, block.get("evidence_status"))),
+        "qa_log": lambda block: "\n".join(chats),
+        "static_markdown": lambda block: block.get("content") or "[待补充：模板未填写内容]",
+    }
 
     manifest = {
         "generated_at": now(),
         "schema_version": SCHEMA_VERSION,
+        "renderer_version": EXPORT_RENDERER_VERSION,
+        "finalized": bool(final),
         "case": {"id": case["id"], "title": case["title"], "case_no": case["case_no"], "status": case["status"]},
+        "template": {**template_info, "blocks": blocks},
         "documents": [
             {"id": doc["id"], "name": doc["name"], "content_hash": doc.get("content_hash"),
              "pages": doc["pages"], "doc_type": doc["doc_type"], "status": doc["status"]}
@@ -917,29 +1091,43 @@ def build_export(case_id: int) -> Path:
             for item in evidence
         ],
         "files": [],
+        "artifacts": [{"archive_name": "资金流水.csv", "sha256": transaction_sha, "transaction_count": len(transactions)}],
     }
 
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("案件摘要.md", summary)
-        archive.writestr("内容级目录.csv", "\ufeff" + directory_csv.getvalue())
-        archive.writestr("证据目录.csv", "\ufeff" + evidence_csv.getvalue())
-        archive.writestr("阅卷问答记录.md", "\n".join(chats))
-        for doc in documents:
-            stored = Path(doc["stored_path"]) if doc["stored_path"] else None
-            if stored and stored.exists() and stored.is_file():
-                # Export must not package files outside the managed data
-                # directory, even if database metadata was tampered with.
-                stored = contained_path(stored, get_db_path().parent)
-                archive_name = f"原始卷宗/{safe_filename(doc['name'])}"
-                archive.write(stored, archive_name)
-                manifest["files"].append({
-                    "archive_name": archive_name, "document_id": doc["id"],
-                    "sha256": _file_sha256(stored), "size": stored.stat().st_size,
-                })
+        archive.writestr("资金流水.csv", transaction_bytes)
+        for block in blocks:
+            kind = block["type"]
+            if kind == "attachments":
+                folder = safe_filename(block.get("filename") or block.get("title") or "原始卷宗")
+                for doc in documents:
+                    stored = Path(doc["stored_path"]) if doc["stored_path"] else None
+                    if stored and stored.exists() and stored.is_file():
+                        # Export must not package files outside the managed data
+                        # directory, even if database metadata was tampered with.
+                        stored = contained_path(stored, get_db_path().parent)
+                        archive_name = f"{folder}/{safe_filename(doc['name'])}"
+                        archive.write(stored, archive_name)
+                        manifest["files"].append({
+                            "archive_name": archive_name, "document_id": doc["id"],
+                            "sha256": _file_sha256(stored), "size": stored.stat().st_size,
+                        })
+                continue
+            archive.writestr(_block_filename(block), block_renderers[kind](block))
         archive.writestr("清单.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     with transaction() as conn:
         conn.execute(
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '导出结案包', ?, ?)",
             (case_id, path.name, now()),
         )
-    return path
+        if final:
+            conn.execute(
+                "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '模板结案打包', ?, ?)",
+                (case_id, f"模板[{template_info['name']}] 操作人[{actor or '未知'}] 包哈希 {_file_sha256(path)[:16]}", now()),
+            )
+    return path, _file_sha256(path)
+
+
+def build_export(case_id: int) -> Path:
+    """Back-compatible wrapper: default layout, no final gating."""
+    return build_export_package(case_id)[0]

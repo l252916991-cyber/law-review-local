@@ -11,6 +11,26 @@ import scripts.build_legal_corpus as corpus_builder
 from scripts.build_legal_corpus import build_document
 
 
+def test_ministry_supplement_sources_are_complete_official_publications():
+    expected = {
+        "traffic-points-2021": ("www.gov.cn", 37),
+        "medical-device-registration-2021": ("www.samr.gov.cn", 124),
+        "medical-device-operation-2022": ("www.samr.gov.cn", 73),
+        "cosmetics-operation-2021": ("www.samr.gov.cn", 66),
+    }
+    selected = {source["document_id"]: source for source in corpus_builder.SOURCES if source["document_id"] in expected}
+
+    assert set(selected) == set(expected)
+    assert len({source["document_id"] for source in corpus_builder.SOURCES}) == len(corpus_builder.SOURCES)
+    for document_id, (host, expected_max) in expected.items():
+        source = selected[document_id]
+        assert source["source_url"].startswith(f"https://{host}/")
+        assert source["expected_max"] == expected_max
+        assert source["version_status"] == "dated_original_publication; currentness_not_asserted"
+        assert source["version_evidence"]
+        assert source["last_sentence"]
+
+
 def test_statutory_paragraphs_references_and_subarticles():
     text = html_to_text("<script>第一条 fake</script><p>第一条 内容。</p><p>依照本法第二条处理。</p>"
                         "<p>第一条之一 补充。</p><h3>第二章 其他</h3><p>第二条 结束。</p>")

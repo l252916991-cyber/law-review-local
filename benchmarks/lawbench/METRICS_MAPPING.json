@@ -1,137 +1,48 @@
 {
-  "title": "LawBench 官方评分逻辑映射",
+  "title": "LawBench 任务与评分指标映射（本地实现口径）",
   "source": "https://github.com/open-compass/LawBench",
   "commit": "e30981bb3ff54c41571f222e0b23e92d27375388",
   "total_tasks": 20,
+  "authoritative_implementation": "app/benchmark_metrics.py 中的 LAW_BENCH_METRICS；本文件只是可读映射，不得与该实现冲突。",
   "metrics": {
-    "1-1": {
-      "name": "法条背诵",
-      "metric": "ROUGE-L",
-      "type": "生成"
-    },
-    "1-2": {
-      "name": "司法考试",
-      "metric": "Accuracy",
-      "type": "选择"
-    },
-    "2-1": {
-      "name": "要素识别",
-      "metric": "F0.5",
-      "type": "分类"
-    },
-    "2-2": {
-      "name": "争议焦点",
-      "metric": "Accuracy",
-      "type": "分类"
-    },
-    "2-3": {
-      "name": "类案匹配",
-      "metric": "F1",
-      "type": "分类"
-    },
-    "2-4": {
-      "name": "论辩理解",
-      "metric": "Accuracy",
-      "type": "选择"
-    },
-    "2-5": {
-      "name": "阅读理解",
-      "metric": "RC-F1",
-      "type": "阅读理解"
-    },
-    "2-6": {
-      "name": "命名实体",
-      "metric": "Soft-F1",
-      "type": "生成"
-    },
-    "2-7": {
-      "name": "司法摘要",
-      "metric": "ROUGE-L",
-      "type": "生成"
-    },
-    "2-8": {
-      "name": "罪名预测",
-      "metric": "Accuracy",
-      "type": "选择"
-    },
-    "2-9": {
-      "name": "案由分类",
-      "metric": "Accuracy",
-      "type": "分类"
-    },
-    "2-10": {
-      "name": "法条推荐",
-      "metric": "Accuracy",
-      "type": "分类"
-    },
-    "3-1": {
-      "name": "案情理解",
-      "metric": "RC-F1",
-      "type": "阅读理解"
-    },
-    "3-2": {
-      "name": "合同撰写",
-      "metric": "ROUGE-L",
-      "type": "生成"
-    },
-    "3-3": {
-      "name": "税额计算",
-      "metric": "NLD",
-      "type": "数值预测"
-    },
-    "3-4": {
-      "name": "咨询判断",
-      "metric": "NLD",
-      "type": "数值预测"
-    },
-    "3-5": {
-      "name": "时效计算",
-      "metric": "NLD",
-      "type": "数值预测"
-    },
-    "3-6": {
-      "name": "刑期预测",
-      "metric": "Accuracy",
-      "type": "选择"
-    },
-    "3-7": {
-      "name": "金额预测",
-      "metric": "Amount-Acc",
-      "type": "金额预测"
-    },
-    "3-8": {
-      "name": "判决撰写",
-      "metric": "ROUGE-L",
-      "type": "生成"
-    }
+    "1-1": { "name": "法条背诵", "metric": "rouge_l", "type": "生成" },
+    "1-2": { "name": "司法考试知识问答", "metric": "accuracy", "type": "选择" },
+    "2-1": { "name": "法律文件校对", "metric": "f0.5", "type": "校对" },
+    "2-2": { "name": "纠纷焦点识别", "metric": "accuracy", "type": "分类" },
+    "2-3": { "name": "婚姻纠纷鉴定", "metric": "f1", "type": "分类" },
+    "2-4": { "name": "法律问题主题识别", "metric": "accuracy", "type": "分类" },
+    "2-5": { "name": "司法阅读理解", "metric": "rc_f1", "type": "阅读理解" },
+    "2-6": { "name": "法律命名实体识别", "metric": "soft_f1", "type": "生成" },
+    "2-7": { "name": "司法舆情摘要", "metric": "rouge_l", "type": "生成" },
+    "2-8": { "name": "法律论点挖掘", "metric": "accuracy", "type": "选择" },
+    "2-9": { "name": "法律事件检测", "metric": "f1", "type": "分类" },
+    "2-10": { "name": "法律触发词提取", "metric": "soft_f1", "type": "生成" },
+    "3-1": { "name": "事实法条预测", "metric": "f1", "type": "分类" },
+    "3-2": { "name": "场景法律依据", "metric": "rouge_l", "type": "生成" },
+    "3-3": { "name": "罪名预测", "metric": "f1", "type": "分类" },
+    "3-4": { "name": "刑期预测", "metric": "normalized_log_distance", "type": "数值预测" },
+    "3-5": { "name": "给定法条刑期预测", "metric": "normalized_log_distance", "type": "数值预测" },
+    "3-6": { "name": "司法考试案例分析", "metric": "accuracy", "type": "选择" },
+    "3-7": { "name": "犯罪金额计算", "metric": "accuracy", "type": "金额预测" },
+    "3-8": { "name": "法律咨询", "metric": "rouge_l", "type": "生成" }
+  },
+  "local_approximations": {
+    "2-1": "字符编辑集合 F0.5，近似 ChERRANT；标点/空格差异由 benchmark_postprocess 在打分前修复。",
+    "2-5": "字符 F1，近似 RC-F1。",
+    "2-6": "按实体类型抽取后的软 F1，实体边界错误按字符相似度折算。",
+    "2-10": "按分号切分后按位置配对的软 F1；顺序不一致会直接损失分数。",
+    "3-1": "条号集合 F1。",
+    "3-3": "分号分隔的罪名集合 F1；复合罪名内部的顿号、逗号不拆分。",
+    "3-7": "金额精确匹配（等值判定）。",
+    "3-4": "上游会跳过无期/死刑参考答案；本项目保留零分并单列 reference_invalid。",
+    "note": "以上近似与官方评测脚本口径不完全一致；对外比较前必须逐项核对官方实现，不能把本地混合均分称为官方榜单分数。"
   },
   "implementation_status": {
-    "completed": [
-      "1-2",
-      "2-8",
-      "3-6"
+    "implemented": [
+      "1-1", "1-2", "2-1", "2-2", "2-3", "2-4", "2-5", "2-6", "2-7", "2-8",
+      "2-9", "2-10", "3-1", "3-2", "3-3", "3-4", "3-5", "3-6", "3-7", "3-8"
     ],
-    "partial": [
-      "1-1",
-      "2-7",
-      "3-2",
-      "3-8"
-    ],
-    "pending": [
-      "2-1",
-      "2-2",
-      "2-3",
-      "2-4",
-      "2-5",
-      "2-6",
-      "2-9",
-      "2-10",
-      "3-1",
-      "3-3",
-      "3-4",
-      "3-5",
-      "3-7"
-    ]
-  },
-  "notes": "当前已实现基础评分，待补充所有20类任务的官方指标"
+    "approximate": ["2-1", "2-5", "2-6", "2-10", "3-1", "3-3", "3-7"],
+    "note": "20 类均已实现确定性评分；近似项见 local_approximations。评分器版本 lawbench-local-v3。"
+  }
 }

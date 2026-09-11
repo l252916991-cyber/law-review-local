@@ -11,6 +11,7 @@ const CONSTANTS = {
 // 全局状态
 // ========================================
 const state = {
+  caseRequestId: 0,
   cases: [],
   caseId: null,
   case: null,
@@ -30,70 +31,24 @@ const state = {
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-/**
- * API 请求封装
- * @param {string} path - API 路径
- * @param {object} options - fetch 选项
- * @returns {Promise} JSON 响应或 Response 对象
- */
-async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  if (!response.ok) {
-    let message = `请求失败(${response.status})`;
-    let detail = null;
-    try {
-      const body = await response.json();
-      detail = body.detail;
-      message = typeof detail === "object" ? (detail.message || message) : (detail || message);
-    } catch (e) {
-      console.warn('Failed to parse error response:', e);
-    }
-    const error = new Error(message);
-    error.status = response.status;
-    if (typeof detail === "object" && detail) {
-      error.runId = detail.run_id;
-      error.resumable = Boolean(detail.resumable);
-    }
-    throw error;
-  }
-  const type = response.headers.get("content-type") || "";
-  return type.includes("application/json") ? response.json() : response;
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const toggle = $("#theme-toggle");
+  if (!toggle) return;
+  const dark = theme === "dark";
+  toggle.querySelector("span").textContent = dark ? "☀" : "☾";
+  toggle.setAttribute("aria-label", dark ? "切换到白天主题" : "切换到黑夜主题");
+  toggle.title = dark ? "切换到白天主题" : "切换到黑夜主题";
 }
 
-/**
- * HTML 转义，防止 XSS 攻击
- * @param {string} value - 需要转义的字符串
- * @returns {string} 转义后的安全字符串
- */
-function escapeHtml(value = "") {
-  return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+function initializeTheme() {
+  const saved = localStorage.getItem("lexvault-theme");
+  const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(saved === "dark" || saved === "light" ? saved : preferred);
 }
 
-/**
- * Markdown 渲染(支持有限的语法)
- * @param {string} value - Markdown 文本
- * @returns {string} HTML 字符串
- */
-function markdown(value = "") {
-  const safe = escapeHtml(value);
-  const lines = safe.split("\n");
-  let inList = false;
-  const output = [];
-  for (const raw of lines) {
-    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\[\s*资料\s*(\d+)\s*\]/g, '<span class="route-badge">资料$1</span>');
-    if (line.startsWith("- ")) {
-      if (!inList) { output.push("<ul>"); inList = true; }
-      output.push(`<li>${line.slice(2)}</li>`);
-    } else {
-      if (inList) { output.push("</ul>"); inList = false; }
-      if (line.startsWith("## ")) output.push(`<h4>${line.slice(3)}</h4>`);
-      else if (line.startsWith("&gt; ")) output.push(`<p class="model-note">${line.slice(5)}</p>`);
-      else if (line.trim()) output.push(`<p>${line}</p>`);
-    }
-  }
-  if (inList) output.push("</ul>");
-  return output.join("");
-}
+const { api, escapeHtml, markdown, formatDate } = window.LexVault;
+window.addEventListener("lexvault:unauthorized", expireSession);
 
 /**
  * 显示 Toast 通知
@@ -106,17 +61,6 @@ function toast(message, tone = "success") {
   node.textContent = message;
   $("#toast-stack").append(node);
   setTimeout(() => node.remove(), CONSTANTS.TOAST_DURATION);
-}
-
-/**
- * 格式化日期
- * @param {string} value - ISO 日期字符串
- * @returns {string} 格式化后的日期
- */
-function formatDate(value) {
-  if (!value) return "刚刚";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -135,20 +79,64 @@ function statusClass(status = "") {
 /**
  * 应用启动入口
  */
-async function bootstrap() {
-  bindEvents();
+function expireSession() {
+  if (document.body.classList.contains("auth-pending")) return;
+  document.body.classList.add("auth-pending");
+  sessionStorage.removeItem("lexvault-active-job");
+  const view = $(".nav-item.active")?.dataset.view || "overview";
+  if (state.caseId) sessionStorage.setItem("lexvault-return", JSON.stringify({ caseId: state.caseId, view }));
+  location.replace("/?auth_error=expired");
+}
+
+const authErrors = {
+  expired: "登录状态已过期，请重新登录。",
+  state: "登录会话已过期或无效，请重新发起登录。",
+  unavailable: "律所身份服务暂不可用，请稍后重试。",
+  denied: "你的账号尚未获得此工作空间的访问权限，请联系律所管理员。",
+  failed: "组织登录验证失败，请重新登录。",
+};
+
+async function checkIdentity() {
+  $("#auth-error").textContent = "";
+  $("#auth-retry").hidden = true;
+  $("#auth-status").textContent = "正在检查登录状态…";
   try {
     const identity = await api("/api/auth/me");
+    $("#auth-support").textContent = identity.support_contact || "请联系律所管理员";
+    $("#auth-status").textContent = "";
+    if (!identity.authenticated) {
+      $("#auth-methods").hidden = false;
+      $("#auth-sso").hidden = !identity.oidc_enabled;
+      $("#auth-token-details").open = !identity.oidc_enabled;
+      $("#auth-token-details summary").hidden = !identity.oidc_enabled;
+      const url = new URL(location.href);
+      const reason = url.searchParams.get("auth_error");
+      $("#auth-error").textContent = reason ? (authErrors[reason] || authErrors.failed) : "";
+      if (reason) { url.searchParams.delete("auth_error"); history.replaceState(null, "", url.pathname + url.search + url.hash); }
+      $(identity.oidc_enabled ? "#auth-sso" : "#auth-token").focus();
+      return null;
+    }
+    return identity;
+  } catch (error) {
+    $("#auth-status").textContent = "暂时无法进入工作空间";
+    $("#auth-error").textContent = error.status ? error.message : "无法连接工作空间，请检查网络后重试。";
+    $("#auth-methods").hidden = true;
+    $("#auth-retry").hidden = false;
+    return null;
+  }
+}
+
+async function bootstrap() {
+  bindEvents();
+  const identity = await checkIdentity();
+  if (!identity) return;
+  document.body.classList.remove("auth-pending");
+  try {
     if (identity.mode === "token") {
-      $(".privacy-chip").textContent = "令牌权限模式";
-      if (!identity.authenticated) {
-        $("#case-title").textContent = "请先登录";
-        $("#auth-dialog").showModal();
-        return;
-      }
+      $("#workspace-access").textContent = "律所授权空间";
       $("#user-name").value = identity.name;
       $("#user-name").readOnly = true;
-      $("#new-case-btn").hidden = !identity.admin;
+      $("#new-case-btn").hidden = !identity.permissions.includes("manage") && !identity.admin;
       $("#sign-out").hidden = false;
     }
     const health = await api("/api/health");
@@ -156,8 +144,14 @@ async function bootstrap() {
     $("#model-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
     $("#model-name").textContent = health.local_llm ? health.model : "仍可使用检索与溯源";
     await loadCases();
-    if (state.cases.length) await selectCase(state.cases[0].id);
-    else $("#case-title").textContent = "暂无可访问案件";
+    let returnTo = null;
+    try { returnTo = JSON.parse(sessionStorage.getItem("lexvault-return")); } catch { /* Ignore invalid navigation state. */ }
+    sessionStorage.removeItem("lexvault-return");
+    const restoredCase = state.cases.find((item) => item.id === returnTo?.caseId);
+    if (state.cases.length) {
+      await selectCase(restoredCase ? restoredCase.id : state.cases[0].id);
+      if (restoredCase && $$(".nav-item").some((item) => item.dataset.view === returnTo.view)) showView(returnTo.view);
+    } else clearCaseWorkspace();
     const activeJob = sessionStorage.getItem("lexvault-active-job");
     if (activeJob) {
       const job = await api(`/api/agent-jobs/${activeJob}`);
@@ -189,12 +183,89 @@ async function loadCases() {
 /**
  * 渲染案件列表
  */
+function openLifecycleDialog(options) {
+  return new Promise((resolve) => {
+    const dialog = $("#case-lifecycle-dialog");
+    $("#lifecycle-kicker").textContent = options.kicker || "案卷生命周期";
+    $("#lifecycle-title").textContent = options.title;
+    $("#lifecycle-message").textContent = options.message;
+    $("#lifecycle-impact").textContent = options.impact || "操作会写入审计记录。";
+    const confirm = $("#lifecycle-confirm"); confirm.textContent = options.action || "确认"; confirm.classList.toggle("danger-action", Boolean(options.danger));
+    const finish = (value) => { dialog.close(); resolve(value); };
+    $("#lifecycle-cancel").onclick = () => finish(false); $("#lifecycle-cancel-action").onclick = () => finish(false); confirm.onclick = () => finish(true);
+    dialog.addEventListener("cancel", () => resolve(false), { once: true }); dialog.showModal();
+  });
+}
+
+function clearCaseWorkspace() {
+  state.caseRequestId++;
+  Object.assign(state, {caseId: null, case: null, documents: [], evidence: [], relations: [], conversations: [], conversationId: null, recoverableAgentRunId: null});
+  $("#case-title").textContent = "暂无工作区案件";
+  $("#case-type").textContent = "案件空间";
+  $$(".view").forEach((view) => view.classList.remove("active"));
+  $("#no-case-state").hidden = false;
+}
+
+async function refreshAfterCaseRemoval(id) {
+  await loadCases();
+  if (state.caseId === id) {
+    if (state.cases[0]) await selectCase(state.cases[0].id);
+    else clearCaseWorkspace();
+  }
+}
+
+async function openCaseStorage(status) {
+  const dialog = $("#case-storage-dialog");
+  $("#case-storage-title").textContent = status === "archived" ? "已归档案卷" : "回收站";
+  $("#case-storage-description").textContent = status === "archived" ? "长期保留，可随时恢复到案件空间。" : "删除的案卷保留 30 天，可在清理前恢复。";
+  $("#case-storage-list").textContent = "正在加载…";
+  if (!dialog.open) dialog.showModal();
+  try {
+    const items = await api(`/api/cases/lifecycle/${status}`);
+    $("#case-storage-list").innerHTML = items.map((item) => `<div class="storage-row"><div><strong>${escapeHtml(item.title)}</strong><small>${status === "archived" ? "长期保留" : `保留至 ${escapeHtml((item.purge_after || "").slice(0,10))}`}</small></div><button type="button" class="secondary-button" data-restore-case="${item.id}">恢复案卷</button></div>`).join("") || '<div class="empty-state">暂无案卷</div>';
+    $$("[data-restore-case]", dialog).forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const id = Number(button.dataset.restoreCase);
+        await api(`/api/cases/${id}/restore`, {method: "POST"});
+        await loadCases(); await selectCase(id); showView("overview");
+        await openCaseStorage(status); toast("案卷已恢复到案件空间");
+      } catch (error) { toast(error.message, "error"); button.disabled = false; }
+    }));
+  } catch (error) { $("#case-storage-list").textContent = error.message; }
+}
+
 function renderCaseList() {
   $("#case-list").innerHTML = state.cases.map((item) => `
-    <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
-      <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
-    </button>`).join("") || '<div class="empty-state">暂无案件</div>';
+    <div class="case-row">
+      <button class="case-item ${item.id === state.caseId ? "active" : ""}" data-case-id="${item.id}">
+        <strong>${escapeHtml(item.title)}</strong><small>${item.document_count} 份卷宗 · ${item.evidence_count} 条证据</small>
+      </button>
+      <details class="case-menu"><summary aria-label="案卷操作">···</summary><div><button data-archive-case="${item.id}">归档案卷</button><button class="case-delete" data-trash-case="${item.id}">移入回收站</button></div></details>
+    </div>`).join("") || '<div class="empty-state">暂无案件</div>';
+  $$(".case-menu").forEach((menu) => menu.addEventListener("toggle", () => {
+    if (!menu.open) return;
+    const rect = menu.querySelector("summary").getBoundingClientRect();
+    const panel = menu.querySelector("div");
+    panel.style.left = `${Math.max(8, rect.right - 144)}px`;
+    panel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 100)}px`;
+    $$(".case-menu").forEach((other) => { if (other !== menu) other.open = false; });
+  }));
   $$(".case-item").forEach((button) => button.addEventListener("click", () => selectCase(Number(button.dataset.caseId))));
+  $$('[data-archive-case]').forEach((button) => button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const id = Number(button.dataset.archiveCase);
+    if (!(await openLifecycleDialog({ title: "归档案卷？", kicker: "长期保留", message: "归档后案卷会从日常工作区移出，但会长期保留并可随时恢复。", action: "归档案卷" }))) return;
+    try { await api(`/api/cases/${id}/archive`, { method: "POST" }); await refreshAfterCaseRemoval(id); toast("案卷已归档"); } catch (error) { toast(error.message, "error"); }
+  }));
+  $$('[data-trash-case]').forEach((button) => button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const id = Number(button.dataset.trashCase);
+    const item = state.cases.find((candidate) => candidate.id === id);
+    if (!item) return;
+    if (!(await openLifecycleDialog({ title: "移入回收站？", kicker: "可恢复删除", message: `案卷「${item.title}」将移入回收站，保留 30 天。`, impact: `将影响 ${item.document_count} 份卷宗、${item.evidence_count} 条证据。`, action: "移入回收站", danger: true }))) return;
+    try { await api(`/api/cases/${id}/trash`, { method: "POST" }); await refreshAfterCaseRemoval(id); toast("案卷已移入回收站，保留 30 天"); } catch (error) { toast(error.message, "error"); }
+  }));
 }
 
 /**
@@ -202,7 +273,10 @@ function renderCaseList() {
  * @param {number} caseId - 案件 ID
  */
 async function selectCase(caseId) {
+  const requestId = ++state.caseRequestId;
+  $("#no-case-state").hidden = true;
   state.caseId = caseId;
+  if (!$(".view.active")) showView("overview");
   state.conversationId = null;
 
   // 显示加载状态
@@ -216,6 +290,7 @@ async function selectCase(caseId) {
       api(`/api/cases/${caseId}/conversations`),
       api(`/api/cases/${caseId}/audit`),
     ]);
+    if (requestId !== state.caseRequestId) return;
     state.case = caseData;
     state.documents = documents;
     state.evidence = evidenceData.evidence;
@@ -223,7 +298,8 @@ async function selectCase(caseId) {
     state.conversations = conversations;
     $("#case-title").textContent = caseData.title;
     $("#case-type").textContent = `${caseData.case_type} · ${caseData.status}`;
-    $("#case-description").textContent = caseData.description || "本地案件阅卷空间";
+    $("#case-description").textContent = caseData.description || "";
+    $("#case-description").hidden = !caseData.description;
     renderCaseList();
     renderOverview(activity);
     renderDirectory();
@@ -232,9 +308,9 @@ async function selectCase(caseId) {
     resetChat();
     await loadLabMetrics();
   } catch (error) {
-    toast(`加载案件失败: ${error.message}`, "error");
+    if (requestId === state.caseRequestId) toast(`加载案件失败: ${error.message}`, "error");
   } finally {
-    hideLoadingState();
+    if (requestId === state.caseRequestId) hideLoadingState();
   }
 }
 
@@ -255,26 +331,24 @@ function hideLoadingState() {
 
 async function loadLabMetrics() {
   if (!state.caseId) return;
+  const requestId = state.caseRequestId;
   try {
-    const [metrics, benchmark] = await Promise.all([
-      api(`/api/cases/${state.caseId}/platform-metrics`),
-      api("/api/benchmarks/lawbench?limit=0"),
-    ]);
+    const metrics = await api(`/api/cases/${state.caseId}/platform-metrics`);
+    if (requestId !== state.caseRequestId) return;
     const runs = metrics.agent_runs || {};
     const vectors = metrics.vector_index || {};
     const evaluation = metrics.evaluation;
     $("#lab-run-count").textContent = runs.total || 0;
     $("#lab-run-success").textContent = `${runs.completed || 0} 成功 · ${runs.failed || 0} 失败 · 均值 ${Math.round(runs.avg_ms || 0)}ms`;
     $("#lab-vector-pages").textContent = vectors.pages || 0;
-    $("#lab-vector-meta").textContent = vectors.pages ? `${vectors.dimensions} 维 · ${vectors.backend}` : "等待构建";
+    $("#lab-vector-meta").textContent = vectors.pages ? `${vectors.pages} 页可用于检索` : "等待构建";
     $("#lab-memory-count").textContent = metrics.memory_count || 0;
     $("#lab-recall").textContent = evaluation?.recall_at_k != null ? `${Math.round(evaluation.recall_at_k * 100)}%` : "—";
-    $("#lab-mrr").textContent = evaluation ? `MRR ${evaluation.mrr == null ? "—" : evaluation.mrr.toFixed(2)} · 原文片段提供率 ${Math.round((evaluation.quote_presence_rate || 0) * 100)}%` : "运行离线评测";
-    $("#benchmark-chip").textContent = `LawBench ${benchmark.total_questions.toLocaleString("zh-CN")} 题`;
+    $("#lab-mrr").textContent = evaluation ? `排序得分 ${evaluation.mrr == null ? "—" : evaluation.mrr.toFixed(2)} · 原文片段提供率 ${Math.round((evaluation.quote_presence_rate || 0) * 100)}%` : "等待质量检查";
     const resumable = (metrics.recent_runs || []).filter((run) => run.resumable);
     const recoveryTarget = $("#lab-resumable-runs");
     recoveryTarget.hidden = resumable.length === 0;
-    recoveryTarget.innerHTML = resumable.map((run) => `<button class="secondary-button resume-button" data-resume-run="${run.id}">继续执行 Run #${run.id} · ${escapeHtml(run.question.slice(0, 24))}</button>`).join("");
+    recoveryTarget.innerHTML = resumable.map((run) => `<button class="secondary-button resume-button" data-resume-run="${run.id}">继续执行 任务 #${run.id} · ${escapeHtml(run.question.slice(0, 24))}</button>`).join("");
     $$('[data-resume-run]', recoveryTarget).forEach((button) => button.addEventListener("click", resumeAgentRun));
   } catch (error) { console.warn("Agent metrics unavailable", error); }
 }
@@ -285,44 +359,44 @@ function renderAgentResult(result) {
   const citationHtml = result.citations?.length ? `<div class="citations">${result.citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small><em>${escapeHtml(item.retrieval_explain || "")}</em></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
   const modelBadge = result.llm_model ? `<span class="route-badge secondary">${escapeHtml(result.llm_model)}</span>` : "";
   const fallbackBadge = result.fallback_reason ? '<span class="route-badge secondary">规则降级</span>' : "";
-  const checkpointBadge = result.runtime === "langgraph" ? `<span class="route-badge secondary">Checkpoint 库 ${Number(result.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B · 恢复 ${result.resume_count || 0} 次</span>` : "";
+  const checkpointBadge = result.runtime === "langgraph" ? `<span class="route-badge secondary">恢复记录 ${Number(result.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B · 恢复 ${result.resume_count || 0} 次</span>` : "";
   $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
   $$('[data-preview]', $("#lab-result")).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
-  $("#trace-total").textContent = `Run #${result.run_id} · ${result.total_ms}ms`;
+  $("#trace-total").textContent = `任务 #${result.run_id} · ${result.total_ms}ms`;
   $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
 
 function comparisonCard(label, result) {
   const nodes = (result.steps || []).map((step) => `${step.role} ${step.latency_ms}ms`).join(" · ");
   const citations = (result.citations || []).map((item) => `<button class="comparison-citation" data-preview="${item.document_id}" data-page="${item.page}">[资料${item.index}] ${escapeHtml(item.document_name)} · 第 ${item.page} 页 →</button>`).join("");
-  return `<article class="comparison-card"><header><strong>${escapeHtml(label)}</strong><span>Run #${result.run_id} · ${result.total_ms}ms</span></header><div class="answer-text">${markdown(result.answer)}</div><div class="comparison-citations">${citations || "暂无引用"}</div><div class="comparison-nodes">${escapeHtml(nodes)}</div></article>`;
+  return `<article class="comparison-card"><header><strong>${escapeHtml(label)}</strong><span>任务 #${result.run_id} · ${result.total_ms}ms</span></header><div class="answer-text">${markdown(result.answer)}</div><div class="comparison-citations">${citations || "暂无引用"}</div><div class="comparison-nodes">${escapeHtml(nodes)}</div></article>`;
 }
 
 function renderComparisonResult(result) {
   const target = $("#runtime-comparison");
   const checks = [
-    ["核心结构", result.comparison.structurally_equivalent],
-    ["完整验收", result.comparison.equivalent],
-    ["路由", result.comparison.route_match],
+    ["分析结构", result.comparison.structurally_equivalent],
+    ["全部检查项", result.comparison.equivalent],
+    ["检索路径", result.comparison.route_match],
     ["引用", result.comparison.citation_match],
-    ["节点", result.comparison.node_match],
+    ["分析步骤", result.comparison.node_match],
     ["专家输出", result.comparison.specialist_output_match],
-    ["答案契约", result.comparison.answer_contract_match],
+    ["答复结构", result.comparison.answer_contract_match],
   ];
-  target.innerHTML = `<div class="comparison-summary">${checks.map(([label, pass]) => `<span class="dataset-chip ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"} ${label}</span>`).join("")}<span class="dataset-chip">LangGraph 差值 ${result.comparison.latency_delta_ms >= 0 ? "+" : ""}${result.comparison.latency_delta_ms}ms</span></div><div class="comparison-grid">${comparisonCard("原生 DAG", result.native)}${comparisonCard("LangGraph", result.langgraph)}</div>`;
+  target.innerHTML = `<div class="comparison-summary">${checks.map(([label, pass]) => `<span class="dataset-chip ${pass ? "pass" : "fail"}">${pass ? "✓" : "×"} ${label}</span>`).join("")}<span class="dataset-chip">可恢复分析耗时差 ${result.comparison.latency_delta_ms >= 0 ? "+" : ""}${result.comparison.latency_delta_ms}ms</span></div><div class="comparison-grid">${comparisonCard("标准分析", result.native)}${comparisonCard("可恢复分析", result.langgraph)}</div>`;
   const overhead = result.comparison.langgraph_overhead_percent;
-  $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">Checkpoint 库 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
+  $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">恢复记录 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
   $$('[data-preview]', target).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   target.hidden = false;
-  $("#lab-result").innerHTML = '<div class="empty-state">双版本已使用相同输入完成；正文允许因模型采样而不同，等价性按路由、引用、节点与结构化专家输出判断。</div>';
-  $("#trace-total").textContent = `Native #${result.native.run_id} ↔ LangGraph #${result.langgraph.run_id}`;
+  $("#lab-result").innerHTML = '<div class="empty-state">两种分析方式已使用相同问题完成。请对比答复、引用和各项检查结果。</div>';
+  $("#trace-total").textContent = `标准分析 #${result.native.run_id} ↔ 可恢复分析 #${result.langgraph.run_id}`;
   $("#agent-trace").innerHTML = [...result.native.steps, ...result.langgraph.steps].map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
 
 function renderRecoverableFailure(error) {
   $("#runtime-comparison").hidden = true;
   state.recoverableAgentRunId = error.resumable ? error.runId : null;
-  const resume = error.resumable && error.runId ? `<button class="secondary-button resume-button" id="resume-agent-btn">继续执行 Run #${error.runId}</button>` : "";
+  const resume = error.resumable && error.runId ? `<button class="secondary-button resume-button" id="resume-agent-btn">继续执行 任务 #${error.runId}</button>` : "";
   $("#lab-result").innerHTML = `<div class="empty-state">运行失败：${escapeHtml(error.message)}${resume}</div>`;
   if (resume) $("#resume-agent-btn").addEventListener("click", resumeAgentRun);
 }
@@ -332,12 +406,12 @@ async function resumeAgentRun(event) {
   const runId = Number(button?.dataset.resumeRun) || state.recoverableAgentRunId;
   if (!runId) return;
   state.recoverableAgentRunId = runId;
-  button.disabled = true; button.textContent = "从 checkpoint 恢复中…";
+  button.disabled = true; button.textContent = "从保存的进度恢复中…";
   try {
     const result = await api(`/api/agent-runs/${runId}/resume`, { method: "POST" });
     renderAgentResult(result);
     await loadLabMetrics();
-    toast(`Run #${runId} 已从 checkpoint 恢复`, "success");
+    toast(`任务 #${runId} 已从保存的进度恢复`, "success");
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -352,9 +426,9 @@ async function runAgentLab() {
   const mode = $("#agent-runtime").value;
   $("#compare-agent-btn").disabled = true;
   $("#agent-runtime").disabled = true;
-  button.disabled = true; button.textContent = `${mode === "langgraph" ? "LangGraph" : "原生 DAG"} 执行中…`;
+  button.disabled = true; button.textContent = `${mode === "langgraph" ? "可恢复分析" : "标准分析"} 执行中…`;
   setLabBusy(true);
-  $("#lab-result").innerHTML = '<div class="empty-state">Planner 正在生成执行图，专家节点随后并行运行…</div>';
+  $("#lab-result").innerHTML = '<div class="empty-state">正在安排分析步骤，请稍候…</div>';
   $("#runtime-comparison").hidden = true;
   try {
     const submitted = await api(`/api/cases/${state.caseId}/agent-jobs`, {
@@ -365,7 +439,7 @@ async function runAgentLab() {
     const result = await pollReviewJob(submitted.job_id);
     renderAgentResult(result);
     await loadLabMetrics();
-    toast(`Run #${result.run_id} 完成：${result.steps.length} 个节点，${result.total_ms}ms`);
+    toast(`任务 #${result.run_id} 完成：${result.steps.length} 个步骤，${result.total_ms}ms`);
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -374,14 +448,14 @@ async function runAgentLab() {
     button.disabled = false;
     $("#compare-agent-btn").disabled = false;
     $("#agent-runtime").disabled = false;
-    button.innerHTML = `运行${mode === "langgraph" ? " LangGraph" : "原生 DAG"} <b>→</b>`;
+    button.innerHTML = `运行${mode === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   }
 }
 
 async function pollReviewJob(jobId) {
   for (;;) {
     const job = await api(`/api/agent-jobs/${jobId}`);
-    $("#trace-total").textContent = `后台任务 ${job.status}${job.run_id ? ` · Run #${job.run_id}` : ""}`;
+    $("#trace-total").textContent = `后台任务 ${job.status}${job.run_id ? ` · 任务 #${job.run_id}` : ""}`;
     $("#agent-trace").innerHTML = (job.steps || []).map((step, index) => `<div class="trace-step"><span>${index + 1}</span><div><strong>${escapeHtml(step.agent_role || step.node_name)}</strong><small>${escapeHtml(step.output?.summary || step.node_name)}</small></div><b>${Number(step.latency_ms || 0)}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
     if (job.status === "completed") {
       sessionStorage.removeItem("lexvault-active-job");
@@ -411,7 +485,7 @@ async function compareAgentRuntimes() {
   $("#agent-runtime").disabled = true;
   button.disabled = true; button.textContent = "依次运行两版中…";
   $("#runtime-comparison").hidden = true;
-  $("#lab-result").innerHTML = '<div class="empty-state">先运行原生 DAG，再运行 LangGraph；两版均不会在对比模式写入长期记忆。</div>';
+  $("#lab-result").innerHTML = '<div class="empty-state">依次运行两种分析方式；对比结果不会写入案件记忆。</div>';
   try {
     const result = await api(`/api/cases/${state.caseId}/agent-compare`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -419,7 +493,7 @@ async function compareAgentRuntimes() {
     });
     renderComparisonResult(result);
     await loadLabMetrics();
-    toast(result.comparison.equivalent ? "双运行时结构等价" : "双运行时存在差异", result.comparison.equivalent ? "success" : "error");
+    toast(result.comparison.equivalent ? "两种分析方式的检查项一致" : "两种分析方式的检查项存在差异", result.comparison.equivalent ? "success" : "error");
   } catch (error) {
     renderRecoverableFailure(error);
     toast(error.message, "error");
@@ -427,7 +501,7 @@ async function compareAgentRuntimes() {
     button.disabled = false;
     $("#run-agent-btn").disabled = false;
     $("#agent-runtime").disabled = false;
-    button.textContent = "双版本对比";
+    button.textContent = "分析方式对比";
   }
 }
 
@@ -436,10 +510,10 @@ async function buildHybridIndex() {
   button.disabled = true; button.textContent = "索引构建中…";
   try {
     const result = await api(`/api/cases/${state.caseId}/vector-index`, { method: "POST" });
-    toast(`Hybrid 索引就绪：${result.indexed.pages} 页，${result.indexed.dimensions} 维，新增 ${result.indexed.embedded} 页`);
+    toast(`检索索引已更新：${result.indexed.pages} 页，新增 ${result.indexed.embedded} 页`);
     await loadLabMetrics();
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "构建 Hybrid 索引"; }
+  finally { button.disabled = false; button.textContent = "更新检索索引"; }
 }
 
 async function runEvaluation() {
@@ -448,10 +522,10 @@ async function runEvaluation() {
   try {
     const report = await api(`/api/cases/${state.caseId}/evaluate-rag`, { method: "POST" });
     const metric = (value) => value == null ? "—" : Number(value).toFixed(2);
-    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>Recall@${report.k}</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small>MRR</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>Ground Truth</small></div></div><p>片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "PASS" : "MISS"}</span><p>${escapeHtml(item.query)}</p><b>R@${report.k} ${metric(item.recall_at_k)} · MRR ${metric(item.mrr)}</b></div>`).join("")}</div>`;
-    await loadLabMetrics(); toast("RAG 离线评测完成");
+    $("#evaluation-result").innerHTML = `<div class="eval-score"><strong>${report.recall_at_k == null ? "—" : `${Math.round(report.recall_at_k * 100)}%`}</strong><span>前 ${report.k} 项召回率</span></div><div class="eval-grid"><div><b>${metric(report.mrr)}</b><small title="标准答案首次出现位置的倒数均值">排序得分</small></div><div><b>${Math.round((report.quote_presence_rate || 0) * 100)}%</b><small>原文片段提供率</small></div><div><b>${report.average_latency_ms}ms</b><small>平均延迟</small></div><div><b>${report.queries}</b><small>标准答案题数</small></div></div><p>片段提供率不代表模型论断受到原文支持；需律师人工复核。</p><div class="eval-cases">${report.cases.map((item) => `<div><span class="${item.recall_at_k >= .5 ? "pass" : "fail"}">${item.recall_at_k == null ? "无答案题" : item.recall_at_k >= .5 ? "达标" : "未达标"}</span><p>${escapeHtml(item.query)}</p><b>召回率 ${metric(item.recall_at_k)} · 排序得分 ${metric(item.mrr)}</b></div>`).join("")}</div>`;
+    await loadLabMetrics(); toast("检索质量检查完成");
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "运行 RAG 评测"; }
+  finally { button.disabled = false; button.textContent = "检查检索质量"; }
 }
 
 function renderOverview(activity = []) {
@@ -459,7 +533,7 @@ function renderOverview(activity = []) {
   $("#metric-docs").textContent = m.documents;
   $("#metric-pages").textContent = m.pages;
   $("#metric-evidence").textContent = m.evidence;
-  $("#metric-confirmed").textContent = `${m.confirmed} 条已确认`;
+  $("#metric-confirmed").textContent = m.confirmed;
   $("#activity-list").innerHTML = activity.slice(0, 6).map((item) => `
     <div class="activity"><div class="activity-mark">${activityIcon(item.action)}</div><div><strong>${escapeHtml(item.action)}</strong><small>${escapeHtml(item.detail)}</small></div><time>${formatDate(item.created_at)}</time></div>
   `).join("") || '<div class="empty-state">尚无操作记录</div>';
@@ -518,7 +592,7 @@ async function saveDirectory() {
   try {
     await api(`/api/documents/${id}/directory`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     $("#directory-dialog").close();
-    toast("目录已校准，并回写检索链路");
+    toast("目录已保存，检索内容已更新");
     await selectCase(state.caseId);
   } catch (error) { toast(error.message, "error"); }
 }
@@ -639,6 +713,19 @@ function evidenceTooltip(lines) {
     box.appendChild(document.createTextNode(line == null ? '' : String(line)));
   });
   return box;
+}
+
+async function loadExportTemplates() {
+  const selector = $("#export-template");
+  if (!selector) return;
+  try {
+    const templates = await api("/api/export-templates");
+    selector.innerHTML = '<option value="">默认结案包（完整归档）</option>' +
+      templates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}${t.builtin ? "" : "（自定义）"}</option>`).join("");
+  } catch (error) {
+    selector.innerHTML = '<option value="">默认结案包（完整归档）</option>';
+    console.warn("Failed to load export templates:", error);
+  }
 }
 
 function renderEvidenceGraph() {
@@ -799,7 +886,7 @@ async function runAnalysis() {
     toast(`扫描 ${result.scanned_pages} 页，新增 ${result.created} 条待复核事项`);
     await selectCase(state.caseId);
   } catch (error) { toast(error.message, "error"); }
-  finally { button.disabled = false; button.textContent = "✦ 运行本地证据分析"; }
+  finally { button.disabled = false; button.textContent = "分析证据"; }
 }
 
 function renderConversations() {
@@ -812,12 +899,7 @@ function renderConversations() {
 function resetChat() {
   state.conversationId = null;
   renderConversations();
-  $("#chat-messages").innerHTML = `<div class="welcome-message"><div class="welcome-icon">✦</div><h2>从卷宗中获得可复核的答案</h2><p>系统会自动判断统计、事实或对比检索路径，每条关键结论都附原文件与页码。</p><div class="prompt-grid"><button>这个案件涉及多少份卷宗和相关人员？</button><button>张某关于固定回报的陈述是否存在矛盾？</button><button>梳理募集资金的主要流向</button><button>哪些材料体现了"不知情"的口供语义？</button></div></div>`;
-  bindPromptButtons();
-}
-
-function bindPromptButtons() {
-  $$(".prompt-grid button").forEach((button) => button.addEventListener("click", () => { $("#chat-input").value = button.textContent; sendChat(); }));
+  $("#chat-messages").innerHTML = '<div class="welcome-message"><h2>案件问答</h2><p>输入需要核查的问题。请结合引用原文复核答复。</p></div>';
 }
 
 async function loadConversation(id) {
@@ -838,7 +920,7 @@ function appendMessage(role, content, route = "", citations = [], semantic = [],
   else {
     const citationHtml = citations.length ? `<div class="citations">${citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
     const semanticBadge = semantic?.length ? `<span class="route-badge secondary">语义扩展 ${semantic.length}</span>` : "";
-    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">本地LLM</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}</div>`;
+    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}</div>`;
   }
   $("#chat-messages").append(node);
   $$('[data-preview]', node).forEach((button) => button.addEventListener("click", () => openPage(Number(button.dataset.preview), Number(button.dataset.page))));
@@ -870,7 +952,7 @@ async function sendChat(event) {
 async function uploadFiles(fileList) {
   const files = [...fileList]; if (!files.length || !state.caseId) return;
   const form = new FormData(); files.forEach((file) => form.append("files", file));
-  toast(`正在本机解析 ${files.length} 个文件…`);
+  toast(`正在解析 ${files.length} 个文件…`);
   try {
     const result = await api(`/api/cases/${state.caseId}/documents`, { method: "POST", body: form });
     if (result.failures.length) toast(`${result.failures.length} 个文件失败：${result.failures[0].error}`, "error");
@@ -881,21 +963,126 @@ async function uploadFiles(fileList) {
 }
 
 function showView(name) {
+  if (!state.caseId) { clearCaseWorkspace(); return; }
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `${name}-view`));
-  $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === name));
+  $$(".nav-item").forEach((item) => {
+    const active = item.dataset.view === name;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   if (name === "lab") loadLabMetrics();
 }
 
 function bindEvents() {
-  $("#auth-dialog").addEventListener("cancel", (event) => event.preventDefault());
+  const menu = $("#workspace-menu");
+  const toggle = $("#workspace-menu-toggle");
+  const items = () => $$("[role=menuitem]", menu).filter((item) => !item.hidden && !item.disabled);
+  const closeMenu = (restore = false) => {
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    if (restore) toggle.focus();
+  };
+  const openMenu = (last = false) => {
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    const available = items();
+    available[last ? available.length - 1 : 0]?.focus();
+  };
+  toggle.addEventListener("click", () => menu.hidden ? openMenu() : closeMenu(true));
+  toggle.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      openMenu(event.key === "ArrowUp");
+    }
+  });
+  menu.addEventListener("keydown", (event) => {
+    const available = items();
+    const index = available.indexOf(document.activeElement);
+    let next;
+    if (event.key === "ArrowDown") next = (index + 1) % available.length;
+    if (event.key === "ArrowUp") next = (index - 1 + available.length) % available.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = available.length - 1;
+    if (next !== undefined) { event.preventDefault(); available[next]?.focus(); }
+    if (event.key === "Tab") closeMenu(true);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) { event.preventDefault(); closeMenu(true); }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".workspace-menu")) closeMenu();
+  });
+  document.addEventListener("focusin", (event) => {
+    if (!event.target.closest(".workspace-menu")) closeMenu();
+  });
+  // Close before opening a dialog so its focus returns to the avatar.
+  menu.addEventListener("click", (event) => {
+    if (event.target.closest("[role=menuitem]")) closeMenu(true);
+  }, true);
+  $("#model-settings-btn").addEventListener("click", async () => {
+    $("#model-dialog-state").textContent = "正在检查模型服务…";
+    $("#model-dialog-name").textContent = "";
+    $("#model-dialog-dot").classList.remove("online");
+    $("#model-settings-dialog").showModal();
+    try {
+      const health = await api("/api/health");
+      $("#model-dialog-state").textContent = health.local_llm ? "本地模型在线" : "规则检索模式";
+      $("#model-dialog-name").textContent = health.model || "未返回模型名称";
+      $("#model-dialog-dot").classList.toggle("online", Boolean(health.local_llm));
+    } catch (error) {
+      $("#model-dialog-state").textContent = "无法检查模型服务";
+      $("#model-dialog-name").textContent = error.message;
+    }
+  });
+  $("#model-settings-dialog").addEventListener("click", (event) => {
+    const dialog = event.currentTarget;
+    const bounds = dialog.getBoundingClientRect();
+    if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
+  });
+  $("#hero-review").addEventListener("click", () => showView("assistant"));
+  $("#hero-upload").addEventListener("click", () => $("#file-input").click());
+  $("#theme-toggle").addEventListener("click", () => {
+    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    localStorage.setItem("lexvault-theme", theme);
+    applyTheme(theme);
+  });
+  $$("[data-case-storage]").forEach((button) => button.addEventListener("click", () => openCaseStorage(button.dataset.caseStorage)));
+  $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
+  $("#auth-retry").addEventListener("click", () => location.reload());
+  $("#auth-reveal").addEventListener("click", () => {
+    const visible = $("#auth-token").type === "password";
+    $("#auth-token").type = visible ? "text" : "password";
+    $("#auth-reveal").textContent = visible ? "隐藏" : "显示";
+    $("#auth-reveal").setAttribute("aria-label", visible ? "隐藏访问令牌" : "显示访问令牌");
+    $("#auth-reveal").setAttribute("aria-pressed", String(visible));
+  });
   $("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const submit = $("#auth-submit");
+    if (submit.disabled) return;
     const token = $("#auth-token").value;
-    $("#auth-token").value = "";
+    submit.disabled = true;
+    submit.textContent = "正在登录…";
+    $("#auth-form").setAttribute("aria-busy", "true");
+    $("#auth-error").textContent = "";
+    $("#auth-token").removeAttribute("aria-invalid");
     try {
       await api("/api/auth/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      $("#auth-token").value = "";
       location.reload();
-    } catch (error) { $("#auth-error").textContent = error.message; }
+    } catch (error) {
+      $("#auth-error").textContent = error.status ? error.message : "连接失败，请检查网络后重试。";
+      if (error.status === 401) {
+        $("#auth-token").value = "";
+        $("#auth-token").setAttribute("aria-invalid", "true");
+      }
+      $("#auth-token").focus();
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "登录工作空间 →";
+      $("#auth-form").removeAttribute("aria-busy");
+    }
   });
   $("#sign-out").addEventListener("click", async () => {
     try { await api("/api/auth/session", { method: "DELETE" }); sessionStorage.removeItem("lexvault-active-job"); location.reload(); }
@@ -904,9 +1091,8 @@ function bindEvents() {
   $("#annotation-form").addEventListener("submit", saveAnnotation);
   $("#annotation-reset").addEventListener("click", () => $("#annotation-form").reset());
   $$(".nav-item").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
-  $$('[data-go]').forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
   $("#file-input").addEventListener("change", (event) => uploadFiles(event.target.files));
-  [$("#hero-upload"), $("#directory-upload")].forEach((button) => button.addEventListener("click", () => $("#file-input").click()));
+  $("#directory-upload").addEventListener("click", () => $("#file-input").click());
   const zone = $("#upload-zone"); zone.addEventListener("click", () => $("#file-input").click());
   zone.addEventListener("dragover", (event) => { event.preventDefault(); zone.classList.add("dragging"); });
   zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
@@ -919,16 +1105,42 @@ function bindEvents() {
   $("#run-agent-btn").addEventListener("click", runAgentLab);
   $("#compare-agent-btn").addEventListener("click", compareAgentRuntimes);
   $("#agent-runtime").addEventListener("change", (event) => {
-    $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? " LangGraph" : "原生 DAG"} <b>→</b>`;
+    $("#run-agent-btn").innerHTML = `运行${event.target.value === "langgraph" ? "可恢复分析" : "标准分析"} <b>→</b>`;
   });
   $("#build-index-btn").addEventListener("click", buildHybridIndex);
   $("#evaluate-btn").addEventListener("click", runEvaluation);
   $("#new-chat").addEventListener("click", resetChat);
   $("#chat-form").addEventListener("submit", sendChat);
   $("#chat-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat(); } });
-  $("#export-btn").addEventListener("click", () => { window.location.href = `/api/cases/${state.caseId}/export`; toast("正在本机生成案件审阅包"); });
+  $("#export-btn").addEventListener("click", () => {
+    const templateId = $("#export-template").value;
+    const query = templateId ? `?template_id=${encodeURIComponent(templateId)}` : "";
+    window.location.href = `/api/cases/${state.caseId}/export${query}`;
+    toast("正在生成案件审阅包");
+  });
+  $("#export-final-btn").addEventListener("click", async () => {
+    const templateId = $("#export-template").value;
+    const query = templateId ? `?template_id=${encodeURIComponent(templateId)}&final=true` : "?final=true";
+    try {
+      const response = await api(`/api/cases/${state.caseId}/export${query}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = decodeURIComponent((response.headers.get("content-disposition") || "").match(/filename="?([^";]+)"?/)?.[1] || "结案包.zip");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      const sha = response.headers.get("x-package-sha256");
+      toast(sha ? `结案包已生成，包哈希 ${sha.slice(0, 16)}（已写入审计）` : "结案包已生成（已写入审计）");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
   $("#new-case-btn").addEventListener("click", () => $("#case-dialog").showModal());
   $("#case-form").addEventListener("submit", createCase);
+  loadExportTemplates();
 
   // 批量上传事件
   $("#batch-upload-btn").addEventListener("click", showBatchUpload);
@@ -1200,11 +1412,6 @@ async function renderGapDashboard() {
       <strong class="gap-count">-</strong>
       <span class="gap-label">建议优化</span>
     </div>
-    <div class="gap-summary-card">
-      <span class="gap-label">完整度</span>
-      <strong class="gap-count">-</strong>
-      <span class="gap-label">评分</span>
-    </div>
   `;
 
   $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #9ba5a2;">点击"🔍 运行疏漏检测"开始分析</div>';
@@ -1243,7 +1450,6 @@ async function runGapDetection() {
     };
 
     const totalGaps = stats.total || gaps.length;
-    const completeness = Math.max(0, 100 - totalGaps * 5); // 简单计算完整度分数
 
     // 更新汇总卡片
     $('#gap-summary-grid').innerHTML = `
@@ -1267,16 +1473,11 @@ async function runGapDetection() {
         <strong class="gap-count">${severityCounts['低']}</strong>
         <span class="gap-label">建议优化</span>
       </div>
-      <div class="gap-summary-card ${completeness >= 80 ? 'severity-low' : completeness >= 60 ? 'severity-medium' : 'severity-high'}">
-        <span class="gap-label">完整度</span>
-        <strong class="gap-count">${completeness}%</strong>
-        <span class="gap-label">评分</span>
-      </div>
     `;
 
     // 渲染详细列表
     if (gaps.length === 0) {
-      $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">✓ 未发现明显疏漏，证据链较为完整</div>';
+      $('#gap-details-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">本次检测未发现疏漏，仍需结合案情人工复核。</div>';
     } else {
       $('#gap-details-list').innerHTML = gaps.map(gap => `
         <div class="gap-item severity-${escapeHtml(gap.severity)}">
@@ -1555,6 +1756,7 @@ function registerKeyboardShortcuts() {
 // ========================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  initializeTheme();
   bootstrap();
   registerKeyboardShortcuts();
 });

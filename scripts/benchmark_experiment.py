@@ -23,7 +23,7 @@ from scripts.benchmark_campaign import digest, probe_model, read_rows, report, s
 SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "app/benchmark_solver.py",
            "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py", "app/benchmark_postprocess.py",
            "app/benchmark_event_tools.py", "app/benchmark_summary_tools.py", "app/legal_corpus.py",
-           "app/services.py", "app/config.py"]
+           "app/services.py", "app/config.py", "app/benchmark_weak_tasks.py"]
 
 
 def configuration(profile_file: Path) -> dict[str, Any]:
@@ -31,13 +31,13 @@ def configuration(profile_file: Path) -> dict[str, Any]:
     allowed = {"url", "model", "temperature", "max_tokens", "timeout", "enable_thinking", "strategy", "corpus_directories"}
     if not isinstance(config, dict) or set(config) - allowed:
         raise ValueError("Unexpected experiment configuration fields")
-    rag = config.get("strategy") == "statutory_rag"
+    rag = config.get("strategy") in {"statutory_rag", "weak_tasks"}
     effective = _configuration({**config, "strategy": "task_guided"} if rag else config)
     if rag:
         paths = config.get("corpus_directories")
         if not isinstance(paths, list) or not paths or not all(isinstance(path, str) for path in paths):
             raise ValueError("RAG requires corpus_directories")
-        effective.update(strategy="statutory_rag", corpus_directories=[str(Path(path).resolve()) for path in paths])
+        effective.update(strategy=config["strategy"], corpus_directories=[str(Path(path).resolve()) for path in paths])
     elif "corpus_directories" in config:
         raise ValueError("Only RAG may use corpus_directories")
     return effective
@@ -60,14 +60,16 @@ def run(directory: Path, name: str, profile_file: Path, split: str = "developmen
                 if item["split"] == split and item["task"] in selected_tasks and item["position_in_task"] < per_task]
     selected.sort(key=lambda item: (item["position_in_task"], list(TASK_NAMES).index(item["task"])))
     references = {item["question_id"]: item["reference"] for item in read_rows(directory / "references.jsonl")}
-    manifest: dict[str, Any] = {"experiment_version": 8, "campaign_sha256": digest(directory / "campaign.json"),
+    manifest: dict[str, Any] = {"experiment_version": 9, "campaign_sha256": digest(directory / "campaign.json"),
                 "profile": profile_file.stem, "profile_sha256": digest(profile_file), "config": config, "split": split,
                 "selected_tasks": list(selected_tasks),
                 "question_ids": [item["question_id"] for item in selected],
                 "input_hashes": {item["question_id"]: item["input_hash"] for item in selected},
                 "scorer_version": SCORER_VERSION, "sources": {name: digest(ROOT / name) for name in SOURCES},
                 "corpus_files": corpus_fingerprint(config.get("corpus_directories", []))}
-    if config["strategy"] == "statutory_rag":
+    if config["strategy"] == "weak_tasks":
+        from app.benchmark_weak_tasks import solve
+    elif config["strategy"] == "statutory_rag":
         from app.benchmark_rag_solver import solve
     else:
         from app.benchmark_solver import solve

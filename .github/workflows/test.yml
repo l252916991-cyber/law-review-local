@@ -54,7 +54,7 @@ jobs:
           uv run --locked python -m compileall -q app tests scripts
           uv run --locked ruff check app tests scripts
           uv run --locked mypy
-          node --check app/static/app.js
+          for script in app/static/*.js; do node --check "$script"; done
       - name: Offline tests with actual reports
         run: |
           export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"

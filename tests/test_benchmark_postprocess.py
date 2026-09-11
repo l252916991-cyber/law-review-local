@@ -11,7 +11,7 @@ def test_uses_only_question_and_does_not_touch_other_tasks():
     prediction, audit = postprocess("2-1", "句子:错另名,金额100元", "错另明，金额 100 元。")
     assert prediction == "错另明,金额100元"
     assert audit["applied"] and audit["original_prediction"].endswith("。")
-    assert postprocess("3-8", "anything", " keep me ")[0] == " keep me "
+    assert postprocess("1-2", "anything", " keep me ")[0] == " keep me "
 
 
 def test_preserves_spaces_when_source_uses_them():
@@ -27,9 +27,29 @@ def test_exact_article_uses_retrieved_content_without_heading():
     assert audit["applied"] and audit["document_articles"] == ["law-2020/42"]
 
 
+def test_exact_article_repairs_archived_page_markup_surface():
+    retrieval = {"mode": "exact_article", "hits": [{
+        "document_id": "law", "article_id": "1", "text": "第一条 公司成立后,股东不得抽 逃出资。",
+    }]}
+    prediction, audit = postprocess("1-1", "某法第一条", "幻觉", retrieval)
+    assert prediction == "公司成立后，股东不得抽逃出资。"
+    assert audit["applied"] and audit["policy"] == "exact-retrieved-article-content; no reference access"
+
+
 def test_trigger_words_are_deduplicated_and_follow_source_order():
     prediction, audit = postprocess("2-10", "补助款随后转账", "转账;补助款;转账")
     assert prediction == "补助款;转账" and audit["applied"]
+
+
+def test_consultation_surface_strips_markup_and_restores_structure():
+    prediction = "**回答：**\n醉驾会影响孩子报考。\n\n**法律依据：**\n1. 《道路交通安全法》第九十一条。"
+    revised, audit = postprocess("3-8", "醉驾影响孩子上学吗", prediction)
+    assert revised == "回答:醉驾会影响孩子报考。\n法律依据:《道路交通安全法》第九十一条。"
+    assert audit["applied"] and audit["policy"] == "stated-reply-then-basis-structure; no reference access"
+    # An already-conforming answer only gains the required reply label.
+    same, audit2 = postprocess("3-8", "问", "回答:结论。法律依据:第九条。")
+    assert same == "回答:结论。法律依据:第九条。"
+    assert not audit2["applied"]
 
 
 def test_event_labels_are_extracted_from_source_language():

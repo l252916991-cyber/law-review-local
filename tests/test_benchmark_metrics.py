@@ -9,7 +9,7 @@ from app.benchmark_metrics import (
     score_lexeval_item,
     set_f1,
 )
-from app.rag_benchmark_dataset import build_rag_benchmark
+from app.rag_benchmark_dataset import DATASET_VERSION, build_rag_benchmark
 
 
 class BenchmarkMetricTest(unittest.TestCase):
@@ -75,8 +75,11 @@ class BenchmarkMetricTest(unittest.TestCase):
         records = build_rag_benchmark()
         self.assertEqual(len(records), 240)
         self.assertEqual(len({item["id"] for item in records}), 240)
-        self.assertEqual(len({item["query"] for item in records}), 240)
+        self.assertEqual(DATASET_VERSION, "lexvault-rag-240-v2")
+        self.assertEqual(len({item["query"] for item in records}), 20)
+        self.assertTrue(all(item["case_key"] not in item["query"] for item in records))
         self.assertEqual(sum(not item["answerable"] for item in records), 24)
+        self.assertEqual(sum(item["challenge"] == "hard_unanswerable" for item in records), 24)
         for item in records:
             document_pages = {(doc["name"], page) for doc in item["documents"] for page in range(1, len(doc["pages"]) + 1)}
             self.assertTrue(all((gold["document"], gold["page"]) in document_pages for gold in item["expected"]))

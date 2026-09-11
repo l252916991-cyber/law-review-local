@@ -172,7 +172,8 @@ def report(directory: Path, manifest: dict[str, Any], rows: list[dict[str, Any]]
 
 def service_may_still_be_busy(error: str | None) -> bool:
     """A timed-out local generation can keep occupying the single-slot server."""
-    return bool(error and ("TimeoutError" in error or "HTTP Error 409" in error or "IncompleteRead" in error))
+    return bool(error and ("TimeoutError" in error or "HTTP Error 409" in error
+                           or "HTTP Error 507" in error or "IncompleteRead" in error))
 
 
 def run(directory: Path, name: str, profile: str, split: str, per_task: int, resume: bool = False) -> dict[str, Any]:

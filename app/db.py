@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
+import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
@@ -374,7 +376,33 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 12
+
+# Built-in case-closing export templates (E32). Block schema is owned by the
+# renderer in services.py; this constant is the seeding source of truth.
+BUILTIN_EXPORT_TEMPLATES = [
+    {
+        "name": "刑事阅卷结案包",
+        "description": "完整阅卷归档：案件摘要、双层目录、证据清单、问答记录与原始卷宗。",
+        "blocks": [
+            {"type": "case_summary", "title": "案件摘要", "filename": "案件摘要.md", "required": False},
+            {"type": "catalog_csv", "title": "内容级目录", "filename": "内容级目录.csv", "required": True},
+            {"type": "evidence_table", "title": "证据目录", "filename": "证据目录.csv", "evidence_status": None, "required": True},
+            {"type": "qa_log", "title": "阅卷问答记录", "filename": "阅卷问答记录.md", "required": False},
+            {"type": "attachments", "title": "原始卷宗", "filename": "原始卷宗", "required": True},
+        ],
+    },
+    {
+        "name": "质证材料包",
+        "description": "面向质证场景：案件摘要、全状态证据清单（状态列区分草稿与已确认）与问答记录。",
+        "blocks": [
+            {"type": "case_summary", "title": "案件摘要", "filename": "案件摘要.md", "required": False},
+            {"type": "evidence_table", "title": "质证证据清单", "filename": "质证证据清单.csv", "evidence_status": None, "required": True},
+            {"type": "qa_log", "title": "阅卷问答记录", "filename": "阅卷问答记录.md", "required": False},
+            {"type": "attachments", "title": "原始卷宗", "filename": "原始卷宗", "required": False},
+        ],
+    },
+]
 
 
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
@@ -468,6 +496,178 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     _execute_script(conn, "ALTER TABLE messages ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';")
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    # Template-driven case-closing exports (E32). Built-in templates are seeded
+    # once and marked immutable; custom templates are managed via the API.
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS export_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    blocks_json TEXT NOT NULL,
+    builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+""",
+    )
+    current = now()
+    for template in BUILTIN_EXPORT_TEMPLATES:
+        conn.execute(
+            """INSERT INTO export_templates(name, description, blocks_json, builtin, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, 1, 'system', ?, ?)
+               ON CONFLICT(name) DO NOTHING""",
+            (template["name"], template["description"], json.dumps(template["blocks"], ensure_ascii=False), current, current),
+        )
+
+
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    session_hash TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK(kind IN ('token', 'oidc')),
+    credential_fingerprint TEXT,
+    oidc_subject TEXT,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    CHECK (
+        (kind = 'token' AND credential_fingerprint IS NOT NULL AND oidc_subject IS NULL)
+        OR (kind = 'oidc' AND credential_fingerprint IS NULL AND oidc_subject IS NOT NULL)
+    )
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+""",
+    )
+
+
+def purge_expired_sessions(conn: sqlite3.Connection, current_epoch: int | None = None) -> int:
+    current_epoch = int(time.time()) if current_epoch is None else current_epoch
+    return conn.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (current_epoch,)).rowcount
+
+
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    _execute_script(
+        conn,
+        """
+CREATE TABLE IF NOT EXISTS bank_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    source_document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+    source_document_hash TEXT NOT NULL DEFAULT '',
+    source_sheet TEXT NOT NULL DEFAULT '',
+    source_row_number INTEGER NOT NULL,
+    source_page_start INTEGER,
+    source_page_end INTEGER,
+    source_ref_json TEXT NOT NULL DEFAULT '{}',
+    account TEXT NOT NULL DEFAULT '',
+    direction TEXT NOT NULL DEFAULT 'unknown' CHECK(direction IN ('inflow','outflow','unknown')),
+    amount_minor INTEGER,
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    amount_raw TEXT NOT NULL DEFAULT '',
+    transaction_time TEXT,
+    time_raw TEXT NOT NULL DEFAULT '',
+    counterparty TEXT NOT NULL DEFAULT '',
+    memo TEXT NOT NULL DEFAULT '',
+    raw_row_json TEXT NOT NULL DEFAULT '{}',
+    parse_status TEXT NOT NULL DEFAULT 'parsed' CHECK(parse_status IN ('parsed','needs_review')),
+    parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+    parser_version TEXT NOT NULL,
+    row_fingerprint TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(source_document_id, source_sheet, source_row_number, row_fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_time ON bank_transactions(case_id, transaction_time);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_account ON bank_transactions(case_id, account);
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_case_counterparty ON bank_transactions(case_id, counterparty);
+CREATE TABLE IF NOT EXISTS bank_transaction_relations (
+    transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+    evidence_id INTEGER NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+    relation_type TEXT NOT NULL DEFAULT '资金链路',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(transaction_id, evidence_id, relation_type)
+);
+""",
+    )
+
+
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    _execute_script(
+        conn,
+        """
+ALTER TABLE conversations ADD COLUMN archived_at TEXT;
+ALTER TABLE conversations ADD COLUMN archive_expires_at INTEGER;
+ALTER TABLE conversations ADD COLUMN archived_by TEXT;
+CREATE INDEX IF NOT EXISTS idx_conversations_archive_expiry ON conversations(archive_expires_at);
+""",
+    )
+
+
+def _migrate_v10(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(cases)")}
+    for name, definition in {
+        "lifecycle_status": "ALTER TABLE cases ADD COLUMN lifecycle_status TEXT NOT NULL DEFAULT 'active'",
+        "archived_at": "ALTER TABLE cases ADD COLUMN archived_at TEXT",
+        "archived_by": "ALTER TABLE cases ADD COLUMN archived_by TEXT",
+        "trashed_at": "ALTER TABLE cases ADD COLUMN trashed_at TEXT",
+        "purge_after": "ALTER TABLE cases ADD COLUMN purge_after TEXT",
+    }.items():
+        if name not in columns:
+            conn.execute(definition)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_lifecycle ON cases(lifecycle_status, purge_after)")
+
+
+def _migrate_v11(conn: sqlite3.Connection) -> None:
+    _execute_script(conn, """
+ALTER TABLE auth_sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE oidc_flows (
+    state_hash TEXT PRIMARY KEY,
+    browser_hash TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    verifier TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    settings_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX idx_oidc_flows_expiry ON oidc_flows(expires_at);
+CREATE TABLE auth_login_limits (
+    bucket TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX idx_auth_login_limits_expiry ON auth_login_limits(expires_at);
+""")
+    # Existing sessions start their idle window at migration; absolute expiry
+    # remains unchanged, so upgrading never extends their original lifetime.
+    conn.execute("UPDATE auth_sessions SET last_seen_at=?", (int(time.time()),))
+
+
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    # In-flight v11 flows cannot safely rotate their originating session.
+    conn.execute("DELETE FROM oidc_flows")
+    _execute_script(conn, """
+ALTER TABLE oidc_flows ADD COLUMN previous_session_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE oidc_flows ADD COLUMN limit_bucket TEXT NOT NULL DEFAULT '';
+ALTER TABLE oidc_flows ADD COLUMN limit_expires_at INTEGER NOT NULL DEFAULT 0;
+""")
+
+
+CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+
+
+def purge_expired_conversations(conn: sqlite3.Connection, current_epoch: int | None = None) -> int:
+    current_epoch = int(time.time()) if current_epoch is None else current_epoch
+    return conn.execute(
+        "DELETE FROM conversations WHERE archive_expires_at IS NOT NULL AND archive_expires_at <= ?",
+        (current_epoch,),
+    ).rowcount
+
+
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
     with transaction() as conn:
@@ -475,7 +675,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5)
+        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12)
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
@@ -494,6 +694,8 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
                 (now(),),
             )
             conn.execute("UPDATE review_jobs SET status='interrupted', error_json='{}', finished_at=? WHERE status IN ('queued','running')", (now(),))
+    with transaction() as conn:
+        purge_expired_conversations(conn)
     sync_fts_index()
 
 

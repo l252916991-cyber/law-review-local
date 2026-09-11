@@ -191,6 +191,95 @@ class BenchmarkProtocolTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.run_benchmark(args)
 
+    def test_correction_surface_is_scored_and_resume_checks_provenance(self):
+        from app.benchmark_postprocess import POSTPROCESS_VERSION
+
+        raw, corrected = "本院认为，支付 100 元。", "本院认为,支付100元"
+        record = runner.load_lawbench_dataset(["2-1"], 1)[0]
+        record.update(question="句子：本院认未,支付100元", reference=corrected)
+        record["question_hash"] = runner.hash_text(record["question"])
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(dataset="lawbench", tasks=["2-1"], limit_per_task=1,
+                                      run_dir=directory, output_dir=directory, resume=False, retry=0)
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=(raw, 1, None)):
+                runner.run_benchmark(args)
+            root = Path(directory)
+            checkpoint = root / "checkpoints" / f"{record['question_id']}.json"
+            row = json.loads(checkpoint.read_text())
+            self.assertEqual(row["original_prediction"], raw)
+            self.assertEqual(row["prediction"], corrected)
+            self.assertEqual(row["score"], 1)
+            self.assertTrue(row["postprocess"]["applied"])
+            self.assertEqual(row["postprocess"]["version"], POSTPROCESS_VERSION)
+            self.assertIn("app/benchmark_postprocess.py", source_hashes())
+            args.resume = True
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model") as verify, \
+                    patch.object(runner, "call_model") as call:
+                runner.run_benchmark(args)
+                call.assert_not_called()
+                self.assertEqual(json.loads(checkpoint.read_text()), row)
+                verify.reset_mock()
+                for key in ("original_prediction", "postprocess"):
+                    broken = {k: v for k, v in row.items() if k != key}
+                    checkpoint.write_text(json.dumps(broken))
+                    with self.assertRaisesRegex(ValueError, "Checkpoint"):
+                        runner.run_benchmark(args)
+                    verify.assert_not_called()
+                checkpoint.write_text(json.dumps(row))
+                manifest_path = root / "manifest.json"
+                manifest = json.loads(manifest_path.read_text())
+                del manifest["postprocess"]
+                manifest_path.write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, "Resume manifest differs"):
+                    runner.run_benchmark(args)
+                verify.assert_not_called()
+                call.assert_not_called()
+
+    def test_postprocess_applies_to_its_tasks_and_leaves_errors_and_others_untouched(self):
+        # A task outside POSTPROCESS_TASKS stays byte-for-byte untouched.
+        for task, raw, error in (("2-1", "原文， 100。", "timeout"), ("1-2", "原文， 100。", None),
+                                 ("2-1", "", None), ("2-1", "原文", None),
+                                 ("2-7", "第一句事实。第二句事实。", None),
+                                 ("2-9", "被告通过微信购买药品", None)):
+            with self.subTest(task=task, raw=raw, error=error), tempfile.TemporaryDirectory() as directory:
+                args = argparse.Namespace(dataset="lawbench", tasks=[task], limit_per_task=1,
+                                          run_dir=directory, output_dir=directory, resume=False, retry=0)
+                with patch.object(runner, "verify_model"), \
+                        patch.object(runner, "call_model", return_value=(raw, 1, error)):
+                    runner.run_benchmark(args)
+                row = json.loads((Path(directory) / "detailed_results.jsonl").read_text())
+                if task in runner.POSTPROCESS_TASKS and not error:
+                    self.assertEqual(row["original_prediction"], raw)
+                    self.assertEqual(row["postprocess"]["version"], runner.POSTPROCESS_VERSION)
+                else:
+                    self.assertEqual(row["prediction"], raw)
+                    self.assertNotIn("postprocess", row)
+                    self.assertNotIn("original_prediction", row)
+                if error:
+                    self.assertEqual(row["score"], 0)
+
+    def test_postprocess_repairs_are_scored_not_just_recorded(self):
+        # 2-9 maps explicit source language to the public ontology; scoring must see the repair.
+        record = runner.load_lawbench_dataset(["2-9"], 1)[0]
+        record.update(question="被告人通过微信购买药品", reference="买入;联络")
+        record["question_hash"] = runner.hash_text(record["question"])
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(dataset="lawbench", tasks=["2-9"], limit_per_task=1,
+                                      run_dir=directory, output_dir=directory, resume=False, retry=0)
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=("买入", 1, None)):
+                runner.run_benchmark(args)
+            row = json.loads((Path(directory) / "detailed_results.jsonl").read_text())
+            self.assertEqual(row["original_prediction"], "买入")
+            self.assertEqual(row["prediction"], "买入;联络")
+            self.assertTrue(row["postprocess"]["applied"])
+            expected = score_lawbench_item("2-9", row["prediction"], row["reference"], question=row["question"]).score
+            self.assertEqual(row["score"], expected)
+
     def test_resume_requires_original_directory(self):
         args = argparse.Namespace(dataset="lawbench", tasks=["1-2"], limit_per_task=1, resume=True)
         with self.assertRaises(ValueError):

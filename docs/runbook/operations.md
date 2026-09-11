@@ -2,6 +2,10 @@
 
 `uv sync --locked --group dev` 创建项目独立 `.venv`，不改变正在运行的全局 oMLX/MLX 环境。应用依赖与开发依赖以 `pyproject.toml` + `uv.lock` 为准；`requirements.txt` 是带 hash 的运行依赖导出。
 
+## E33 部署验收
+
+多人律所部署前按 [deployment-acceptance.md](deployment-acceptance.md) 逐项执行；当前 compose 只向 loopback 发布 Web 端口，生产必须由 TLS 代理提供 HSTS，并通过 `LAW_REVIEW_ALLOWED_HOSTS` 配置正式域名。
+
 执行 `uv run python scripts/doctor.py --require-ocr`，检查 Python 3.11–3.14、SQLite FTS5、Python 包、Poppler 三个命令及 Tesseract `chi_sim`/`eng`。此命令不探测模型、不读取案件。缺少 OCR 时仍可使用纯文本/DOCX。
 
 复制 `.env.example` 为 `.env` 后人工核对；在每个服务终端显式 `set -a; . ./.env; set +a`。不要在共享终端打印 token 或带密码的 Redis URL。服务应从项目根目录启动；相对数据目录以进程工作目录为准。

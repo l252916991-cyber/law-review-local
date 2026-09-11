@@ -23,6 +23,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY scripts ./scripts
+COPY benchmarks/lawbench ./benchmarks/lawbench
 RUN uv sync --locked --no-dev
 
 # Non-root runtime identity; /data holds the SQLite database, uploads,
@@ -38,4 +39,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:8000/api/health', timeout=4).read()"]
 
-CMD ["uv", "run", "--locked", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/opt/lexvault-venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

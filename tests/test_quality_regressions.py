@@ -92,20 +92,18 @@ class VectorCompatibilityTest(IsolatedQualityTest):
                     conn.execute(f"UPDATE embedding_cache SET {field}=?", (value,))
                 self.assertEqual(retriever.ensure_vector_index()["embedded"], 1)
 
-    def test_remote_failure_mid_index_falls_back_to_one_consistent_space(self):
+    def test_remote_failure_mid_index_preserves_existing_space(self):
         retriever = self.retriever()
+        retriever.ensure_vector_index()
+        with closing(connect()) as conn:
+            before = [tuple(row) for row in conn.execute("SELECT * FROM embedding_cache")]
         retriever.embedding_client.prefer_remote = True
         with patch.object(retriever.embedding_client, "embed", side_effect=[
             ([[1.0, 0.0]], "omlx"), ([hashed_embedding("page")], "hashed-local"),
-        ]):
-            results = retriever.vector_search("固定回报")
-        self.assertTrue(results)
-        self.assertEqual(retriever.vector_diagnostics["backend"], "hashed-local")
-        self.assertEqual(retriever.vector_diagnostics["fallback_reason"], "embedding_space_changed")
+        ]), self.assertRaisesRegex(RuntimeError, "embedding_backend_changed_during_index"):
+            retriever.vector_search("固定回报")
         with closing(connect()) as conn:
-            row = conn.execute("SELECT model, backend, dimensions FROM embedding_cache").fetchone()
-        self.assertEqual(row["dimensions"], 384)
-        self.assertEqual(row["backend"], "hashed-local")
+            self.assertEqual(before, [tuple(row) for row in conn.execute("SELECT * FROM embedding_cache")])
 
     def test_backend_recovery_replaces_hashed_cache(self):
         retriever = self.retriever()
@@ -150,14 +148,13 @@ class VectorCompatibilityTest(IsolatedQualityTest):
         self.assertFalse(metrics["keyword"]["fts_available"])
         self.assertNotIn("固定回报", " ".join(logs.output))
 
-    def test_invalid_embedding_payload_uses_named_fallback(self):
+    def test_invalid_embedding_payload_fails_closed(self):
         client = EmbeddingClient(True)
         invalid = io.BytesIO(json.dumps({"data": [{"index": 0, "embedding": [float("nan"), 1.0]}]}).encode())
         with patch("app.rag.urllib.request.build_opener") as opener:
             opener.return_value.open.return_value = invalid
-            vectors, backend = client.embed(["private text"])
-        self.assertEqual(backend, "hashed-local")
-        self.assertEqual(len(vectors[0]), 384)
+            with self.assertRaisesRegex(RuntimeError, "embedding_model_unavailable:ValueError"):
+                client.embed(["private text"])
         self.assertEqual(client.last_failure, "ValueError")
 
 
@@ -376,15 +373,11 @@ class CaseEvaluationTest(IsolatedQualityTest):
 
 class OrdinaryChatQualityTest(IsolatedQualityTest):
     def test_plain_chat_uses_the_same_validation_gate(self):
-        with patch("app.services.call_local_llm", return_value="SECRET invented result without citation"):
-            result = chat(self.case_id, "固定回报", "律师", None, True)
-        self.assertFalse(result["llm_used"])
-        self.assertTrue(result["validation"]["valid"])
-        self.assertFalse(result["validation"]["semantic_entailment_checked"])
-        self.assertTrue(result["rejected_llm_validation"]["issues"])
+        with patch("app.services.call_local_llm", return_value="SECRET invented result without citation"), \
+                self.assertRaisesRegex(RuntimeError, "model_unavailable_or_invalid"):
+            chat(self.case_id, "固定回报", "律师", None, True)
         with closing(connect()) as conn:
-            stored = conn.execute("SELECT content FROM messages WHERE role='assistant'").fetchone()[0]
-        self.assertNotIn("SECRET", stored)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM messages WHERE role='assistant'").fetchone()[0], 0)
 
     def test_plain_chat_valid_llm_answer_is_used(self):
         answer = "固定回报已经确认[资料1]，请律师复核。"
@@ -395,11 +388,12 @@ class OrdinaryChatQualityTest(IsolatedQualityTest):
         self.assertEqual(result["citation_check"], "passed")
 
     def test_plain_chat_error_body_is_not_persisted_or_returned(self):
-        with patch("app.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")):
-            result = chat(self.case_id, "固定回报", "律师", None, True)
-        self.assertFalse(result["llm_used"])
-        self.assertEqual(result["failure_diagnostic"]["error_type"], "RuntimeError")
-        self.assertNotIn("SECRET_TOKEN", json.dumps(result))
+        with patch("app.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
+                self.assertRaises(RuntimeError) as raised:
+            chat(self.case_id, "固定回报", "律师", None, True)
+        self.assertNotIn("SECRET_TOKEN", str(raised.exception))
+        with closing(connect()) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM messages WHERE role='assistant'").fetchone()[0], 0)
 
     def test_comparison_rule_answer_has_actual_citation_markers(self):
         result = chat(self.case_id, "固定回报的陈述是否矛盾", "律师", None, False)

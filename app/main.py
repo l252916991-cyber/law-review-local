@@ -9,6 +9,9 @@ import sqlite3
 import tempfile
 import time
 import uuid
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
@@ -20,19 +23,39 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
 from .config import config
-from .db import connect, get_db_path, init_db, now, process_ownership, record_security_event, sync_fts_index, transaction
+from .db import (
+    CONVERSATION_ARCHIVE_RETENTION_SECONDS,
+    connect,
+    get_db_path,
+    init_db,
+    now,
+    process_ownership,
+    purge_expired_conversations,
+    record_security_event,
+    sync_fts_index,
+    transaction,
+)
 from .logger import request_id as logger_request_id
 from .services import (
+    ArchivedConversationError,
     auto_analyze_case,
     build_export,
+    build_export_package,
+    bank_transaction_graph,
     chat,
     contained_path,
+    get_export_template,
     get_document,
     index_upload,
+    list_bank_transactions,
     local_llm_available,
+    persist_bank_transactions,
+    persist_parsed_bank_rows,
     rowdict,
     safe_filename,
+    parse_spreadsheet,
     search_pages,
+    summarize_bank_transactions,
     upload_error_message,
 )
 from .security import actor_name, allowed_case_ids, require_case_access, require_permission
@@ -228,6 +251,10 @@ class CaseCreate(BaseModel):
     description: str = ""
 
 
+class ModelConfigTest(BaseModel):
+    base_url: str = Field(min_length=8, max_length=500)
+
+
 class DirectoryUpdate(BaseModel):
     doc_type: str | None = None
     people: str | None = None
@@ -360,6 +387,36 @@ def health():
     return {"status": "ok", "private_mode": True, "local_llm": available, "model": model}
 
 
+@app.post("/api/model-config/test")
+def test_model_config(payload: ModelConfigTest):
+    """Check an OpenAI-compatible local model service without exposing its response body."""
+    require_permission("view")
+    base_url = payload.base_url.rstrip("/")
+    try:
+        parsed = urllib.parse.urlsplit(base_url)
+        port = parsed.port
+    except ValueError as exc:
+        raise HTTPException(400, "模型服务地址无效") from exc
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise HTTPException(400, "模型服务地址必须是本机地址")
+    connection_url = base_url
+    loopback_host = os.getenv("LAW_REVIEW_MODEL_LOOPBACK_HOST", "").strip()
+    if loopback_host:
+        port_suffix = f":{port}" if port is not None else ""
+        connection_url = urllib.parse.urlunsplit(
+            (parsed.scheme, f"{loopback_host}{port_suffix}", parsed.path, parsed.query, parsed.fragment)
+        )
+    try:
+        request = urllib.request.Request(f"{connection_url}/models", headers={"Accept": "application/json"})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=5) as response:
+            body = json.loads(response.read())
+        models = [item.get("id") for item in body.get("data", []) if item.get("id")]
+        return {"reachable": True, "models": models}
+    except Exception as exc:
+        raise HTTPException(502, f"无法连接本地模型服务（{type(exc).__name__}）") from exc
+
+
 @app.get("/api/benchmarks/lawbench")
 def lawbench_dataset(
     task: str | None = Query(default=None),
@@ -415,7 +472,7 @@ def list_cases():
                    (SELECT COALESCE(SUM(pages), 0) FROM documents d WHERE d.case_id = c.id) AS page_count,
                    (SELECT COUNT(*) FROM evidence e WHERE e.case_id = c.id) AS evidence_count
             FROM cases c
-            """ + where + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
+            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (" AND " + where[7:] if where else "")) + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
         ).fetchall()
         return [rowdict(x) for x in rows]
     finally:
@@ -438,6 +495,63 @@ def create_case(payload: CaseCreate):
             (case_id, payload.title, ts),
         )
     return require_case(case_id)
+
+
+@app.post("/api/cases/{case_id}/archive")
+def archive_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") != "active":
+        raise HTTPException(409, "案件当前不在正常工作区")
+    ts = now()
+    actor = identity().get("name")
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='archived', archived_at=?, archived_by=?, updated_at=? WHERE id=?", (ts, actor, ts, case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "归档案卷", "长期保留", ts))
+    return require_case(case_id)
+
+@app.post("/api/cases/{case_id}/restore")
+def restore_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") not in {"archived", "trash"}:
+        raise HTTPException(409, "案件当前不可恢复")
+    ts = now()
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='active', archived_at=NULL, archived_by=NULL, trashed_at=NULL, purge_after=NULL, updated_at=? WHERE id=?", (ts, case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "恢复案卷", "恢复到正常工作区", ts))
+    return require_case(case_id)
+
+@app.post("/api/cases/{case_id}/trash")
+def trash_case(case_id: int):
+    require_permission("edit")
+    case = require_case(case_id)
+    if case.get("lifecycle_status") not in {"active", "archived"}:
+        raise HTTPException(409, "案件已在回收站")
+    ts = datetime.now().astimezone(); purge = (ts + timedelta(days=30)).isoformat(timespec="seconds")
+    with transaction() as conn:
+        conn.execute("UPDATE cases SET lifecycle_status='trash', trashed_at=?, purge_after=?, updated_at=? WHERE id=?", (ts.isoformat(timespec="seconds"), purge, ts.isoformat(timespec="seconds"), case_id))
+        conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,?,?,?)", (case_id, "移入回收站", "30天后可永久清理", ts.isoformat(timespec="seconds")))
+    record_security_event("case_trash", "success", actor=identity().get("name"), case_id=case_id, detail="retention_days=30", request_path=f"/api/cases/{case_id}/trash")
+    return require_case(case_id)
+
+@app.get("/api/cases/lifecycle/{lifecycle_status}")
+def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
+    require_permission("view")
+    conn = connect()
+    try:
+        permitted = allowed_case_ids()
+        if permitted == ():
+            return []
+        clause = ""
+        parameters: tuple = (lifecycle_status,)
+        if permitted is not None:
+            clause = " AND id IN (" + ",".join("?" for _ in permitted) + ")"
+            parameters += tuple(permitted)
+        return [rowdict(r) for r in conn.execute(
+            "SELECT * FROM cases WHERE lifecycle_status=?" + clause + " ORDER BY updated_at DESC", parameters
+        ).fetchall()]
+    finally: conn.close()
 
 
 @app.get("/api/cases/{case_id}")
@@ -1052,6 +1166,8 @@ def analyze(case_id: int):
 @app.get("/api/cases/{case_id}/conversations")
 def list_conversations(case_id: int):
     require_case(case_id)
+    with transaction() as cleanup_conn:
+        purge_expired_conversations(cleanup_conn)
     conn = connect()
     try:
         rows = conn.execute(
@@ -1061,13 +1177,72 @@ def list_conversations(case_id: int):
             """,
             (case_id,),
         ).fetchall()
-        return [rowdict(x) for x in rows]
+        result = []
+        for row in rows:
+            item = rowdict(row)
+            item["archived"] = item["archived_at"] is not None
+            result.append(item)
+        return result
     finally:
         conn.close()
 
 
+@app.post("/api/conversations/{conversation_id}/archive")
+def archive_conversation(conversation_id: int):
+    archived_by = actor_name()
+    expires_at = int(time.time()) + CONVERSATION_ARCHIVE_RETENTION_SECONDS
+    with transaction() as conn:
+        purge_expired_conversations(conn)
+        conversation = conn.execute(
+            "SELECT id, case_id, title, archived_at, archive_expires_at, archived_by FROM conversations WHERE id=?",
+            (conversation_id,),
+        ).fetchone()
+        if not conversation:
+            raise HTTPException(404, "会话不存在")
+        if conversation["archived_at"] is None:
+            archived_at = now()
+            conn.execute(
+                "UPDATE conversations SET archived_at=?, archive_expires_at=?, archived_by=? WHERE id=?",
+                (archived_at, expires_at, archived_by, conversation_id),
+            )
+        else:
+            archived_at = conversation["archived_at"]
+            expires_at = conversation["archive_expires_at"]
+            archived_by = conversation["archived_by"]
+        conn.execute(
+            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '归档AI阅卷会话', ?, ?)",
+            (conversation["case_id"], f"{archived_by}：会话#{conversation_id}（{conversation['title'][:60]}）", now()),
+        )
+    return {
+        "conversation_id": conversation_id,
+        "archived": True,
+        "archived_at": archived_at,
+        "archive_expires_at": expires_at,
+        "archived_by": archived_by,
+        "message": "会话已归档，将保留七天后自动清理",
+    }
+
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int):
+    with transaction() as conn:
+        purge_expired_conversations(conn)
+        conversation = conn.execute("SELECT id, case_id, title FROM conversations WHERE id=?", (conversation_id,)).fetchone()
+        if not conversation:
+            raise HTTPException(404, "会话不存在")
+        message_count = conn.execute("SELECT COUNT(*) FROM messages WHERE conversation_id=?", (conversation_id,)).fetchone()[0]
+        conn.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+        conn.execute(
+            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '永久删除AI阅卷会话', ?, ?)",
+            (conversation["case_id"], f"{actor_name()}：会话#{conversation_id}（{conversation['title'][:60]}），消息{message_count}条", now()),
+        )
+    return {"conversation_id": conversation_id, "deleted": True, "messages_deleted": message_count, "message": "会话及其消息已永久删除，无法恢复"}
+
+
 @app.get("/api/conversations/{conversation_id}/messages")
 def conversation_messages(conversation_id: int):
+    with transaction() as cleanup_conn:
+        purge_expired_conversations(cleanup_conn)
     conn = connect()
     try:
         if conn.execute("SELECT id FROM conversations WHERE id=?", (conversation_id,)).fetchone() is None:
@@ -1088,6 +1263,8 @@ def case_chat(case_id: int, payload: ChatRequest):
     require_case(case_id)
     try:
         return chat(case_id, payload.question, actor_name(payload.user_name), payload.conversation_id, payload.use_llm)
+    except ArchivedConversationError as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -1178,6 +1355,19 @@ def resume_agent_run(run_id: int):
         raise HTTPException(500, "恢复失败，请查看服务端诊断事件") from exc
 
 
+def model_operation_error(exc: Exception, fallback: str) -> HTTPException:
+    code = str(exc).split(":", 1)[0]
+    messages = {
+        "embedding_model_unavailable": "嵌入模型不可用，请检查本地模型服务及嵌入模型配置后重试。",
+        "rerank_model_unavailable": "重排模型不可用，请检查本地模型服务及重排模型配置后重试。",
+        "embedding_backend_changed_during_index": "嵌入模型在索引期间发生变化，请确认模型配置后重新构建索引。",
+        "embedding_backend_changed_during_query": "嵌入模型与索引不一致，请重新构建索引。",
+    }
+    if code in messages:
+        return HTTPException(503, {"code": code, "message": messages[code]})
+    return HTTPException(500, fallback)
+
+
 @app.post("/api/cases/{case_id}/agent-compare")
 def compare_agent_runtimes(case_id: int, payload: AgentChatRequest):
     require_case(case_id)
@@ -1224,7 +1414,7 @@ def compare_agent_runtimes(case_id: int, payload: AgentChatRequest):
                     "resume_count": getattr(exc, "resume_count", 0),
                 },
             ) from exc
-        raise HTTPException(500, "双运行时对比失败，请查看服务端诊断事件") from exc
+        raise model_operation_error(exc, "双运行时对比失败，请查看服务端诊断事件") from exc
 
 
 @app.post("/api/cases/{case_id}/vector-index")
@@ -1257,7 +1447,7 @@ def build_vector_index(case_id: int):
     except ImportError as exc:
         raise HTTPException(503, "向量检索依赖不可用；请按锁文件重新安装依赖") from exc
     except Exception as exc:
-        raise HTTPException(500, "索引失败，请查看服务端诊断事件") from exc
+        raise model_operation_error(exc, "索引失败，请查看服务端诊断事件") from exc
 
 
 @app.get("/api/agent-runs/{run_id}")
@@ -1279,6 +1469,8 @@ def evaluate_rag(case_id: int, ground_truth: list[dict[str, Any]] | None = Body(
         return evaluate_case(case_id, prefer_remote_embeddings=True, k=5, ground_truth=ground_truth)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise model_operation_error(exc, "评测失败，请查看服务端诊断事件") from exc
 
 
 @app.get("/api/cases/{case_id}/platform-metrics")
@@ -1289,16 +1481,158 @@ def case_platform_metrics(case_id: int):
     return platform_metrics(case_id)
 
 
+@app.post("/api/cases/{case_id}/bank-transactions/import", status_code=201)
+async def import_bank_transactions(case_id: int, file: UploadFile = File(...)):
+    require_case(case_id)
+    if not (file.filename or "").lower().endswith((".csv", ".xlsx", ".xls")):
+        raise HTTPException(400, "流水文件仅支持 CSV、XLSX、XLS")
+    payload = await file.read(config.max_upload_size + 1)
+    await file.close()
+    if len(payload) > config.max_upload_size:
+        raise HTTPException(413, "流水文件超过单文件大小限制")
+    try:
+        result = index_upload(case_id, file.filename or "bank-transactions.csv", payload, file.content_type)
+        source_hash = result.get("content_hash", "")
+        if (file.filename or "").lower().endswith((".xlsx", ".xls")):
+            rows = parse_spreadsheet(payload, file.filename or "")
+            persisted = persist_bank_transactions(case_id, result["id"], source_hash, payload) if not rows else persist_parsed_bank_rows(case_id, result["id"], source_hash, rows)
+        else:
+            persisted = persist_bank_transactions(case_id, result["id"], source_hash, payload)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(400, upload_error_message(exc)) from exc
+    record_security_event("bank_import", "success", actor=actor_name(), case_id=case_id,
+                          detail=f"document:{result['id']} rows:{persisted['rows']}", request_path="/api/cases/%s/bank-transactions/import" % case_id)
+    return {"document": result, "transactions": persisted}
+
+
+@app.get("/api/cases/{case_id}/bank-transactions")
+def get_bank_transactions(case_id: int, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), account: str | None = None, direction: Literal["inflow", "outflow", "unknown"] | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    require_case(case_id)
+    return list_bank_transactions(case_id, limit=limit, offset=offset, account=account, direction=direction, counterparty=counterparty, date_from=date_from, date_to=date_to)
+
+
+@app.get("/api/cases/{case_id}/bank-transactions/summary")
+def get_bank_transaction_summary(case_id: int, account: str | None = None, direction: Literal["inflow", "outflow", "unknown"] | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    require_case(case_id)
+    return summarize_bank_transactions(case_id, account=account, direction=direction, counterparty=counterparty, date_from=date_from, date_to=date_to)
+
+
+@app.get("/api/cases/{case_id}/bank-transactions/graph")
+def get_bank_transaction_graph(case_id: int):
+    require_case(case_id)
+    return bank_transaction_graph(case_id)
+
+
 @app.get("/api/cases/{case_id}/export")
-def export_case(case_id: int, request: Request):
+def export_case(case_id: int, request: Request, template_id: int | None = None, final: bool = False):
     require_case(case_id)
     try:
-        path = build_export(case_id)
+        path, package_sha = build_export_package(case_id, template_id=template_id, final=final, actor=actor_name())
     except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
     record_security_event("case_export", "success", actor=actor_name(), case_id=case_id,
                           detail=path.name, request_path=request.url.path)
-    return FileResponse(path, media_type="application/zip", filename=path.name)
+    return FileResponse(path, media_type="application/zip", filename=path.name,
+                        headers={"X-Package-Sha256": package_sha})
+
+
+class ExportTemplateBlockIn(BaseModel):
+    type: Literal["case_summary", "catalog_csv", "evidence_table", "qa_log", "static_markdown", "attachments"]
+    title: str = Field(min_length=1, max_length=60)
+    filename: str | None = Field(default=None, max_length=120)
+    content: str = Field(default="", max_length=20000)
+    evidence_status: Literal["待复核", "已确认", "待质证", "待补证"] | None = None
+    required: bool = False
+
+
+class ExportTemplateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    description: str = Field(default="", max_length=300)
+    blocks: list[ExportTemplateBlockIn] = Field(min_length=1, max_length=12)
+
+
+def _reject_immutable_builtin(template: dict[str, Any] | None) -> dict[str, Any]:
+    if template is None:
+        raise HTTPException(404, "结案模板不存在")
+    if template["builtin"]:
+        raise HTTPException(409, "内置模板不可修改或删除")
+    return template
+
+
+@app.get("/api/export-templates")
+def list_export_templates():
+    conn = connect()
+    try:
+        return [
+            {"id": row["id"], "name": row["name"], "description": row["description"],
+             "builtin": bool(row["builtin"]), "updated_at": row["updated_at"]}
+            for row in conn.execute("SELECT * FROM export_templates ORDER BY builtin DESC, id").fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+@app.get("/api/export-templates/{template_id}")
+def get_export_template_detail(template_id: int):
+    require_permission("manage")
+    template = get_export_template(template_id)
+    if template is None:
+        raise HTTPException(404, "结案模板不存在")
+    return template
+
+
+@app.post("/api/export-templates", status_code=201)
+def create_export_template(body: ExportTemplateIn, request: Request):
+    require_permission("manage")
+    for block in body.blocks:
+        if block.type == "static_markdown" and not block.content.strip():
+            raise HTTPException(400, "静态说明区块必须填写内容")
+        if block.type != "static_markdown" and block.type != "evidence_table" and block.evidence_status is not None:
+            raise HTTPException(400, "仅证据表区块支持状态过滤")
+    ts = now()
+    with transaction() as conn:
+        try:
+            template_id = conn.execute(
+                """INSERT INTO export_templates(name, description, blocks_json, builtin, created_by, created_at, updated_at)
+                   VALUES (?, ?, ?, 0, ?, ?, ?)""",
+                (body.name.strip(), body.description, json.dumps([b.model_dump() for b in body.blocks], ensure_ascii=False),
+                 actor_name(), ts, ts),
+            ).lastrowid
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(409, "同名结案模板已存在") from exc
+    record_security_event("config", "export_template_created", actor=actor_name(), detail=body.name.strip(),
+                          request_path=request.url.path)
+    return {"id": template_id, "name": body.name.strip()}
+
+
+@app.put("/api/export-templates/{template_id}")
+def update_export_template(template_id: int, body: ExportTemplateIn, request: Request):
+    require_permission("manage")
+    _reject_immutable_builtin(get_export_template(template_id))
+    for block in body.blocks:
+        if block.type == "static_markdown" and not block.content.strip():
+            raise HTTPException(400, "静态说明区块必须填写内容")
+    with transaction() as conn:
+        updated = conn.execute(
+            "UPDATE export_templates SET name=?, description=?, blocks_json=?, updated_at=? WHERE id=? AND builtin=0",
+            (body.name.strip(), body.description, json.dumps([b.model_dump() for b in body.blocks], ensure_ascii=False), now(), template_id),
+        ).rowcount
+    if not updated:
+        raise HTTPException(404, "结案模板不存在")
+    record_security_event("config", "export_template_updated", actor=actor_name(), detail=body.name.strip(),
+                          request_path=request.url.path)
+    return {"id": template_id, "name": body.name.strip()}
+
+
+@app.delete("/api/export-templates/{template_id}")
+def delete_export_template(template_id: int, request: Request):
+    require_permission("manage")
+    template = _reject_immutable_builtin(get_export_template(template_id))
+    with transaction() as conn:
+        conn.execute("DELETE FROM export_templates WHERE id=? AND builtin=0", (template_id,))
+    record_security_event("config", "export_template_deleted", actor=actor_name(), detail=template["name"],
+                          request_path=request.url.path)
+    return {"deleted": True}
 
 
 @app.get("/api/cases/{case_id}/audit")
@@ -1352,3 +1686,8 @@ app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/mobile", include_in_schema=False)
+def mobile():
+    return FileResponse(STATIC_DIR / "mobile.html")

@@ -10,6 +10,7 @@
 - [模型配置](runbook/models.md)：已有模型核查与显式版本下载，不自动替换模型。
 - [评测协议](benchmarks/README.md)：LawBench、项目 RAG、双运行时分别评价。
 - [混合均分 85 分实施计划](benchmarks/SCORE_85_PLAN.md)：冻结口径、开发/确认拆分、真实模型初筛和当前执行进展。
+- [均分提升实测与路线图](benchmarks/score-uplift-20260909.md)：10,000 题离线复算、确定性后处理收益、已证伪手段与剩余差距。
 - [历史索引](history/README.md)：旧报告的适用范围与限制。
 - [42 项清单修复映射](runbook/improvement-checklist.md)：逐项状态、验收与保留边界。
 - [2026-09-05 修复验收](runbook/validation-20260905.md)：全量测试、干净源码包验证、1000 题真实模型与评分审计结果。

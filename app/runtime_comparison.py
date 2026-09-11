@@ -8,7 +8,7 @@ from typing import Any
 from .agents import answer_contract, get_run_trace
 
 
-SPECIALIST_NODES = ("facts", "evidence", "contradiction", "gap_detection")
+SPECIALIST_NODES = ("facts", "evidence", "contradiction", "gap_detection", "statutory_conflict")
 
 
 def _citation_set(result: dict[str, Any]) -> set[tuple[int, int]]:

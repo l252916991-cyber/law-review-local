@@ -24,6 +24,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item, score_lexeval_item
+from app.benchmark_postprocess import POSTPROCESS_VERSION, postprocess
 from app.benchmark_solver import TASK_GUIDANCE
 from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task, validate_lawbench
 from app.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
@@ -48,6 +49,9 @@ LEXEVAL_TASKS = {
 LEXEVAL_CACHE = Path(__file__).resolve().parent / "benchmarks" / "lexeval"
 CURRENT_LAW_PATH = Path(__file__).resolve().parent / "benchmarks" / "current_law" / "current_law_300.json"
 RAG_PROJECT_PATH = Path(__file__).resolve().parent / "benchmarks" / "rag_project" / "rag_240.json"
+# Tasks whose gold-blind deterministic output repair is applied before scoring.
+# 2-10 is deliberately excluded: the measured gain was noise (15 up, 16 down).
+POSTPROCESS_TASKS = ("2-1", "2-7", "2-9", "3-8")
 
 
 def hash_text(text: str) -> str:
@@ -284,6 +288,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 raise ValueError(f"Baseline missing/mismatched: {r['question_id']}")
     manifest = {
         "protocol_version": PROMPT_VERSION, "scorer_version": SCORER_VERSION,
+        "postprocess": {"version": POSTPROCESS_VERSION, "tasks": list(POSTPROCESS_TASKS)},
         "prompt_strategy": getattr(args, "prompt_strategy", "task_guided"),
         "model_config": dict(MODEL_CONFIG), "sample_seed": getattr(args, "sample_seed", None),
         "retry": args.retry, "planned_questions": len(records), "source_hashes": source_hashes(),
@@ -320,7 +325,6 @@ def run_benchmark(args: argparse.Namespace) -> None:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise RuntimeError("Another process is already executing this run")
-        verify_model(MODEL_CONFIG)
         completed = {}
         planned = {r["question_id"]: r for r in records}
         for path in checkpoint_dir.glob("*.json"):
@@ -331,7 +335,15 @@ def run_benchmark(args: argparse.Namespace) -> None:
             expected = planned[key]
             if any(row.get(k) != v for k, v in expected.items()) or row.get("scorer_version") != SCORER_VERSION:
                 raise ValueError(f"Checkpoint mismatch: {key}")
+            if row["task"] in POSTPROCESS_TASKS and not row.get("error"):
+                raw = row.get("original_prediction")
+                if not isinstance(raw, str):
+                    raise ValueError(f"Checkpoint missing original prediction: {key}")
+                prediction, metadata = postprocess(row["task"], row["question"], raw)
+                if row["prediction"] != prediction or row.get("postprocess") != metadata:
+                    raise ValueError(f"Checkpoint postprocess mismatch: {key}")
             completed[key] = row
+        verify_model(MODEL_CONFIG)
         rows = [completed[r["question_id"]] for r in records if r["question_id"] in completed]
         prior_duration = 0
         if (output_dir / "summary.json").exists():
@@ -351,6 +363,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 system, prompt = prompt_for({**record, "prompt_strategy": strategy})
                 response_metadata = {}
                 prediction, latency, error = call_model(prompt, system, MODEL_CONFIG, retry=args.retry, metadata=response_metadata)
+                if record["task"] in POSTPROCESS_TASKS and not error:
+                    response_metadata["original_prediction"] = prediction
+                    prediction, response_metadata["postprocess"] = postprocess(record["task"], record["question"], prediction)
                 scored = score_lawbench_item(record["task"], prediction, record["reference"], question=record["question"]).to_dict() if not error else {
                     "score": 0.0, "metric": "error", "abstained": False, "parse_failed": False,
                     "parsed_prediction": None, "parsed_reference": None,

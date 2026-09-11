@@ -6,13 +6,14 @@ import os
 import tempfile
 import unittest
 from contextlib import closing
+from unittest.mock import patch
 from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-rag-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
 from app.db import connect, init_db, now  # noqa: E402
-from app.rag import HybridRetriever, expand_retrieval_query, hashed_embedding  # noqa: E402
+from app.rag import HybridRetriever, expand_retrieval_query, hashed_embedding, query_signals  # noqa: E402
 
 
 def create_test_case_with_documents(conn):
@@ -95,6 +96,45 @@ class RAGRetrievalTest(IsolatedDatabaseTestCase):
 
         # 应该返回空结果或所有结果
         self.assertIsInstance(results, list)
+
+    def test_case_identifier_is_not_parsed_as_amount(self):
+        signals = query_signals("RAG-01：募集金额是否为137万元？")
+
+        self.assertEqual(signals["amounts"], ["137万元"])
+
+    def test_diversity_cap_preserves_relevance_order_and_same_document_pages(self):
+        items = [
+            {"document_id": 1, "page_no": 1},
+            {"document_id": 1, "page_no": 2},
+            {"document_id": 2, "page_no": 1},
+            {"document_id": 1, "page_no": 3},
+            {"document_id": 1, "page_no": 4},
+            {"document_id": 3, "page_no": 1},
+        ]
+
+        selected = HybridRetriever._select_diverse(items, 5)
+
+        self.assertEqual(
+            [(item["document_id"], item["page_no"]) for item in selected],
+            [(1, 1), (1, 2), (2, 1), (1, 3), (3, 1)],
+        )
+
+    def test_neural_reranker_can_be_enabled_with_hashed_embeddings(self):
+        retriever = HybridRetriever(
+            self.case_id,
+            prefer_remote_embeddings=False,
+            use_neural_reranker=True,
+        )
+        with patch.object(
+            retriever.rerank_client,
+            "score",
+            side_effect=lambda _query, documents: [0.5] * len(documents),
+        ) as rerank:
+            _results, metrics = retriever.retrieve("固定回报", limit=3)
+
+        rerank.assert_called_once()
+        self.assertTrue(metrics["reranker"]["requested"])
+        self.assertTrue(metrics["reranker"]["enabled"])
 
 
 class RAGCitationTest(IsolatedDatabaseTestCase):
@@ -297,6 +337,32 @@ class RAGRRFFusionTest(IsolatedDatabaseTestCase):
 
         # 应该有结果
         self.assertGreater(len(hybrid_results), 0)
+    def test_adaptive_metrics_and_explanations(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("固定回报", limit=5)
+
+        self.assertEqual(metrics["strategy"], "adaptive_hybrid_rerank")
+        self.assertEqual(metrics["query_profile"], "semantic_fact")
+        self.assertGreaterEqual(metrics["direct_match_count"], 1)
+        self.assertGreaterEqual(metrics["source_diversity"], 1)
+        self.assertIn(metrics["confidence"], {"high", "medium", "low"})
+        self.assertTrue(all("rerank_score" in item and "rerank_components" in item for item in results))
+
+    def test_unrelated_query_does_not_return_first_pages(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("火星采矿许可证", limit=5)
+
+        self.assertEqual(results, [])
+        self.assertEqual(metrics["confidence"], "low")
+        self.assertIn("no_retrieval_match", metrics["confidence_reasons"])
+
+    def test_neighbor_pages_are_deduplicated_and_marked(self):
+        retriever = HybridRetriever(self.case_id, prefer_remote_embeddings=False)
+        results, metrics = retriever.retrieve("固定回报", limit=5)
+
+        keys = [(item["document_id"], item["page_no"]) for item in results]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(metrics["neighbor_count"], sum(bool(item.get("is_neighbor")) for item in results))
 
 
 if __name__ == "__main__":

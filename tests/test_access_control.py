@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -37,6 +37,33 @@ class AccessControlTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
         self.headers = {"Authorization": f"Bearer {self.token}"}
+
+    def test_app_assets_revalidate_after_updates(self):
+        for path in ("/", "/assets/app.js", "/assets/styles.css"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["cache-control"], "no-cache")
+                self.assertIn("script-src 'self'", response.headers["content-security-policy"])
+
+    def test_lifecycle_lists_and_restore_preserve_case_scope(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        for case_id in self.cases:
+            self.assertEqual(self.client.post(f"/api/cases/{case_id}/archive", headers=admin).status_code, 200)
+        listed = self.client.get("/api/cases/lifecycle/archived", headers=self.headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual([row["id"] for row in listed.json()], [self.cases[0]])
+        self.assertIsNone(listed.json()[0]["purge_after"])
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[1]}/restore", headers=self.headers).status_code, 404)
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[0]}/restore", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get("/api/cases/lifecycle/archived", headers=self.headers).json(), [])
+        for case_id in self.cases:
+            self.assertEqual(self.client.post(f"/api/cases/{case_id}/trash", headers=admin).status_code, 200)
+        listed = self.client.get("/api/cases/lifecycle/trash", headers=self.headers)
+        self.assertEqual([row["id"] for row in listed.json()], [self.cases[0]])
+        self.assertIsNotNone(listed.json()[0]["purge_after"])
+        self.assertEqual(self.client.post(f"/api/cases/{self.cases[0]}/restore", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get("/api/cases", headers=self.headers).json()[0]["id"], self.cases[0])
 
     def test_anonymous_denied_and_invalid_token_does_not_leak(self):
         for headers in ({}, {"Authorization": "Bearer invalid"}):
@@ -76,7 +103,11 @@ class AccessControlTests(unittest.TestCase):
         self.client.post('/api/auth/session', json={'token': self.token})
         session = self.client.cookies.get('lexvault_session')
         self.assertNotEqual(session, self.token)
-        self.assertNotIn(self.token, repr(security._sessions))
+        with closing(connect()) as conn:
+            stored = conn.execute("SELECT session_hash,credential_fingerprint FROM auth_sessions").fetchall()
+        self.assertTrue(stored)
+        self.assertNotIn(self.token, repr(stored))
+        self.assertNotIn(session, repr(stored))
         self.assertEqual(self.client.get('/api/cases', headers={'Authorization': f'Bearer {session}'}).status_code, 401)
         self.client.delete('/api/auth/session')
         self.client.cookies.set('lexvault_session', session)
@@ -94,7 +125,37 @@ class AccessControlTests(unittest.TestCase):
         self.client.cookies.set('lexvault_session', self.token)
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
 
-    def test_request_user_name_cannot_forge_audit_identity(self):
+    def test_persisted_session_survives_security_module_reload_and_expiry_is_purged(self):
+        import importlib
+        import app.security as security
+        response = self.client.post("/api/auth/session", json={"token": self.token})
+        self.assertEqual(response.status_code, 200)
+        cookie = self.client.cookies.get("lexvault_session")
+        self.assertTrue(cookie)
+        with closing(connect()) as conn:
+            row = conn.execute("SELECT session_hash,kind,expires_at FROM auth_sessions").fetchone()
+        self.assertEqual(row["kind"], "token")
+        self.assertNotIn(cookie, row["session_hash"])
+        self.assertNotIn(self.token, row["session_hash"])
+        # A fresh client/process can resolve the SQLite-backed session.
+        self.client = TestClient(app)
+        self.client.cookies.set("lexvault_session", cookie)
+        self.assertEqual(self.client.get("/api/cases").status_code, 200)
+        with transaction() as conn:
+            conn.execute("UPDATE auth_sessions SET expires_at=? WHERE session_hash=?", (0, security._session_hash(cookie)))
+        self.assertEqual(self.client.get("/api/cases").status_code, 401)
+        with closing(connect()) as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
+
+    def test_oidc_and_token_sessions_share_capacity_and_logout_deletes_row(self):
+        from app import security
+        self.client.post("/api/auth/session", json={"token": self.token})
+        cookie = self.client.cookies.get("lexvault_session")
+        with closing(connect()) as conn:
+            self.assertIsNotNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
+        self.client.delete("/api/auth/session")
+        with closing(connect()) as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
         with patch("app.services.call_local_llm", side_effect=AssertionError("no model")):
             response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
         self.assertEqual(response.status_code, 200, response.text)
@@ -310,15 +371,21 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/cases", headers=self.headers, json={"title": "x"}).status_code, 403)
 
     def test_oidc_unconfigured_is_disabled_and_partial_config_fails_closed(self):
-        self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 404)
+        response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
         for partial in ({"LAW_REVIEW_OIDC_ISSUER": "https://idp.example"},
                         {"LAW_REVIEW_OIDC_CLIENT_ID": "app"}):
             with self.subTest(partial=partial), patch.dict(os.environ, partial):
-                self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+                response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
         with patch.dict(os.environ, {"LAW_REVIEW_OIDC_ISSUER": "http://idp.example",
                                      "LAW_REVIEW_OIDC_CLIENT_ID": "app",
                                      "LAW_REVIEW_OIDC_CLIENT_SECRET": "s"}):
-            self.assertEqual(self.client.get("/api/auth/oidc/login").status_code, 503)
+            response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["location"], "/?auth_error=unavailable")
 
     def test_oidc_login_flow_with_mock_provider(self):
         import jwt as pyjwt
@@ -346,9 +413,8 @@ class AccessControlTests(unittest.TestCase):
                 return {}
             if url.endswith("/token"):
                 self.assertEqual(data["grant_type"], "authorization_code")
-                code = data["code"]
-                flows = security_module._oidc_flows
-                claims = {"iss": "https://idp.example", "aud": "lexvault-client", "nonce": flows[code][0] if code in flows else "stale",
+                self.assertTrue(data["code_verifier"])
+                claims = {"iss": "https://idp.example", "aud": "lexvault-client", "nonce": nonce,
                           "sub": "user-001", "email": "lv@example.com", "exp": 9999999999}
                 token = pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "test-key"})
                 return {"id_token": token, "access_token": "at"}
@@ -373,8 +439,7 @@ class AccessControlTests(unittest.TestCase):
             self.assertEqual(query["client_id"], ["lexvault-client"])
             self.assertIn("openid", query["scope"][0])
             state, nonce = query["state"][0], query["nonce"][0]
-            # register a fake authorization code bound to that flow nonce
-            security_module._oidc_flows["auth-code-1"] = (nonce, security_module.time.monotonic() + 60)
+            # Provider returns the nonce captured from the real authorization request.
             with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
                 callback = self.client.get(f"/api/auth/oidc/callback?code=auth-code-1&state={state}", follow_redirects=False)
         self.assertEqual(callback.status_code, 302, callback.text)
@@ -387,7 +452,8 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/cases/{self.cases[1]}").status_code, 404)
         # State is single use: replay is rejected.
         replay = self.client.get("/api/auth/oidc/callback?code=auth-code-2&state=" + state, follow_redirects=False)
-        self.assertEqual(replay.status_code, 400)
+        self.assertEqual(replay.status_code, 302)
+        self.assertEqual(replay.headers["location"], "/?auth_error=state")
 
     def test_oidc_unmapped_identity_and_bad_audience_rejected(self):
         import jwt as pyjwt
@@ -423,18 +489,16 @@ class AccessControlTests(unittest.TestCase):
             if url.endswith("/token"):
                 return {"id_token": token_for(base_claims)}
             raise AssertionError(url)
-        with patch.object(security_module, "fetch_json", side_effect=lambda url, **kw: discovery if url.endswith("openid-configuration") else {}):
-            self.client.get("/api/auth/oidc/login", follow_redirects=False)
+        from urllib.parse import parse_qs, urlparse
         with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
-            with transaction() as conn:
-                state = "manual-state"
-                conn.execute("SELECT 1")
-            security_module._oidc_flows["flow-stranger"] = ("nonce-x", security_module.time.monotonic() + 60)
-            stranger = self.client.get("/api/auth/oidc/callback?code=c&state=flow-stranger", follow_redirects=False)
-        self.assertEqual(stranger.status_code, 403)
+            started = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            query = parse_qs(urlparse(started.headers["location"]).query)
+            base_claims["nonce"] = query["nonce"][0]
+            stranger = self.client.get("/api/auth/oidc/callback", params={"code": "c", "state": query["state"][0]}, follow_redirects=False)
+        self.assertEqual(stranger.status_code, 302)
+        self.assertEqual(stranger.headers["location"], "/?auth_error=denied")
         self.assertNotIn("lexvault_session", stranger.headers.get("set-cookie", ""))
-        # Wrong audience fails validation with a sanitized message.
-        security_module._oidc_flows["flow-badaud"] = ("nonce-y", security_module.time.monotonic() + 60)
+        # Wrong audience fails signature-backed validation with a fixed error code.
         bad_claims = dict(base_claims, sub="known-user", aud="someone-else", nonce="nonce-y")
         def bad_fetch(url, *, data=None, timeout=5):
             if url.endswith("openid-configuration"):
@@ -443,12 +507,81 @@ class AccessControlTests(unittest.TestCase):
                 return jwks
             return {"id_token": token_for(bad_claims)}
         with patch.object(security_module, "fetch_json", side_effect=bad_fetch):
-            bad = self.client.get("/api/auth/oidc/callback?code=c&state=flow-badaud", follow_redirects=False)
-        self.assertEqual(bad.status_code, 401)
+            started = self.client.get("/api/auth/oidc/login", follow_redirects=False)
+            query = parse_qs(urlparse(started.headers["location"]).query)
+            bad_claims["nonce"] = query["nonce"][0]
+            bad = self.client.get("/api/auth/oidc/callback", params={"code": "c", "state": query["state"][0]}, follow_redirects=False)
+        self.assertEqual(bad.status_code, 302)
+        self.assertEqual(bad.headers["location"], "/?auth_error=failed")
         self.assertNotIn("lexvault-client", bad.text)
         with closing(connect()) as conn:
             failures = conn.execute("SELECT COUNT(*) FROM security_events WHERE event_type='auth' AND outcome='login_failed' AND detail LIKE '%OIDC%'").fetchone()[0]
         self.assertGreaterEqual(failures, 2)
+
+    def test_export_template_crud_requires_manage_and_custom_templates_render(self):
+        viewer = self.headers
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        listed = self.client.get("/api/export-templates", headers=viewer)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertGreaterEqual(len(listed.json()), 2)
+        self.assertEqual(self.client.get("/api/export-templates/1", headers=viewer).status_code, 403)
+        body = {
+            "name": "测试质证模板",
+            "description": "只导出已确认证据",
+            "blocks": [
+                {"type": "evidence_table", "title": "已确认证据", "filename": "confirmed.csv", "evidence_status": "已确认", "required": True},
+                {"type": "static_markdown", "title": "律师说明", "filename": "说明.md", "content": "律师复核说明", "required": True},
+            ],
+        }
+        self.assertEqual(self.client.post("/api/export-templates", headers=viewer, json=body).status_code, 403)
+        created = self.client.post("/api/export-templates", headers=admin, json=body)
+        self.assertEqual(created.status_code, 201, created.text)
+        template_id = created.json()["id"]
+        detail = self.client.get(f"/api/export-templates/{template_id}", headers=admin)
+        self.assertEqual(detail.status_code, 200)
+        self.assertFalse(detail.json()["builtin"])
+        self.assertEqual(self.client.delete("/api/export-templates/1", headers=admin).status_code, 409)
+        rejected = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn("缺少必选内容", rejected.text)
+        preview = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}", headers=admin)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertTrue(preview.headers.get("x-package-sha256"))
+
+        # Add the required source/evidence and verify a real final package.
+        source = self.root / "final-source.txt"
+        source.write_text("结案原始材料", encoding="utf-8")
+        with transaction() as conn:
+            document_id = conn.execute(
+                "INSERT INTO documents(case_id,name,stored_path,mime_type,pages,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (self.cases[0], "final-source.txt", str(source), "text/plain", 1, "已索引", now(), now()),
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO evidence(case_id,title,category,fact,credibility,status,source_document_id,source_page_start,source_page_end,quote,approved_by,approved_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (self.cases[0], "已确认结案事实", "书证", "材料支持该事实", "高", "已确认", document_id, 1, 1, "结案原始材料", "管理员", now(), now()),
+            )
+        final = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
+        self.assertEqual(final.status_code, 200, final.text)
+        self.assertTrue(final.headers.get("x-package-sha256"))
+
+    def test_export_template_invalid_blocks_fail_closed(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        invalid = {"name": "错误模板", "blocks": [{"type": "static_markdown", "title": "空", "content": ""}]}
+        response = self.client.post("/api/export-templates", headers=admin, json=invalid)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("必须填写内容", response.text)
+
+    def test_export_template_update_and_delete_custom(self):
+        admin = {"Authorization": f"Bearer {self.admin_token}"}
+        body = {"name": "可删除模板", "description": "", "blocks": [{"type": "case_summary", "title": "摘要", "required": False}]}
+        created = self.client.post("/api/export-templates", headers=admin, json=body)
+        self.assertEqual(created.status_code, 201)
+        template_id = created.json()["id"]
+        updated = self.client.put(f"/api/export-templates/{template_id}", headers=admin,
+                                  json={**body, "name": "已更新模板"})
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(self.client.delete(f"/api/export-templates/{template_id}", headers=admin).status_code, 200)
+        self.assertEqual(self.client.get(f"/api/export-templates/{template_id}", headers=admin).status_code, 404)
 
     def test_cross_site_get_cannot_generate_export(self):
         headers = {"Authorization": f"Bearer {self.admin_token}", "Sec-Fetch-Site": "cross-site", "Origin": "https://attacker.example"}
@@ -471,3 +604,46 @@ class AccessControlTests(unittest.TestCase):
                 self.assertEqual(remote.get("/api/auth/me").status_code, 403)
             finally:
                 remote.close()
+
+    def test_local_mode_accepts_only_explicit_trusted_container_peer(self):
+        with patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "local", "LAW_REVIEW_TRUSTED_LOCAL_PEERS": "172.18.0.1"}):
+            trusted = TestClient(app, client=("172.18.0.1", 5000))
+            untrusted = TestClient(app, client=("172.18.0.2", 5000))
+            try:
+                self.assertEqual(trusted.get("/api/auth/me").status_code, 200)
+                self.assertEqual(untrusted.get("/api/auth/me").status_code, 403)
+            finally:
+                trusted.close()
+                untrusted.close()
+
+    def test_model_detection_maps_loopback_to_configured_container_host(self):
+        response_body = json.dumps({"data": [{"id": "local-chat-model"}]}).encode()
+        response = MagicMock()
+        response.read.return_value = response_body
+        response.__enter__.return_value = response
+        opener = MagicMock()
+        opener.open.return_value = response
+        with patch.dict(os.environ, {"LAW_REVIEW_MODEL_LOOPBACK_HOST": "host.docker.internal"}), patch(
+            "app.main.urllib.request.build_opener", return_value=opener
+        ):
+            result = self.client.post(
+                "/api/model-config/test",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={"base_url": "http://127.0.0.1:8000/v1"},
+            )
+
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json(), {"reachable": True, "models": ["local-chat-model"]})
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, "http://host.docker.internal:8000/v1/models")
+
+    def test_model_detection_rejects_loopback_prefix_hostname(self):
+        with patch("app.main.urllib.request.build_opener") as build_opener:
+            result = self.client.post(
+                "/api/model-config/test",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={"base_url": "http://localhost.attacker.example/v1"},
+            )
+
+        self.assertEqual(result.status_code, 400)
+        build_opener.assert_not_called()

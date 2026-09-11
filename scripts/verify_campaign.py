@@ -110,7 +110,7 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
     issues = []
     if digest(campaign_dir / "campaign.json") != manifest["campaign_sha256"]:
         issues.append("Campaign manifest mismatch")
-    if manifest.get("experiment_version") in {2, 3, 4, 5, 6, 7, 8}:
+    if manifest.get("experiment_version") in {2, 3, 4, 5, 6, 7, 8, 9}:
         from scripts.benchmark_experiment import configuration
         if digest(run_dir / "profile.json") != manifest["profile_sha256"] or configuration(run_dir / "profile.json") != manifest["config"]:
             issues.append("External profile mismatch")
@@ -137,10 +137,12 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
     elif manifest.get("experiment_version") == 7:
         known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
                               "app/benchmark_postprocess.py", "app/benchmark_event_tools.py", "app/legal_corpus.py"})
-    elif manifest.get("experiment_version") == 8:
+    elif manifest.get("experiment_version") in {8, 9}:
         known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
                               "app/benchmark_postprocess.py", "app/benchmark_event_tools.py",
                               "app/benchmark_summary_tools.py", "app/legal_corpus.py"})
+    if manifest.get("experiment_version") == 9:
+        known_sources.add("app/benchmark_weak_tasks.py")
     if set(manifest["sources"]) != known_sources:
         issues.append("Source snapshot coverage mismatch")
     for name, expected in manifest["sources"].items():
@@ -180,7 +182,18 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
                 issues.append(f"Thinking mode mismatch: {key}")
             if request["messages"][1]["content"] != original["instruction"].strip() + "\n" + original["question"]:
                 issues.append(f"Question prompt mismatch: {key}")
-            if manifest["config"]["strategy"] == "statutory_rag":
+            weak = manifest["config"]["strategy"] == "weak_tasks"
+            if weak:
+                from app.benchmark_weak_tasks import solve as weak_solve
+                from unittest.mock import patch
+                with patch("app.benchmark_rag_solver._call", return_value=call) as rc, patch("app.benchmark_solver._call", return_value=call) as bc:
+                    reconstructed = weak_solve(original["task"], original["instruction"], original["question"], manifest["config"])
+                invoked = [args for mock in (rc, bc) for args in mock.call_args_list]
+                if len(invoked) != 1 or invoked[0].args[0] != request["messages"]:
+                    issues.append(f"Weak task prompt mismatch: {key}")
+                if reconstructed["prediction"] != row["prediction"] or reconstructed.get("retrieval") != row.get("retrieval"):
+                    issues.append(f"Weak task reconstruction mismatch: {key}")
+            if manifest["config"]["strategy"] == "statutory_rag" or (weak and original["task"] in {"1-1", "2-1", "3-2"}):
                 from app.benchmark_retrieval import retrieve
                 context = retrieve(original["task"], original["question"], manifest["config"]["corpus_directories"])
                 if row.get("retrieval") != context:

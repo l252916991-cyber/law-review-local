@@ -22,12 +22,15 @@ services:
     build: .
     image: lexvault-local
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
-      LAW_REVIEW_ALLOWED_HOSTS: localhost,127.0.0.1
+      LAW_REVIEW_ALLOWED_HOSTS: ${LAW_REVIEW_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      LAW_REVIEW_LOCAL_MODEL_HOSTS: host.docker.internal
+      LAW_REVIEW_MODEL_LOOPBACK_HOST: host.docker.internal
+      LAW_REVIEW_TRUSTED_LOCAL_PEERS: ${LAW_REVIEW_TRUSTED_LOCAL_PEERS:-172.18.0.1}
     volumes:
       - web-data:/data
     depends_on:
@@ -38,16 +41,23 @@ services:
   worker:
     image: lexvault-local
     build: .
-    command: ["uv", "run", "--locked", "--no-dev", "arq", "app.tasks.WorkerSettings"]
+    command: ["/opt/lexvault-venv/bin/arq", "app.tasks.WorkerSettings"]
     env_file:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      LAW_REVIEW_LOCAL_MODEL_HOSTS: host.docker.internal
     volumes:
       - web-data:/data
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/lexvault-venv/bin/python", "-c", "import redis; assert redis.Redis.from_url('redis://redis:6379/0').ping()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped
 
 volumes:

@@ -10,7 +10,7 @@ from pathlib import Path
 from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item
 from app.benchmark_solver import GUIDED_SYSTEM_SUFFIX, TASK_GUIDANCE
 
-PROMPT_VERSION = "lawbench-task-guided-v3"
+PROMPT_VERSION = "lawbench-task-guided-v4"
 SYSTEM_PROMPT = "你正在参加中国法律能力评测。严格遵循题目的任务说明和输出格式，直接给出所要求的答案，不展示思维过程，不添加题目未要求的开场白或结论。"
 
 # Tasks whose paired anchor scores improved under task guidance; guidance is
@@ -44,7 +44,7 @@ def source_hashes() -> dict:
     root = Path(__file__).resolve().parent.parent
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
         "unified_benchmark_runner.py", "app/benchmark_metrics.py", "app/benchmark_reporting.py", "app/lawbench.py",
-        "app/benchmark_solver.py",
+        "app/benchmark_solver.py", "app/benchmark_postprocess.py",
     )}
 
 
