@@ -3,8 +3,44 @@ import json
 
 import pytest
 
-from app.benchmark_retrieval import corpus_fingerprint, retrieve
+from app.benchmark_retrieval import corpus_fingerprint, matched_law_names, retrieve
 from app.legal_corpus import SCHEMA_VERSION, split_articles
+
+
+def _law(name, aliases):
+    return {"law_name": name, "aliases": aliases}
+
+
+COMPANY = _law("中华人民共和国公司法", ["中华人民共和国公司法", "公司法"])
+LABOR = _law("中华人民共和国劳动法", ["中华人民共和国劳动法", "劳动法"])
+
+
+@pytest.mark.parametrize("question,expected", [
+    # Substring collisions: 公司法 inside 公司法定代表人 / 公司法人 are not references.
+    ("其担任公司法定代表人。", set()),
+    ("该公司法人刘某借款", set()),
+    ("一人有限责任公司法定代表人以公司法人名义贷款", set()),
+    # Genuine references must survive.
+    ("根据公司法第二百条规定", {"中华人民共和国公司法"}),
+    ("依照公司法规定应当承担", {"中华人民共和国公司法"}),
+    ("违反劳动法规怎么办", {"中华人民共和国劳动法"}),
+    ("按照劳动法的一半进行赔偿", {"中华人民共和国劳动法"}),
+    # A collision in one place does not erase a real reference elsewhere.
+    ("公司法定代表人和公司法第二百条", {"中华人民共和国公司法"}),
+])
+def test_matched_law_names_rejects_embedded_substrings(question, expected):
+    assert matched_law_names(question, [COMPANY, LABOR]) == expected
+
+
+def test_matched_law_names_prefers_longest_alias():
+    # 道路交通安全法 is a substring of its own implementing regulation; the longer
+    # name must win so the specific statute is not read as the general one.
+    docs = [_law("中华人民共和国道路交通安全法",
+                 ["中华人民共和国道路交通安全法", "道路交通安全法"]),
+            _law("中华人民共和国道路交通安全法实施条例",
+                 ["中华人民共和国道路交通安全法实施条例", "道路交通安全法实施条例"])]
+    assert matched_law_names("根据道路交通安全法实施条例第二十四条", docs) == {"中华人民共和国道路交通安全法实施条例"}
+    assert matched_law_names("根据道路交通安全法第七十条", docs) == {"中华人民共和国道路交通安全法"}
 
 
 @pytest.fixture
