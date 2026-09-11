@@ -62,6 +62,7 @@ from .services import (
 )
 from .security import actor_name, allowed_case_ids, require_case_access, require_permission
 from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
+from .statutory_retrieval import corpus_status
 from .agent_tools import execute_readonly_tool
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
@@ -108,6 +109,11 @@ async def lifespan(application: FastAPI):
                 dispatched = await reconcile_batch_dispatches()
                 if dispatched:
                     logging.info("Redispatched %s pending batch import(s)", dispatched)
+            # A broken corpus degrades statutory verification only; the case workspace
+            # stays usable, so this never blocks startup. Readiness reports it.
+            startup_corpus = corpus_status()
+            if startup_corpus["configured"] and not startup_corpus["available"]:
+                logging.error("Statutory corpus unavailable: %s", startup_corpus["error"])
             application.state.ready = True
             yield
         finally:
@@ -393,7 +399,19 @@ def health():
     if not identity()["authenticated"]:
         return {"status": "ok"}
     available, model = local_llm_available()
-    return {"status": "ok", "private_mode": True, "local_llm": available, "model": model}
+    return {"status": "ok", "private_mode": True, "local_llm": available, "model": model,
+            "corpus": corpus_status()}
+
+
+@app.get("/api/ready")
+def ready():
+    """Readiness probe: legal verification is unavailable unless the corpus loaded intact.
+
+    Reports only availability, never the corpus path, so it can stay unauthenticated.
+    """
+    status = corpus_status()
+    return {"status": "ok" if status["available"] else "degraded",
+            "legal_verification": "available" if status["available"] else "unavailable"}
 
 
 @app.post("/api/model-config/test")

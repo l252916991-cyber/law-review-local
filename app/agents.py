@@ -115,7 +115,9 @@ def validate_specialist_output(
     normalized.setdefault("schema_version", schema)
     normalized.setdefault("status", "ok")
     normalized.setdefault("summary", "")
-    if normalized["status"] not in {"ok", "needs_review", "failed"}:
+    # ``candidate`` marks unverified lexical matches (discovery), which are never a
+    # legal citation and must not be promoted to one downstream.
+    if normalized["status"] not in {"ok", "candidate", "needs_review", "failed"}:
         raise ValueError("invalid specialist status")
     max_index = len(contexts)
     for key in ("facts", "sources", "conflicts", "gaps", "items"):

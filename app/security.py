@@ -303,7 +303,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                     principal = token_principal(authorization[7:])
                 else:
                     principal = session_principal(request.cookies.get("lexvault_session", ""))
-                public = not request.url.path.startswith("/api/") or request.url.path in {"/api/auth/session", "/api/auth/me", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/health"}
+                public = not request.url.path.startswith("/api/") or request.url.path in {"/api/auth/session", "/api/auth/me", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/health", "/api/ready"}
                 if principal is None and not public:
                     raise HTTPException(401, "需要有效访问令牌")
             marker = _principal.set(principal)
@@ -317,7 +317,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                 if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
                         raise HTTPException(403, "仅管理员可以创建案件")
-                    if case_id is None and request.url.path not in {"/api/cases/lifecycle/archived", "/api/cases/lifecycle/trash", "/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates"}:
+                    if case_id is None and request.url.path not in {"/api/cases/lifecycle/archived", "/api/cases/lifecycle/trash", "/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/ready", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates"}:
                         raise HTTPException(403, "需要管理员权限")
             response = await call_next(request)
             if principal and not principal.local and response.status_code < 400 and (
