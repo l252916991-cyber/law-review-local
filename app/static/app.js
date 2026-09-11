@@ -333,10 +333,7 @@ async function loadLabMetrics() {
   if (!state.caseId) return;
   const requestId = state.caseRequestId;
   try {
-    const [metrics, benchmark] = await Promise.all([
-      api(`/api/cases/${state.caseId}/platform-metrics`),
-      api("/api/benchmarks/lawbench?limit=0"),
-    ]);
+    const metrics = await api(`/api/cases/${state.caseId}/platform-metrics`);
     if (requestId !== state.caseRequestId) return;
     const runs = metrics.agent_runs || {};
     const vectors = metrics.vector_index || {};
@@ -348,7 +345,6 @@ async function loadLabMetrics() {
     $("#lab-memory-count").textContent = metrics.memory_count || 0;
     $("#lab-recall").textContent = evaluation?.recall_at_k != null ? `${Math.round(evaluation.recall_at_k * 100)}%` : "—";
     $("#lab-mrr").textContent = evaluation ? `排序得分 ${evaluation.mrr == null ? "—" : evaluation.mrr.toFixed(2)} · 原文片段提供率 ${Math.round((evaluation.quote_presence_rate || 0) * 100)}%` : "等待质量检查";
-    $("#benchmark-chip").textContent = `LawBench ${benchmark.total_questions.toLocaleString("zh-CN")} 题`;
     const resumable = (metrics.recent_runs || []).filter((run) => run.resumable);
     const recoveryTarget = $("#lab-resumable-runs");
     recoveryTarget.hidden = resumable.length === 0;

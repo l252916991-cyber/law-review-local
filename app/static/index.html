@@ -272,10 +272,10 @@
               <textarea id="lab-question" rows="3" aria-label="阅卷问题" placeholder="输入需要核查的事实或证据问题"></textarea>
               <div class="lab-run-actions"><button class="primary-button" id="run-agent-btn">运行标准分析 <b>→</b></button><button class="secondary-button" id="compare-agent-btn">分析方式对比</button></div>
               <div id="lab-resumable-runs" class="resumable-runs" hidden></div>
-              <div id="lab-result" class="lab-result"><div class="empty-state">运行后将在这里显示最终答复与来源。</div></div>
             </article>
-            <article class="panel evaluation-panel">
-              <div class="panel-heading"><div><h3>检索质量检查</h3></div><span class="dataset-chip" id="benchmark-chip">加载 LawBench…</span></div>
+            <article class="panel lab-output">
+              <div class="panel-heading"><div><h3>阅卷结果</h3></div></div>
+              <div id="lab-result" class="lab-result"><div class="empty-state">运行后将在这里显示最终答复与来源。</div></div>
               <div id="evaluation-result" class="evaluation-result"></div>
             </article>
           </div>
