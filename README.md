@@ -14,6 +14,26 @@ FastAPI + SQLite 的私有化法律阅卷工作台：多格式卷宗导入、页
 
 当前版本 **v0.2.0**（2026-09-07）。发布序列：`v0.1.0` 工程基线 → `v0.1.1` 首个 CI 全绿 → `v0.2.0` 治理批次（权限矩阵、OIDC、证据链、审计事件、容器化、供应链扫描）。版本历史与验收证据见[企业化改进报告](docs/runbook/enterprise-improvement-report.md)第 10–11 节。
 
+### 1.1 仓库结构
+
+```text
+app/          产品代码：API、Agent 双运行时、检索、语料、权限与审计
+tests/        离线自动化测试（CI 禁网运行）
+benchmarks/   评测数据集与历史实验产物（LawBench 上游数据、结果 JSON）
+scripts/      发布、运维与维护工具（环境自检、备份、语料构建、发布打包）
+docs/         架构说明、运维手册与工程记录
+
+unified_benchmark_runner.py   模型评测公开入口
+rag_project_benchmark.py      项目 RAG 页级检索回归入口
+verify_benchmark_run.py       评测产物完整性与评分复算校验
+compare_agent_runtimes.py     双运行时对比入口
+BENCHMARK_TEST_PLAN.md        评测验证计划
+```
+
+评测**入口脚本有意保留在根目录**，由 `.gitignore` 白名单与[发布白名单](scripts/package_release.py)显式维护，使公开发布入口一眼可见；评测**数据与产物**则归入 `benchmarks/`，避免把可执行代码混入评测资产树。这是设计结果，不是历史残留。
+
+`data/`、`models/`、`output/` 是本地运行边界（数据库、上传、导出、模型权重与实验产物），永不入库。
+
 ## 2. 能力总览
 
 | 领域 | 能力 | 明确边界 |
