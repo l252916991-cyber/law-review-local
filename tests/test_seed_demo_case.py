@@ -30,8 +30,8 @@ class DemoCaseSeedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="lexvault-demo-seed-") as directory:
             summary = self._seed(directory)
             self.assertGreaterEqual(summary["documents"], 18)
-            self.assertGreaterEqual(summary["pages"], 50)
-            self.assertGreaterEqual(summary["evidence"], 20)
+            self.assertGreaterEqual(summary["pages"], 120)
+            self.assertGreaterEqual(summary["evidence"], 40)
             self.assertGreater(summary["bank_transactions"], 0)
             self.assertGreaterEqual(summary["conversations"], 6)
             self.assertGreaterEqual(summary["agent_runs"], 8)
@@ -55,11 +55,23 @@ class DemoCaseSeedTests(unittest.TestCase):
         self.assertGreaterEqual(len(volumes), 17)
         for volume in volumes:
             self.assertGreaterEqual(len(volume["pages"]), 1)
-        # _evidence() needs ids; reuse the catalogue order with synthetic ids.
-        indexed = [{"id": i + 1, "pages": len(v["pages"])} for i, v in enumerate(volumes)]
-        for item in _evidence(indexed):
+        # Pages are located from the quote inside the named volume, so a stale
+        # reference raises instead of silently pointing at the wrong page.
+        indexed = [{"id": i + 1, "name": v["name"], "pages": len(v["pages"])} for i, v in enumerate(volumes)]
+        indexed.append({"id": 18, "name": "18-恒远商贸对公账户流水.csv", "pages": 1})
+        for item in _evidence(indexed, "账号,收支方向,交易金额,交易日期,对方户名,摘要,币种"):
             self.assertGreaterEqual(item["source_page_start"], 1)
             self.assertLessEqual(item["source_page_start"], item["source_page_end"])
+
+    def test_volumes_read_as_full_documents(self) -> None:
+        volumes = _documents()
+        pages = [(volume["name"], page) for volume in volumes for page in volume["pages"]]
+        self.assertGreaterEqual(len(pages), 120)
+        for name, page in pages:
+            self.assertGreaterEqual(len(page), 120, f"{name} 存在过短的页面")
+        # A page of substance, not a one-line stub.
+        average = sum(len(page) for _, page in pages) / len(pages)
+        self.assertGreaterEqual(average, 250, "卷宗平均每页字数过低，读起来不像真实文书")
 
     def test_bank_csv_parses_into_directed_rows(self) -> None:
         rows = parse_csv(_bank_transactions(random.Random(1)))
