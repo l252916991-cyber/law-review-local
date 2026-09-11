@@ -1,6 +1,6 @@
 import json
 
-from scripts.build_npc_corpus import canonical_law_name, extract_document, requested_laws
+from scripts.build_npc_corpus import TITLE_OVERRIDES, canonical_law_name, extract_document, requested_laws
 
 
 def _line(text):
@@ -77,3 +77,7 @@ def test_law_names_come_from_questions_and_skip_existing(tmp_path):
         "中华人民共和国宪法修正案（1993年）": {"宪法修正案1993年"},
     }
     assert canonical_law_name("中华人民共和国劳动法") == "中华人民共和国劳动法"
+
+
+def test_constitution_maps_to_official_consolidated_title():
+    assert TITLE_OVERRIDES["中华人民共和国宪法"] == "中华人民共和国宪法（2018年修正文本）"

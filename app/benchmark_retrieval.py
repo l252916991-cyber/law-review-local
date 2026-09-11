@@ -84,6 +84,20 @@ def retrieve(task_id: str, question: str, directories: list[str], *, limit: int 
                 hits.extend(corpus.lookup(doc["law_name"], article_number(match[1]),
                                          version_date=doc["version_date"],
                                          subarticle=article_number(match[2]) if match[2] else None))
+        if not hits:
+            # An amendment text only carries its own clauses; when the requested
+            # article is absent, the consolidated base statute governs that number.
+            for _, amendment in chosen:
+                base = re.sub(r"修正案[（(].*$", "", amendment["law_name"])
+                if base == amendment["law_name"]:
+                    continue
+                for name, docs in grouped.items():
+                    for corpus, doc in docs:
+                        if not any(alias == base or alias.startswith(base) for alias in doc["aliases"]):
+                            continue
+                        for match in ARTICLE.finditer(question):
+                            hits.extend(corpus.lookup(name, article_number(match[1]),
+                                                     version_date=doc["version_date"]))
         result["mode"] = "exact_article"
     else:
         for corpus, doc in chosen:

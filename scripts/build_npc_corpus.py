@@ -32,6 +32,9 @@ READER_HOST = "flkofd.npc.gov.cn"
 DEFAULT_CUTOFF = "2023-11-13"
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 MAX_PAGES = 500
+# The official database titles a consolidated statute with a status suffix while
+# questions name the statute itself; map the requested name to the publication title.
+TITLE_OVERRIDES = {"中华人民共和国宪法": "中华人民共和国宪法（2018年修正文本）"}
 ARTICLE_TITLE = re.compile(rf"^第({r'[零〇一二三四五六七八九十百千万两0-9]+'})条(?:之.+)?$")
 QUESTION_LAW = re.compile(
     r"^(?:民法商法|社会法|诉讼与非诉讼程序法)?(.+?)第[零〇一二三四五六七八九十百千万两0-9]+条"
@@ -169,15 +172,16 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
 
 
 def download_law(name: str, aliases: set[str], cutoff: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    official_title = TITLE_OVERRIDES.get(name, name)
     search_body = {"searchRange": 1, "sxrq": [], "gbrq": [], "sxx": [], "searchType": 1,
-                   "xgzlSearch": False, "searchContent": name, "pageNum": 1, "pageSize": 100}
+                   "xgzlSearch": False, "searchContent": official_title, "pageNum": 1, "pageSize": 100}
     search_raw, search = _request_json(SEARCH_URL, body=search_body)
-    rows = [row for row in search.get("rows", []) if _clean_title(row.get("title", "")) == name and row.get("gbrq", "") <= cutoff]
+    rows = [row for row in search.get("rows", []) if _clean_title(row.get("title", "")) == official_title and row.get("gbrq", "") <= cutoff]
     if not rows:
-        raise ValueError(f"No exact official version at or before cutoff: {name}")
+        raise ValueError(f"No exact official version at or before cutoff: {official_title}")
     selected = max(rows, key=lambda row: row["gbrq"])
     detail_raw, detail = _request_json(DETAIL_URL + "?" + urllib.parse.urlencode({"bbbs": selected["bbbs"]}))
-    if detail.get("code") != 200 or detail.get("data", {}).get("title") != name:
+    if detail.get("code") != 200 or detail.get("data", {}).get("title") != official_title:
         raise ValueError("Official detail response does not match selected law")
     publication_files = detail["data"].get("ossFile") or {}
     ofd_path = publication_files.get("ossWordOfdPath") or publication_files.get("ossPdfOfdPath")
@@ -221,7 +225,7 @@ def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: st
     for name, aliases in sorted(laws.items()):
         attempted = datetime.now(timezone.utc).isoformat()
         try:
-            bundle, document = download_law(name, aliases, cutoff)
+            bundle, document = download_law(name, aliases | {name}, cutoff)
             stem = document["document_id"]
             raw = (json.dumps(bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
             serialized = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode()

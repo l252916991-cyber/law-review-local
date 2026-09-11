@@ -84,6 +84,22 @@ uv run --locked python scripts/build_legal_corpus.py --output output/score85/leg
 
 固定模型复测：`dev20-statutory-police-v9` 为47.64分，上一版47.30分，1升19平0降；执法偏差题第79条召回排名第一，单题21.13→27.88。`confirm10-statutory-police-v9` 为47.96分，10题均与上一版相同；30次调用无错误、空答或截断。按已保留方案直接接入的要求，`weak4-candidate-v1.json` 已加入该库。小样本结果不代表200/1000题验收完成。
 
+## 2026-09-11 宪法补充集（npc_v8）
+
+`build_npc_corpus.py` 原按题目推导出的法名做官方标题精确匹配，官方库把整合版登记为《中华人民共和国宪法（2018年修正文本）》，导致 `中华人民共和国宪法` 报 "No exact official version"。新增 `TITLE_OVERRIDES` 将该请求名映射到官方整合版标题，抓取到 1 份文书、143 条（含第一百二十六条），valid=true。本次为完整的 2018 年修正后整合文本，非修正案（修正案本身只含第32–52项）。
+
+`app/benchmark_retrieval.py` 增加最小回退：当问题点名某修正案、而该条不在修正案自身条文中时，落到同法制定的整合版文本按条号查询。第500题"宪法修正案2018年第一百二十六条"命中整合版宪法第一百二十六条。
+
+```sh
+uv run --locked python scripts/build_npc_corpus.py \
+  --output output/score85/legal_corpus_supplement_npc_v8 \
+  --campaign <仅含宪法题的 inputs.jsonl> \
+  --existing-corpus <已有语料目录，可重复>
+uv run --locked python scripts/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v8 --verify
+```
+
+LawBench 1-1 法条检索覆盖由 492/500 提升到 **500/500**（按 `weak4-candidate-v1.json` 链 + npc_v8 实测）。该口径只证明条号可精确检索到官方法条，不代表生成模型最终得分；模型基准仍需授权环境实测。
+
 ## P2 独立实验层（默认不启用）
 
 `app/statutory_index.py` 接收 `LegalCorpus`、`IndexSpec`、以 `document_id/article_id` 为键的预计算 vectors，以及按 document_id 的 validity 映射。索引仅做文件与纯计算操作，不创建模型客户端，不接入现有 `retrieve` 或 `retrieve_statutory`。指纹包括完整 manifest/文书内容、schema、parser 版本与源码哈希、embedding 模型身份（应含不可变 revision）/backend/dim、normalization、segmentation 和 validity；加载缓存逐项失配即拒绝，不能只匹配维度。
