@@ -171,14 +171,33 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
     }
 
 
+def _candidate_titles(name: str) -> list[str]:
+    """Official titles to try in order.
+
+    Statutes are titled ``中华人民共和国X法``, but administrative regulations are
+    often titled without that prefix (``工伤保险条例``) and a few carry it
+    (``中华人民共和国户口登记条例``). Try the name as given, then the opposite
+    prefix form, so either publication style resolves without a per-law override.
+    Selection stays exact-title, so the fallback cannot match a different law.
+    """
+    base = TITLE_OVERRIDES.get(name, name)
+    if base.startswith("中华人民共和国"):
+        return [base, base.removeprefix("中华人民共和国")]
+    return [base, "中华人民共和国" + base]
+
+
 def download_law(name: str, aliases: set[str], cutoff: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    official_title = TITLE_OVERRIDES.get(name, name)
-    search_body = {"searchRange": 1, "sxrq": [], "gbrq": [], "sxx": [], "searchType": 1,
-                   "xgzlSearch": False, "searchContent": official_title, "pageNum": 1, "pageSize": 100}
-    search_raw, search = _request_json(SEARCH_URL, body=search_body)
-    rows = [row for row in search.get("rows", []) if _clean_title(row.get("title", "")) == official_title and row.get("gbrq", "") <= cutoff]
-    if not rows:
-        raise ValueError(f"No exact official version at or before cutoff: {official_title}")
+    official_title: str | None = None
+    for title in _candidate_titles(name):
+        search_body = {"searchRange": 1, "sxrq": [], "gbrq": [], "sxx": [], "searchType": 1,
+                       "xgzlSearch": False, "searchContent": title, "pageNum": 1, "pageSize": 100}
+        search_raw, search = _request_json(SEARCH_URL, body=search_body)
+        rows = [row for row in search.get("rows", []) if _clean_title(row.get("title", "")) == title and row.get("gbrq", "") <= cutoff]
+        if rows:
+            official_title = title
+            break
+    if official_title is None:
+        raise ValueError(f"No exact official version at or before cutoff: {TITLE_OVERRIDES.get(name, name)}")
     selected = max(rows, key=lambda row: row["gbrq"])
     detail_raw, detail = _request_json(DETAIL_URL + "?" + urllib.parse.urlencode({"bbbs": selected["bbbs"]}))
     if detail.get("code") != 200 or detail.get("data", {}).get("title") != official_title:

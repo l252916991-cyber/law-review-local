@@ -81,3 +81,16 @@ def test_law_names_come_from_questions_and_skip_existing(tmp_path):
 
 def test_constitution_maps_to_official_consolidated_title():
     assert TITLE_OVERRIDES["中华人民共和国宪法"] == "中华人民共和国宪法（2018年修正文本）"
+
+
+def test_candidate_titles_try_both_prefix_forms():
+    from scripts.build_npc_corpus import _candidate_titles
+
+    # Administrative regulations are usually published without the prefix...
+    assert _candidate_titles("工伤保险条例") == ["工伤保险条例", "中华人民共和国工伤保险条例"]
+    # ...but a few carry it, and the prefixed input must still fall back.
+    assert _candidate_titles("中华人民共和国户口登记条例") == [
+        "中华人民共和国户口登记条例", "户口登记条例"]
+    # Statutes keep the prefixed form first.
+    assert _candidate_titles("中华人民共和国劳动法") == ["中华人民共和国劳动法", "劳动法"]
+    assert _candidate_titles("中华人民共和国宪法")[0] == "中华人民共和国宪法（2018年修正文本）"
