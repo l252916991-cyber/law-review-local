@@ -375,14 +375,14 @@ class OrdinaryChatQualityTest(IsolatedQualityTest):
     def test_plain_chat_uses_the_same_validation_gate(self):
         with patch("app.services.call_local_llm", return_value="SECRET invented result without citation"), \
                 self.assertRaisesRegex(RuntimeError, "model_unavailable_or_invalid"):
-            chat(self.case_id, "固定回报", "律师", None, True)
+            chat(self.case_id, "固定回报", "律师", None, True, False)
         with closing(connect()) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM messages WHERE role='assistant'").fetchone()[0], 0)
 
     def test_plain_chat_valid_llm_answer_is_used(self):
         answer = "固定回报已经确认[资料1]，请律师复核。"
         with patch("app.services.call_local_llm", return_value=answer):
-            result = chat(self.case_id, "固定回报", "律师", None, True)
+            result = chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertTrue(result["llm_used"])
         self.assertEqual(result["answer"], answer)
         self.assertEqual(result["citation_check"], "passed")
@@ -390,19 +390,19 @@ class OrdinaryChatQualityTest(IsolatedQualityTest):
     def test_plain_chat_error_body_is_not_persisted_or_returned(self):
         with patch("app.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
                 self.assertRaises(RuntimeError) as raised:
-            chat(self.case_id, "固定回报", "律师", None, True)
+            chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertNotIn("SECRET_TOKEN", str(raised.exception))
         with closing(connect()) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM messages WHERE role='assistant'").fetchone()[0], 0)
 
     def test_comparison_rule_answer_has_actual_citation_markers(self):
-        result = chat(self.case_id, "固定回报的陈述是否矛盾", "律师", None, False)
+        result = chat(self.case_id, "固定回报的陈述是否矛盾", "律师", None, False, False)
         self.assertEqual(result["route"], "多文档对比")
         self.assertTrue(result["validation"]["valid"])
         self.assertIn("[资料1]", result["answer"])
 
     def test_directory_statistics_are_labeled_metadata_not_citation_verification(self):
-        result = chat(self.case_id, "共有多少份卷宗", "律师", None, False)
+        result = chat(self.case_id, "共有多少份卷宗", "律师", None, False, False)
         self.assertEqual(result["validation"]["scope"], "database_metadata_counts")
         self.assertEqual(result["citation_check"], "not_applicable")
 

@@ -345,6 +345,62 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(confirmed.status_code, 200)
         self.assertEqual(confirmed.json()["evidence"]["approved_by"], "管理员")
 
+    def test_readonly_agent_tools_enforce_scope_allowlist_and_redacted_audit(self):
+        viewer_token = "e" * 40
+        with patch.dict(os.environ, {"LAW_REVIEW_API_TOKENS_JSON": json.dumps({
+            self.admin_token: {"name": "管理员", "admin": True},
+            viewer_token: {"name": "只读律师", "case_ids": [self.cases[0]], "permissions": ["view"]},
+        })}):
+            viewer = {"Authorization": f"Bearer {viewer_token}"}
+            with transaction() as conn:
+                conn.execute(
+                    "INSERT INTO documents(case_id,name,summary,created_at,updated_at) VALUES (?,?,?,?,?)",
+                    (self.cases[0], "SECRET_CASE_TEXT.txt", "卷宗摘要", now(), now()),
+                )
+            path = f"/api/cases/{self.cases[0]}/agent-tools/call"
+            for tool in ("documents", "evidence", "saved_gap_analysis"):
+                response = self.client.post(path, headers=viewer, json={"tool": tool, "params": {}})
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()["permission"], "view")
+                self.assertIn("不是指令", response.json()["data_notice"])
+            self.assertEqual(
+                self.client.get(f"/api/cases/{self.cases[0]}/gap-analysis/preview", headers=viewer).status_code,
+                200,
+            )
+            self.assertEqual(
+                self.client.post(f"/api/cases/{self.cases[0]}/gap-analysis/detect", headers=viewer).status_code,
+                403,
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/api/cases/{self.cases[1]}/agent-tools/call",
+                    headers=viewer,
+                    json={"tool": "documents", "params": {}},
+                ).status_code,
+                404,
+            )
+            for tool in ("delete_evidence", "export", "chat"):
+                with self.subTest(tool=tool):
+                    self.assertEqual(
+                        self.client.post(path, headers=viewer, json={"tool": tool, "params": {}}).status_code,
+                        404,
+                    )
+            downgrade = self.client.post(
+                path,
+                headers=viewer,
+                json={"tool": "search", "params": {"query": "测试", "use_remote_embeddings": False}},
+            )
+            self.assertEqual(downgrade.status_code, 400)
+            with closing(connect()) as conn:
+                audits = [row[0] for row in conn.execute(
+                    "SELECT detail FROM audit_log WHERE case_id=? AND action='Agent只读工具调用' ORDER BY id",
+                    (self.cases[0],),
+                )]
+            self.assertTrue(any("只读律师：tool=documents count=1" in audit for audit in audits))
+            self.assertTrue(any("tool=evidence" in audit for audit in audits))
+            self.assertTrue(any("tool=saved_gap_analysis" in audit for audit in audits))
+            self.assertNotIn("SECRET_CASE_TEXT", "\n".join(audits))
+
     def test_invalid_permission_values_fail_closed(self):
         for value in ('{"permissions": ["root"]}', '{"permissions": []}', '{"permissions": "view"}'):
             payload = dict(self._token_config())

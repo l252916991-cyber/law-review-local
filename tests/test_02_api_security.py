@@ -140,7 +140,10 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
 
         # 3000字符成功
         question_3000 = "问" * 3000
-        resp = self.client.post(f"/api/cases/{self.case_id}/chat", json={"question": question_3000, "use_llm": False})
+        resp = self.client.post(
+            f"/api/cases/{self.case_id}/chat",
+            json={"question": question_3000, "use_llm": False, "use_remote_embeddings": False},
+        )
         self.assertEqual(resp.status_code, 200)
 
         # 3001字符失败

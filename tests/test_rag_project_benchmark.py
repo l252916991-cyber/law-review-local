@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from rag_project_benchmark import paired_comparison
+from app.rag_benchmark_dataset import LONG_PAGE_VERSION, build_long_page_benchmark
+from rag_project_benchmark import paired_comparison, paired_run_comparison
 from rag_project_benchmark import score_query, summarize
 import pytest
 
@@ -53,6 +54,104 @@ def test_paired_comparison_rejects_changed_labels():
         paired_comparison([row], [{**row, "expected": []}])
     with pytest.raises(ValueError, match="unique identical"):
         paired_comparison([row, row], [row])
+
+
+def test_paired_run_comparison_requires_only_page_children_to_differ():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    baseline_summary = {
+        "dataset": LONG_PAGE_VERSION,
+        "dataset_sha256": "frozen-hash",
+        "k": 2,
+        "configuration": {
+            "embedding_mode": "hashed-local",
+            "reranker": "off",
+            "page_children": "False",
+        },
+    }
+    candidate_summary = {
+        **baseline_summary,
+        "configuration": {**baseline_summary["configuration"], "page_children": "True"},
+    }
+
+    report = paired_run_comparison(baseline_summary, candidate_summary, [row], [row])
+
+    assert report["comparison"] == "two_complete_retrieval_paths_diagnostic"
+    assert report["causal_attribution"] == "not_a_pure_chunking_ablation"
+    assert report["controls"]["k"] == 2
+    assert report["controls"]["dataset_sha256"] == "frozen-hash"
+    assert report["metrics"]["recall_at_k"]["paired_query_count"] == 1
+
+    for changed, message in (
+        ({**candidate_summary, "k": 3}, "identical k"),
+        ({**candidate_summary, "dataset_sha256": "changed"}, "dataset_sha256"),
+        (
+            {
+                **candidate_summary,
+                "configuration": {**candidate_summary["configuration"], "reranker": "on"},
+            },
+            "run mode",
+        ),
+        ({**candidate_summary, "configuration": baseline_summary["configuration"]}, "page-level baseline"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            paired_run_comparison(baseline_summary, changed, [row], [row])
+
+    missing_hash = {key: value for key, value in candidate_summary.items() if key != "dataset_sha256"}
+    with pytest.raises(ValueError, match="present dataset_sha256"):
+        paired_run_comparison(baseline_summary, missing_hash, [row], [row])
+
+    changed_runtime = {**row, "retrieval": full_metrics()}
+    with pytest.raises(ValueError, match="actual runtime"):
+        paired_run_comparison(baseline_summary, candidate_summary, [row], [changed_runtime])
+
+    missing_runtime = {**row, "retrieval": {"embedding": {"backend": "hashed-local"}}}
+    with pytest.raises(ValueError, match="runtime telemetry"):
+        paired_run_comparison(baseline_summary, candidate_summary, [row], [missing_runtime])
+
+
+def test_long_page_dataset_is_frozen_and_fact_grounded():
+    rows = build_long_page_benchmark()
+
+    assert len(rows) == 12
+    assert len({row["id"] for row in rows}) == 12
+    assert len({row["query"] for row in rows}) == 12
+    assert len({row["cluster_id"] for row in rows}) == 4
+    assert {row["template_id"] for row in rows} == {row["cluster_id"] for row in rows}
+    assert {row["diagnostic_provenance"] for row in rows} == {
+        "synthetic_long_page_diagnostic"
+    }
+    assert {row["challenge"] for row in rows} == {
+        "long_page_dilution",
+        "similar_neighbor_interference",
+        "cross_page_two_aspects",
+    }
+
+    for row in rows:
+        pages_by_document = {
+            document["name"]: document["pages"] for document in row["documents"]
+        }
+        expected = {(gold["document"], gold["page"]) for gold in row["expected"]}
+        facts = {(fact["document"], fact["page"]) for fact in row["gold_facts"]}
+        assert expected == facts
+        for fact in row["gold_facts"]:
+            pages = pages_by_document[fact["document"]]
+            assert 1 <= fact["page"] <= len(pages)
+            page_text = pages[fact["page"] - 1]
+            assert page_text.count(fact["text"]) == 1
+
+    long_page_rows = [row for row in rows if row["challenge"] == "long_page_dilution"]
+    assert len(long_page_rows) == 4
+    for row in long_page_rows:
+        fact = row["gold_facts"][0]
+        page_text = row["documents"][0]["pages"][fact["page"] - 1]
+        fact_offset = page_text.index(fact["text"])
+        assert len(page_text) > 1200
+        assert fact_offset >= 400
+        assert page_text.count("\n\n") >= 8
+
+    cross_page_rows = [row for row in rows if row["challenge"] == "cross_page_two_aspects"]
+    assert len(cross_page_rows) == 4
+    assert all(len({gold["page"] for gold in row["expected"]}) == 2 for row in cross_page_rows)
 
 
 def test_hard_unanswerable_requires_empty_retrieval():
