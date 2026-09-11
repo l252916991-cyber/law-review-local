@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from time import perf_counter
-from typing import Any, Literal, Protocol
+from typing import Any, Iterable, Literal, Protocol
 
 from .legal_corpus import _terms
 from .statutory_index import StatutoryIndex
@@ -37,6 +37,7 @@ class StatutoryHybrid:
         self.candidates, self.rrf_k, self.soft_boost = candidates, rrf_k, soft_boost
 
     def search(self, query: str, *, mode: Mode = "lexical", explicit_law: str | None = None,
+               explicit_laws: Iterable[str] | None = None,
                inferred_law: str | None = None, query_effective_date: str | None = None,
                limit: int = 10) -> dict[str, Any]:
         if mode not in MODES or limit < 1 or limit > self.candidates:
@@ -45,7 +46,8 @@ class StatutoryHybrid:
         result: dict[str, Any] = {"mode": mode, "available": False, "failure": None, "hits": [],
                                   "issues": [], "embedding_calls": 0, "rerank_candidates": 0}
         try:
-            keys, issues = self.index.eligible(explicit_law=explicit_law, query_effective_date=query_effective_date)
+            keys, issues = self.index.eligible(explicit_law=explicit_law, explicit_laws=explicit_laws,
+                                               query_effective_date=query_effective_date)
             result["issues"] = issues
             if not keys:
                 raise ValueError("no_verified_candidates")

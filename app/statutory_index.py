@@ -7,7 +7,7 @@ import math
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .legal_corpus import LegalCorpus, SCHEMA_VERSION
 
@@ -108,13 +108,18 @@ class StatutoryIndex:
         index.vectors = {key: vector_values(value, spec) for key, value in vectors.items()}
         return index
 
-    def eligible(self, *, explicit_law: str | None = None, query_effective_date: str | None = None,
+    def eligible(self, *, explicit_law: str | None = None, explicit_laws: Iterable[str] | None = None,
+                 query_effective_date: str | None = None,
                  today: date | None = None) -> tuple[list[str], list[str]]:
+        """Candidate article IDs. ``explicit_laws`` mirrors a multi-law production scope."""
+        if explicit_law is not None and explicit_laws is not None:
+            raise ValueError("Pass explicit_law or explicit_laws, not both")
+        allowed = {explicit_law} if explicit_law is not None else (set(explicit_laws) if explicit_laws is not None else None)
         target = date.fromisoformat(query_effective_date) if query_effective_date else (today or date.today())
         active: dict[str, list[str]] = {}
         issues: list[str] = []
         for key, doc in self.documents.items():
-            if explicit_law is not None and explicit_law not in [doc["law_name"], *doc["aliases"]]:
+            if allowed is not None and not allowed & {doc["law_name"], *doc["aliases"]}:
                 continue
             try:
                 meta = self.validity[key]

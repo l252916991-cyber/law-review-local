@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.lawbench import load_task  # noqa: E402
+from app.benchmark_retrieval import RETRIEVAL_VERSION, matched_law_names  # noqa: E402
 from app.legal_corpus import LegalCorpus  # noqa: E402
 from app.rag import EmbeddingClient, RerankClient  # noqa: E402
 from app.statutory_benchmark import METRICS, evaluate  # noqa: E402
@@ -63,11 +64,22 @@ def build_index(corpus: LegalCorpus, embedding: EmbeddingClient, spec: IndexSpec
     return StatutoryIndex(corpus, spec, vectors=vectors, validity=build_validity(corpus))
 
 
-def build_dataset(task_id: str, index: StatutoryIndex, *, per_split: int, effective_date: str) -> dict[str, Any]:
+def build_dataset(task_id: str, index: StatutoryIndex, *, per_split: int, effective_date: str,
+                  scope: str = "global") -> dict[str, Any]:
+    """Assemble dev/confirm from citation gold.
+
+    ``scope="global"`` searches every indexed law (retriever capability without any
+    law-name hint). ``scope="production"`` mirrors ``benchmark_retrieval``: when the
+    question names a law, its aliases constrain candidates; otherwise the search
+    stays global. No law is assigned that the question does not itself contain.
+    """
+    if scope not in {"global", "production"}:
+        raise ValueError("scope must be global or production")
     aliases: dict[str, str] = {}
     for doc in index.documents.values():
         for alias in {doc["law_name"], *doc["aliases"]}:
             aliases.setdefault(alias, doc["document_id"])
+    grouped = list(index.documents.values()) if scope == "production" else None
     tasks: list[dict[str, Any]] = []
     seen: set[str] = set()
     for row in load_task(task_id):
@@ -81,13 +93,22 @@ def build_dataset(task_id: str, index: StatutoryIndex, *, per_split: int, effect
         if not gold or question in seen:
             continue
         seen.add(question)
-        tasks.append({"id": f"{task_id}-{len(tasks):04d}", "query": question, "gold": gold,
-                      "query_effective_date": effective_date})
+        task: dict[str, Any] = {"id": f"{task_id}-{len(tasks):04d}", "query": question, "gold": gold,
+                                "query_effective_date": effective_date}
+        if scope == "production" and grouped is not None:
+            names = matched_law_names(question, grouped)
+            if names:
+                # Mirror production: only constrain when the question names a law.
+                task["explicit_laws"] = sorted(names)
+                # A question name can contradict the reference law; production would
+                # then miss, which is scored as a failure rather than rejected.
+                task["allow_out_of_scope"] = True
+        tasks.append(task)
     if len(tasks) < 2 * per_split:
         raise ValueError(f"Not enough evaluable questions for {task_id}: {len(tasks)}")
     for position, item in enumerate(tasks):
         item["split"] = "dev" if position < per_split else "confirm"
-    return {"tasks": tasks[:2 * per_split]}
+    return {"retrieval_version": RETRIEVAL_VERSION, "tasks": tasks[:2 * per_split]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--task", default="3-1")
     parser.add_argument("--per-split", type=int, default=100)
     parser.add_argument("--effective-date", default="2026-01-01", help="query 适用日期，须晚于语料内所有生效日")
+    parser.add_argument("--scope", choices=["global", "production"], default="global",
+                        help="global=全库检索；production=复现 benchmark_retrieval 的法名约束")
     parser.add_argument("--index-cache", type=Path, help="复用/保存向量索引")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -103,17 +126,24 @@ def main(argv: list[str] | None = None) -> int:
     embedding = EmbeddingClient(prefer_remote=True, model="Qwen3-Embedding-4B-4bit-DWQ")
     corpus = LegalCorpus(args.corpus_dir)
     if args.index_cache and args.index_cache.exists():
-        index = StatutoryIndex.load(args.index_cache, corpus, IndexSpec(embedding.model, 2560, "omlx"))
+        # load() rebuilds the fingerprint from validity, so it must be passed the
+        # same sidecar that save() used, not the default empty one.
+        index = StatutoryIndex.load(args.index_cache, corpus, IndexSpec(embedding.model, 2560, "omlx"),
+                                    validity=build_validity(corpus))
     else:
         index = build_index(corpus, embedding, IndexSpec(embedding.model, 2560, "omlx"))
         if args.index_cache:
             args.index_cache.parent.mkdir(parents=True, exist_ok=True)
             index.save(args.index_cache)
-    dataset = build_dataset(args.task, index, per_split=args.per_split, effective_date=args.effective_date)
+    dataset = build_dataset(args.task, index, per_split=args.per_split, effective_date=args.effective_date,
+                            scope=args.scope)
     engine = StatutoryHybrid(index, embedding=embedding, reranker=RerankClient())
     report = evaluate(engine, dataset, config)
-    summary = {"corpus": str(args.corpus_dir), "task": args.task, "articles_indexed": len(index.rows),
+    scoped = sum(1 for task in dataset["tasks"] if task.get("explicit_laws"))
+    summary = {"corpus": str(args.corpus_dir), "task": args.task, "scope": args.scope,
+               "articles_indexed": len(index.rows),
                "questions": len(dataset["tasks"]), "per_split": args.per_split,
+               "law_constrained_questions": scoped,
                "modes": list(MODES), "dev": {}, "confirm": {}, "promotion": report["promotion"]}
     for split in ("dev", "confirm"):
         for mode in MODES:

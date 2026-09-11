@@ -11,13 +11,40 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from app.legal_corpus import LegalCorpus, article_number
 
 RETRIEVAL_VERSION = "statutory-context-v1"
 SUPPORTED_TASKS = {"1-1", "1-2", "3-1", "3-2", "3-3", "3-6", "3-8"}
 NUMBER = r"[零〇一二三四五六七八九十百千万两0-9]+"
+
+
+def group_publications(corpora: list[LegalCorpus]) -> dict[str, list[tuple[LegalCorpus, dict[str, Any]]]]:
+    """Group document publications by law name, rejecting conflicting duplicates."""
+    grouped: dict[str, list[tuple[LegalCorpus, dict[str, Any]]]] = defaultdict(list)
+    seen: dict[tuple[str, str], str] = {}
+    for corpus in corpora:
+        for doc in corpus.documents:
+            key = (doc["law_name"], doc["version_date"])
+            signature = hashlib.sha256(json.dumps(doc["articles"], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+            if key in seen:
+                if seen[key] != signature:
+                    raise ValueError(f"Conflicting publications for {key}")
+                continue
+            seen[key] = signature
+            grouped[doc["law_name"]].append((corpus, doc))
+    return grouped
+
+
+def matched_law_names(question: str, documents: Iterable[dict[str, Any]]) -> set[str]:
+    """Law names whose aliases appear in the question.
+
+    Longest aliases win, so a specific statute is not read as a shorter law name.
+    An empty set means no law was named, not that no law applies.
+    """
+    matched = [(alias, doc["law_name"]) for doc in documents for alias in doc["aliases"] if alias in question]
+    return {name for alias, name in matched if not any(alias != other and alias in other for other, _ in matched)}
 ARTICLE = re.compile(rf"第({NUMBER})条(?:之({NUMBER}))?")
 
 
@@ -42,22 +69,8 @@ def retrieve(task_id: str, question: str, directories: list[str], *, limit: int 
     if task_id not in SUPPORTED_TASKS:
         return result
     corpora = [LegalCorpus(directory) for directory in directories]
-    grouped: dict[str, list[tuple[LegalCorpus, dict[str, Any]]]] = defaultdict(list)
-    seen: dict[tuple[str, str], str] = {}
-    for corpus in corpora:
-        for doc in corpus.documents:
-            key = (doc["law_name"], doc["version_date"])
-            signature = hashlib.sha256(json.dumps(doc["articles"], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-            if key in seen:
-                if seen[key] != signature:
-                    raise ValueError(f"Conflicting publications for {key}")
-                continue
-            seen[key] = signature
-            grouped[doc["law_name"]].append((corpus, doc))
-    # Longest aliases avoid interpreting a specific statute as a shorter law name.
-    matched = [(alias, name) for name, docs in grouped.items() for _, doc in docs
-               for alias in doc["aliases"] if alias in question]
-    names = {name for alias, name in matched if not any(alias != other and alias in other for other, _ in matched)}
+    grouped = group_publications(corpora)
+    names = matched_law_names(question, [doc for corpus in corpora for doc in corpus.documents])
     years = set(re.findall(r"((?:19|20)\d{2})年(?:修订|修正|版本|版)", question))
     if task_id == "1-1":
         # In exact-text questions dates name the requested law, not case events.

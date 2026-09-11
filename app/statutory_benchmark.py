@@ -69,8 +69,13 @@ def evaluate(retriever: StatutoryHybrid, dataset: dict[str, Any], config: dict[s
         if not task.get("query_effective_date"):
             raise ValueError("Frozen benchmark requires query_effective_date")
         eligible, _ = retriever.index.eligible(explicit_law=task.get("explicit_law"),
+                                               explicit_laws=task.get("explicit_laws"),
                                                query_effective_date=task["query_effective_date"])
-        if {key for key, grade in gold.items() if grade > 0} - set(eligible):
+        positives = {key for key, grade in gold.items() if grade > 0}
+        # A production-aligned scope may exclude the gold (the question named a law
+        # the reference disagrees with). That is a genuine retrieval miss scored 0,
+        # so it is allowed only when the task explicitly opts in.
+        if not task.get("allow_out_of_scope") and positives - set(eligible):
             raise ValueError("Positive gold is outside task law/date eligibility")
     selected = [task for task in tasks if task["split"] == split]
     if not selected:
@@ -79,7 +84,8 @@ def evaluate(retriever: StatutoryHybrid, dataset: dict[str, Any], config: dict[s
     for task in selected:
         for mode in MODES:
             result = retriever.search(task["query"], mode=mode, limit=10,
-                                      explicit_law=task.get("explicit_law"), inferred_law=task.get("inferred_law"),
+                                      explicit_law=task.get("explicit_law"), explicit_laws=task.get("explicit_laws"),
+                                      inferred_law=task.get("inferred_law"),
                                       query_effective_date=task["query_effective_date"])
             result["task_id"] = task["id"]
             result["metrics"] = metrics([hit["id"] for hit in result["hits"]], task["gold"]) if result["available"] else None

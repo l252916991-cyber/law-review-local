@@ -82,3 +82,38 @@ def test_build_dataset_requires_enough_evaluable_questions(tmp_path):
     # Synthetic answers cite 刑法, which this corpus lacks, so nothing is evaluable.
     with pytest.raises(ValueError, match="Not enough evaluable"):
         build_dataset("3-1", index, per_split=5, effective_date="2026-01-01")
+
+
+def test_production_scope_constrains_only_named_laws(tmp_path):
+    # Synthetic 3-1 questions do not name any law, so production scope must not
+    # invent an explicit_laws hint even though the gold cites 刑法.
+    corpus = write_corpus(tmp_path, [
+        {"document_id": "criminal-law-2023", "law_name": "中华人民共和国刑法",
+         "aliases": ["中华人民共和国刑法", "刑法"], "version_date": "2023-01-01",
+         "effective_date": "2024-03-01", "text": "第一条 总则。\n第二百六十四条 盗窃。"},
+        {"document_id": "civil-code-2020", "law_name": "中华人民共和国民法典",
+         "aliases": ["中华人民共和国民法典", "民法典"], "version_date": "2020-05-28",
+         "effective_date": "2021-01-01", "text": "第一条 保护民事权益。"}])
+    index = make_index(corpus)
+    dataset = build_dataset("3-1", index, per_split=5, effective_date="2026-01-01", scope="production")
+    assert all("explicit_laws" not in task for task in dataset["tasks"])
+    assert dataset["retrieval_version"]
+    assert all("explicit_laws" not in task for task in
+               build_dataset("3-1", index, per_split=5, effective_date="2026-01-01")["tasks"])
+    with pytest.raises(ValueError, match="scope must be"):
+        build_dataset("3-1", index, per_split=5, effective_date="2026-01-01", scope="bogus")
+
+
+def test_production_scope_adds_hint_when_question_names_law(tmp_path):
+    from unittest.mock import patch
+
+    corpus = write_corpus(tmp_path, [
+        {"document_id": "criminal-law-2023", "law_name": "中华人民共和国刑法",
+         "aliases": ["中华人民共和国刑法", "刑法"], "version_date": "2023-01-01",
+         "effective_date": "2024-03-01", "text": "第一条 总则。\n第二百六十四条 盗窃。"}])
+    index = make_index(corpus)
+    rows = [{"instruction": "x", "question": f"根据刑法认定盗窃的事实{i}",
+             "answer": "法条:刑法第264条"} for i in range(12)]
+    with patch("scripts.statutory_hybrid_experiment.load_task", return_value=tuple(rows)):
+        dataset = build_dataset("3-1", index, per_split=5, effective_date="2026-01-01", scope="production")
+    assert dataset["tasks"][0]["explicit_laws"] == ["中华人民共和国刑法"]
