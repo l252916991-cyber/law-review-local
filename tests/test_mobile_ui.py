@@ -1,6 +1,7 @@
 """Mobile entry, shared helpers and desktop race regressions without a browser."""
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -52,7 +53,9 @@ class MobileRouteTests(unittest.TestCase):
             self.assertLess(html.index('/assets/shared.js'), html.index(app_script))
         self.assertGreaterEqual(desktop.text.count('/mobile?ui=mobile'), 2)
         for asset in ("entry.js", "shared.js", "app.js"):
-            self.assertIn(f'/assets/{asset}?v=20260910-mobile-workspace', desktop.text)
+            # Require a cache-busting version token without pinning its value,
+            # so a legitimate version bump does not break the security checks.
+            self.assertRegex(desktop.text, rf'/assets/{re.escape(asset)}\?v=[0-9A-Za-z._-]+')
         self.assertIn('?ui=desktop', mobile.text + (ROOT / "app/static/mobile.js").read_text())
 
     def test_mobile_shell_does_not_bypass_api_or_host_security(self):
