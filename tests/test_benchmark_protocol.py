@@ -191,6 +191,30 @@ class BenchmarkProtocolTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.run_benchmark(args)
 
+    def test_correction_locate_strategy_is_wired_end_to_end(self):
+        # Locate strategy: the model returns only the fragments, the runner applies
+        # them to the source sentence and scores the result. Mirrors the measured
+        # 2-1 protocol (+2.04 pt over a single-pass rewrite on all 500 questions).
+        record = runner.load_lawbench_dataset(["2-1"], 1)[0]
+        record.update(question="句子：借阅档案费按规定及时归还",
+                      reference="借阅档案未按规定及时归还")
+        record["question_hash"] = runner.hash_text(record["question"])
+        located = '{"edits":[{"original":"费按","corrected":"未按"}]}'
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(dataset="lawbench", tasks=["2-1"], limit_per_task=1,
+                                      run_dir=directory, output_dir=directory, resume=False, retry=0,
+                                      prompt_strategy="correction_locate")
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=(located, 1, None)):
+                runner.run_benchmark(args)
+            row = json.loads((Path(directory) / "checkpoints" / f"{record['question_id']}.json").read_text())
+        self.assertEqual(row["prediction"], "借阅档案未按规定及时归还")
+        self.assertEqual(row["score"], 1)
+        self.assertEqual(row["prompt_version"], "lawbench-task-guided-v4")
+        self.assertIn("edits", row["system_prompt"])
+        self.assertEqual(row["postprocess"]["policy"], "located-edits; no reference access")
+
     def test_correction_surface_is_scored_and_resume_checks_provenance(self):
         from app.benchmark_postprocess import POSTPROCESS_VERSION
 
@@ -238,6 +262,37 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 verify.assert_not_called()
                 call.assert_not_called()
 
+    def test_locate_strategy_applies_edits_and_leaves_baseline_intact(self):
+        from app.benchmark_postprocess import apply_located_edits, postprocess
+        from app.benchmark_reporting import prompt_for
+
+        question = "句子：借阅档案费按规定及时归还"
+        base = {"dataset": "lawbench", "task": "2-1", "question_id": "Q", "instruction": "纠正。",
+                "question": question, "reference": "借阅档案未按规定及时归还"}
+
+        in_locate = prompt_for({**base, "prompt_strategy": "correction_locate"}, strategy="correction_locate")[0]
+        self.assertIn("edits", in_locate)
+        self.assertNotIn("edits", prompt_for({**base, "prompt_strategy": "task_guided"}, strategy="task_guided")[0])
+
+        # A plain rewrite is not the located contract: None keeps baseline behaviour.
+        self.assertIsNone(apply_located_edits(question, "借阅档案未按规定及时归还"))
+        self.assertIsNone(apply_located_edits(question, "不是 JSON"))
+        self.assertIsNone(apply_located_edits(question, '{"note":"没有 edits 键"}'))
+        # Located edits are applied to the source; an empty list leaves it unchanged.
+        located = '{"edits":[{"original":"费按","corrected":"未按"}]}'
+        self.assertEqual(apply_located_edits(question, located), "借阅档案未按规定及时归还")
+        self.assertEqual(apply_located_edits(question, '{"edits":[]}'), "借阅档案费按规定及时归还")
+        self.assertEqual(apply_located_edits(question, '{"edits":[{"original":"不存在","corrected":"x"}]}'),
+                         "借阅档案费按规定及时归还")
+        # postprocess routes located output through the applier and says so.
+        revised, details = postprocess("2-1", question, located)
+        self.assertEqual(revised, "借阅档案未按规定及时归还")
+        self.assertEqual(details["policy"], "located-edits; no reference access")
+        # Baseline strategy keeps the old policy and surface (trailing 。 stripped).
+        revised_plain, details_plain = postprocess("2-1", question, "借阅档案未按规定及时归还。")
+        self.assertEqual(revised_plain, "借阅档案未按规定及时归还")
+        self.assertEqual(details_plain["policy"], "source-surface-only; no reference access")
+
     def test_postprocess_applies_to_its_tasks_and_leaves_errors_and_others_untouched(self):
         # A task outside POSTPROCESS_TASKS stays byte-for-byte untouched.
         for task, raw, error in (("2-1", "原文， 100。", "timeout"), ("1-2", "原文， 100。", None),
@@ -284,6 +339,78 @@ class BenchmarkProtocolTest(unittest.TestCase):
         args = argparse.Namespace(dataset="lawbench", tasks=["1-2"], limit_per_task=1, resume=True)
         with self.assertRaises(ValueError):
             runner.run_benchmark(args)
+
+    def test_statutory_corpus_replaces_1_1_output_and_is_frozen_on_resume(self):
+        import hashlib
+
+        from app.legal_corpus import SCHEMA_VERSION, split_articles
+
+        body = "第一条 当事人订立合同，应当具有相应的民事权利能力和民事行为能力。"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            document = {"schema_version": SCHEMA_VERSION, "document_id": "contract", "law_name": "合同法",
+                        "aliases": ["合同法"], "version_date": "2020-01-01", "effective_date": "2020-02-01",
+                        "version_status": "currentness_not_asserted", "source_url": "https://example.invalid/law",
+                        "articles": split_articles(body)}
+            raw = json.dumps(document).encode()
+            (corpus / "contract.json").write_bytes(raw)
+            (corpus / "manifest.json").write_text(json.dumps({"schema_version": SCHEMA_VERSION, "documents": [
+                {"document_file": "contract.json", "document_sha256": hashlib.sha256(raw).hexdigest()}]}))
+            record = runner.load_lawbench_dataset(["1-1"], 1)[0]
+            record.update(question="请背诵《合同法》第一条。", reference="当事人订立合同，应当具有相应的民事权利能力和民事行为能力。")
+            record["question_hash"] = runner.hash_text(record["question"])
+            run_dir = root / "run"
+
+            def namespace(**overrides):
+                return argparse.Namespace(
+                    **{"dataset": "lawbench", "tasks": ["1-1"], "limit_per_task": 1,
+                       "run_dir": str(run_dir), "output_dir": str(root), "resume": False, "retry": 0,
+                       "corpus_dir": [corpus], **overrides})
+
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=("完全错误的答案", 1, None)):
+                runner.run_benchmark(namespace())
+            row = json.loads((run_dir / "detailed_results.jsonl").read_text())
+            self.assertEqual(row["original_prediction"], "完全错误的答案")
+            self.assertIn("民事行为能力", row["prediction"])
+            self.assertEqual(row["retrieval"]["mode"], "exact_article")
+            self.assertEqual(row["postprocess"]["version"], runner.POSTPROCESS_VERSION)
+            manifest = json.loads((run_dir / "manifest.json").read_text())
+            self.assertIn("1-1", manifest["postprocess"]["tasks"])
+            self.assertEqual(manifest["retrieval"]["corpus_directories"], [str(corpus.resolve())])
+            self.assertTrue(manifest["retrieval"]["corpus_files"])
+
+            # Resume must reproduce the same repair and reject a checkpoint whose frozen retrieval was dropped.
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model") as call:
+                runner.run_benchmark(namespace(resume=True))
+                call.assert_not_called()
+            checkpoint = run_dir / "checkpoints" / f"{record['question_id']}.json"
+            for key in ("retrieval", "original_prediction", "postprocess"):
+                broken = {k: v for k, v in row.items() if k != key}
+                checkpoint.write_text(json.dumps(broken))
+                with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                        patch.object(runner, "verify_model"):
+                    with self.assertRaisesRegex(ValueError, "Checkpoint"):
+                        runner.run_benchmark(namespace(resume=True))
+
+    def test_1_1_without_corpus_dir_keeps_model_output(self):
+        record = runner.load_lawbench_dataset(["1-1"], 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            args = argparse.Namespace(dataset="lawbench", tasks=["1-1"], limit_per_task=1,
+                                      run_dir=directory, output_dir=directory, resume=False, retry=0)
+            with patch.object(runner, "load_all_datasets", return_value=[record]), \
+                    patch.object(runner, "verify_model"), \
+                    patch.object(runner, "call_model", return_value=("模型原始答案", 1, None)):
+                runner.run_benchmark(args)
+            row = json.loads((Path(directory) / "detailed_results.jsonl").read_text())
+            self.assertEqual(row["prediction"], "模型原始答案")
+            self.assertNotIn("postprocess", row)
+            self.assertNotIn("retrieval", row)
 
     def test_offline_verifier_accepts_complete_run_and_detects_tampering(self):
         from verify_benchmark_run import verify

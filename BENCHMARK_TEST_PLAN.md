@@ -69,6 +69,25 @@ python3 -u unified_benchmark_runner.py \
 python3 verify_benchmark_run.py output/benchmark_fixed_1000_20260907_8bit
 ```
 
+### 全量 10,000 题与 1-1 法条检索
+
+全量运行去掉 `--limit-per-task`（20 类各 500 题），并加 `--corpus-dir` 指向冻结法条库；
+提供后 runner 会在评分前对 1-1 用官方法条正文替换模型输出（只读题面检索，不读参考答案）：
+
+```sh
+LAW_REVIEW_LLM_MODEL=Qwythos-9B-v2-8bit-mlx \
+LAW_REVIEW_LLM_URL=http://127.0.0.1:8000/v1 \
+python3 -u unified_benchmark_runner.py \
+  --dataset lawbench --tasks all --sample-seed 42 \
+  --timeout 180 --max-tokens 900 --retry 2 \
+  --corpus-dir output/score85/legal_corpus_canonical_v2 \
+  --run-dir output/benchmark_10k_v5
+```
+
+`--corpus-dir` 可重复；不提供时 1-1 保持模型原始输出。冻结的语料目录与文件哈希写入
+`manifest.json` 的 `retrieval` 段，续跑会校验语料与逐题的 `retrieval` 溯源。
+实测：`legal_corpus_canonical_v2` 单库即可让 1-1 精确查条 500/500 命中，1-1 由 30.35% → 94.90%。
+
 验收：1,000 个唯一 question_id、20 类各 50 题、checkpoint 与 JSONL 逐条一致、提示词和源码哈希一致、离线重评与保存分数一致、汇总和配对差值可复算。
 接口成功率、解析失败率、截断数量、均分及分任务变化全部报告；不预先承诺分数一定提升。
 

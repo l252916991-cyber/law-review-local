@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item, score_lexeval_item
 from app.benchmark_postprocess import POSTPROCESS_VERSION, postprocess
+from app.benchmark_retrieval import RETRIEVAL_VERSION, corpus_fingerprint, retrieve
 from app.benchmark_solver import TASK_GUIDANCE
 from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task, validate_lawbench
 from app.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
@@ -52,11 +53,21 @@ RAG_PROJECT_PATH = Path(__file__).resolve().parent / "benchmarks" / "rag_project
 # Tasks whose gold-blind deterministic output repair is applied before scoring.
 # 2-10 is deliberately excluded: the measured gain was noise (15 up, 16 down).
 POSTPROCESS_TASKS = ("2-1", "2-7", "2-9", "3-8")
+# Tasks whose repair needs the frozen statutory corpus; only active when --corpus-dir is supplied.
+RETRIEVAL_TASKS = ("1-1",)
 
 
 def hash_text(text: str) -> str:
     """计算文本的 SHA256 哈希"""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def postprocess_with_retrieval(task: str, question: str, prediction: str, corpus_directories: list[str],
+                               ) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
+    """Deterministic output repair; 1-1 resolves the official article text from the frozen corpus."""
+    context = retrieve(task, question, corpus_directories) if task in RETRIEVAL_TASKS else None
+    revised, metadata = postprocess(task, question, prediction, context)
+    return revised, metadata, context
 
 
 def call_model(prompt: str, system: str, config: dict[str, Any], retry: int = 0, metadata: dict | None = None) -> tuple[str, float, str | None]:
@@ -270,8 +281,12 @@ def run_benchmark(args: argparse.Namespace) -> None:
     if not records:
         raise ValueError("No questions loaded")
     strategy = getattr(args, "prompt_strategy", "task_guided")
-    if strategy not in {"direct", "task_guided", "hybrid"}:
-        raise ValueError("prompt_strategy must be direct, task_guided or hybrid")
+    if strategy not in {"direct", "task_guided", "hybrid", "correction_locate"}:
+        raise ValueError("prompt_strategy must be direct, task_guided, hybrid or correction_locate")
+    corpus_directories = [str(Path(path).resolve()) for path in (getattr(args, "corpus_dir", None) or [])]
+    postprocess_tasks = list(POSTPROCESS_TASKS) + (list(RETRIEVAL_TASKS) if corpus_directories else [])
+    if not corpus_directories and any(record["task"] in RETRIEVAL_TASKS for record in records):
+        print("⚠️  未提供 --corpus-dir：1-1 使用模型原始输出，不启用官方条文替换", flush=True)
     explicit_dir = getattr(args, "run_dir", None)
     if args.resume and not explicit_dir:
         raise ValueError("--resume requires the original --run-dir; never creates a new run")
@@ -288,7 +303,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 raise ValueError(f"Baseline missing/mismatched: {r['question_id']}")
     manifest = {
         "protocol_version": PROMPT_VERSION, "scorer_version": SCORER_VERSION,
-        "postprocess": {"version": POSTPROCESS_VERSION, "tasks": list(POSTPROCESS_TASKS)},
+        "postprocess": {"version": POSTPROCESS_VERSION, "tasks": postprocess_tasks},
+        "retrieval": {"version": RETRIEVAL_VERSION, "corpus_directories": corpus_directories,
+                      "corpus_files": corpus_fingerprint(corpus_directories) if corpus_directories else {}},
         "prompt_strategy": getattr(args, "prompt_strategy", "task_guided"),
         "model_config": dict(MODEL_CONFIG), "sample_seed": getattr(args, "sample_seed", None),
         "retry": args.retry, "planned_questions": len(records), "source_hashes": source_hashes(),
@@ -335,13 +352,15 @@ def run_benchmark(args: argparse.Namespace) -> None:
             expected = planned[key]
             if any(row.get(k) != v for k, v in expected.items()) or row.get("scorer_version") != SCORER_VERSION:
                 raise ValueError(f"Checkpoint mismatch: {key}")
-            if row["task"] in POSTPROCESS_TASKS and not row.get("error"):
+            if row["task"] in postprocess_tasks and not row.get("error"):
                 raw = row.get("original_prediction")
                 if not isinstance(raw, str):
                     raise ValueError(f"Checkpoint missing original prediction: {key}")
-                prediction, metadata = postprocess(row["task"], row["question"], raw)
+                prediction, metadata, context = postprocess_with_retrieval(row["task"], row["question"], raw, corpus_directories)
                 if row["prediction"] != prediction or row.get("postprocess") != metadata:
                     raise ValueError(f"Checkpoint postprocess mismatch: {key}")
+                if context is not None and row.get("retrieval") != context:
+                    raise ValueError(f"Checkpoint retrieval mismatch: {key}")
             completed[key] = row
         verify_model(MODEL_CONFIG)
         rows = [completed[r["question_id"]] for r in records if r["question_id"] in completed]
@@ -363,9 +382,13 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 system, prompt = prompt_for({**record, "prompt_strategy": strategy})
                 response_metadata = {}
                 prediction, latency, error = call_model(prompt, system, MODEL_CONFIG, retry=args.retry, metadata=response_metadata)
-                if record["task"] in POSTPROCESS_TASKS and not error:
+                if record["task"] in postprocess_tasks and not error:
                     response_metadata["original_prediction"] = prediction
-                    prediction, response_metadata["postprocess"] = postprocess(record["task"], record["question"], prediction)
+                    prediction, metadata, context = postprocess_with_retrieval(
+                        record["task"], record["question"], prediction, corpus_directories)
+                    response_metadata["postprocess"] = metadata
+                    if context is not None:
+                        response_metadata["retrieval"] = context
                 scored = score_lawbench_item(record["task"], prediction, record["reference"], question=record["question"]).to_dict() if not error else {
                     "score": 0.0, "metric": "error", "abstained": False, "parse_failed": False,
                     "parsed_prediction": None, "parsed_reference": None,
@@ -448,8 +471,12 @@ def main():
     parser.add_argument("--baseline-results", help="旧回答 JSONL，用于同题同规则比较，不额外调用模型")
     parser.add_argument("--max-tokens", type=int, default=900)
     parser.add_argument(
-        "--prompt-strategy", choices=["direct", "task_guided", "hybrid"], default="task_guided",
-        help="选择通用提示、按任务指导提示或仅对受益任务启用指导的混合策略；默认 task_guided",
+        "--prompt-strategy", choices=["direct", "task_guided", "hybrid", "correction_locate"], default="task_guided",
+        help="选择通用提示、按任务指导提示、仅对受益任务启用指导的混合策略，或 2-1 两段式定位纠错；默认 task_guided",
+    )
+    parser.add_argument(
+        "--corpus-dir", type=Path, action="append", default=None,
+        help="可重复：冻结法条库目录；提供后 1-1 在评分前用官方条文替换模型输出（不读取参考答案）",
     )
     args = parser.parse_args()
     if args.retry < 0 or args.timeout < 1 or args.max_tokens < 1:

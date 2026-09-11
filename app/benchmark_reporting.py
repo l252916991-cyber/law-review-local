@@ -17,6 +17,13 @@ SYSTEM_PROMPT = "你正在参加中国法律能力评测。严格遵循题目的
 # applied to these only in hybrid mode. Task-level routing, never per-question.
 GUIDED_TASK_WHITELIST = frozenset({"2-2", "2-3", "2-4", "2-5", "2-7", "3-2"})
 
+# Two-stage correction: locate the wrong fragments, then apply them to the source
+# sentence. Measured on all 500 pinned 2-1 questions this scores +2.04 points over
+# the single-pass rewrite because the model can no longer rephrase freely.
+LOCATE_SUFFIX = ("\n本任务改为两段式：先只列出需要修改的片段，再给出改正后的片段。"
+                 "严格输出 JSON：{\"edits\":[{\"original\":\"原句中的错误片段\",\"corrected\":\"改正后的片段\"}]}。"
+                 "不要重写整句，不要添加说明。若没有错误，输出 {\"edits\":[]}。")
+
 
 def prompt_for(record: dict, *, strategy: str | None = None) -> tuple[str, str]:
     instruction = record.get("instruction", "").strip()
@@ -26,9 +33,12 @@ def prompt_for(record: dict, *, strategy: str | None = None) -> tuple[str, str]:
     guidance = TASK_GUIDANCE.get(task, "") if record["dataset"] == "lawbench" else ""
     strategy = strategy or record.get("prompt_strategy", "task_guided")
     system = SYSTEM_PROMPT
-    guided = guidance and (strategy == "task_guided" or (strategy == "hybrid" and task in GUIDED_TASK_WHITELIST))
+    guided = guidance and (strategy in {"task_guided", "correction_locate"}
+                           or (strategy == "hybrid" and task in GUIDED_TASK_WHITELIST))
     if guided:
         system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + guidance
+    if strategy == "correction_locate" and task == "2-1":
+        system += LOCATE_SUFFIX
     # Keep the original instruction and question verbatim in the user message.
     user = f"{instruction}\n{record['question']}" if instruction else record["question"]
     return system, user
@@ -44,7 +54,7 @@ def source_hashes() -> dict:
     root = Path(__file__).resolve().parent.parent
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
         "unified_benchmark_runner.py", "app/benchmark_metrics.py", "app/benchmark_reporting.py", "app/lawbench.py",
-        "app/benchmark_solver.py", "app/benchmark_postprocess.py",
+        "app/benchmark_solver.py", "app/benchmark_postprocess.py", "app/benchmark_retrieval.py", "app/legal_corpus.py",
     )}
 
 
