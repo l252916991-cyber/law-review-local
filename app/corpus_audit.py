@@ -60,10 +60,27 @@ def _hash(articles: dict[str, str], project: Callable[[str], str]) -> str:
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest()
 
 
+def dedup_digest(articles: dict[str, str]) -> str:
+    """Comparison projection used by both the audit and the canonical builder.
+
+    Two publications with equal digests carry the same legal characters and differ
+    only by caption/punctuation/whitespace churn. This is a dedup projection, not a
+    hash of legal content authenticity.
+    """
+    return _hash(articles, _semantic)
+
+
+def heading_leak_articles(articles: dict[str, str]) -> list[str]:
+    """Article IDs whose body wrongly swallowed a structural heading line."""
+    return sorted(key for key, text in articles.items()
+                  if any(HEADING_LINE.match(line.strip()) for line in text.splitlines()))
+
+
 def _publication(directory: Path, entry: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "source_dir": str(directory), "document_id": doc["document_id"],
-        "source_url": doc.get("source_url"), "article_count": len(doc["articles"]),
+        "source_url": doc.get("source_url"), "publisher": doc.get("publisher"),
+        "article_count": len(doc["articles"]),
         "manifest_document_sha256": entry.get("document_sha256"),
         "manifest_raw_sha256": entry.get("raw_sha256"),
         "articles": {article["article_id"]: article["text"] for article in doc["articles"]},
@@ -75,7 +92,7 @@ def classify(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     ids_a, ids_b = set(a["articles"]), set(b["articles"])
     raw_a, raw_b = _hash(a["articles"], lambda t: t), _hash(b["articles"], lambda t: t)
     basic_a, basic_b = _hash(a["articles"], _basic), _hash(b["articles"], _basic)
-    sem_a, sem_b = _hash(a["articles"], _semantic), _hash(b["articles"], _semantic)
+    sem_a, sem_b = dedup_digest(a["articles"]), dedup_digest(b["articles"])
     body_a, body_b = _hash(a["articles"], _body), _hash(b["articles"], _body)
 
     common = sorted(ids_a & ids_b)

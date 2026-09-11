@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.corpus_audit import audit, classify
+from app.corpus_audit import audit, classify, dedup_digest, heading_leak_articles
 from app.legal_corpus import SCHEMA_VERSION, split_articles
 from scripts.audit_corpus_conflicts import main as audit_main
 
@@ -82,6 +82,14 @@ def test_distinct_laws_and_versions_are_not_paired(tmp_path):
     b = write_corpus(tmp_path, "b", [("甲法", "2021-01-01", "第一条 甲修。")])
     report = audit([a, b])
     assert report["pair_count"] == 0 and report["classification_counts"]["substantive_conflict"] == 0
+
+
+def test_projection_helpers_are_shared_with_builder():
+    # dedup projection ignores caption/punctuation/whitespace differences.
+    assert dedup_digest({"1": "第一条 【目的】内容,"}) == dedup_digest({"1": "第一条 内容。"})
+    assert dedup_digest({"1": "甲"}) != dedup_digest({"1": "乙"})
+    assert heading_leak_articles({"1": "第一条 甲。", "2": "第二条 乙。\n附 则"}) == ["2"]
+    assert heading_leak_articles({"1": "第一条 甲。"}) == []
 
 
 def test_classify_is_pure_on_prepared_publications():
