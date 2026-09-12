@@ -1,9 +1,10 @@
 """Build the 2-2 LoRA training file from the annotated SFT pool.
 
-Renders each pool entry into the exact chat format the benchmark uses at inference
-time (same system guidance, same instruction prefix, same [争议焦点]...<eoa> answer
-format), so there is no train/inference mismatch. Output goes under output/ and is
-never committed; the annotated pool itself is the committed artifact.
+Renders each pool entry as ``{"prompt", "completion"}`` with the prompt byte-identical
+to the benchmark inference path (chat template applied with ``enable_thinking=False``,
+ending in the closed empty think block), so mlx_lm's own template application — whose
+default kwargs differ — cannot reintroduce a train/inference mismatch. Output goes
+under output/ and is never committed; the annotated pool is the committed artifact.
 """
 from __future__ import annotations
 
@@ -22,13 +23,14 @@ POOL_PATH = ROOT / "benchmarks/fewshot/2-2_sft_pool.jsonl"
 PINNED_PATH = ROOT / "benchmarks/lawbench/zero_shot/2-2.json"
 
 
-def render(instruction: str, sentence: str, label: str) -> dict[str, list[dict[str, str]]]:
+def render(tokenizer, instruction: str, sentence: str, label: str) -> dict[str, str]:
     system = SYSTEM_PROMPT + GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + TASK_GUIDANCE["2-2"]
-    return {"messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": f"{instruction}\n句子:{sentence}"},
-        {"role": "assistant", "content": f"[争议焦点]{label}<eoa>"},
-    ]}
+    messages = [{"role": "system", "content": system},
+                {"role": "user", "content": f"{instruction}\n句子:{sentence}"}]
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True,
+                                           enable_thinking=False)
+    assert prompt.endswith("<think>\n\n</think>\n\n"), "benchmark rendering drifted"
+    return {"prompt": prompt, "completion": f"[争议焦点]{label}<eoa>"}
 
 
 def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
@@ -37,10 +39,15 @@ def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
     instruction = pinned[0]["instruction"].strip()
     if len({row["instruction"] for row in pinned}) != 1:
         raise ValueError("Pinned 2-2 instructions are not uniform; cannot render a single template")
+    try:
+        from mlx_lm import load
+    except ImportError as exc:  # repo venv has no mlx; build with the training venv
+        raise SystemExit("run with output/lora-2-2-v1/venv/bin/python (needs mlx_lm)") from exc
+    _, tokenizer = load("/Users/xiaoy/.omlx/models/Qwythos-9B-v2-8bit-mlx")
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as handle:
         for item in pool:
-            handle.write(json.dumps(render(instruction, item["sentence"], item["label"]),
+            handle.write(json.dumps(render(tokenizer, instruction, item["sentence"], item["label"]),
                                     ensure_ascii=False) + "\n")
     return {"examples": len(pool)}
 

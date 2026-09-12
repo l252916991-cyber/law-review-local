@@ -46,6 +46,7 @@ def test_pool_leakage_against_pinned_questions():
 
 
 def test_build_renders_benchmark_matched_chat_format(tmp_path):
+    pytest.importorskip("mlx_lm")
     path = Path(__file__).resolve().parents[1] / "benchmarks/lawbench/zero_shot/2-2.json"
     if not path.exists():
         pytest.skip("pinned LawBench dataset not present")
@@ -53,8 +54,7 @@ def test_build_renders_benchmark_matched_chat_format(tmp_path):
     result = build(POOL_PATH, path, output)
     assert result["examples"] == 480
     first = json.loads(output.read_text(encoding="utf-8").splitlines()[0])
-    roles = [message["role"] for message in first["messages"]]
-    assert roles == ["system", "user", "assistant"]
-    assert "本任务核对方法" in first["messages"][0]["content"]
-    assert first["messages"][1]["content"].startswith("判断句子包含的争议焦点类别")
-    assert first["messages"][2]["content"].startswith("[争议焦点]") and first["messages"][2]["content"].endswith("<eoa>")
+    assert set(first) == {"prompt", "completion"}
+    assert first["prompt"].endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n")
+    assert "本任务核对方法" in first["prompt"]
+    assert first["completion"].startswith("[争议焦点]") and first["completion"].endswith("<eoa>")
