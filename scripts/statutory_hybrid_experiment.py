@@ -75,10 +75,13 @@ def build_dataset(task_id: str, index: StatutoryIndex, *, per_split: int, effect
     """
     if scope not in {"global", "production"}:
         raise ValueError("scope must be global or production")
+    # Gold carries no version, so resolve each alias to the newest publication —
+    # the same rule as scripts/statutory_gold_report.resolve. Taking the first
+    # encountered instead points gold at a superseded, now-ineligible version.
     aliases: dict[str, str] = {}
-    for doc in index.documents.values():
+    for doc in sorted(index.documents.values(), key=lambda item: item["version_date"]):
         for alias in {doc["law_name"], *doc["aliases"]}:
-            aliases.setdefault(alias, doc["document_id"])
+            aliases[alias] = doc["document_id"]
     grouped = list(index.documents.values()) if scope == "production" else None
     tasks: list[dict[str, Any]] = []
     seen: set[str] = set()

@@ -281,8 +281,8 @@ def run_benchmark(args: argparse.Namespace) -> None:
     if not records:
         raise ValueError("No questions loaded")
     strategy = getattr(args, "prompt_strategy", "task_guided")
-    if strategy not in {"direct", "task_guided", "hybrid", "correction_locate"}:
-        raise ValueError("prompt_strategy must be direct, task_guided, hybrid or correction_locate")
+    if strategy not in {"direct", "task_guided", "hybrid", "correction_locate", "few_shot"}:
+        raise ValueError("prompt_strategy must be direct, task_guided, hybrid, correction_locate or few_shot")
     corpus_directories = [str(Path(path).resolve()) for path in (getattr(args, "corpus_dir", None) or [])]
     postprocess_tasks = list(POSTPROCESS_TASKS) + (list(RETRIEVAL_TASKS) if corpus_directories else [])
     if not corpus_directories and any(record["task"] in RETRIEVAL_TASKS for record in records):
@@ -471,8 +471,8 @@ def main():
     parser.add_argument("--baseline-results", help="旧回答 JSONL，用于同题同规则比较，不额外调用模型")
     parser.add_argument("--max-tokens", type=int, default=900)
     parser.add_argument(
-        "--prompt-strategy", choices=["direct", "task_guided", "hybrid", "correction_locate"], default="task_guided",
-        help="选择通用提示、按任务指导提示、仅对受益任务启用指导的混合策略，或 2-1 两段式定位纠错；默认 task_guided",
+        "--prompt-strategy", choices=["direct", "task_guided", "hybrid", "correction_locate", "few_shot"], default="task_guided",
+        help="选择通用提示、按任务指导提示、仅对受益任务启用指导的混合策略、2-1 两段式定位纠错，或 2-2 few-shot 示例；默认 task_guided",
     )
     parser.add_argument(
         "--corpus-dir", type=Path, action="append", default=None,
