@@ -53,13 +53,6 @@ class StatutoryHybrid:
                 raise ValueError("no_verified_candidates")
             if issues:
                 raise ValueError("incomplete_validity")
-            query_terms = _terms(query)
-            terms = {key: _terms(self.index.rows[key]["text"]) for key in keys}
-            df = Counter(term for counts in terms.values() for term in counts)
-            lexical = {key: sum((1 + math.log(counts[t])) * (math.log((len(keys) + 1) / (df[t] + 1)) + 1)
-                                for t in query_terms if counts[t]) / math.sqrt(sum(counts.values()) or 1)
-                       for key, counts in terms.items()}
-
             positions = {key: position for position, key in enumerate(keys)}
 
             def ranked(scores: dict[str, float]) -> list[str]:
@@ -76,15 +69,24 @@ class StatutoryHybrid:
                 if self.embedding.last_failure or backend != self.index.spec.embedding_backend or len(vectors) != 1:
                     raise ValueError("embedding_backend_or_response_mismatch")
                 dense = dict(self.index.search(vectors[0], keys, len(keys)))
-            if mode == "lexical":
-                scores = {key: value for key, value in lexical.items() if value > 0}
-            elif mode == "dense":
+            if mode == "dense":
+                # Dense never reads the lexical scores; tokenizing every article
+                # per query would add ~200ms of dead work to each dense call.
                 scores = dense
             else:
-                scores = {}
-                for ranking in (ranked({k: v for k, v in lexical.items() if v > 0}), ranked(dense)):
-                    for rank, key in enumerate(ranking, 1):
-                        scores[key] = scores.get(key, 0.0) + 1 / (self.rrf_k + rank)
+                query_terms = _terms(query)
+                terms = {key: _terms(self.index.rows[key]["text"]) for key in keys}
+                df = Counter(term for counts in terms.values() for term in counts)
+                lexical = {key: sum((1 + math.log(counts[t])) * (math.log((len(keys) + 1) / (df[t] + 1)) + 1)
+                                    for t in query_terms if counts[t]) / math.sqrt(sum(counts.values()) or 1)
+                           for key, counts in terms.items()}
+                if mode == "lexical":
+                    scores = {key: value for key, value in lexical.items() if value > 0}
+                else:
+                    scores = {}
+                    for ranking in (ranked({k: v for k, v in lexical.items() if v > 0}), ranked(dense)):
+                        for rank, key in enumerate(ranking, 1):
+                            scores[key] = scores.get(key, 0.0) + 1 / (self.rrf_k + rank)
             scale = max((abs(value) for value in scores.values()), default=1.0) or 1.0
             scores = {key: value + (scale * self.soft_boost if inferred_law is not None
                        and inferred_law in self.index.rows[key]["aliases"] else 0) for key, value in scores.items()}

@@ -6,6 +6,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from datetime import date
+from operator import mul
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -82,10 +83,17 @@ class StatutoryIndex:
         self.vectors = {key: vector_values(value, spec) for key, value in (vectors or {}).items()}
 
     def search(self, vector: list[float], eligible_ids: list[str], limit: int = 48) -> list[tuple[str, float]]:
-        """Cosine search over an explicitly authorized candidate set, without I/O."""
+        """Cosine search over an explicitly authorized candidate set, without I/O.
+
+        L2-normalized rows turn cosine into a plain dot product; ``sum(map(mul, ...))``
+        keeps that inner loop in C instead of a Python generator per row.
+        """
         query = vector_values(vector, self.spec)
-        scores = [(key, sum(a * b for a, b in zip(query, self.vectors[key])) /
-                   (math.hypot(*query) * math.hypot(*self.vectors[key]))) for key in eligible_ids]
+        if self.spec.normalization == "l2":
+            scores = [(key, sum(map(mul, query, self.vectors[key]))) for key in eligible_ids]
+        else:
+            scores = [(key, sum(map(mul, query, self.vectors[key])) /
+                       (math.hypot(*query) * math.hypot(*self.vectors[key]))) for key in eligible_ids]
         return sorted(scores, key=lambda pair: (-pair[1], pair[0]))[:max(0, limit)]
 
     def save(self, path: str | Path) -> None:
