@@ -8,7 +8,7 @@ from app.benchmark_retrieval import retrieve
 from app.benchmark_postprocess import postprocess
 from app.benchmark_solver import (
     DIRECT_SYSTEM, GUIDED_SYSTEM_SUFFIX, SOLVER_VERSION, TASK_GUIDANCE,
-    _call, _configuration, solve as base_solve,
+    _call, _configuration, solve as base_solve, task_guidance,
 )
 
 
@@ -39,7 +39,7 @@ def solve(task_id: str, instruction: str, question: str, config: dict[str, Any])
             result.update({key: value for key, value in fallback.items() if key not in {"solver_version", "model_config"}})
         else:
             messages = [
-                {"role": "system", "content": DIRECT_SYSTEM + GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + TASK_GUIDANCE[task_id]},
+                {"role": "system", "content": DIRECT_SYSTEM + GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + task_guidance(task_id, effective)},
                 {"role": "user", "content": instruction.strip() + "\n" + question},
                 {"role": "user", "content": context["context"]},
             ]

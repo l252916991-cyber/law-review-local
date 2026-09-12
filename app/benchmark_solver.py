@@ -50,6 +50,12 @@ TASK_GUIDANCE = {
     "3-8": "先直接回答当事人的具体问题，再说明适用规则、关键条件、例外和可执行的处理办法。只根据题目事实分析，对缺失事实使用条件表述；覆盖咨询的全部子问题，避免通用开场白、重复结论和无关内容。",
 }
 
+def task_guidance(task_id: str, config: dict[str, Any]) -> str:
+    """Per-call guidance: an explicit config override or the frozen default."""
+    override = config.get("task_guidance") or {}
+    return override.get(task_id) or TASK_GUIDANCE[task_id]
+
+
 GUIDED_SYSTEM_SUFFIX = (
     "\n作答前在内部核对任务类型、关键事实与输出格式。以下方法只辅助理解；"
     "原始任务说明优先，不得增加其未要求的分析、标签、声明或格式。最终只提交答案。"
@@ -103,12 +109,19 @@ def _configuration(config: dict[str, Any]) -> dict[str, Any]:
         "timeout": config.get("timeout", 180),
         "enable_thinking": config.get("enable_thinking", False),
         "strategy": config.get("strategy", "direct"),
+        "task_guidance": config.get("task_guidance", {}),
     }
     _endpoint(result["url"])
     if not isinstance(result["model"], str) or not result["model"].strip():
         raise ValueError("model must be a nonempty string")
     if result["strategy"] not in {"direct", "task_guided", "verify"}:
         raise ValueError("Unknown solver strategy")
+    guidance = result["task_guidance"]
+    if not isinstance(guidance, dict) or any(
+        task not in TASK_GUIDANCE or not isinstance(text, str) or not text.strip()
+        for task, text in guidance.items()
+    ):
+        raise ValueError("task_guidance must map known LawBench tasks to nonempty guidance")
     for key in ("temperature", "timeout"):
         value = result[key]
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -202,7 +215,7 @@ def solve(task_id: str, instruction: str, question: str, config: dict[str, Any])
             raise ValueError("question must be nonempty")
         system = DIRECT_SYSTEM
         if effective["strategy"] != "direct":
-            system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + TASK_GUIDANCE[task_id]
+            system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + task_guidance(task_id, effective)
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": f"{instruction.strip()}\n{question}"},

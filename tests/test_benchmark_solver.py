@@ -70,6 +70,35 @@ def test_every_task_has_guidance_without_changing_original_input(task):
     assert messages[1]["content"] == "只输出选项。\n测试问题？"
 
 
+def test_task_guidance_override_replaces_only_its_task_and_is_recorded():
+    override = {"task_guidance": {"3-8": "专用组织方法。"}}
+    result, _ = run_mock(response(), strategy="task_guided", task="3-8", config=override)
+    assert result["error"] is None
+    system = result["calls"][0]["request"]["messages"][0]["content"]
+    assert "专用组织方法。" in system
+    assert solver.TASK_GUIDANCE["3-8"] not in system
+    assert result["model_config"]["task_guidance"] == {"3-8": "专用组织方法。"}
+    scoped, _ = run_mock(response(), strategy="task_guided", task="1-2", config=override)
+    assert solver.TASK_GUIDANCE["1-2"] in scoped["calls"][0]["request"]["messages"][0]["content"]
+
+
+def test_direct_strategy_still_ignores_task_guidance_override():
+    result, _ = run_mock(response(), strategy="direct", task="3-8", config={"task_guidance": {"3-8": "专用组织方法。"}})
+    system = result["calls"][0]["request"]["messages"][0]["content"]
+    assert "专用组织方法。" not in system and solver.TASK_GUIDANCE["3-8"] not in system
+
+
+@pytest.mark.parametrize("bad", [
+    {"task_guidance": {"9-9": "x"}}, {"task_guidance": {"3-8": "  "}},
+    {"task_guidance": {"3-8": 5}}, {"task_guidance": ["3-8"]},
+])
+def test_invalid_task_guidance_cannot_make_requests(bad):
+    result, build = run_mock(config=bad)
+    assert result["error"] and "task_guidance" in result["error"]
+    assert not result["calls"]
+    build.assert_not_called()
+
+
 def test_verify_retains_both_calls_and_uses_final_revision():
     result, _ = run_mock(response("A"), response("B"), strategy="verify")
     assert result["prediction"] == "B"

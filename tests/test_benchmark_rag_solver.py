@@ -34,6 +34,15 @@ def test_exact_article_call_is_retained_but_final_answer_uses_frozen_text():
     assert result["postprocess"]["document_articles"] == ["law-2020/1"]
 
 
+def test_rag_guidance_override_reaches_the_prompt():
+    context = {"context": "official article", "hits": [], "warnings": []}
+    with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch("app.benchmark_rag_solver._call", return_value=CALL) as call:
+        result = solve("3-8", "instruction", "question", {**CONFIG, "task_guidance": {"3-8": "专用组织方法。"}})
+    assert retrieve.return_value == result["retrieval"]
+    system = call.call_args.args[0][0]["content"]
+    assert "专用组织方法。" in system and "GOLD_CANARY" not in system
+
+
 def test_no_hits_has_explicit_unchanged_guided_fallback():
     with patch("app.benchmark_rag_solver.retrieve", return_value={"context": "", "hits": []}), patch("app.benchmark_rag_solver.base_solve", return_value={**CALL, "calls": [CALL]}) as fallback:
         result = solve("2-1", "instruction", "question", CONFIG)
