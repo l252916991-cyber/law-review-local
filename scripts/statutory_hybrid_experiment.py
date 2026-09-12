@@ -24,29 +24,7 @@ from app.rag import EmbeddingClient, RerankClient  # noqa: E402
 from app.statutory_benchmark import METRICS, evaluate  # noqa: E402
 from app.statutory_gold import gold_citations  # noqa: E402
 from app.statutory_hybrid import MODES, StatutoryHybrid  # noqa: E402
-from app.statutory_index import IndexSpec, StatutoryIndex  # noqa: E402
-
-
-def build_validity(corpus: LegalCorpus) -> dict[str, dict[str, Any]]:
-    """One verified interval per document; only the newest version of a law is open.
-
-    ponytail: effective_from falls back to version_date when the publication omits
-    an effective date, and superseded versions close when the next one opens. That
-    is enough to disambiguate today's corpus; real amendment history would need the
-    official transition dates.
-    """
-    by_law: dict[str, list[dict[str, Any]]] = {}
-    for doc in corpus.documents:
-        by_law.setdefault(doc["law_name"], []).append(doc)
-    validity: dict[str, dict[str, Any]] = {}
-    for law, docs in by_law.items():
-        ordered = sorted(docs, key=lambda item: item["effective_date"] or item["version_date"])
-        for index, doc in enumerate(ordered):
-            start = doc["effective_date"] or doc["version_date"]
-            end = (ordered[index + 1]["effective_date"] or ordered[index + 1]["version_date"]) if index + 1 < len(ordered) else None
-            validity[doc["document_id"]] = {"effective_from": start, "effective_to": end,
-                                            "source": doc["source_url"]}
-    return validity
+from app.statutory_index import IndexSpec, StatutoryIndex, build_validity  # noqa: E402
 
 
 def build_index(corpus: LegalCorpus, embedding: EmbeddingClient, spec: IndexSpec) -> StatutoryIndex:

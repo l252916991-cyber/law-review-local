@@ -46,6 +46,30 @@ def vector_values(vector: list[float], spec: IndexSpec) -> tuple[float, ...]:
     return tuple(x / norm if spec.normalization == "l2" else float(x) for x in vector)
 
 
+def build_validity(corpus: LegalCorpus) -> dict[str, dict[str, Any]]:
+    """One verified interval per document; only the newest version of a law is open.
+
+    ponytail: effective_from falls back to version_date when the publication omits
+    an effective date, and superseded versions close when the next one opens. That
+    is enough to disambiguate today's corpus; real amendment history would need the
+    official transition dates.
+    """
+    by_law: dict[str, list[dict[str, Any]]] = {}
+    for doc in corpus.documents:
+        by_law.setdefault(doc["law_name"], []).append(doc)
+    validity: dict[str, dict[str, Any]] = {}
+    for law, docs in by_law.items():
+        ordered = sorted(docs, key=lambda item: item["effective_date"] or item["version_date"])
+        for position, doc in enumerate(ordered):
+            start = doc["effective_date"] or doc["version_date"]
+            end = None
+            if position + 1 < len(ordered):
+                end = ordered[position + 1]["effective_date"] or ordered[position + 1]["version_date"]
+            validity[doc["document_id"]] = {"effective_from": start, "effective_to": end,
+                                            "source": doc["source_url"]}
+    return validity
+
+
 class StatutoryIndex:
     """Validity sidecars require effective_from, effective_to and a source.
 
