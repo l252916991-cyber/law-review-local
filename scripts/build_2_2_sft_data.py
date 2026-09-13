@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Protocol
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -23,7 +24,23 @@ POOL_PATH = ROOT / "benchmarks/fewshot/2-2_sft_pool.jsonl"
 PINNED_PATH = ROOT / "benchmarks/lawbench/zero_shot/2-2.json"
 
 
-def render(tokenizer, instruction: str, sentence: str, label: str) -> dict[str, str]:
+class ChatTemplateTokenizer(Protocol):
+    def apply_chat_template(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        tokenize: bool,
+        add_generation_prompt: bool,
+        enable_thinking: bool,
+    ) -> str: ...
+
+
+def render(
+    tokenizer: ChatTemplateTokenizer,
+    instruction: str,
+    sentence: str,
+    label: str,
+) -> dict[str, str]:
     system = SYSTEM_PROMPT + GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + TASK_GUIDANCE["2-2"]
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": f"{instruction}\n句子:{sentence}"}]
@@ -40,7 +57,7 @@ def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
     if len({row["instruction"] for row in pinned}) != 1:
         raise ValueError("Pinned 2-2 instructions are not uniform; cannot render a single template")
     try:
-        from mlx_lm import load
+        from mlx_lm import load  # type: ignore[import-not-found]  # optional training-environment dependency
     except ImportError as exc:  # repo venv has no mlx; build with the training venv
         raise SystemExit("run with output/lora-2-2-v1/venv/bin/python (needs mlx_lm)") from exc
     _, tokenizer = load("/Users/xiaoy/.omlx/models/Qwythos-9B-v2-8bit-mlx")
