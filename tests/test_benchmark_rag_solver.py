@@ -12,7 +12,7 @@ def test_rag_only_adds_provenanced_context_and_keeps_original_question():
     context = {"context": "official article", "hits": [{"source_url": "https://example.gov.cn/law"}], "warnings": []}
     with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch("app.benchmark_rag_solver._call", return_value=CALL) as call:
         result = solve("1-1", "instruction", "question", CONFIG)
-    retrieve.assert_called_once_with("1-1", "question", ["/test-corpus"])
+    retrieve.assert_called_once_with("1-1", "question", ["/test-corpus"], ranker_policy="auto")
     messages, config, phase = call.call_args.args
     assert messages[1] == {"role": "user", "content": "instruction\nquestion"}
     assert messages[2] == {"role": "user", "content": "official article"}
@@ -65,3 +65,14 @@ def test_correction_postprocess_is_recorded_after_raw_call():
         result = solve("2-1", "instruction", "在此情况下,各别部门改为2012年", CONFIG)
     assert result["prediction"] == "在此情况下,各别部门改为2012年"
     assert result["calls"][0]["prediction"].endswith("。") and result["postprocess"]["applied"]
+
+
+def test_explicit_lexical_policy_is_passed_per_call():
+    context = {"context": "official article", "hits": [], "warnings": [], "ranker": "lexical"}
+    config = {**CONFIG, "retrieval_ranker_policy": "lexical"}
+    with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch(
+        "app.benchmark_rag_solver._call", return_value=CALL,
+    ):
+        result = solve("3-2", "instruction", "question", config)
+    retrieve.assert_called_once_with("3-2", "question", ["/test-corpus"], ranker_policy="lexical")
+    assert result["model_config"]["retrieval_ranker_policy"] == "lexical"

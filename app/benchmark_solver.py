@@ -191,6 +191,25 @@ def _call(messages: list[dict[str, str]], config: dict[str, Any], phase: str) ->
     return record
 
 
+def messages_for(task_id: str, instruction: str, question: str,
+                 config: dict[str, Any]) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    """Return the exact first-call messages and effective solver configuration."""
+    effective = _configuration(config)
+    if task_id not in TASK_GUIDANCE:
+        raise ValueError(f"Unknown LawBench task: {task_id}")
+    if not isinstance(instruction, str) or not instruction.strip():
+        raise ValueError("instruction must be nonempty")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("question must be nonempty")
+    system = DIRECT_SYSTEM
+    if effective["strategy"] != "direct":
+        system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + task_guidance(task_id, effective)
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": f"{instruction.strip()}\n{question}"},
+    ], effective
+
+
 def solve(task_id: str, instruction: str, question: str, config: dict[str, Any]) -> dict[str, Any]:
     """Run a fixed inference strategy, returning every request and its outcome.
 
@@ -205,21 +224,8 @@ def solve(task_id: str, instruction: str, question: str, config: dict[str, Any])
         "usage": None, "calls": [], "model_config": {}, "solver_version": SOLVER_VERSION,
     }
     try:
-        effective = _configuration(config)
+        messages, effective = messages_for(task_id, instruction, question, config)
         result["model_config"] = effective
-        if task_id not in TASK_GUIDANCE:
-            raise ValueError(f"Unknown LawBench task: {task_id}")
-        if not isinstance(instruction, str) or not instruction.strip():
-            raise ValueError("instruction must be nonempty")
-        if not isinstance(question, str) or not question.strip():
-            raise ValueError("question must be nonempty")
-        system = DIRECT_SYSTEM
-        if effective["strategy"] != "direct":
-            system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + task_guidance(task_id, effective)
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"{instruction.strip()}\n{question}"},
-        ]
         first = _call(messages, effective, "draft")
         result["calls"].append(first)
         selected = first

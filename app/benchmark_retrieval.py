@@ -16,7 +16,7 @@ from typing import Any, Iterable
 
 from app.legal_corpus import LegalCorpus, article_number
 
-RETRIEVAL_VERSION = "statutory-context-v1"
+RETRIEVAL_VERSION = "statutory-context-v2"
 SUPPORTED_TASKS = {"1-1", "1-2", "3-1", "3-2", "3-3", "3-6", "3-8"}
 NUMBER = r"[零〇一二三四五六七八九十百千万两0-9]+"
 
@@ -145,11 +145,15 @@ def corpus_fingerprint(directories: list[str]) -> dict[str, str]:
 
 
 def retrieve(task_id: str, question: str, directories: list[str], *, limit: int = 5,
-             max_characters: int = 10000, embedder: Any = None) -> dict[str, Any]:
+             max_characters: int = 10000, embedder: Any = None,
+             ranker_policy: str = "auto") -> dict[str, Any]:
     if not 1 <= limit <= 10 or not 256 <= max_characters <= 30000:
         raise ValueError("Invalid statutory context budget")
+    if ranker_policy not in {"auto", "lexical"}:
+        raise ValueError("ranker_policy must be auto or lexical")
     result: dict[str, Any] = {"version": RETRIEVAL_VERSION, "policy": "explicit_revision_year_else_latest_available",
-                              "hits": [], "warnings": [], "context": "", "mode": "skipped"}
+                              "ranker_policy": ranker_policy, "hits": [], "warnings": [],
+                              "context": "", "mode": "skipped"}
     if task_id not in SUPPORTED_TASKS:
         return result
     corpora = [LegalCorpus(directory) for directory in directories]
@@ -198,14 +202,15 @@ def retrieve(task_id: str, question: str, directories: list[str], *, limit: int 
         result["mode"] = "exact_article"
     else:
         ranker = "lexical"
-        if embedder is None and os.getenv(DENSE_INDEX_ENV, "").strip():
+        if ranker_policy != "lexical" and embedder is None and os.getenv(DENSE_INDEX_ENV, "").strip():
             from .rag import EmbeddingClient
 
             embedder = EmbeddingClient(prefer_remote=True)
-        dense_hits = _dense_ranked_hits(question, chosen, directories, embedder, limit)
+        dense_hits = (_dense_ranked_hits(question, chosen, directories, embedder, limit)
+                      if ranker_policy != "lexical" else None)
         if dense_hits is not None:
-            # The promoted configuration (3-2/3-8, production scope): dense beats
-            # lexical alone; keep version pinning above untouched, rerank only.
+            # The opt-in dense index improved retrieval-layer recall in experiments;
+            # keep version pinning above untouched and rerank only.
             hits = dense_hits
             ranker = "dense"
         else:

@@ -12,11 +12,21 @@ from app.benchmark_metrics import score_lawbench_item
 from app.benchmark_reporting import atomic_json, metrics, paired_baseline, prompt_for, source_hashes
 
 
+def _hash_json(value: object) -> str:
+    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def verify(directory: Path, *, artifacts_only: bool = False, write: bool = True) -> dict:
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
     rows = [json.loads(line) for line in (directory / "detailed_results.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     issues = []
+    routed_protocol = "routing" in manifest
+    manifest_config_hash = _hash_json({key: manifest[key] for key in (
+        "protocol_version", "scorer_version", "postprocess", "retrieval", "prompt_strategy",
+        "model_config", "retry", "routing",
+    )}) if routed_protocol else None
     planned = {r["question_id"]: r for r in manifest["samples"]}
     counts = Counter(r["question_id"] for r in rows)
     if summary["status"] not in {"completed", "completed_with_errors"}:
@@ -43,8 +53,59 @@ def verify(directory: Path, *, artifacts_only: bool = False, write: bool = True)
         path = directory / "checkpoints" / f"{key}.json"
         if not path.exists() or json.loads(path.read_text(encoding="utf-8")) != row:
             issues.append(f"Checkpoint mismatch: {key}")
-        system, prompt = (row["system_prompt"], row["user_prompt"]) if artifacts_only else prompt_for(row, strategy=manifest.get("prompt_strategy", "task_guided"))
-        digest = hashlib.sha256(json.dumps((system, prompt), ensure_ascii=False).encode()).hexdigest()
+        sample = planned[key]
+        if routed_protocol:
+            route = sample.get("route")
+            if route not in {"legacy_prompt", "solver_task_guided_control", "statutory_rag"}:
+                issues.append(f"Missing/invalid task route: {key}")
+                continue
+            retrieval = sample.get("retrieval")
+            if route == "statutory_rag":
+                required = manifest.get("routing", {}).get("task_3_2", {})
+                if row.get("task") != "3-2" or required.get("ranker_policy") != "lexical" \
+                        or required.get("solver_transport_retries") != 0:
+                    issues.append(f"RAG route policy mismatch: {key}")
+                if retrieval is None or _hash_json(retrieval) != sample.get("retrieval_hash") \
+                        or row.get("retrieval") != retrieval or retrieval.get("ranker") != "lexical" \
+                        or retrieval.get("ranker_policy") != "lexical":
+                    issues.append(f"Retrieval provenance mismatch: {key}")
+                if not artifacts_only:
+                    from app.benchmark_retrieval import retrieve
+
+                    current = retrieve(row["task"], row["question"], manifest["retrieval"]["corpus_directories"],
+                                       ranker_policy="lexical")
+                    if current != retrieval:
+                        issues.append(f"Live retrieval mismatch: {key}")
+            if artifacts_only:
+                messages = row.get("request_messages")
+            else:
+                from unified_benchmark_runner import route_messages
+
+                messages = route_messages(row, route, manifest.get("prompt_strategy", "task_guided"),
+                                          manifest["model_config"], retrieval)
+            if not isinstance(messages, list) or len(messages) < 2:
+                issues.append(f"Missing request messages: {key}")
+                messages = []
+            system = messages[0].get("content") if messages else None
+            prompt = messages[1].get("content") if len(messages) > 1 else None
+            digest = _hash_json(messages)
+            if row.get("task_route") != route or row.get("manifest_config_hash") != manifest_config_hash:
+                issues.append(f"Route/config provenance mismatch: {key}")
+            if row.get("request_messages") != messages:
+                issues.append(f"Request messages mismatch: {key}")
+            if route in {"solver_task_guided_control", "statutory_rag"}:
+                from unified_benchmark_runner import solver_provenance_issues
+
+                provenance = solver_provenance_issues(
+                    row, route, messages, manifest["model_config"],
+                    manifest["retrieval"]["corpus_directories"],
+                )
+                if provenance:
+                    issues.append(f"Solver provenance mismatch: {key} ({', '.join(provenance)})")
+        else:
+            system, prompt = ((row["system_prompt"], row["user_prompt"]) if artifacts_only else
+                              prompt_for(row, strategy=manifest.get("prompt_strategy", "task_guided")))
+            digest = hashlib.sha256(json.dumps((system, prompt), ensure_ascii=False).encode()).hexdigest()
         if (system, prompt) != (row["system_prompt"], row["user_prompt"]) or digest != planned[key]["prompt_hash"] or digest != row["prompt_hash"]:
             issues.append(f"Prompt mismatch: {key}")
         record = {name: row[name] for name in ("dataset", "task", "task_name", "question_id", "question", "instruction", "dataset_version", "reference", "question_hash")}
@@ -63,6 +124,8 @@ def verify(directory: Path, *, artifacts_only: bool = False, write: bool = True)
                     issues.append(f"Score mismatch: {key}")
             if not row.get("finish_reason") or row.get("usage") is None:
                 issues.append(f"Missing response metadata: {key}")
+        elif row.get("score") != 0.0 or row.get("metric") != "error":
+            issues.append(f"Failure must score zero: {key}")
         if row.get("attempts", 0) < 1:
             issues.append(f"Missing model attempt: {key}")
     recalculated = metrics(rows)

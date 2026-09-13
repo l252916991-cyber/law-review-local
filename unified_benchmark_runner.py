@@ -55,11 +55,105 @@ RAG_PROJECT_PATH = Path(__file__).resolve().parent / "benchmarks" / "rag_project
 POSTPROCESS_TASKS = ("2-1", "2-7", "2-9", "3-8")
 # Tasks whose repair needs the frozen statutory corpus; only active when --corpus-dir is supplied.
 RETRIEVAL_TASKS = ("1-1",)
+STATUTORY_RAG_TASK = "3-2"
+STATUTORY_RAG_RANKER = "lexical"
+ROUTING_VERSION = "lawbench-task-routing-v1"
 
 
 def hash_text(text: str) -> str:
     """计算文本的 SHA256 哈希"""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def hash_json(value: object) -> str:
+    """Stable hash for frozen protocol objects and actual request messages."""
+    return hash_text(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+
+
+def task_route(task: str, corpus_directories: list[str], disable_3_2_rag: bool) -> str:
+    """Choose the frozen per-task inference path."""
+    if task != STATUTORY_RAG_TASK or not corpus_directories:
+        return "legacy_prompt"
+    return "solver_task_guided_control" if disable_3_2_rag else "statutory_rag"
+
+
+def route_messages(record: dict[str, Any], route: str, strategy: str,
+                   config: dict[str, Any], retrieval: dict[str, Any] | None = None,
+                   ) -> list[dict[str, str]]:
+    """Build the exact first request messages for manifest prompt hashing."""
+    if route == "legacy_prompt":
+        from app.benchmark_reporting import prompt_for
+
+        system, user = prompt_for(record, strategy=strategy)
+        return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    if route == "solver_task_guided_control":
+        from app.benchmark_solver import messages_for
+
+        messages, _ = messages_for(record["task"], record["instruction"], record["question"],
+                                   {**config, "strategy": "task_guided"})
+        return messages
+    if retrieval is None:
+        raise ValueError("statutory_rag route requires frozen retrieval")
+    from app.benchmark_rag_solver import messages_for
+
+    messages, _ = messages_for(record["task"], record["instruction"], record["question"],
+                               {**config, "strategy": "statutory_rag"}, retrieval)
+    return messages
+
+
+def solver_provenance_issues(row: dict[str, Any], route: str, messages: list[dict[str, str]],
+                             config: dict[str, Any], corpus_directories: list[str]) -> list[str]:
+    """Validate one solver-backed row against its frozen request configuration."""
+    from app.benchmark_solver import SOLVER_VERSION, _configuration, _endpoint
+
+    issues = []
+    expected_request = {
+        "model": config["model"], "messages": messages,
+        "temperature": config["temperature"], "max_tokens": config["max_tokens"],
+        "stream": False, "chat_template_kwargs": {"enable_thinking": config["enable_thinking"]},
+    }
+    effective = _configuration({**config, "strategy": "task_guided"})
+    expected_effective = effective
+    expected_phase = "draft"
+    expected_solver = SOLVER_VERSION
+    if route == "statutory_rag":
+        expected_effective = {
+            **effective, "strategy": "statutory_rag", "corpus_directories": corpus_directories,
+            "retrieval_ranker_policy": STATUTORY_RAG_RANKER,
+        }
+        expected_phase = "statutory_rag" if len(messages) == 3 else "draft"
+        expected_solver += "+statutory-rag-v2"
+    calls = row.get("calls")
+    if row.get("request_messages") != messages:
+        issues.append("request messages")
+    if row.get("effective_config") != expected_effective:
+        issues.append("effective config")
+    if row.get("solver_version") != expected_solver:
+        issues.append("solver version")
+    if row.get("attempts") != 1 or not isinstance(calls, list) or len(calls) != 1:
+        issues.append("single-call trace")
+        return issues
+    call = calls[0]
+    if call.get("phase") != expected_phase or call.get("request_url") != _endpoint(config["url"]):
+        issues.append("call route")
+    if call.get("request") != expected_request or call.get("request_sha256") != hash_json(expected_request):
+        issues.append("request body")
+    expected_errors = [call["error"]] if call.get("error") else []
+    if row.get("attempt_errors") != expected_errors or row.get("error") != call.get("error") \
+            or row.get("finish_reason") != call.get("finish_reason") or row.get("usage") != call.get("usage"):
+        issues.append("call result")
+    expected_prediction = call.get("prediction")
+    if route == "statutory_rag":
+        from app.benchmark_postprocess import postprocess
+
+        expected_prediction, expected_postprocess = postprocess(
+            row["task"], row["question"], expected_prediction or "", retrieval=row.get("retrieval"),
+        )
+        if row.get("postprocess") != expected_postprocess:
+            issues.append("postprocess result")
+    if row.get("prediction") != expected_prediction:
+        issues.append("selected prediction")
+    return issues
 
 
 def postprocess_with_retrieval(task: str, question: str, prediction: str, corpus_directories: list[str],
@@ -273,7 +367,7 @@ def load_all_datasets(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 def run_benchmark(args: argparse.Namespace) -> None:
     """Frozen, resumable run; checkpoints are the source of truth."""
-    from app.benchmark_reporting import PROMPT_VERSION, atomic_json, prompt_for, source_hashes, write_report
+    from app.benchmark_reporting import PROMPT_VERSION, atomic_json, source_hashes, write_report
 
     if args.dataset != "lawbench":
         raise ValueError("This audited runner currently supports --dataset lawbench only; other datasets need dedicated scorers.")
@@ -284,9 +378,13 @@ def run_benchmark(args: argparse.Namespace) -> None:
     if strategy not in {"direct", "task_guided", "hybrid", "correction_locate"}:
         raise ValueError("prompt_strategy must be direct, task_guided, hybrid or correction_locate")
     corpus_directories = [str(Path(path).resolve()) for path in (getattr(args, "corpus_dir", None) or [])]
+    disable_3_2_rag = bool(getattr(args, "disable_3_2_rag", False))
     postprocess_tasks = list(POSTPROCESS_TASKS) + (list(RETRIEVAL_TASKS) if corpus_directories else [])
-    if not corpus_directories and any(record["task"] in RETRIEVAL_TASKS for record in records):
-        print("⚠️  未提供 --corpus-dir：1-1 使用模型原始输出，不启用官方条文替换", flush=True)
+    if not corpus_directories:
+        if any(record["task"] in RETRIEVAL_TASKS for record in records):
+            print("⚠️  未提供 --corpus-dir：1-1 使用模型原始输出，不启用官方条文替换", flush=True)
+        if any(record["task"] == STATUTORY_RAG_TASK for record in records):
+            print("⚠️  未提供 --corpus-dir：3-2 保持旧统一 runner 提示路径，不启用已采纳的词法 RAG", flush=True)
     explicit_dir = getattr(args, "run_dir", None)
     if args.resume and not explicit_dir:
         raise ValueError("--resume requires the original --run-dir; never creates a new run")
@@ -301,6 +399,40 @@ def run_benchmark(args: argparse.Namespace) -> None:
             b = old.get(r["question_id"])
             if not b or (b["question"], b["reference"]) != (r["question"], r["reference"]):
                 raise ValueError(f"Baseline missing/mismatched: {r['question_id']}")
+    route_samples = []
+    for record in records:
+        route = task_route(record["task"], corpus_directories, disable_3_2_rag)
+        frozen_retrieval = None
+        if route == "statutory_rag":
+            frozen_retrieval = retrieve(
+                record["task"], record["question"], corpus_directories,
+                ranker_policy=STATUTORY_RAG_RANKER,
+            )
+            if frozen_retrieval.get("ranker") != STATUTORY_RAG_RANKER:
+                raise ValueError(f"3-2 retrieval did not use lexical ranking: {record['question_id']}")
+        messages = route_messages(record, route, strategy, MODEL_CONFIG, frozen_retrieval)
+        route_samples.append({
+            "question_id": record["question_id"], "question_hash": record["question_hash"],
+            "record_hash": hash_text(json.dumps(record, ensure_ascii=False, sort_keys=True)),
+            "route": route, "prompt_hash": hash_json(messages),
+            "retrieval_hash": hash_json(frozen_retrieval) if frozen_retrieval is not None else None,
+            "retrieval": frozen_retrieval,
+        })
+    routing = {
+        "version": ROUTING_VERSION,
+        "task_3_2": {
+            "enabled": bool(corpus_directories) and not disable_3_2_rag,
+            "corpus_required": True,
+            "enabled_route": "statutory_rag",
+            "disabled_route": "solver_task_guided_control",
+            "no_corpus_route": "legacy_prompt",
+            "ranker_policy": STATUTORY_RAG_RANKER,
+            "solver_transport_retries": 0,
+        },
+    }
+    if args.retry and any(sample["route"] in {"statutory_rag", "solver_task_guided_control"}
+                          for sample in route_samples):
+        print(f"⚠️  3-2 solver 路径固定单次调用；--retry={args.retry} 仅适用于旧提示路径", flush=True)
     manifest = {
         "protocol_version": PROMPT_VERSION, "scorer_version": SCORER_VERSION,
         "postprocess": {"version": POSTPROCESS_VERSION, "tasks": postprocess_tasks},
@@ -309,13 +441,15 @@ def run_benchmark(args: argparse.Namespace) -> None:
         "prompt_strategy": getattr(args, "prompt_strategy", "task_guided"),
         "model_config": dict(MODEL_CONFIG), "sample_seed": getattr(args, "sample_seed", None),
         "retry": args.retry, "planned_questions": len(records), "source_hashes": source_hashes(),
+        "routing": routing,
         "baseline_results": baseline,
         "baseline_sha256": hashlib.sha256(Path(baseline).read_bytes()).hexdigest() if baseline else None,
-        "samples": [{"question_id": r["question_id"], "question_hash": r["question_hash"],
-                     "record_hash": hash_text(json.dumps(r, ensure_ascii=False, sort_keys=True)),
-                     "prompt_hash": hash_text(json.dumps(prompt_for(r, strategy=strategy), ensure_ascii=False))}
-                    for r in records],
+        "samples": route_samples,
     }
+    manifest_config_hash = hash_json({key: manifest[key] for key in (
+        "protocol_version", "scorer_version", "postprocess", "retrieval", "prompt_strategy",
+        "model_config", "retry", "routing",
+    )})
     if args.resume:
         stored_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if stored_manifest != manifest:
@@ -344,6 +478,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
             raise RuntimeError("Another process is already executing this run")
         completed = {}
         planned = {r["question_id"]: r for r in records}
+        frozen_samples = {sample["question_id"]: sample for sample in manifest["samples"]}
         for path in checkpoint_dir.glob("*.json"):
             row = json.loads(path.read_text(encoding="utf-8"))
             key = row["question_id"]
@@ -352,6 +487,20 @@ def run_benchmark(args: argparse.Namespace) -> None:
             expected = planned[key]
             if any(row.get(k) != v for k, v in expected.items()) or row.get("scorer_version") != SCORER_VERSION:
                 raise ValueError(f"Checkpoint mismatch: {key}")
+            if row.get("error") and (row.get("score") != 0.0 or row.get("metric") != "error"):
+                raise ValueError(f"Checkpoint failure score mismatch: {key}")
+            sample = frozen_samples[key]
+            if row.get("task_route") != sample["route"] or row.get("prompt_hash") != sample["prompt_hash"] \
+                    or row.get("manifest_config_hash") != manifest_config_hash:
+                raise ValueError(f"Checkpoint route/protocol mismatch: {key}")
+            if sample["route"] in {"statutory_rag", "solver_task_guided_control"}:
+                messages = route_messages(expected, sample["route"], strategy, MODEL_CONFIG, sample.get("retrieval"))
+                if solver_provenance_issues(
+                    row, sample["route"], messages, MODEL_CONFIG, corpus_directories,
+                ):
+                    raise ValueError(f"Checkpoint request provenance mismatch: {key}")
+                if sample["route"] == "statutory_rag" and row.get("retrieval") != sample.get("retrieval"):
+                    raise ValueError(f"Checkpoint retrieval mismatch: {key}")
             if row["task"] in postprocess_tasks and not row.get("error"):
                 raw = row.get("original_prediction")
                 if not isinstance(raw, str):
@@ -379,10 +528,40 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 key = record["question_id"]
                 if key in completed:
                     continue
-                system, prompt = prompt_for({**record, "prompt_strategy": strategy})
-                response_metadata = {}
-                prediction, latency, error = call_model(prompt, system, MODEL_CONFIG, retry=args.retry, metadata=response_metadata)
-                if record["task"] in postprocess_tasks and not error:
+                sample = frozen_samples[key]
+                route = sample["route"]
+                messages = route_messages(record, route, strategy, MODEL_CONFIG, sample.get("retrieval"))
+                system, prompt = messages[0]["content"], messages[1]["content"]
+                response_metadata: dict[str, Any] = {}
+                if route == "legacy_prompt":
+                    prediction, latency, error = call_model(
+                        prompt, system, MODEL_CONFIG, retry=args.retry, metadata=response_metadata,
+                    )
+                else:
+                    solver_config = {**MODEL_CONFIG, "strategy": "task_guided"}
+                    if route == "statutory_rag":
+                        from app.benchmark_rag_solver import solve
+
+                        solver_config.update(
+                            strategy="statutory_rag", corpus_directories=corpus_directories,
+                            retrieval_ranker_policy=STATUTORY_RAG_RANKER,
+                            retrieval_context=sample["retrieval"],
+                        )
+                    else:
+                        from app.benchmark_solver import solve
+                    result = solve(record["task"], record["instruction"], record["question"], solver_config)
+                    prediction, latency, error = result["prediction"], result["latency_ms"], result["error"]
+                    calls = result.get("calls", [])
+                    response_metadata.update(
+                        attempts=len(calls), attempt_errors=[call["error"] for call in calls if call.get("error")],
+                        finish_reason=result.get("finish_reason"), usage=result.get("usage"),
+                        calls=calls, solver_version=result.get("solver_version"),
+                        effective_config=result.get("model_config"), request_messages=messages,
+                    )
+                    if route == "statutory_rag":
+                        response_metadata.update(retrieval=result.get("retrieval"),
+                                                 postprocess=result.get("postprocess"))
+                if route == "legacy_prompt" and record["task"] in postprocess_tasks and not error:
                     response_metadata["original_prediction"] = prediction
                     prediction, metadata, context = postprocess_with_retrieval(
                         record["task"], record["question"], prediction, corpus_directories)
@@ -395,8 +574,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 }
                 row = {**record, **scored, "prediction": prediction, "error": error, "latency_ms": latency,
                        "model_config": dict(MODEL_CONFIG), "scorer_version": SCORER_VERSION, "prompt_version": PROMPT_VERSION,
-                       "system_prompt": system, "user_prompt": prompt,
-                       "prompt_hash": hash_text(json.dumps((system, prompt), ensure_ascii=False)),
+                       "system_prompt": system, "user_prompt": prompt, "request_messages": messages,
+                       "prompt_hash": hash_json(messages), "task_route": route,
+                       "manifest_config_hash": manifest_config_hash,
                        "timestamp": datetime.now().isoformat(), **response_metadata}
                 atomic_json(checkpoint_dir / f"{key}.json", row)
                 with detail_path.open("a", encoding="utf-8") as stream:
@@ -476,7 +656,11 @@ def main():
     )
     parser.add_argument(
         "--corpus-dir", type=Path, action="append", default=None,
-        help="可重复：冻结法条库目录；提供后 1-1 在评分前用官方条文替换模型输出（不读取参考答案）",
+        help="可重复：冻结法条库目录；启用 1-1 条文替换，并默认启用 3-2 词法 statutory RAG（不读取参考答案）",
+    )
+    parser.add_argument(
+        "--disable-3-2-rag", action="store_true",
+        help="提供法条库时显式关闭 3-2 RAG，改走同 solver 的 task-guided 单次调用配对控制路径",
     )
     args = parser.parse_args()
     if args.retry < 0 or args.timeout < 1 or args.max_tokens < 1:

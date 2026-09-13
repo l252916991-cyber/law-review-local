@@ -54,7 +54,8 @@ def source_hashes() -> dict:
     root = Path(__file__).resolve().parent.parent
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
         "unified_benchmark_runner.py", "app/benchmark_metrics.py", "app/benchmark_reporting.py", "app/lawbench.py",
-        "app/benchmark_solver.py", "app/benchmark_postprocess.py", "app/benchmark_retrieval.py", "app/legal_corpus.py",
+        "app/benchmark_solver.py", "app/benchmark_rag_solver.py", "app/benchmark_postprocess.py",
+        "app/benchmark_retrieval.py", "app/legal_corpus.py",
     )}
 
 
@@ -128,6 +129,7 @@ def write_report(rows: list[dict], output_dir: Path, duration: float, model_conf
     lines += ["", "## 分任务", "", "| 任务 | 题数 | 混合均分/任务分数 | 解析失败 | 技术失败 |", "|---|---:|---:|---:|---:|"]
     for task, m in summary["tasks"].items():
         lines.append(f"| {task} {m['name']} | {m['total']} | {m['mean_score_all']:.2%} | {m['parse_failed']} | {m['failed']} |")
+    route_note = manifest.get("routing", {}).get("task_3_2", {})
     lines += ["", "## 方法和限制", "",
         "- 20 类分层抽样，抽样清单在调用模型前冻结；每题完整传入原始 instruction 和 question，不向模型提供 reference。",
         "- 不按分数筛题、不重试低分题、不使用标准答案修复模型输出；仅网络/服务错误允许按配置重试。",
@@ -136,7 +138,9 @@ def write_report(rows: list[dict], output_dir: Path, duration: float, model_conf
         "- 上游刑期评分会跳过无期/死刑参考答案；本报告不静默剔除，单列 reference_invalid，不能据此评价模型的刑期预测能力。",
         "- 解析器采取保守的答案格式识别；长篇解释、歧义答案可能被记为解析失败或零分，不代表人工法律结论。",
         "- 每题只生成一次（技术重试除外），温度 0 仍不保证服务完全确定；1,000 题不能代表所有法律场景。",
-        "- 此测试直接调用模型，不经过 RAG、原生 DAG 或 LangGraph，不能用来证明框架之间的质量差异。",
+        ("- 3-2 在提供冻结法条库时走 statutory RAG，逐题保存实际检索与请求；其余模型题不经过项目原生 DAG 或 LangGraph。"
+         if route_note.get("enabled") else
+         "- 此次运行未启用 3-2 statutory RAG；模型题不经过项目原生 DAG 或 LangGraph。"),
         "- 原始回答、finish_reason、usage、所有尝试错误、完整提示词和源码哈希均保留在本运行目录。",
         "", "数据来源：[LawBench 固定版本](https://github.com/open-compass/LawBench/tree/e30981bb3ff54c41571f222e0b23e92d27375388)。", ""]
     (output_dir / "REPORT.md").write_text("\n".join(lines), encoding="utf-8")

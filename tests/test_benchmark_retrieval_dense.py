@@ -105,6 +105,18 @@ def test_dense_ranking_overrides_lexical_order(corpus, tmp_path, monkeypatch):
         assert field in hit
 
 
+def test_explicit_lexical_ignores_inherited_dense_environment(corpus, tmp_path, monkeypatch):
+    path = save_index(corpus, tmp_path / "index.json", {
+        "劳动报酬": [1.0, 0.0], "合同履行": [0.0, 1.0]})
+    monkeypatch.setenv(DENSE_INDEX_ENV, str(path))
+    benchmark_retrieval._index_cache = None
+    result = retrieve("3-2", "合同履行约定", [corpus],
+                      embedder=FakeEmbedder([1.0, 0.0]), ranker_policy="lexical")
+    assert result["ranker_policy"] == "lexical"
+    assert result["ranker"] == "lexical"
+    assert result["hits"][0]["article_id"] == "2"
+
+
 def test_embedding_failure_falls_back_to_lexical(corpus, tmp_path, monkeypatch):
     path = save_index(corpus, tmp_path / "index.json", {"劳动报酬": [1.0, 0.0]})
     monkeypatch.setenv(DENSE_INDEX_ENV, str(path))
