@@ -470,9 +470,11 @@ class HybridRetriever:
         return output
 
     def retrieve(self, query: str, limit: int = 6) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        if self.use_page_children and query.strip():
-            return self._retrieve_children(query, limit)
-        if not isinstance(query, str) or not query.strip():
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            raise ValueError("Positive integer retrieval limit required")
+        if not isinstance(query, str):
+            raise ValueError("Retrieval query must be text")
+        if not query.strip():
             return [], {
                 "mode": "FTS5/BM25 + Legal Lexical + Vector + RRF",
                 "retrieval_mode": "hybrid_rrf", "strategy": "adaptive_hybrid_rerank", "source_count": 0,
@@ -480,6 +482,8 @@ class HybridRetriever:
                 "direct_match_count": 0, "neighbor_count": 0, "source_diversity": 0,
                 "degraded": False,
             }
+        if self.use_page_children:
+            return self._retrieve_children(query, limit)
         started = time.perf_counter()
         expanded_query = expand_retrieval_query(query)
         signals = query_signals(query)
@@ -573,43 +577,51 @@ class HybridRetriever:
         return selected, metrics
 
     def _retrieve_children(self, query: str, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        """Experimental bounded full-scan child recall; page indexes stay untouched."""
-        from .rag_chunks import CHUNK_VERSION, page_chunks
+        """Experimental exact-scan child recall backed by a persistent vector cache."""
+        from .rag_child_index import load_or_build_child_index
+        from .rag_chunks import CHUNK_VERSION
         from .legal_corpus import _terms
         from collections import Counter
 
-        if limit < 1:
-            raise ValueError("Positive retrieval limit required")
-        conn = connect()
-        try:
-            pages = [rowdict(row) for row in conn.execute(
-                "SELECT p.id AS page_id,p.page_no,p.text,d.id AS document_id,d.name "
-                "FROM pages p JOIN documents d ON d.id=p.document_id WHERE d.case_id=? ORDER BY p.id",
-                (self.case_id,),
-            )]
-        finally:
-            conn.close()
-        children = [{**page, **chunk} for page in pages for chunk in page_chunks(page["text"])]
-        if len(children) > 10000:
-            raise ValueError("Experimental child scan exceeds 10000 chunks")
-        if not children:
-            return [], {"retrieval_mode": CHUNK_VERSION, "source_count": 0, "degraded": False}
         query_vectors, backend = self.embedding_client.embed([query])
+        if len(query_vectors) != 1 or not valid_vector(query_vectors[0]):
+            raise RuntimeError("invalid_query_embedding")
         dimensions = len(query_vectors[0])
-        vectors = []
-        for start in range(0, len(children), 32):
-            batch = children[start:start + 32]
-            embedded, actual_backend = self.embedding_client.embed([child["text"] for child in batch])
-            if actual_backend != backend or len(embedded) != len(batch) or not all(valid_vector(v, dimensions) for v in embedded):
-                raise RuntimeError("embedding_backend_changed_during_index")
-            vectors.extend(embedded)
+        model = embedding_identity(self.embedding_client.model, backend)
+        children, index_metrics = load_or_build_child_index(
+            self.case_id,
+            backend=backend,
+            dimensions=dimensions,
+            model_identity=model,
+            embed=self.embedding_client.embed,
+        )
+        base_metrics = {
+            "retrieval_mode": CHUNK_VERSION,
+            "source_count": 0,
+            "child_count": len(children),
+            "fused_candidates": 0,
+            "degraded": backend == "hashed-local",
+            "index_storage": "sqlite_persistent",
+            "index_search": "exact_scan",
+            **index_metrics,
+            "embedding": {
+                "backend": backend,
+                "dimensions": dimensions,
+                "model": model + "|" + CHUNK_VERSION,
+                "embedded_child_count": index_metrics["embedded_child_count"],
+                "reused_child_count": index_metrics["reused_child_count"],
+            },
+            "reranker": {"enabled": False, "requested": self.use_neural_reranker},
+        }
+        if not children:
+            return [], base_metrics
         terms = [_terms(child["text"]) for child in children]
         df = Counter(term for bag in terms for term in bag)
         query_terms_set = _terms(query)
         average_length = sum(sum(bag.values()) for bag in terms) / len(terms) or 1
         lexical = []
         semantic = []
-        for index, (bag, vector) in enumerate(zip(terms, vectors)):
+        for index, (bag, child) in enumerate(zip(terms, children)):
             length = sum(bag.values())
             score = sum(
                 math.log(1 + (len(terms) - df[t] + 0.5) / (df[t] + 0.5))
@@ -618,7 +630,7 @@ class HybridRetriever:
             )
             if score > 0:
                 lexical.append((score, index))
-            similarity = cosine_similarity(query_vectors[0], vector)
+            similarity = cosine_similarity(query_vectors[0], child["vector"])
             if similarity > 0:
                 semantic.append((similarity, index))
         scores: dict[int, float] = {}
@@ -636,26 +648,23 @@ class HybridRetriever:
             final_scores = scores
         selected = []
         seen = set()
-        parent_text = {page["page_id"]: page["text"] for page in pages}
         for index in indices:
             child = children[index]
             if child["page_id"] in seen:
                 continue
             seen.add(child["page_id"])
             selected.append({
-                **child, "text": parent_text[child["page_id"]],
-                "quote": child["text"], "rank": len(selected) + 1,
+                **{key: value for key, value in child.items() if key not in ("vector", "parent_text")},
+                "text": child["parent_text"], "quote": child["text"], "rank": len(selected) + 1,
                 "rrf_score": scores[index], "rerank_score": final_scores[index],
                 "retrieval_explain": f"{CHUNK_VERSION}; chars=[{child['char_start']},{child['char_end']}); RRF={scores[index]}",
             })
             if len(selected) == limit:
                 break
         return selected, {
-            "retrieval_mode": CHUNK_VERSION, "source_count": len(selected),
-            "child_count": len(children), "fused_candidates": len(indices),
-            "degraded": backend == "hashed-local", "index_storage": "ephemeral_full_scan",
-            "embedding": {"backend": backend, "dimensions": dimensions,
-                          "model": embedding_identity(self.embedding_client.model, backend) + "|" + CHUNK_VERSION},
+            **base_metrics,
+            "source_count": len(selected),
+            "fused_candidates": len(indices),
             "reranker": {"enabled": neural is not None, "requested": self.use_neural_reranker},
         }
 
