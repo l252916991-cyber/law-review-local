@@ -24,6 +24,17 @@ LOCATE_SUFFIX = ("\n本任务改为两段式：先只列出需要修改的片段
                  "严格输出 JSON：{\"edits\":[{\"original\":\"原句中的错误片段\",\"corrected\":\"改正后的片段\"}]}。"
                  "不要重写整句，不要添加说明。若没有错误，输出 {\"edits\":[]}。")
 
+# Synthetic few-shot examples for 2-2, written by hand to cover the measured
+# confusion clusters (责任认定/责任承担, 原审判决是否适当). They are not copied from
+# any pinned question (verified substring absence) and carry no reference answers.
+FEWSHOT_2_2 = (
+    "\n示例：\n"
+    "句子:交警大队作出道路交通事故认定书，认定甲负主要责任、乙负次要责任，双方对责任认定均未申请复核。->[争议焦点]责任认定<eoa>\n"
+    "句子:二审中甲上诉称其不应与乙连带赔偿货物损失，请求改判由乙独自承担赔偿义务。->[争议焦点]责任承担<eoa>\n"
+    "句子:甲上诉称一审法院对其提交的关键证据未予采信、认定事实错误，请求撤销原判发回重审。->[争议焦点]原审判决是否适当<eoa>\n"
+    "示例结束。\n"
+)
+
 
 def prompt_for(record: dict, *, strategy: str | None = None) -> tuple[str, str]:
     instruction = record.get("instruction", "").strip()
@@ -33,10 +44,12 @@ def prompt_for(record: dict, *, strategy: str | None = None) -> tuple[str, str]:
     guidance = TASK_GUIDANCE.get(task, "") if record["dataset"] == "lawbench" else ""
     strategy = strategy or record.get("prompt_strategy", "task_guided")
     system = SYSTEM_PROMPT
-    guided = guidance and (strategy in {"task_guided", "correction_locate"}
+    guided = guidance and (strategy in {"task_guided", "few_shot", "correction_locate"}
                            or (strategy == "hybrid" and task in GUIDED_TASK_WHITELIST))
     if guided:
         system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + guidance
+    if strategy == "few_shot" and task == "2-2":
+        system += FEWSHOT_2_2
     if strategy == "correction_locate" and task == "2-1":
         system += LOCATE_SUFFIX
     # Keep the original instruction and question verbatim in the user message.
