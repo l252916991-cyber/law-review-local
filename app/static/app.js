@@ -25,6 +25,9 @@ const state = {
   recoverableAgentRunId: null,
 };
 
+// 证据时间线图表实例；容器隐藏时无法测量尺寸，需在视图显示后重建。
+let evidenceTimelineChart = null;
+
 // ========================================
 // 工具函数
 // ========================================
@@ -395,7 +398,8 @@ function renderComparisonResult(result) {
   $(".comparison-summary", target).insertAdjacentHTML("beforeend", `<span class="dataset-chip">相对耗时 ${overhead === null ? "—" : `${overhead > 0 ? "+" : ""}${overhead}%`}</span><span class="dataset-chip">恢复记录 ${Number(result.comparison.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B</span>`);
   $$('[data-preview]', target).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   target.hidden = false;
-  $("#lab-result").innerHTML = '<div class="empty-state">两种分析方式已使用相同问题完成。请对比答复、引用和各项检查结果。</div>';
+  // 对比结果就在上方的对比面板里，这里回到单次分析面板的默认空状态。
+  $("#lab-result").innerHTML = '<div class="empty-state">运行后将在这里显示最终答复与来源。</div>';
   $("#trace-total").textContent = `标准分析 #${result.native.run_id} ↔ 可恢复分析 #${result.langgraph.run_id}`;
   $("#agent-trace").innerHTML = [...result.native.steps, ...result.langgraph.steps].map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
 }
@@ -1025,6 +1029,8 @@ function showView(name) {
     else item.removeAttribute("aria-current");
   });
   if (name === "lab") loadLabMetrics();
+  // 证据视图隐藏时无法测量尺寸，显示后重绘一次时间线。
+  if (name === "evidence") renderEvidenceTimeline();
 }
 
 async function refreshModelDialogStatus() {
@@ -1283,6 +1289,10 @@ function bindEvents() {
     batchDropArea.classList.remove("dragging");
     handleBatchUpload(event.dataTransfer.files);
   });
+  // 只注册一次；时间线实例在渲染时按需重建。
+  window.addEventListener("resize", () => {
+    if (evidenceTimelineChart && !evidenceTimelineChart.isDisposed()) evidenceTimelineChart.resize();
+  });
 }
 
 async function createCase(event) {
@@ -1396,14 +1406,20 @@ async function pollBatchStatus(batchId) {
 }
 
 // 渲染证据时间线
+function clearEvidenceTimeline(message) {
+  if (evidenceTimelineChart && !evidenceTimelineChart.isDisposed()) evidenceTimelineChart.dispose();
+  evidenceTimelineChart = null;
+  $("#evidence-timeline").innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">${message}</div>`;
+}
+
 function renderEvidenceTimeline() {
   if (!state.evidence || state.evidence.length === 0) {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">暂无证据数据</div>';
+    clearEvidenceTimeline("暂无证据数据");
     return;
   }
 
   if (typeof echarts === 'undefined') {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">可视化库加载中...</div>';
+    clearEvidenceTimeline("可视化库加载中...");
     return;
   }
 
@@ -1433,11 +1449,20 @@ function renderEvidenceTimeline() {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (evidenceWithTime.length === 0) {
-    $("#evidence-timeline").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ba5a2;">证据所在文档缺少时间信息</div>';
+    clearEvidenceTimeline("证据所在文档缺少时间信息");
     return;
   }
 
-  const chart = echarts.init(document.getElementById('evidence-timeline'));
+  // 证据视图初始是隐藏的（display:none），此时初始化量到宽度 0，
+  // 画布会一直是空的。等视图显示后再测量并渲染。
+  const container = document.getElementById('evidence-timeline');
+  if (!container || container.clientWidth === 0) return;
+
+  if (!evidenceTimelineChart || evidenceTimelineChart.isDisposed()) {
+    container.innerHTML = '';
+    evidenceTimelineChart = echarts.init(container);
+  }
+  const chart = evidenceTimelineChart;
 
   // 按日期聚合证据数量
   const dateCountMap = {};
@@ -1506,9 +1531,8 @@ function renderEvidenceTimeline() {
   };
 
   chart.setOption(option);
-
-  // 响应式调整
-  window.addEventListener('resize', () => chart.resize());
+  // 视图切走再切回时容器尺寸会变，渲染后同步一次画布。
+  chart.resize();
 }
 
 // 渲染疏漏检测仪表板
