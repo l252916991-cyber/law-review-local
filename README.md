@@ -41,7 +41,7 @@ BENCHMARK_TEST_PLAN.md        评测验证计划
 | 领域 | 能力 | 明确边界 |
 |---|---|---|
 | 卷宗导入 | PDF/DOCX/TXT/图片；扫描件本机 Tesseract OCR；页级存储 | 解析预算：单文件 50MiB、PDF ≤500 页、提取文本 ≤5M 字符（超限明确截断标注） |
-| 检索 | SQLite FTS5/BM25 + 法律词项 + 本地向量，RRF 融合；页级引用溯源 | 向量服务不可用时确定性降级并标注 |
+| 检索 | SQLite FTS5/BM25 + 法律词项 + 本地向量，RRF 融合；页级引用溯源 | 模型 embedding / reranker 不可用时明确失败；hashed-local 为显式离线路径 |
 | 法条核验 | 显式法名/条号在受控法条语料中精确核验，附版本、来源与正文；无法唯一核验时拒答并标记待核验 | 法条语料为受控部署资产（非入库数据）；语料标注不保证现行有效性，有效性仍需律师核验 |
 | 证据治理 | 证据/关系/标注 CRUD；原件内容哈希与同案件去重；审批归属，确认内容被编辑后审批自动失效 | 并发乐观锁、批量操作、软删除尚未实现 |
 | 问答与 Agent | 检索路由问答；原生 DAG（默认）与 LangGraph（可选）双运行时，失败续跑、后台任务轮询 | 长期记忆是草稿性质，不具已确认事实地位 |
@@ -60,7 +60,7 @@ LexVault 的检索目标不是单纯提高召回率，而是在法律场景下�
 | 路由（`detect_route`） | 检索路径 | 生成 |
 |---|---|---|
 | 目录统计 | 确定性数据库元数据查询 | 不经模型，直接汇总 |
-| 事实检索 / 多文档对比 / 知识库+卷宗 | 案件卷宗页级混合检索 | 模型（失败回退规则式回答） |
+| 事实检索 / 多文档对比 / 知识库+卷宗 | 案件卷宗页级混合检索 | 普通问答启用模型时，调用或引用校验失败会报错；显式关闭 LLM 时生成规则摘要 |
 
 法条核验是**独立的分析节点**：阅卷编排在问题含法律依据信号（法律、法规、构成要件、规定、法条）时，把「法条核验 Agent」追加进分析计划，与事实、证据、矛盾节点**并列**运行，不汇入案件事实问答的上下文；其核验结果独立呈现并标注待核验。
 
@@ -82,15 +82,15 @@ LexVault 的检索目标不是单纯提高召回率，而是在法律场景下�
 
 - 关键词通道为 FTS5/BM25 与法律词项 bigram，向量通道为本地 embedding，两路以 RRF 融合（`k=60`，通道权重随查询画像与向量后端自适应）。
 - 确定性 hashed 向量后端只作召回通道并把权重压到 0.25，避免其越过精确法律词项、金额或文件名的匹配。
-- 命中页扩展相邻页候选后再做候选级重排；向量服务不可用时确定性降级，并在检索指标中标注。
+- 命中页扩展相邻页候选后再做候选级重排；模型向量或神经重排请求失败时明确报错，显式离线模式使用 hashed-local 并记录实际后端。
 - 回答中的引用卡片与上下文一一对应，可点击回溯到原文页。
 - 实验性页内子块模式默认关闭；启用后将最多 400 字、重叠 50 字的子块向量持久化到 SQLite，按页哈希、切分版本和完整 embedding 身份懒重建。热查询复用未变化页面的切分与向量，但词法和向量候选仍逐子块精确扫描，并非 ANN 或持久化倒排索引。
 
 ### 3.3 生成与引用校验
 
-生成阶段受检索结果约束：模型回答必须通过引用校验（`validate_review_answer`）才会被采纳，否则该次作答判为失败并回退规则式回答，同时记录 `citation_check` 状态。
+生成阶段受检索结果约束：普通问答的模型回答必须通过引用校验（`validate_review_answer`）才会被采纳，否则请求明确失败。显式关闭 LLM 时才走规则摘要路径。Agent 审校节点另有规则汇总及失败诊断逻辑，不应与普通问答的错误契约混为一谈。
 
-fail-closed 的适用范围需要如实区分：**法条引用不可核验时会拒答并标记待核验**；**案件卷宗检索不足时不会拒答**，而是降级为基于已检索材料的规则式回答，并提示律师补充材料。
+法条引用无法核验时返回待核验状态。卷宗检索不足通过检索指标和回答校验暴露，不能仅凭空结果或引用格式合法宣称答案已正确弃答、事实已获支持；语义支撑与法律适用仍需人工复核。
 
 ## 4. 安全边界
 
@@ -123,7 +123,7 @@ uv run python scripts/doctor.py            # 环境自检
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8765
 ```
 
-打开 <http://127.0.0.1:8765>。没有模型时自动使用规则模式（回答显式声明未用模型）。配置参考 [.env.example](.env.example)——应用不隐式加载 dotenv，需显式注入环境并重启服务。
+打开 <http://127.0.0.1:8765>。模型功能需要可用的本地服务；无模型演示应显式关闭 LLM 并选择离线检索配置，不能依赖模型请求失败后的自动回退。配置参考 [.env.example](.env.example)——应用不隐式加载 dotenv，需显式注入环境并重启服务。
 
 OCR 依赖：
 
@@ -183,15 +183,15 @@ docker compose up -d
 
 ## 9. 质量保障与评测
 
-- **测试**：603 项离线测试（另有 8 项跳过）+ 分支覆盖率 86.6%（门槛 70%），CI 禁网运行，JUnit/覆盖率报告随构建产出。本地复现：
+- **测试**：以[对应提交的 GitHub Actions 运行与产物](https://github.com/l252916991-cyber/law-review-local/actions/workflows/test.yml)为准，避免把历史测试数量写成当前结论。CI 在 Ubuntu / Python 3.11、3.14 上禁网运行，行与分支综合覆盖率门槛为 70%，产出 JUnit 与覆盖率报告；可选模型和未分发语料会影响跳过数量。历史本地验证及适用版本见[策略基线](docs/architecture/strategy-baseline-20260914.md)。本地检查命令如下，完整隔离配置以 [.github/workflows/test.yml](.github/workflows/test.yml) 为准：
 
 ```bash
 uv run --locked ruff check app tests scripts
 uv run --locked mypy
-uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py \
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py \
   scripts/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
-node --check app/static/app.js
+for script in app/static/*.js; do node --check "$script"; done
 ```
 
 - **评测分层**（四层指标不可互相替代，详见[评测协议](docs/benchmarks/README.md)）：
