@@ -103,6 +103,39 @@ class OrderedMigrationTest(unittest.TestCase):
                 self.assertIsNone(conn.execute("SELECT name FROM sqlite_master WHERE name IN ('cases','partial_change')").fetchone())
             db.init_db(seed=False)
 
+    def test_v13_child_index_migration_is_ordered_and_atomic(self):
+        from app import db
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
+            with patch.object(db, "SCHEMA_VERSION", 12):
+                db.init_db(seed=False)
+            with db.transaction() as conn:
+                insert_case(conn, "v12 preserved", "V12")
+
+            def fail(conn):
+                conn.execute("CREATE TABLE partial_v13(id INTEGER)")
+                raise RuntimeError("injected v13 failure")
+
+            with patch.object(db, "_migrate_v13", fail), self.assertRaisesRegex(RuntimeError, "injected"):
+                db.init_db(seed=False)
+            with closing(db.connect()) as conn:
+                self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 12)
+                self.assertEqual(conn.execute("SELECT title FROM cases").fetchone()[0], "v12 preserved")
+                self.assertIsNone(conn.execute(
+                    "SELECT name FROM sqlite_master WHERE name IN ('partial_v13','page_child_index_state')"
+                ).fetchone())
+
+            db.init_db(seed=False)
+            with closing(db.connect()) as conn:
+                self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 13)
+                self.assertIsNotNone(conn.execute(
+                    "SELECT name FROM sqlite_master WHERE name='page_child_index_state'"
+                ).fetchone())
+                self.assertIsNotNone(conn.execute(
+                    "SELECT name FROM sqlite_master WHERE name='page_child_chunks'"
+                ).fetchone())
+
 
 class DatabaseTransactionTest(IsolatedDatabaseTestCase):
     """事务回滚和一致性测试"""

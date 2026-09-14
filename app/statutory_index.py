@@ -6,6 +6,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from datetime import date
+from operator import mul
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -45,6 +46,30 @@ def vector_values(vector: list[float], spec: IndexSpec) -> tuple[float, ...]:
     return tuple(x / norm if spec.normalization == "l2" else float(x) for x in vector)
 
 
+def build_validity(corpus: LegalCorpus) -> dict[str, dict[str, Any]]:
+    """One verified interval per document; only the newest version of a law is open.
+
+    ponytail: effective_from falls back to version_date when the publication omits
+    an effective date, and superseded versions close when the next one opens. That
+    is enough to disambiguate today's corpus; real amendment history would need the
+    official transition dates.
+    """
+    by_law: dict[str, list[dict[str, Any]]] = {}
+    for doc in corpus.documents:
+        by_law.setdefault(doc["law_name"], []).append(doc)
+    validity: dict[str, dict[str, Any]] = {}
+    for law, docs in by_law.items():
+        ordered = sorted(docs, key=lambda item: item["effective_date"] or item["version_date"])
+        for position, doc in enumerate(ordered):
+            start = doc["effective_date"] or doc["version_date"]
+            end = None
+            if position + 1 < len(ordered):
+                end = ordered[position + 1]["effective_date"] or ordered[position + 1]["version_date"]
+            validity[doc["document_id"]] = {"effective_from": start, "effective_to": end,
+                                            "source": doc["source_url"]}
+    return validity
+
+
 class StatutoryIndex:
     """Validity sidecars require effective_from, effective_to and a source.
 
@@ -82,10 +107,17 @@ class StatutoryIndex:
         self.vectors = {key: vector_values(value, spec) for key, value in (vectors or {}).items()}
 
     def search(self, vector: list[float], eligible_ids: list[str], limit: int = 48) -> list[tuple[str, float]]:
-        """Cosine search over an explicitly authorized candidate set, without I/O."""
+        """Cosine search over an explicitly authorized candidate set, without I/O.
+
+        L2-normalized rows turn cosine into a plain dot product; ``sum(map(mul, ...))``
+        keeps that inner loop in C instead of a Python generator per row.
+        """
         query = vector_values(vector, self.spec)
-        scores = [(key, sum(a * b for a, b in zip(query, self.vectors[key])) /
-                   (math.hypot(*query) * math.hypot(*self.vectors[key]))) for key in eligible_ids]
+        if self.spec.normalization == "l2":
+            scores = [(key, sum(map(mul, query, self.vectors[key]))) for key in eligible_ids]
+        else:
+            scores = [(key, sum(map(mul, query, self.vectors[key])) /
+                       (math.hypot(*query) * math.hypot(*self.vectors[key]))) for key in eligible_ids]
         return sorted(scores, key=lambda pair: (-pair[1], pair[0]))[:max(0, limit)]
 
     def save(self, path: str | Path) -> None:

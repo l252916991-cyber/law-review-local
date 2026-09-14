@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -15,7 +16,7 @@ from typing import Any, Iterable
 
 from app.legal_corpus import LegalCorpus, article_number
 
-RETRIEVAL_VERSION = "statutory-context-v1"
+RETRIEVAL_VERSION = "statutory-context-v2"
 SUPPORTED_TASKS = {"1-1", "1-2", "3-1", "3-2", "3-3", "3-6", "3-8"}
 NUMBER = r"[零〇一二三四五六七八九十百千万两0-9]+"
 
@@ -65,6 +66,69 @@ def matched_law_names(question: str, documents: Iterable[dict[str, Any]]) -> set
     return {name for alias, name in matched if not any(alias != other and alias in other for other, _ in matched)}
 
 
+DENSE_INDEX_ENV = "LAW_REVIEW_STATUTORY_INDEX"
+_index_cache: tuple[tuple[str, tuple[str, ...]], Any, Any] | None = None
+
+
+def _dense_assets(directories: list[str], embedder: Any) -> tuple[Any, Any] | None:
+    """Load the optional dense index for a single-directory corpus; cached.
+
+    Returns ``(index, embedder)`` or ``None`` when the gate is unset, the corpus is
+    not a single directory, or the index does not match the corpus fingerprint.
+    The embedder embeds with the index's own model so vectors stay comparable.
+    """
+    global _index_cache
+    path = os.getenv(DENSE_INDEX_ENV, "").strip()
+    if not path or len(directories) != 1:
+        return None
+    key = (path, tuple(directories))
+    if _index_cache is not None and _index_cache[0] == key:
+        return _index_cache[1], _index_cache[2]
+    try:
+        from .statutory_index import IndexSpec, StatutoryIndex, build_validity
+
+        corpus = LegalCorpus(Path(directories[0]))
+        spec = IndexSpec(embedder.model, embedder_dim(embedder), "omlx")
+        index = StatutoryIndex.load(path, corpus, spec, validity=build_validity(corpus))
+        if embedder.model != spec.embedding_model:
+            return None
+    except Exception:
+        return None
+    _index_cache = (key, index, embedder)
+    return index, embedder
+
+
+def embedder_dim(embedder: Any) -> int:
+    """Dimension of one embedded vector; used to build the matching IndexSpec."""
+    vectors, _ = embedder.embed(["维度探测"])
+    return len(vectors[0])
+
+
+def _dense_ranked_hits(question: str, chosen: list[tuple[Any, dict[str, Any]]], directories: list[str],
+                       embedder: Any, limit: int) -> list[dict[str, Any]] | None:
+    """Rank the chosen publications' articles by dense cosine; None on any failure.
+
+    Any embedding or index problem falls back to the caller's lexical path, so the
+    gate can only improve ranking, never break retrieval.
+    """
+    if not chosen or embedder is None:
+        return None
+    try:
+        assets = _dense_assets(directories, embedder)
+        if assets is None:
+            return None
+        index, active_embedder = assets
+        allowed = {doc["document_id"] for _, doc in chosen}
+        eligible = [key for key, row in index.rows.items() if row["document_id"] in allowed]
+        vectors, backend = active_embedder.embed([question])
+        if active_embedder.last_failure or backend != index.spec.embedding_backend or len(vectors) != 1:
+            return None
+        ranked = index.search(vectors[0], eligible, limit)
+        return [index.rows[key] | {"retrieval_score": score} for key, score in ranked]
+    except Exception:
+        return None
+
+
 ARTICLE = re.compile(rf"第({NUMBER})条(?:之({NUMBER}))?")
 
 
@@ -81,11 +145,15 @@ def corpus_fingerprint(directories: list[str]) -> dict[str, str]:
 
 
 def retrieve(task_id: str, question: str, directories: list[str], *, limit: int = 5,
-             max_characters: int = 10000) -> dict[str, Any]:
+             max_characters: int = 10000, embedder: Any = None,
+             ranker_policy: str = "auto") -> dict[str, Any]:
     if not 1 <= limit <= 10 or not 256 <= max_characters <= 30000:
         raise ValueError("Invalid statutory context budget")
+    if ranker_policy not in {"auto", "lexical"}:
+        raise ValueError("ranker_policy must be auto or lexical")
     result: dict[str, Any] = {"version": RETRIEVAL_VERSION, "policy": "explicit_revision_year_else_latest_available",
-                              "hits": [], "warnings": [], "context": "", "mode": "skipped"}
+                              "ranker_policy": ranker_policy, "hits": [], "warnings": [],
+                              "context": "", "mode": "skipped"}
     if task_id not in SUPPORTED_TASKS:
         return result
     corpora = [LegalCorpus(directory) for directory in directories]
@@ -133,9 +201,23 @@ def retrieve(task_id: str, question: str, directories: list[str], *, limit: int 
                                                      version_date=doc["version_date"]))
         result["mode"] = "exact_article"
     else:
-        for corpus, doc in chosen:
-            hits.extend(corpus.search(question, law_name=doc["law_name"], version_date=doc["version_date"], limit=limit))
-        hits.sort(key=lambda hit: (-hit["retrieval_score"], hit["document_id"], hit["article_id"]))
+        ranker = "lexical"
+        if ranker_policy != "lexical" and embedder is None and os.getenv(DENSE_INDEX_ENV, "").strip():
+            from .rag import EmbeddingClient
+
+            embedder = EmbeddingClient(prefer_remote=True)
+        dense_hits = (_dense_ranked_hits(question, chosen, directories, embedder, limit)
+                      if ranker_policy != "lexical" else None)
+        if dense_hits is not None:
+            # The opt-in dense index improved retrieval-layer recall in experiments;
+            # keep version pinning above untouched and rerank only.
+            hits = dense_hits
+            ranker = "dense"
+        else:
+            for corpus, doc in chosen:
+                hits.extend(corpus.search(question, law_name=doc["law_name"], version_date=doc["version_date"], limit=limit))
+            hits.sort(key=lambda hit: (-hit["retrieval_score"], hit["document_id"], hit["article_id"]))
+        result["ranker"] = ranker
         result["mode"] = "lexical_search"
     parts = []
     used = 0

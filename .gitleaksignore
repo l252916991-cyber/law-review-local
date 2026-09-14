@@ -1,0 +1,3 @@
+# Synthetic long-pages-v2 case identifier "v2-tender-withdrawal", not a credential.
+# Exact historical finding only; generic-api-key detection remains enabled.
+be469d2796b737e50ccd2eedac3370e9988d90b4:app/rag_benchmark_dataset.py:generic-api-key:207

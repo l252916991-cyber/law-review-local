@@ -3,6 +3,7 @@
 以代码、测试产物与以下维护文档为准；根目录早期报告保留为历史证据，不作为“全部完成”的实时声明。
 
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
+- [2026-09-14 策略基线](architecture/strategy-baseline-20260914.md)：默认 RAG、子块实验边界、模型配置及后续变更条件。
 - [企业级改进报告](runbook/enterprise-improvement-report.md)：能力基线、30 项工作包、真实卷宗验收、分阶段路线图与放行门槛。
 - [运维手册](runbook/operations.md)：依赖、服务、配置、故障排查。
 - [发布与数据保护](runbook/release.md)：白名单打包、备份与发布门槛。

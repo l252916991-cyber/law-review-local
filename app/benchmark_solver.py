@@ -31,7 +31,7 @@ TASK_GUIDANCE = {
     "1-1": "先确定法律名称、条号及题目给定的版本；回忆完整条文的条件、行为和法律后果。按条文原有次序完整作答，保留款项、数值、例外和但书，不用概括代替原文，不自行增加版本说明。",
     "1-2": "逐项核对选项的适用主体、构成条件、程序及例外，留意题目问正确还是错误、单选还是多选。只输出要求的选项，不把分析中出现的选项写进最终答案。",
     "2-1": "逐字检查法律文书中的错别字、漏字、多字和明显错误用词。只纠正能够确定的文字错误，保留未出错的原句、原有事实、数值、标点和排版；不要润色、重写或增加说明。",
-    "2-2": "先区分双方一致的背景事实与真正争执的问题，找出决定本案处理结果的核心争议。若任务给定候选焦点，只选对应的原始标签，不改写标签，不把所有背景问题并列为焦点。相近标签的边界：责任认定＝交警或法院对责任归属作出的认定结论；责任划分＝在多个主体之间分配责任比例；责任承担＝确定最终由谁承担赔偿或法律后果；合同效力＝合同是否成立、有效或无效；合同解除＝合同是否被解除及如何解除；原审判决是否适当＝针对原审裁判本身是否正确的争议，而非原审认定的具体事实分歧。出现「赔偿」「承担」字样不等于责任承担，须看争执的核心结论。",
+    "2-2": "先区分双方一致的背景事实与真正争执的问题，找出决定本案处理结果的核心争议。若任务给定候选焦点，只选对应的原始标签，不改写标签，不把所有背景问题并列为焦点。",
     "2-3": "分别检查婚姻关系、财产、债务、子女及损害赔偿等事实涉及的请求。仅从题目提供的类别中选择确有事实支持的全部类别，保留原始类别名称；不要因一般关联加入没有出现的类别。",
     "2-4": "根据咨询或事实的主要法律关系确定主题，而不是凭孤立词语分类。若给定候选类别，比较最相近类别的区别后只输出所要求的类别原名。",
     "2-5": "先定位问题询问的人、时间、金额、行为或法律关系，再回到给定材料找直接依据。答案使用材料支持的最小完整片段；多人、多笔或多次行为要对应准确，不能用外部常识补造事实。",
@@ -49,6 +49,12 @@ TASK_GUIDANCE = {
     "3-7": "先确定问题所问的犯罪金额口径，逐笔列出应计入的金额并统一元、万元等单位。避免重复累计总额与分项、混算本金与利息或把追回、退赔自动当成犯罪金额扣减；完成加减乘除并复核后只输出要求的金额及单位。",
     "3-8": "先直接回答当事人的具体问题，再说明适用规则、关键条件、例外和可执行的处理办法。只根据题目事实分析，对缺失事实使用条件表述；覆盖咨询的全部子问题，避免通用开场白、重复结论和无关内容。",
 }
+
+def task_guidance(task_id: str, config: dict[str, Any]) -> str:
+    """Per-call guidance: an explicit config override or the frozen default."""
+    override = config.get("task_guidance") or {}
+    return override.get(task_id) or TASK_GUIDANCE[task_id]
+
 
 GUIDED_SYSTEM_SUFFIX = (
     "\n作答前在内部核对任务类型、关键事实与输出格式。以下方法只辅助理解；"
@@ -103,12 +109,19 @@ def _configuration(config: dict[str, Any]) -> dict[str, Any]:
         "timeout": config.get("timeout", 180),
         "enable_thinking": config.get("enable_thinking", False),
         "strategy": config.get("strategy", "direct"),
+        "task_guidance": config.get("task_guidance", {}),
     }
     _endpoint(result["url"])
     if not isinstance(result["model"], str) or not result["model"].strip():
         raise ValueError("model must be a nonempty string")
     if result["strategy"] not in {"direct", "task_guided", "verify"}:
         raise ValueError("Unknown solver strategy")
+    guidance = result["task_guidance"]
+    if not isinstance(guidance, dict) or any(
+        task not in TASK_GUIDANCE or not isinstance(text, str) or not text.strip()
+        for task, text in guidance.items()
+    ):
+        raise ValueError("task_guidance must map known LawBench tasks to nonempty guidance")
     for key in ("temperature", "timeout"):
         value = result[key]
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -178,6 +191,25 @@ def _call(messages: list[dict[str, str]], config: dict[str, Any], phase: str) ->
     return record
 
 
+def messages_for(task_id: str, instruction: str, question: str,
+                 config: dict[str, Any]) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    """Return the exact first-call messages and effective solver configuration."""
+    effective = _configuration(config)
+    if task_id not in TASK_GUIDANCE:
+        raise ValueError(f"Unknown LawBench task: {task_id}")
+    if not isinstance(instruction, str) or not instruction.strip():
+        raise ValueError("instruction must be nonempty")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("question must be nonempty")
+    system = DIRECT_SYSTEM
+    if effective["strategy"] != "direct":
+        system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + task_guidance(task_id, effective)
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": f"{instruction.strip()}\n{question}"},
+    ], effective
+
+
 def solve(task_id: str, instruction: str, question: str, config: dict[str, Any]) -> dict[str, Any]:
     """Run a fixed inference strategy, returning every request and its outcome.
 
@@ -192,21 +224,8 @@ def solve(task_id: str, instruction: str, question: str, config: dict[str, Any])
         "usage": None, "calls": [], "model_config": {}, "solver_version": SOLVER_VERSION,
     }
     try:
-        effective = _configuration(config)
+        messages, effective = messages_for(task_id, instruction, question, config)
         result["model_config"] = effective
-        if task_id not in TASK_GUIDANCE:
-            raise ValueError(f"Unknown LawBench task: {task_id}")
-        if not isinstance(instruction, str) or not instruction.strip():
-            raise ValueError("instruction must be nonempty")
-        if not isinstance(question, str) or not question.strip():
-            raise ValueError("question must be nonempty")
-        system = DIRECT_SYSTEM
-        if effective["strategy"] != "direct":
-            system += GUIDED_SYSTEM_SUFFIX + "\n本任务核对方法：" + TASK_GUIDANCE[task_id]
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"{instruction.strip()}\n{question}"},
-        ]
         first = _call(messages, effective, "draft")
         result["calls"].append(first)
         selected = first

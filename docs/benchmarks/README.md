@@ -2,7 +2,7 @@
 
 统一模型评测入口是 `unified_benchmark_runner.py --help`。旧 `simple_benchmark.py`、`model_benchmark.py`、`comprehensive_benchmark.py`、各 `run_*test*`/`rescore_*` 属于历史实验，保留原件，不作为新实验推荐入口。2026-09-05 的 1,000 题已按[测试计划](../../BENCHMARK_TEST_PLAN.md)完成，原始记录和评分审计分目录保存。
 
-统一 runner 在评分前对 2-1/2-7/2-9/3-8 的成功响应应用 `app/benchmark_postprocess.py` 的无参考答案规则（2-1 恢复源句标点与句尾形式；2-7 取有界导语摘要；2-9 按公开事件本体词表标注；3-8 去除 Markdown 标记并恢复题面要求的「回答→法律依据」结构）；2-10 因实测增益为噪声（15 升 16 降）未启用。1-1 需要法条库，传 `--corpus-dir <法条库>`（可重复）后才会在评分前用官方法条正文替换模型输出；不传则保持模型原始输出。`prediction` 是评分文本，`original_prediction` 始终保留该任务的模型返回文本，`postprocess` 保存处理版本、策略与是否变更，1-1 另存逐题 `retrieval` 上下文。manifest 冻结任务范围、版本、后处理与检索源码哈希、语料目录及文件哈希；旧 manifest、语料变更或缺失处理/检索溯源的检查点不能续跑为新配置，请使用新运行目录。评分器与提示词未改变，离线回放收益不代表新模型运行或官方 LawBench 成绩。
+统一 runner 在评分前对 2-1/2-7/2-9/3-8 的成功响应应用 `app/benchmark_postprocess.py` 的无参考答案规则（2-1 恢复源句标点与句尾形式；2-7 取有界导语摘要；2-9 按公开事件本体词表标注；3-8 去除 Markdown 标记并恢复题面要求的「回答→法律依据」结构）；2-10 因实测增益为噪声（15 升 16 降）未启用。1-1 需要法条库，传 `--corpus-dir <法条库>`（可重复）后才会在评分前用官方法条正文替换模型输出；不传则保持模型原始输出。同一参数会默认启用[3-2 词法 RAG 采纳协议](3-2-lexical-rag-adoption-20260913.md)；`--disable-3-2-rag` 提供同 solver 的无检索配对控制路径，未提供语料时 3-2 保留旧路径。`prediction` 是评分文本，处理、检索、路由、实际请求和有效配置均逐题保存。manifest 冻结任务范围、版本、路由、后处理与检索源码哈希、语料目录及文件哈希；旧 manifest、语料变更或缺失溯源的检查点不能续跑为新配置，请使用新运行目录。
 
 已完成实验的评分修正入口为 `python scripts/audit_benchmark.py <原运行目录> <新的审计目录>`。它不调用模型、不覆盖旧产物，对新旧同题回答统一重评，记录逐题变化、源文件哈希与分层配对 bootstrap 区间。默认 `verify_benchmark_run.py` 同时要求源码版本和评分复算一致；源码升级后，可使用 `--artifacts-only` 验证历史文件完整性，但该模式不验证历史评分正确性，不能冒充完整评分复算。
 
@@ -27,6 +27,10 @@ uv run --locked python rag_project_benchmark.py \
 `--embedding-mode` 与 `--reranker` 独立配置，因此可以分别验证哈希召回、本地模型向量、神经重排及其组合；请求的配置、逐题实际 embedding 后端、降级状态、重排启用数、数据集和源码哈希都会写入摘要。模型或重排服务不可用时，对应模型配置直接失败，不静默换成正常样本。
 
 `lexvault-rag-240-v2` 移除了题面案件号，负例改为库内存在高度相似词面的真弃答题。正例的 `passed` 要求全部金标页命中；摘要分列 Recall@k、MRR、页精度、完整召回率、多来源题、硬负例空召回率及按题型模板聚类的 bootstrap 区间。`quote_presence_rate` 只表示结果含原文摘录，不能表述为引用忠实度。
+
+`--suite long-pages-v2`是长页切分对照套件（8案24题、一案一模板、页长282–8443、金标埋在首个子块窗口之后，另含主题重复干扰页使 k 小于候选池）。`--page-children`开启子块路径，`--child-chunk-profile {sentence-400,whole-page}`选择切分窗口（`whole-page`是只改窗口的消融档），`--child-pipeline {exact-scan,unified}`选择子块如何参与排序（`unified`把最佳子块作为向量通道喂给页级融合/重排/多样度，`exact-scan`是独立子块管线）。`--paired-with <目录>`把本 run 与既有 run 配对并落 `paired_comparison.json`，并按两臂差异自动选比较器：页级基线对 `unified` 子块走 `paired_channel_comparison`（通道粒度，自标 `channel_granularity_within_shared_pipeline`）、页级基线对 `exact-scan` 子块走 `paired_run_comparison`（整套管线对照，自标非纯切分消融）、两个 page-children run 走 `paired_window_comparison`（窗口消融）。摘要新增 `latency`（p50/p95 与冷/热拆分）、`child_index`（每案子块数、重排候选数）、`child_retrieval_runtime`（子块命中数与页级降级原因）、`child_chunk_profile` 与 `child_pipeline`。子块总量超 10000 预算时退回页级并在逐题 `child_retrieval.fallback_reason` 记录，不再让查询失败。页内命中按页去重，每页最多回 1 个子块，`text`是整页、`quote`才是匹配窗口。
+
+`quote_gold_fact_rate`是 quote 定位指标：标出金标事实整句落在返回 quote 窗口内的比例，用来区分「返回了正确页」和「引用定位到金标句」。它与 `quote_presence_rate`（只看有没有 quote）不同，也不同于答案引用忠实度；不同臂窗口宽度不同，须与 `max_quote_chars` 同读。长页实测：页级 quote 覆盖金标 0.1667、子块 unified 0.9375，但对金标召回无净收益（见 rag-structural-progress.md）。
 
 pytest 的 LawBench 装载、抽样和评分协议回归使用临时合成数据，避免 CI 依赖未提交的本地题库。真实模型测试仍严格加载固定上游题库；合成协议测试的题数不计入真实测试成绩。
 

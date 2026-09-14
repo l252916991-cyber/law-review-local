@@ -12,7 +12,7 @@ def test_rag_only_adds_provenanced_context_and_keeps_original_question():
     context = {"context": "official article", "hits": [{"source_url": "https://example.gov.cn/law"}], "warnings": []}
     with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch("app.benchmark_rag_solver._call", return_value=CALL) as call:
         result = solve("1-1", "instruction", "question", CONFIG)
-    retrieve.assert_called_once_with("1-1", "question", ["/test-corpus"])
+    retrieve.assert_called_once_with("1-1", "question", ["/test-corpus"], ranker_policy="auto")
     messages, config, phase = call.call_args.args
     assert messages[1] == {"role": "user", "content": "instruction\nquestion"}
     assert messages[2] == {"role": "user", "content": "official article"}
@@ -32,6 +32,15 @@ def test_exact_article_call_is_retained_but_final_answer_uses_frozen_text():
     assert result["calls"][0]["prediction"] == "final"
     assert result["prediction"] == "官方正文。"
     assert result["postprocess"]["document_articles"] == ["law-2020/1"]
+
+
+def test_rag_guidance_override_reaches_the_prompt():
+    context = {"context": "official article", "hits": [], "warnings": []}
+    with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch("app.benchmark_rag_solver._call", return_value=CALL) as call:
+        result = solve("3-8", "instruction", "question", {**CONFIG, "task_guidance": {"3-8": "专用组织方法。"}})
+    assert retrieve.return_value == result["retrieval"]
+    system = call.call_args.args[0][0]["content"]
+    assert "专用组织方法。" in system and "GOLD_CANARY" not in system
 
 
 def test_no_hits_has_explicit_unchanged_guided_fallback():
@@ -56,3 +65,14 @@ def test_correction_postprocess_is_recorded_after_raw_call():
         result = solve("2-1", "instruction", "在此情况下,各别部门改为2012年", CONFIG)
     assert result["prediction"] == "在此情况下,各别部门改为2012年"
     assert result["calls"][0]["prediction"].endswith("。") and result["postprocess"]["applied"]
+
+
+def test_explicit_lexical_policy_is_passed_per_call():
+    context = {"context": "official article", "hits": [], "warnings": [], "ranker": "lexical"}
+    config = {**CONFIG, "retrieval_ranker_policy": "lexical"}
+    with patch("app.benchmark_rag_solver.retrieve", return_value=context) as retrieve, patch(
+        "app.benchmark_rag_solver._call", return_value=CALL,
+    ):
+        result = solve("3-2", "instruction", "question", config)
+    retrieve.assert_called_once_with("3-2", "question", ["/test-corpus"], ranker_policy="lexical")
+    assert result["model_config"]["retrieval_ranker_policy"] == "lexical"

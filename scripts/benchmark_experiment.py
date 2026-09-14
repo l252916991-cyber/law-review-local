@@ -28,7 +28,8 @@ SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "
 
 def configuration(profile_file: Path) -> dict[str, Any]:
     config = json.loads(profile_file.read_text())
-    allowed = {"url", "model", "temperature", "max_tokens", "timeout", "enable_thinking", "strategy", "corpus_directories"}
+    allowed = {"url", "model", "temperature", "max_tokens", "timeout", "enable_thinking", "strategy",
+               "task_guidance", "corpus_directories"}
     if not isinstance(config, dict) or set(config) - allowed:
         raise ValueError("Unexpected experiment configuration fields")
     rag = config.get("strategy") in {"statutory_rag", "weak_tasks"}

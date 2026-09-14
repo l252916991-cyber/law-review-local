@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -657,6 +657,34 @@ ALTER TABLE oidc_flows ADD COLUMN limit_expires_at INTEGER NOT NULL DEFAULT 0;
 """)
 
 
+def _migrate_v13(conn: sqlite3.Connection) -> None:
+    # One current child-vector space per page. Replacing the state row removes
+    # its old children, and deleting a page/document removes the whole cache.
+    _execute_script(conn, """
+CREATE TABLE page_child_index_state (
+    page_id INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+    page_hash TEXT NOT NULL,
+    chunk_version TEXT NOT NULL,
+    model_identity TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK(dimensions > 0),
+    child_count INTEGER NOT NULL CHECK(child_count >= 0),
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE page_child_chunks (
+    page_id INTEGER NOT NULL REFERENCES page_child_index_state(page_id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+    char_start INTEGER NOT NULL CHECK(char_start >= 0),
+    char_end INTEGER NOT NULL CHECK(char_end > char_start),
+    text TEXT NOT NULL,
+    vector_json TEXT NOT NULL,
+    PRIMARY KEY(page_id, ordinal)
+);
+CREATE INDEX idx_page_child_chunks_offsets
+ON page_child_chunks(page_id, char_start, char_end);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -675,7 +703,11 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}; refusing downgrade")
-        migrations = (_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12)
+        migrations = (
+            _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
+            _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
+            _migrate_v13,
+        )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
