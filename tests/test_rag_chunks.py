@@ -12,6 +12,8 @@ from app.rag_chunks import page_chunks
 
 
 class FakeEmbeddingClient:
+    prefer_remote = False
+
     def __init__(self, *, model="test-model", backend="test-backend", dimensions=12, on_call=None, fail_on=None):
         self.model = model
         self.backend = backend
@@ -173,7 +175,7 @@ def test_cold_build_and_reopened_retriever_reuses_all_child_vectors(tmp_path, mo
     assert cold["embedded_child_count"] == cold["child_count"] > 1
     assert sum(len(call) for call in cold_client.calls[1:]) == cold["child_count"]
 
-    def unexpected_split(_text):
+    def unexpected_split(_text, *_args):
         raise AssertionError("warm child cache must not split parent text")
 
     monkeypatch.setattr(rag_child_index, "page_chunks", unexpected_split)
@@ -424,21 +426,78 @@ def test_blank_page_state_is_cached_without_child_embedding(tmp_path):
     assert warm["reused_page_count"] == 1
 
 
-def test_cached_children_still_obey_global_budget(tmp_path, monkeypatch):
+def test_child_scan_budget_exceeded_falls_back_to_page_level(tmp_path, monkeypatch):
     database = tmp_path / "budget.sqlite"
+    fresh_database = tmp_path / "budget-fresh.sqlite"
     case_id, _, _ = _create_case(database, ["甲乙丙丁"])
+    fresh_case_id, _, _ = _create_case(fresh_database, ["甲乙丙丁"])
     monkeypatch.setattr(rag_child_index, "MAX_CHILDREN", 2)
-    monkeypatch.setattr(rag_child_index, "page_chunks", lambda _text: [
+    monkeypatch.setattr(rag_child_index, "page_chunks", lambda _text, *_args: [
         {"char_start": 0, "char_end": 2, "text": "甲乙"},
         {"char_start": 2, "char_end": 4, "text": "丙丁"},
     ])
     with db_scope(database):
-        _retriever(case_id, FakeEmbeddingClient()).retrieve("甲乙", limit=1)
+        _, warm = _retriever(case_id, FakeEmbeddingClient()).retrieve("甲乙", limit=1)
+        assert warm["child_count"] == 2
+
+        # The cached index now exceeds the budget, so the request must degrade to
+        # the page-level pipeline instead of failing.
         monkeypatch.setattr(rag_child_index, "MAX_CHILDREN", 1)
+        cached_hits, cached_metrics = _retriever(case_id, FakeEmbeddingClient()).retrieve("甲乙", limit=1)
+
+    # A freshly built index that cannot fit the budget degrades the same way.
+    with db_scope(fresh_database):
+        _, fresh_metrics = _retriever(fresh_case_id, FakeEmbeddingClient()).retrieve("甲乙", limit=1)
+
+    assert cached_hits and cached_hits[0]["page_no"] == 1
+    assert cached_metrics["retrieval_mode"] == "hybrid_rrf"
+    assert cached_metrics["child_retrieval"] == {
+        "requested": True, "used": False, "fallback_reason": "child_scan_budget_exceeded",
+    }
+    assert fresh_metrics["retrieval_mode"] == "hybrid_rrf"
+    assert fresh_metrics["child_retrieval"]["fallback_reason"] == "child_scan_budget_exceeded"
+
+
+def test_exceeded_child_budget_keeps_named_valueerror_contract(tmp_path, monkeypatch):
+    """Existing guards that catch ValueError still see the budget failure."""
+    database = tmp_path / "budget-type.sqlite"
+    case_id, _, _ = _create_case(database, ["甲乙丙丁"])
+    monkeypatch.setattr(rag_child_index, "MAX_CHILDREN", 1)
+    monkeypatch.setattr(rag_child_index, "page_chunks", lambda _text, *_args: [
+        {"char_start": 0, "char_end": 2, "text": "甲乙"},
+        {"char_start": 2, "char_end": 4, "text": "丙丁"},
+    ])
+    with db_scope(database):
         client = FakeEmbeddingClient()
         with pytest.raises(ValueError, match="exceeds 1 chunks"):
-            _retriever(case_id, client).retrieve("甲乙", limit=1)
-    assert client.calls == [["甲乙"]]
+            rag_child_index.load_or_build_child_index(
+                case_id,
+                backend=client.backend,
+                dimensions=client.dimensions,
+                model_identity=embedding_identity(client.model, client.backend),
+                embed=client.embed,
+            )
+
+
+def test_exceeded_child_budget_keeps_named_valueerror_contract(tmp_path, monkeypatch):
+    """Existing guards that catch ValueError still see the budget failure."""
+    database = tmp_path / "budget-type.sqlite"
+    case_id, _, _ = _create_case(database, ["甲乙丙丁"])
+    monkeypatch.setattr(rag_child_index, "MAX_CHILDREN", 1)
+    monkeypatch.setattr(rag_child_index, "page_chunks", lambda _text, *_args: [
+        {"char_start": 0, "char_end": 2, "text": "甲乙"},
+        {"char_start": 2, "char_end": 4, "text": "丙丁"},
+    ])
+    with db_scope(database):
+        client = FakeEmbeddingClient()
+        with pytest.raises(ValueError, match="exceeds 1 chunks"):
+            rag_child_index.load_or_build_child_index(
+                case_id,
+                backend=client.backend,
+                dimensions=client.dimensions,
+                model_identity=embedding_identity(client.model, client.backend),
+                embed=client.embed,
+            )
 
 
 def test_invalid_child_query_or_limit_never_calls_embedding(tmp_path):

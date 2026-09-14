@@ -20,6 +20,7 @@ from typing import Any
 
 from .config import LLMConfig
 from .db import connect, now, transaction
+from .rag_chunks import DEFAULT_CHUNK_PROFILE
 from .services import (
     assert_model_endpoint_allowed,
     best_quote,
@@ -209,9 +210,11 @@ class HybridRetriever:
         *,
         use_neural_reranker: bool | None = None,
         use_page_children: bool = False,
+        child_chunk_profile: str = DEFAULT_CHUNK_PROFILE,
     ):
         self.case_id = case_id
         self.use_page_children = use_page_children
+        self.child_chunk_profile = child_chunk_profile
         self.embedding_client = EmbeddingClient(prefer_remote_embeddings)
         self.use_neural_reranker = (
             prefer_remote_embeddings if use_neural_reranker is None else use_neural_reranker
@@ -483,7 +486,17 @@ class HybridRetriever:
                 "degraded": False,
             }
         if self.use_page_children:
-            return self._retrieve_children(query, limit)
+            from .rag_child_index import ChildScanBudgetExceeded
+
+            try:
+                return self._retrieve_children(query, limit)
+            except ChildScanBudgetExceeded:
+                # The experimental exact scan would exceed its budget. Serving the
+                # page-level pipeline is strictly better than failing the request;
+                # the fallback is reported per query instead of hidden.
+                child_fallback = "child_scan_budget_exceeded"
+        else:
+            child_fallback = None
         started = time.perf_counter()
         expanded_query = expand_retrieval_query(query)
         signals = query_signals(query)
@@ -567,6 +580,11 @@ class HybridRetriever:
             "confidence_reasons": reasons,
             "query_expansion": expanded_query if expanded_query != query else "none",
             "latency_ms": round((time.perf_counter() - started) * 1000),
+            "rerank_candidate_count": len(rerank_items),
+            "child_retrieval": (
+                {"requested": False} if child_fallback is None
+                else {"requested": True, "used": False, "fallback_reason": child_fallback}
+            ),
             "degraded": bool(self.vector_diagnostics.get("degraded")) or not self.keyword_diagnostics.get("fts_available", True),
             "embedding": dict(self.vector_diagnostics),
             "keyword": dict(self.keyword_diagnostics),
@@ -594,9 +612,11 @@ class HybridRetriever:
             dimensions=dimensions,
             model_identity=model,
             embed=self.embedding_client.embed,
+            chunk_profile=self.child_chunk_profile,
         )
         base_metrics = {
-            "retrieval_mode": CHUNK_VERSION,
+            "retrieval_mode": CHUNK_VERSION if self.child_chunk_profile == DEFAULT_CHUNK_PROFILE
+            else str(index_metrics.get("chunk_version", CHUNK_VERSION)),
             "source_count": 0,
             "child_count": len(children),
             "fused_candidates": 0,
@@ -665,6 +685,9 @@ class HybridRetriever:
             **base_metrics,
             "source_count": len(selected),
             "fused_candidates": len(indices),
+            "rerank_candidate_count": len(indices),
+            "child_retrieval": {"requested": True, "used": True},
+            "child_chunk_profile": self.child_chunk_profile,
             "reranker": {"enabled": neural is not None, "requested": self.use_neural_reranker},
         }
 

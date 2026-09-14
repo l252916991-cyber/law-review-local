@@ -28,6 +28,8 @@ uv run --locked python rag_project_benchmark.py \
 
 `lexvault-rag-240-v2` 移除了题面案件号，负例改为库内存在高度相似词面的真弃答题。正例的 `passed` 要求全部金标页命中；摘要分列 Recall@k、MRR、页精度、完整召回率、多来源题、硬负例空召回率及按题型模板聚类的 bootstrap 区间。`quote_presence_rate` 只表示结果含原文摘录，不能表述为引用忠实度。
 
+`--suite long-pages-v2`是长页切分对照套件（8案24题、一案一模板、页长282–8443、金标埋在首个子块窗口之后，另含主题重复干扰页使 k 小于候选池）。`--page-children`开启子块路径，`--child-chunk-profile {sentence-400,whole-page}`选择切分窗口（`whole-page`是只改窗口的消融档）。`--paired-with <目录>`把本 run 与既有 run 配对并落 `paired_comparison.json`：对页级基线调 `paired_run_comparison`（整套管线对照，自标非纯切分消融），对两个 page-children run 调 `paired_window_comparison`（窗口消融）。摘要新增 `latency`（p50/p95 与冷/热拆分）、`child_index`（每案子块数、重排候选数）、`child_retrieval_runtime`（子块命中数与页级降级原因）与 `child_chunk_profile`。子块总量超 10000 预算时退回页级并在逐题 `child_retrieval.fallback_reason` 记录，不再让查询失败。页内命中按页去重，每页最多回 1 个子块，`text`是整页、`quote`才是匹配窗口。
+
 pytest 的 LawBench 装载、抽样和评分协议回归使用临时合成数据，避免 CI 依赖未提交的本地题库。真实模型测试仍严格加载固定上游题库；合成协议测试的题数不计入真实测试成绩。
 
 ## 四层结果不得混称

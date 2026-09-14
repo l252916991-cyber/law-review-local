@@ -8,11 +8,32 @@ from collections.abc import Callable
 from typing import Any
 
 from .db import connect, now, transaction
-from .rag_chunks import CHUNK_VERSION, page_chunks
+from .rag_chunks import CHUNK_PROFILES, CHUNK_VERSION, DEFAULT_CHUNK_PROFILE, page_chunks
 
 
 MAX_CHILDREN = 10_000
 EMBED_BATCH_SIZE = 32
+
+
+def resolve_chunk_profile(name: str) -> dict[str, Any]:
+    """Resolve a chunk profile to size/overlap/version for the index identity."""
+    if name == DEFAULT_CHUNK_PROFILE:
+        # Read CHUNK_VERSION through this module so a patched version still
+        # invalidates the cache, as the existing tests rely on.
+        return {"size": 400, "overlap": 50, "version": CHUNK_VERSION}
+    profile = CHUNK_PROFILES.get(name)
+    if profile is None:
+        raise ValueError(f"Unknown child chunk profile: {name}")
+    return dict(profile)
+
+
+class ChildScanBudgetExceeded(ValueError):
+    """The case child index cannot fit the exact-scan budget.
+
+    A ``ValueError`` subclass so callers that only guard the experimental index
+    keep working unchanged; the retriever catches it to fall back to page-level
+    retrieval instead of failing the request.
+    """
 
 
 def _valid_vector(vector: Any, dimensions: int) -> bool:
@@ -47,6 +68,7 @@ def _read_snapshot(
     backend: str,
     dimensions: int,
     model_identity: str,
+    chunk_version: str,
 ) -> tuple[
     list[dict[str, Any]],
     dict[int, dict[str, Any]],
@@ -91,7 +113,7 @@ def _read_snapshot(
             if (
                 (state := states.get(page_id)) is not None
                 and state["page_hash"] == page_hash
-                and state["chunk_version"] == CHUNK_VERSION
+                and state["chunk_version"] == chunk_version
                 and state["model_identity"] == model_identity
                 and state["backend"] == backend
                 and int(state["dimensions"]) == dimensions
@@ -99,7 +121,7 @@ def _read_snapshot(
             )
         ]
         if sum(int(states[page_id]["child_count"]) for page_id in metadata_hits) > MAX_CHILDREN:
-            raise ValueError(f"Experimental child scan exceeds {MAX_CHILDREN} chunks")
+            raise ChildScanBudgetExceeded(f"Experimental child scan exceeds {MAX_CHILDREN} chunks")
 
         grouped: dict[int, list[dict[str, Any]]] = {page_id: [] for page_id in metadata_hits}
         for start in range(0, len(metadata_hits), 400):
@@ -161,16 +183,20 @@ def load_or_build_child_index(
     dimensions: int,
     model_identity: str,
     embed: Callable[[list[str]], tuple[list[list[float]], str]],
+    chunk_profile: str = DEFAULT_CHUNK_PROFILE,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Return current children, rebuilding only invalid or stale parent pages."""
     if dimensions < 1 or not backend or not model_identity:
         raise ValueError("Invalid child embedding space")
+    profile = resolve_chunk_profile(chunk_profile)
+    chunk_version = str(profile["version"])
 
     pages, states, page_hashes, metadata_hits, cached_rows = _read_snapshot(
         case_id,
         backend=backend,
         dimensions=dimensions,
         model_identity=model_identity,
+        chunk_version=chunk_version,
     )
     reused_by_page: dict[int, list[dict[str, Any]]] = {}
     pending_pages: list[dict[str, Any]] = []
@@ -188,15 +214,22 @@ def load_or_build_child_index(
     pending_children: list[dict[str, Any]] = []
     for page in pending_pages:
         children = [
-            {**page, "parent_text": str(page["text"]), **chunk, "ordinal": ordinal}
-            for ordinal, chunk in enumerate(page_chunks(str(page["text"])))
+            {
+                **page,
+                "parent_text": str(page["text"]),
+                **chunk,
+                "ordinal": ordinal,
+            }
+            for ordinal, chunk in enumerate(
+                page_chunks(str(page["text"]), profile["size"], int(profile["overlap"]))
+            )
         ]
         built_by_page[int(page["page_id"])] = children
         pending_children.extend(children)
 
     reused_count = sum(len(children) for children in reused_by_page.values())
     if reused_count + len(pending_children) > MAX_CHILDREN:
-        raise ValueError(f"Experimental child scan exceeds {MAX_CHILDREN} chunks")
+        raise ChildScanBudgetExceeded(f"Experimental child scan exceeds {MAX_CHILDREN} chunks")
 
     vectors: list[list[float]] = []
     for start in range(0, len(pending_children), EMBED_BATCH_SIZE):
@@ -255,7 +288,7 @@ def load_or_build_child_index(
                     (
                         page_id,
                         page_hashes[page_id],
-                        CHUNK_VERSION,
+                        chunk_version,
                         model_identity,
                         backend,
                         dimensions,
@@ -292,4 +325,6 @@ def load_or_build_child_index(
         "reused_page_count": len(pages) - len(pending_pages),
         "embedded_child_count": len(pending_children),
         "reused_child_count": reused_count,
+        "child_chunk_profile": chunk_profile,
+        "chunk_version": chunk_version,
     }

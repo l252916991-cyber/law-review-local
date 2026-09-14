@@ -10,6 +10,224 @@ INDUSTRIES = ["新能源", "医疗器械", "物流", "教育", "软件", "农业
 DATASET_VERSION = "lexvault-rag-240-v2"
 CHALLENGE_VERSION = "lexvault-rag-challenges-v1"
 LONG_PAGE_VERSION = "lexvault-rag-long-pages-v1"
+LONG_PAGE_V2_VERSION = "lexvault-rag-long-pages-v2"
+LONG_PAGE_V2_TARGETS = (2000, 3200, 5000, 8000)
+
+# Dilution filler: every paragraph repeats the case's key nouns while stating
+# that the actor and minute-level time are *not* recorded here. A page that
+# mentions "关闭 制冷机" sixty times dilutes a page-level BM25 window, which is
+# exactly the failure mode child chunking is meant to test. Gold sentences are
+# hand-written and never drawn from this pool.
+_V2_THEMED_FILLER = (
+    "交接记录再次提到{t}，但仅作为班次背景，未写明具体执行人、动作与分钟级时间。",
+    "巡检台账在{t}项下只登记设备编号和外观状态，没有说明谁在此时完成操作。",
+    "该页附注把{t}连同温控、闸位与签封一并列出，注明由值班人员按表核对。",
+    "{t}在汇总表里以简称出现，原件仍保留完整字段，汇总不得覆盖原始记录。",
+    "同页还转录了{t}相关电话摘要，摘要未记载接听账号，不能替代设备日志。",
+    "质量复核抽查了与{t}相邻的条目，确认签字栏与执行人栏分列，未合并填写。",
+    "{t}所在段落的页眉、页码和水印齐全，扫描件与电子件分别归档。",
+    "值班员在{t}处置过程中保持通讯畅通，处置节点的具体时间以控制器日志为准。",
+)
+_V2_PLAIN_FILLER = (
+    "卷内另附例行说明，记载当日班次交接、设备巡检与签字流程均按既定表格完成。",
+    "复核要求原始附件保留生成时间、保管位置与文件校验值，后续分析只能追加说明。",
+    "归档目录登记了介质编号、保管人、复核日期和双人交接回执，供逐项核验。",
+    "双方约定在处置结束后再清点数量，不在过程中估算金额，也不以人工抄录覆盖日志。",
+    "现场照片按区域命名并附索引入册，照片只反映人员所在位置，不单独证明机械操作。",
+    "会议电话授权与终端命令输入由不同账号完成，授权人不等于实际操作人。",
+)
+
+
+def _v2_page(theme: str, target: int, gold: str | None, *, seed_offset: int) -> str:
+    """Deterministic dilution page with an optional gold sentence buried past offset 400."""
+    theme = theme.replace(" ", "")
+    paragraphs: list[str] = []
+    gold_at = target // 2
+    length = 0
+    placed = False
+    index = seed_offset
+    while length < target:
+        if gold is not None and not placed and length >= gold_at:
+            paragraphs.append(gold)
+            length += len(gold)
+            placed = True
+            continue
+        if index % 3 == 0:
+            paragraph = _V2_PLAIN_FILLER[index % len(_V2_PLAIN_FILLER)]
+        else:
+            paragraph = _V2_THEMED_FILLER[index % len(_V2_THEMED_FILLER)].format(t=theme)
+        paragraphs.append(paragraph)
+        length += len(paragraph)
+        index += 1
+    if gold is not None and not placed:
+        paragraphs.append(gold)
+    return "\n\n".join(paragraphs)
+
+
+def build_long_page_v2_benchmark() -> list[dict[str, Any]]:
+    """Larger frozen long-page suite: one template per case, gold facts buried deep.
+
+    Page 1 of every case is a dilution page of 2000-8000 characters whose gold fact
+    sits past the first chunk window, surrounded by paragraphs that repeat the query
+    nouns without naming the actor. Page 2 holds a similar-sounding distractor fact,
+    page 3 a short cross-reference fact, and the remaining pages are theme-heavy
+    distractor pages with no gold fact at all. The distractor pages exist so k is
+    smaller than the candidate pool: the gold page has to outrank pages that repeat
+    the query nouns at least as often, which is the pressure page-level BM25 faces
+    and child chunking is meant to relieve.
+    """
+    rows: list[dict[str, Any]] = []
+    for index, case in enumerate(_LONG_PAGE_V2_CASES):
+        case_key = str(case["case_key"])
+        document = str(case["document"])
+        theme = str(case["theme"])
+        target = LONG_PAGE_V2_TARGETS[index % len(LONG_PAGE_V2_TARGETS)]
+        pages = [
+            _v2_page(theme, target, f"{case['deep']}\n\n{case['aspect_a']}", seed_offset=index),
+            _v2_page(theme, max(500, target // 3), str(case["neighbor"]), seed_offset=index + 1),
+            _v2_page(theme, 260, str(case["aspect_b"]), seed_offset=index + 2),
+        ]
+        # Theme-repeating filler pages: no gold fact, but the same query nouns as
+        # the real page, spread over several pages rather than one.
+        for distractor in range(6):
+            pages.append(
+                _v2_page(theme, target, None, seed_offset=index + 3 + distractor)
+            )
+        documents = [{"name": document, "pages": pages}]
+        specs = (
+            ("long_page_dilution", str(case["q_deep"]), [(1, str(case["deep"]))]),
+            ("similar_neighbor_interference", str(case["q_neighbor"]), [(2, str(case["neighbor"]))]),
+            (
+                "cross_page_two_aspects",
+                str(case["q_cross"]),
+                [(1, str(case["aspect_a"])), (3, str(case["aspect_b"]))],
+            ),
+        )
+        for question_index, (challenge, query, facts) in enumerate(specs, 1):
+            rows.append(
+                {
+                    "id": f"{case_key}-{question_index}",
+                    "template_id": case_key,
+                    "cluster_id": case_key,
+                    "case_key": case_key,
+                    "query": query,
+                    "documents": documents,
+                    "expected": [
+                        {"document": document, "page": page}
+                        for page in dict.fromkeys(page for page, _ in facts)
+                    ],
+                    "gold_facts": [
+                        {"document": document, "page": page, "text": fact_text}
+                        for page, fact_text in facts
+                    ],
+                    "answerable": True,
+                    "challenge": challenge,
+                    "diagnostic_provenance": "synthetic_long_page_v2_diagnostic",
+                }
+            )
+    if len(rows) != 24 or len({row["id"] for row in rows}) != 24:
+        raise AssertionError("Long-page v2 benchmark must contain exactly 24 unique records")
+    return rows
+
+
+_LONG_PAGE_V2_CASES: list[dict[str, str]] = [
+    {
+        "case_key": "v2-cold-chain",
+        "document": "冷链运输交接记录.txt",
+        "theme": "关闭 备用制冷机 回油管",
+        "deep": "值班制冷技师顾承宇于十六时四十七分关闭备用制冷机，登记原因为回油管接头渗漏，需隔离设备防止润滑油继续流失。",
+        "aspect_a": "装货前预冷设定值为零下十八摄氏度，四时二十分的车厢实测值达到零下十七点六摄氏度，发货方据此允许开始装货。",
+        "neighbor": "十四时十分的远程报警由调度员在平台确认，司机当时仍在山区路段，未在该时点关闭备用制冷机。",
+        "aspect_b": "到货抽检确认第七与第八托盘出现浆果软化和渗液，收货方将两托盘隔离并拍照留样。",
+        "q_deep": "备用制冷机由谁在何时关闭，登记的原因是什么？",
+        "q_neighbor": "十四时十分确认远程报警的人是否关闭了备用制冷机？",
+        "q_cross": "装货前的预冷设定与到货后的抽检结果分别是什么？",
+    },
+    {
+        "case_key": "v2-medical-device",
+        "document": "手术器械追溯记录.txt",
+        "theme": "开启 替代衬垫 外包装",
+        "deep": "巡回护士苏毓于十一时三十六分开启替代衬垫VR-62的外层包装，器械护士在无菌台接收内包装，并将原计划批次TQ-31划线保留。",
+        "aspect_a": "九时四十分的术前清点发现原计划使用的陶瓷衬垫批次TQ-31少一件，器械护士随即在缺件栏标红并通知库房。",
+        "neighbor": "供应商工程师十时十八分到达手术部外走廊，始终停留在非无菌区，未开启任何衬垫包装。",
+        "aspect_b": "术后复核确认未使用候选衬垫封条编号F-908由库房回收登记保存，包装保持完整。",
+        "q_deep": "替代衬垫VR-62由谁在什么时间开启外层包装？",
+        "q_neighbor": "十时十八分到达的供应商工程师是否开启过衬垫包装？",
+        "q_cross": "术前缺件情况与术后未使用候选件的封存情况分别如何记录？",
+    },
+    {
+        "case_key": "v2-warehouse-leak",
+        "document": "仓库漏水处置日志.txt",
+        "theme": "关闭 消防支管 阀门",
+        "deep": "物业维修员沈岳于八时十二分关闭东侧消防支管阀门，抢险单同时注明关闭原因为接口垫片破损持续漏水。",
+        "aspect_a": "交付日的联合检查确认东侧货区地面干燥，消防支管压力稳定，未发现阀门渗水。",
+        "neighbor": "承租方仓管员在七时二十五分仅通过值班电话报告东侧出现积水，并未关闭消防支管阀门。",
+        "aspect_b": "修复复验确认更换垫片后支管压力恢复且三十分钟无渗漏，双方随后解除东侧警戒。",
+        "q_deep": "东侧消防支管阀门实际由谁在何时关闭，抢险单记载的原因是什么？",
+        "q_neighbor": "七时二十五分最先报告积水的人是否关闭了消防支管阀门？",
+        "q_cross": "仓库交付时东侧状态与漏水修复后的复验结果分别是什么？",
+    },
+    {
+        "case_key": "v2-software-release",
+        "document": "系统发布与回退纪要.txt",
+        "theme": "执行 版本回退 生产环境",
+        "deep": "值班运维工程师程墨于二十三时十八分在生产环境执行版本回退，审计命令标识为rollback-release-7，原因栏填写订单消息重复消费导致积压持续扩大。",
+        "aspect_a": "验收基线显示生产环境订单接口在二十时三十分连续一百次请求无错误，中位响应时间为一百八十毫秒。",
+        "neighbor": "测试工程师顾言在二十一时十分于预发布环境执行数据库迁移演练，没有生产账号，未执行版本回退。",
+        "aspect_b": "零时二十五分的恢复检查确认订单接口连续两百次请求无新增错误，消息积压降至日常警戒线以内。",
+        "q_deep": "生产版本回退由谁在什么时间执行，审计命令标识是什么？",
+        "q_neighbor": "二十一时十分执行迁移演练的测试工程师是否执行了生产回退？",
+        "q_cross": "发布前订单接口基线与回退后的恢复检查结果分别是什么？",
+    },
+    {
+        "case_key": "v2-dredging",
+        "document": "疏浚施工监测记录.txt",
+        "theme": "停止 排放疏浚土 弃土区",
+        "deep": "施工船长陆启于凌晨三时零五分下令停止向二号弃土区排放疏浚土，登记原因为监测断面浊度超过合同阈值。",
+        "aspect_a": "开工前的联合测量确认二号弃土区边界浮标位置与批准坐标一致。",
+        "neighbor": "监理员凌晨二时五十分仅在监控屏观察到船舶航迹偏北，未下达停止排放指令。",
+        "aspect_b": "三日后的复核测量显示二号弃土区淤积厚度处于允许范围内，未发生越界。",
+        "q_deep": "谁在何时下令停止向二号弃土区排放疏浚土，登记的原因是什么？",
+        "q_neighbor": "凌晨二时五十分观察航迹的监理员是否下达了停止排放指令？",
+        "q_cross": "开工前的边界测量与三日后的复核测量结果分别是什么？",
+    },
+    {
+        "case_key": "v2-elevator-rescue",
+        "document": "电梯困人救援工单.txt",
+        "theme": "开启 电梯层门 救援",
+        "deep": "维保技师裴延于九时十四分使用三角钥匙开启三号电梯层门完成救援，工单登记原因为制动器抱闸未复位。",
+        "aspect_a": "年检报告显示三号电梯制动器间隙处于标准范围内，签发日期为上月。",
+        "neighbor": "物业保安在八时五十八分到场安抚被困人员，未使用三角钥匙开启层门。",
+        "aspect_b": "复检确认更换抱闸线圈后空载试运行二十次无异常，电梯恢复投用。",
+        "q_deep": "三号电梯层门由谁在何时开启完成救援，工单登记的原因是什么？",
+        "q_neighbor": "八时五十八分到场的保安是否开启了电梯层门？",
+        "q_cross": "年检报告的制动器间隙与复检后的试运行结果分别如何？",
+    },
+    {
+        "case_key": "v2-tender-withdrawal",
+        "document": "电子投标撤回记录.txt",
+        "theme": "撤回 投标文件 平台",
+        "deep": "投标专员祁昀于十六时四十分在电子平台撤回第二包投标文件，操作原因为最高限价与预算不符。",
+        "aspect_a": "招标公告载明第二包最高限价为一千二百万元，投标截止时间为当日十七时。",
+        "neighbor": "合作方代表在十六时二十分仅来电建议重新报价，未登录平台撤回任何投标文件。",
+        "aspect_b": "开标记录显示第二包因不足三家投标而流标，撤回行为已计入平台日志。",
+        "q_deep": "第二包投标文件由谁在何时撤回，操作原因是什么？",
+        "q_neighbor": "十六时二十分来电的合作方代表是否撤回了投标文件？",
+        "q_cross": "公告载明的第二包限价与开标记录的流标结果分别是什么？",
+    },
+    {
+        "case_key": "v2-sample-disposal",
+        "document": "食堂留样处置台账.txt",
+        "theme": "销毁 留样 冰箱",
+        "deep": "食堂管理员罗穗于十三时三十分监督销毁超过保存期限的留样，登记原因为留样超过四十八小时。",
+        "aspect_a": "留样冰箱温度日志显示当日凌晨曾短时升至七摄氏度，持续十一分钟。",
+        "neighbor": "帮厨在十三时十分仅将留样柜钥匙交还管理员，未实施留样销毁操作。",
+        "aspect_b": "复核确认销毁记录与废物交接单编号一致，未发现留样二次使用。",
+        "q_deep": "超过保存期限的留样由谁在何时监督销毁，登记原因是什么？",
+        "q_neighbor": "十三时十分交还钥匙的帮厨是否实施了留样销毁？",
+        "q_cross": "留样冰箱的温度异常与销毁记录的复核结果分别是什么？",
+    },
+]
 
 
 def build_long_page_benchmark() -> list[dict[str, Any]]:

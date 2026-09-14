@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import random
 import subprocess
@@ -18,12 +19,75 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
-SOURCE_PATHS = ("rag_project_benchmark.py", "app/rag.py", "app/rag_chunks.py", "app/rag_benchmark_dataset.py")
+SOURCE_PATHS = (
+    "rag_project_benchmark.py",
+    "app/rag.py",
+    "app/rag_chunks.py",
+    "app/rag_child_index.py",
+    "app/rag_benchmark_dataset.py",
+)
 
 
 def _mean(rows: list[dict[str, Any]], field: str) -> float | None:
     values = [float(row[field]) for row in rows if row.get(field) is not None]
     return round(sum(values) / len(values), 4) if values else None
+
+
+def _percentile(values: list[float], fraction: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(1, math.ceil(fraction * len(ordered)))
+    return round(ordered[rank - 1], 1)
+
+
+def _latency_report(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Latency over the full run and over cold (index-building) queries only.
+
+    The first query per case pays child-index construction, so a run-average alone
+    hides a bimodal distribution; the cold/warm split is the number that matters
+    when deciding whether child retrieval is affordable.
+    """
+    latencies = [float(row["latency_ms"]) for row in results]
+    cold = [float(row["latency_ms"]) for row in results if row.get("child_index_cold")]
+    warm = [float(row["latency_ms"]) for row in results if row.get("child_index_cold") is False]
+    return {
+        "average_latency_ms": round(sum(latencies) / len(latencies)),
+        "p50_latency_ms": _percentile(latencies, 0.5),
+        "p95_latency_ms": _percentile(latencies, 0.95),
+        "cold_query_count": len(cold),
+        "cold_average_latency_ms": round(sum(cold) / len(cold)) if cold else None,
+        "warm_average_latency_ms": round(sum(warm) / len(warm)) if warm else None,
+    }
+
+
+def _child_index_size(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Reported child index scale, taken from the last observed query per case."""
+    per_case: dict[str, dict[str, Any]] = {}
+    for row in results:
+        retrieval = row.get("retrieval", {})
+        if "embedded_child_count" not in retrieval:
+            continue
+        per_case[str(row["case_key"])] = {
+            "child_count": retrieval.get("child_count"),
+            "embedded_child_count": retrieval.get("embedded_child_count"),
+            "reused_child_count": retrieval.get("reused_child_count"),
+            "rerank_candidate_count": retrieval.get("rerank_candidate_count"),
+            "index_search": retrieval.get("index_search"),
+            "index_storage": retrieval.get("index_storage"),
+        }
+    return {"cases": per_case, "case_count": len(per_case)}
+
+
+def _child_retrieval_runtime(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """How the requested child path actually behaved, including budget fallback."""
+    used = sum(row.get("retrieval", {}).get("child_retrieval", {}).get("used") is True for row in results)
+    fallbacks = Counter(
+        str(row.get("retrieval", {}).get("child_retrieval", {}).get("fallback_reason"))
+        for row in results
+        if row.get("retrieval", {}).get("child_retrieval", {}).get("fallback_reason")
+    )
+    return {"child_used_queries": used, "fallback_reasons": dict(sorted(fallbacks.items()))}
 
 
 def _template_bootstrap_ci(
@@ -49,6 +113,7 @@ def _template_bootstrap_ci(
 
 def score_query(
     item: dict[str, Any], hits: list[dict[str, Any]], metrics: dict[str, Any], latency_ms: int,
+    *, child_index_cold: bool | None = None,
 ) -> dict[str, Any]:
     returned_pairs = [(str(hit["name"]), int(hit["page_no"])) for hit in hits]
     returned = set(returned_pairs)
@@ -96,6 +161,7 @@ def score_query(
         "quote_presence_rate": round(quote_presence_rate, 4),
         "answer_citation_faithfulness": None,
         "latency_ms": latency_ms,
+        "child_index_cold": child_index_cold,
         "retrieval": metrics,
     }
 
@@ -213,6 +279,74 @@ def paired_run_comparison(
     }
 
 
+def paired_window_comparison(
+    baseline_summary: dict[str, Any],
+    candidate_summary: dict[str, Any],
+    baseline: list[dict[str, Any]],
+    candidate: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compare two page-children runs that differ only in the child chunk window.
+
+    Both runs execute the same exact-scan pipeline, so this is the one comparison
+    that can attribute a delta to the chunk window itself rather than to the
+    page-level-vs-exact-scan pipeline swap.
+    """
+    for field in ("dataset", "dataset_sha256", "k"):
+        if field not in baseline_summary or field not in candidate_summary:
+            raise ValueError(f"Paired run comparison requires present {field}")
+        if baseline_summary.get(field) != candidate_summary.get(field):
+            raise ValueError(f"Paired run comparison requires identical {field}")
+    baseline_configuration = dict(baseline_summary.get("configuration", {}))
+    candidate_configuration = dict(candidate_summary.get("configuration", {}))
+    if baseline_configuration.pop("page_children", None) != "True":
+        raise ValueError("Paired window comparison requires a page-children baseline")
+    if candidate_configuration.pop("page_children", None) != "True":
+        raise ValueError("Paired window comparison requires a page-children candidate")
+    baseline_configuration.pop("child_chunk_profile", None)
+    candidate_configuration.pop("child_chunk_profile", None)
+    if baseline_configuration != candidate_configuration:
+        raise ValueError("Paired run comparison requires identical run mode")
+    baseline_profile = baseline_summary.get("child_chunk_profile")
+    candidate_profile = candidate_summary.get("child_chunk_profile")
+    if not baseline_profile or not candidate_profile:
+        raise ValueError("Paired window comparison requires present child_chunk_profile")
+    if baseline_profile == candidate_profile:
+        raise ValueError("Paired window comparison requires two different chunk profiles")
+    baseline_by_id = {row.get("id"): row for row in baseline}
+    candidate_by_id = {row.get("id"): row for row in candidate}
+    if (
+        len(baseline_by_id) != len(baseline)
+        or len(candidate_by_id) != len(candidate)
+        or baseline_by_id.keys() != candidate_by_id.keys()
+    ):
+        raise ValueError("Paired run comparison requires unique identical question IDs")
+    for question_id, baseline_row in baseline_by_id.items():
+        baseline_runtime = _runtime_dimensions(baseline_row)
+        candidate_runtime = _runtime_dimensions(candidate_by_id[question_id])
+        if (
+            baseline_runtime["embedding_backend"] == "unknown"
+            or baseline_runtime["degraded"] is None
+            or candidate_runtime["embedding_backend"] == "unknown"
+            or candidate_runtime["degraded"] is None
+        ):
+            raise ValueError("Paired run comparison requires complete per-query runtime telemetry")
+        if baseline_runtime != candidate_runtime:
+            raise ValueError("Paired run comparison requires identical per-query actual runtime")
+    return {
+        "comparison": "child_chunk_window_ablation",
+        "causal_attribution": "window_only_but_shares_downstream_rrf",
+        "controls": {
+            "dataset": baseline_summary["dataset"],
+            "dataset_sha256": baseline_summary["dataset_sha256"],
+            "k": baseline_summary["k"],
+            "run_mode": baseline_configuration,
+            "baseline_child_chunk_profile": baseline_profile,
+            "candidate_child_chunk_profile": candidate_profile,
+        },
+        "metrics": paired_comparison(baseline, candidate),
+    }
+
+
 def _runtime_dimensions(row: dict[str, Any]) -> dict[str, Any]:
     retrieval = row["retrieval"]
     embedding = retrieval.get("embedding")
@@ -243,7 +377,7 @@ def _runtime_group_name(dimensions: dict[str, Any]) -> str:
 
 def summarize(
     results: list[dict[str, Any]], *, dataset_version: str, k: int, configuration: dict[str, str],
-    dataset_sha256: str,
+    dataset_sha256: str, child_chunk_profile: str | None = None,
 ) -> dict[str, Any]:
     if not results:
         raise ValueError("results must not be empty")
@@ -285,6 +419,7 @@ def summarize(
     return {
         "dataset": dataset_version,
         "dataset_sha256": dataset_sha256,
+        "child_chunk_profile": child_chunk_profile,
         "questions": len(results),
         "answerable_queries": len(answerable),
         "unanswerable_queries": len(unanswerable),
@@ -319,11 +454,17 @@ def summarize(
             "reranker_enabled_queries": reranker_enabled,
         },
         "average_latency_ms": round(sum(row["latency_ms"] for row in results) / len(results)),
+        "latency": _latency_report(results),
+        "child_index": _child_index_size(results),
+        "child_retrieval_runtime": _child_retrieval_runtime(results),
         "metric_notes": {
             "within_document_page_precision": "conditional on retrieving a gold document; report with recall because cross-document misses are excluded and no retrieved gold-document page is null",
             "unanswerable_empty_rate": "retrieval-empty diagnostic only; related evidence may support an answer of insufficient evidence; not answer abstention accuracy",
             "quote_presence_rate": "presence only; not citation grounding or entailment",
             "confidence_interval": "template-cluster bootstrap; repeated case variants are not independent samples",
+            "child_text_and_quote": "page-children hits return the whole page as text and the matched window as quote; text alone cannot show which span matched",
+            "cold_latency": "cold queries are the first query per case and pay index construction; report p95 and the cold/warm split, not just the mean",
+            "child_retrieval_runtime": "child_used_queries counts rows where the exact-scan child path served the query; fallback_reasons counts page-level degradations such as child_scan_budget_exceeded",
         },
         "source_sha256": source_hashes,
         "git_revision": git_revision,
@@ -336,17 +477,33 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="LexVault项目专用RAG评测")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--k", type=int, default=5)
-    parser.add_argument("--suite", choices=("classic", "challenges", "long-pages"), default="classic")
+    parser.add_argument(
+        "--suite",
+        choices=("classic", "challenges", "long-pages", "long-pages-v2"),
+        default="classic",
+    )
     parser.add_argument("--page-children", action="store_true")
+    parser.add_argument(
+        "--child-chunk-profile",
+        choices=("sentence-400", "whole-page"),
+        default="sentence-400",
+        help="Child window: sentence-400 is the production candidate; whole-page is the window-ablation control",
+    )
     parser.add_argument("--embedding-mode", choices=("hashed-local", "model"), default="hashed-local")
     parser.add_argument("--reranker", choices=("off", "on"), default="off")
+    parser.add_argument(
+        "--paired-with",
+        type=Path,
+        help="Directory of a page-level run to compare against; writes paired_comparison.json",
+    )
     args = parser.parse_args()
     if args.k <= 0:
         parser.error("--k must be greater than zero")
     output_dir = args.output_dir or Path("output") / "test-runs" / datetime.now().strftime("%Y%m%d-%H%M%S") / "rag-240"
     output_dir.mkdir(parents=True, exist_ok=True)
     configuration = {"embedding_mode": args.embedding_mode, "reranker": args.reranker,
-                     "page_children": str(args.page_children)}
+                     "page_children": str(args.page_children),
+                     "child_chunk_profile": args.child_chunk_profile}
     with tempfile.TemporaryDirectory(prefix="lexvault-rag240-") as data_dir:
         os.environ["LAW_REVIEW_DATA_DIR"] = data_dir
         from app.db import init_db, now, transaction
@@ -354,14 +511,19 @@ def main() -> int:
         from app.rag_benchmark_dataset import (
             CHALLENGE_VERSION,
             DATASET_VERSION,
+            LONG_PAGE_V2_VERSION,
             LONG_PAGE_VERSION,
             build_challenge_benchmark,
             build_long_page_benchmark,
+            build_long_page_v2_benchmark,
             build_rag_benchmark,
         )
 
         init_db(seed=False)
-        if args.suite == "long-pages":
+        if args.suite == "long-pages-v2":
+            dataset = build_long_page_v2_benchmark()
+            dataset_version = LONG_PAGE_V2_VERSION
+        elif args.suite == "long-pages":
             dataset = build_long_page_benchmark()
             dataset_version = LONG_PAGE_VERSION
         elif args.suite == "challenges":
@@ -408,15 +570,26 @@ def main() -> int:
                 prefer_remote_embeddings=prefer_remote,
                 use_neural_reranker=use_reranker,
                 use_page_children=args.page_children,
+                child_chunk_profile=args.child_chunk_profile,
             )
             for key, value in case_ids.items()
         }
         total = len(dataset)
+        warmed_cases: set[str] = set()
         for position, item in enumerate(dataset, 1):
             started = time.perf_counter()
             hits, metrics = retrievers[item["case_key"]].retrieve(item["query"], args.k)
             latency_ms = round((time.perf_counter() - started) * 1000)
-            record = score_query(item, hits, metrics, latency_ms)
+            # A child index build reports embedded children; the first such query
+            # per case is the cold one and the rest are warm reuses.
+            child_index_cold: bool | None = None
+            if args.page_children:
+                child_index_cold = (
+                    int(metrics.get("embedded_child_count", 0)) > 0
+                    and item["case_key"] not in warmed_cases
+                )
+                warmed_cases.add(item["case_key"])
+            record = score_query(item, hits, metrics, latency_ms, child_index_cold=child_index_cold)
             results.append(record)
             print(f"[{position}/{total}] {item['id']} {'PASS' if record['passed'] else 'MISS'}", flush=True)
         summary = summarize(
@@ -425,6 +598,7 @@ def main() -> int:
             k=args.k,
             configuration=configuration,
             dataset_sha256=dataset_sha256,
+            child_chunk_profile=args.child_chunk_profile if args.page_children else None,
         )
         (output_dir / "results.json").write_text(
             json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8",
@@ -432,6 +606,26 @@ def main() -> int:
         (output_dir / "summary.json").write_text(
             json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8",
         )
+        if args.paired_with is not None:
+            baseline_summary = json.loads(
+                (args.paired_with / "summary.json").read_text(encoding="utf-8")
+            )
+            baseline_results = json.loads(
+                (args.paired_with / "results.json").read_text(encoding="utf-8")
+            )
+            # Two page-children runs differing only in the chunk window are the
+            # window ablation; a page-level baseline is the full-pipeline swap.
+            baseline_children = str(
+                baseline_summary.get("configuration", {}).get("page_children")
+            ) == "True"
+            compare = paired_window_comparison if (
+                baseline_children and args.page_children
+            ) else paired_run_comparison
+            comparison = compare(baseline_summary, summary, baseline_results, results)
+            (output_dir / "paired_comparison.json").write_text(
+                json.dumps(comparison, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+            print(json.dumps(comparison, ensure_ascii=False, indent=2))
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         print(f"结果目录：{output_dir.resolve()}")
     return 0
