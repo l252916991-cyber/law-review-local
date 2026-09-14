@@ -54,12 +54,14 @@ def _create_case(database, texts):
     return int(case_id), int(document_id), [int(page_id) for page_id in page_ids]
 
 
-def _retriever(case_id, client):
+def _retriever(case_id, client, *, pipeline="exact-scan", profile="sentence-400"):
     retriever = HybridRetriever(
         case_id,
         prefer_remote_embeddings=False,
         use_neural_reranker=False,
         use_page_children=True,
+        child_pipeline=pipeline,
+        child_chunk_profile=profile,
     )
     retriever.embedding_client = client
     return retriever
@@ -160,6 +162,40 @@ def test_page_children_preserve_quotes_parents_case_scope_and_unique_pages(tmp_p
         parent = parents[hit["page_no"]]
         assert hit["text"] == parent
         assert hit["quote"] == parent[hit["char_start"]:hit["char_end"]]
+
+
+def test_whole_page_profile_emits_one_child_per_page():
+    text = "整页材料。" * 100
+    chunks = page_chunks(text, None, 0)
+
+    assert chunks == [{"char_start": 0, "char_end": len(text), "text": text}]
+    assert page_chunks("   \n ", None, 0) == []
+    with pytest.raises(ValueError):
+        page_chunks(text, None, 10)
+
+
+def test_unified_child_pipeline_quotes_matched_window_but_returns_whole_page(tmp_path):
+    database = tmp_path / "unified.sqlite"
+    filler = "例行台账仅登记设备编号与外观状态。\n\n"
+    gold = "值班技师在末尾段落确认关闭二号机组，登记原因为回油管渗漏。"
+    text = filler * 20 + gold
+    case_id, _, _ = _create_case(database, [text])
+    with db_scope(database):
+        hits, metrics = _retriever(
+            case_id, FakeEmbeddingClient(), pipeline="unified"
+        ).retrieve("二号机组 关闭 回油管", limit=1)
+
+    assert hits
+    hit = hits[0]
+    assert metrics["child_retrieval"]["used"] is True
+    assert metrics["child_retrieval"]["pipeline"] == "unified"
+    # The point of the unified path: the quote is the matched child window, which is
+    # narrower than the page and lands on the gold sentence rather than the first
+    # filler mention of the query nouns.
+    assert hit["text"] == text
+    assert hit["quote"] == text[hit["char_start"]:hit["char_end"]]
+    assert len(hit["quote"]) < len(text)
+    assert gold in hit["quote"]
 
 
 def test_cold_build_and_reopened_retriever_reuses_all_child_vectors(tmp_path, monkeypatch):

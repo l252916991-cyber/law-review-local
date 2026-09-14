@@ -38,6 +38,12 @@ EMBEDDING_TEXT_VERSION = "raw-text-v1"
 HASHED_MODEL = "hashed-bigram-v1"
 MAX_RETRIEVAL_CANDIDATES = 48
 NEIGHBOR_RADIUS = 1
+# ``exact-scan`` is the experimental child pipeline measured against the page-level
+# path; ``unified`` runs the same child exact scan but feeds the child channel into
+# the page-level fusion/rerank/diversity, so a delta against the page-level path
+# isolates the vector channel's granularity instead of the whole pipeline.
+CHILD_PIPELINE_EXACT_SCAN = "exact-scan"
+CHILD_PIPELINE_UNIFIED = "unified"
 logger = logging.getLogger(__name__)
 
 
@@ -211,10 +217,14 @@ class HybridRetriever:
         use_neural_reranker: bool | None = None,
         use_page_children: bool = False,
         child_chunk_profile: str = DEFAULT_CHUNK_PROFILE,
+        child_pipeline: str = CHILD_PIPELINE_EXACT_SCAN,
     ):
+        if child_pipeline not in (CHILD_PIPELINE_EXACT_SCAN, CHILD_PIPELINE_UNIFIED):
+            raise ValueError(f"Unknown child pipeline: {child_pipeline}")
         self.case_id = case_id
         self.use_page_children = use_page_children
         self.child_chunk_profile = child_chunk_profile
+        self.child_pipeline = child_pipeline
         self.embedding_client = EmbeddingClient(prefer_remote_embeddings)
         self.use_neural_reranker = (
             prefer_remote_embeddings if use_neural_reranker is None else use_neural_reranker
@@ -489,6 +499,19 @@ class HybridRetriever:
             from .rag_child_index import ChildScanBudgetExceeded
 
             try:
+                if self.child_pipeline == CHILD_PIPELINE_UNIFIED:
+                    started = time.perf_counter()
+                    # Mirror the page-level vector channel by scoring the child
+                    # channel with the same expanded query.
+                    expanded = expand_retrieval_query(query)
+                    child_candidates, child_scan_metrics = self._child_page_candidates(expanded, limit)
+                    selected, metrics = self._retrieve_page_level(
+                        query, limit, started,
+                        child_retrieval={"requested": True, "used": True, "pipeline": CHILD_PIPELINE_UNIFIED},
+                        child_candidates=child_candidates,
+                    )
+                    metrics.update(child_scan_metrics)
+                    return selected, metrics
                 return self._retrieve_children(query, limit)
             except ChildScanBudgetExceeded:
                 # The experimental exact scan would exceed its budget. Serving the
@@ -498,19 +521,67 @@ class HybridRetriever:
         else:
             child_fallback = None
         started = time.perf_counter()
+        return self._retrieve_page_level(
+            query, limit, started,
+            child_retrieval=(
+                {"requested": False} if child_fallback is None
+                else {"requested": True, "used": False, "fallback_reason": child_fallback}
+            ),
+        )
+
+    @staticmethod
+    def _vector_weight(vector: list[dict[str, Any]], signals: dict[str, Any]) -> float:
+        # The deterministic hashed fallback is deliberately cheap and useful as
+        # a recall channel, but it is not a semantic model and must not outrank
+        # exact legal terms, amounts or document names.
+        backend = vector[0].get("query_embedding_backend") if vector else "none"
+        return 0.25 if backend == "hashed-local" else (0.75 if signals["profile"] == "precision" else 0.85)
+
+    def _retrieve_page_level(
+        self, query: str, limit: int, started: float, *,
+        child_retrieval: dict[str, Any], child_candidates: list[dict[str, Any]] | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         expanded_query = expand_retrieval_query(query)
         signals = query_signals(query)
         candidate_limit = min(MAX_RETRIEVAL_CANDIDATES, max(limit * 8, 24))
         keyword = self.keyword_search(expanded_query, candidate_limit)
-        vector = self.vector_search(expanded_query, candidate_limit)
+        if child_candidates is None:
+            vector = self.vector_search(expanded_query, candidate_limit)
+            channels = [("bm25", 1.0, keyword), ("vector", self._vector_weight(vector, signals), vector)]
+            prefer_child_quote = False
+        else:
+            vector = child_candidates
+            channels = [("bm25", 1.0, keyword), ("child-vector", self._vector_weight(vector, signals), vector)]
+            prefer_child_quote = True
+        return self._fuse_rank_select(
+            query, expanded_query, signals, channels, limit, started,
+            child_retrieval=child_retrieval, prefer_child_quote=prefer_child_quote,
+        )
+
+    def _fuse_rank_select(
+        self,
+        query: str,
+        expanded_query: str,
+        signals: dict[str, Any],
+        channels: list[tuple[str, float, list[dict[str, Any]]]],
+        limit: int,
+        started: float,
+        *,
+        child_retrieval: dict[str, Any],
+        prefer_child_quote: bool = False,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fuse ranked channels, feature-rerank, optionally neural-rerank, then diversify.
+
+        Shared by the page-level path and the unified child path so that a delta
+        between them comes only from the vector channel's granularity.
+        """
         fused: dict[tuple[int, int], dict[str, Any]] = {}
         rrf_k = 60
-        # The deterministic hashed fallback is deliberately cheap and useful as
-        # a recall channel, but it is not a semantic model and must not outrank
-        # exact legal terms, amounts or document names.
+        keyword = channels[0][2] if channels else []
+        vector = channels[-1][2] if channels else []
+        vector_weight = channels[-1][1] if channels else 0.0
         vector_backend = vector[0].get("query_embedding_backend") if vector else "none"
-        vector_weight = 0.25 if vector_backend == "hashed-local" else (0.75 if signals["profile"] == "precision" else 0.85)
-        for channel, weight, results in (("bm25", 1.0, keyword), ("vector", vector_weight, vector)):
+        for channel, weight, results in channels:
             for rank, item in enumerate(results, 1):
                 key = (int(item["document_id"]), int(item["page_no"]))
                 target = fused.setdefault(key, {**item, "rrf_score": 0.0, "channels": [], "is_neighbor": False})
@@ -519,6 +590,10 @@ class HybridRetriever:
                 for field in ("keyword_rank", "vector_rank", "vector_score", "query_embedding_backend"):
                     if field in item:
                         target[field] = item[field]
+                if prefer_child_quote and item.get("child_quote"):
+                    target["child_quote"] = item["child_quote"]
+                    target["char_start"] = item.get("char_start")
+                    target["char_end"] = item.get("char_end")
         direct = list(fused.values())
         for item in self._neighbor_candidates(sorted(direct, key=lambda row: -row["rrf_score"])):
             key = (int(item["document_id"]), int(item["page_no"]))
@@ -528,7 +603,13 @@ class HybridRetriever:
             rerank, components = self._rerank_candidate(item, query, signals, float(item["rrf_score"]))
             item["rerank_score"] = round(rerank, 6)
             item["rerank_components"] = {key: round(value, 6) for key, value in components.items()}
-            item["quote"] = best_quote(item["text"], query_terms(query))
+            # A matched child window is the reason this page was retrieved, so it
+            # points at the gold sentence instead of the first decoy mention of the
+            # query nouns that best_quote would otherwise anchor on.
+            if prefer_child_quote and item.get("child_quote"):
+                item["quote"] = item["child_quote"]
+            else:
+                item["quote"] = best_quote(item["text"], query_terms(query))
         rerank_items = list(fused.values())
         rerank_scores = (
             self.rerank_client.score(query, [str(item.get("text", "")) for item in rerank_items])
@@ -581,10 +662,7 @@ class HybridRetriever:
             "query_expansion": expanded_query if expanded_query != query else "none",
             "latency_ms": round((time.perf_counter() - started) * 1000),
             "rerank_candidate_count": len(rerank_items),
-            "child_retrieval": (
-                {"requested": False} if child_fallback is None
-                else {"requested": True, "used": False, "fallback_reason": child_fallback}
-            ),
+            "child_retrieval": child_retrieval,
             "degraded": bool(self.vector_diagnostics.get("degraded")) or not self.keyword_diagnostics.get("fts_available", True),
             "embedding": dict(self.vector_diagnostics),
             "keyword": dict(self.keyword_diagnostics),
@@ -593,6 +671,119 @@ class HybridRetriever:
                          "fallback_reason": self.rerank_client.last_failure},
         }
         return selected, metrics
+
+    def _load_children(
+        self, query: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any], str, list[float]]:
+        """Embed the query and load (or lazily build) the case child index."""
+        from .rag_child_index import load_or_build_child_index
+
+        query_vectors, backend = self.embedding_client.embed([query])
+        if len(query_vectors) != 1 or not valid_vector(query_vectors[0]):
+            raise RuntimeError("invalid_query_embedding")
+        dimensions = len(query_vectors[0])
+        model = embedding_identity(self.embedding_client.model, backend)
+        children, index_metrics = load_or_build_child_index(
+            self.case_id,
+            backend=backend,
+            dimensions=dimensions,
+            model_identity=model,
+            embed=self.embedding_client.embed,
+            chunk_profile=self.child_chunk_profile,
+        )
+        # The unified child path reuses the page-level metrics dict, which reads
+        # these diagnostics, so the child embedding space must be reported here.
+        self.vector_diagnostics = {
+            "backend": backend,
+            "model": model,
+            "dimensions": dimensions,
+            "degraded": backend == "hashed-local",
+            "incompatible_vectors_skipped": 0,
+            "fallback_reason": (
+                "remote_embedding_unavailable" if self.embedding_client.last_failure
+                else "offline_embeddings_requested" if not self.embedding_client.prefer_remote
+                else None
+            ),
+        }
+        return children, index_metrics, backend, query_vectors[0]
+
+    @staticmethod
+    def _child_scores(
+        query: str, children: list[dict[str, Any]], query_vector: list[float],
+    ) -> tuple[dict[int, float], dict[int, float]]:
+        """Chinese bigram BM25 and cosine similarity for every child, plus RRF."""
+        from .legal_corpus import _terms
+        from collections import Counter
+
+        terms = [_terms(child["text"]) for child in children]
+        df = Counter(term for bag in terms for term in bag)
+        query_terms_set = _terms(query)
+        average_length = sum(sum(bag.values()) for bag in terms) / len(terms) or 1
+        lexical: list[tuple[float, int]] = []
+        semantic: list[tuple[float, int]] = []
+        for index, (bag, child) in enumerate(zip(terms, children)):
+            length = sum(bag.values())
+            score = sum(
+                math.log(1 + (len(terms) - df[t] + 0.5) / (df[t] + 0.5))
+                * bag[t] * 2.2 / (bag[t] + 1.2 * (0.25 + 0.75 * length / average_length))
+                for t in query_terms_set if bag[t]
+            )
+            if score > 0:
+                lexical.append((score, index))
+            similarity = cosine_similarity(query_vector, child["vector"])
+            if similarity > 0:
+                semantic.append((similarity, index))
+        scores: dict[int, float] = {}
+        for channel in (lexical, semantic):
+            for rank, (_, index) in enumerate(sorted(channel, key=lambda x: (-x[0], x[1]))[:50], 1):
+                scores[index] = scores.get(index, 0) + 1 / (60 + rank)
+        similarities = {index: value for value, index in semantic}
+        return scores, similarities
+
+    def _child_page_candidates(self, query: str, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Page-level candidates whose ranks come from child-granularity matching.
+
+        Best child per page, so the page-level fusion/rerank can consume the child
+        channel exactly like it consumes the page-level vector channel.
+        """
+        children, index_metrics, backend, query_vector = self._load_children(query)
+        scan_metrics = {
+            "child_count": len(children),
+            "index_storage": "sqlite_persistent",
+            "index_search": "exact_scan",
+            **index_metrics,
+            "embedding": {
+                "backend": backend,
+                "dimensions": len(query_vector),
+                "embedded_child_count": index_metrics["embedded_child_count"],
+                "reused_child_count": index_metrics["reused_child_count"],
+            },
+        }
+        if not children:
+            return [], scan_metrics
+        scores, similarities = self._child_scores(query, children, query_vector)
+        ordered = sorted(scores, key=lambda index: (-scores[index], index))
+        candidates: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        for index in ordered:
+            child = children[index]
+            if child["page_id"] in seen:
+                continue
+            seen.add(child["page_id"])
+            candidates.append({
+                **{key: value for key, value in child.items() if key not in ("vector", "parent_text")},
+                "text": child["parent_text"],
+                "child_quote": child["text"],
+                "char_start": child["char_start"],
+                "char_end": child["char_end"],
+                "vector_score": round(similarities.get(index, 0.0), 6),
+                "query_embedding_backend": backend,
+                "vector_rank": len(candidates) + 1,
+                "is_neighbor": False,
+            })
+            if len(candidates) >= limit:
+                break
+        return candidates, scan_metrics
 
     def _retrieve_children(self, query: str, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Experimental exact-scan child recall backed by a persistent vector cache."""

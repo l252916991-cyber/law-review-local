@@ -8,6 +8,7 @@ from app.rag_benchmark_dataset import (
 )
 from app.rag_chunks import page_chunks
 from rag_project_benchmark import (
+    paired_channel_comparison,
     paired_comparison,
     paired_run_comparison,
     paired_window_comparison,
@@ -525,3 +526,117 @@ def test_paired_window_comparison_rejects_page_level_baseline():
 
     with pytest.raises(ValueError, match="page-children baseline"):
         paired_window_comparison(page_level, _children_summary("sentence-400"), [row], [row])
+
+
+def _fact_item():
+    return {
+        **item([{"document": "a.txt", "page": 1}]),
+        "gold_facts": [{"document": "a.txt", "page": 1, "text": "金标事实句子"}],
+    }
+
+
+def test_quote_gold_fact_rate_requires_the_fact_inside_the_quote_window():
+    covered = score_query(
+        _fact_item(),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "…… 金标事实句子 ……",
+          "char_start": 10, "char_end": 60}],
+        metrics(), 3,
+    )
+    missed = score_query(
+        _fact_item(),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "无关键句的干扰窗口",
+          "char_start": 0, "char_end": 40}],
+        metrics(), 3,
+    )
+
+    assert covered["quote_gold_fact_rate"] == 1.0
+    assert covered["max_quote_chars"] == len("…… 金标事实句子 ……")
+    assert covered["returned"][0]["char_start"] == 10
+    assert missed["quote_gold_fact_rate"] == 0.0
+    # Presence alone cannot tell these apart, which is why the span metric exists.
+    assert covered["quote_presence_rate"] == missed["quote_presence_rate"] == 1.0
+
+
+def test_quote_gold_fact_rate_is_null_without_gold_facts():
+    record = score_query(
+        item([{"document": "a.txt", "page": 1}]),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "窗口"}],
+        metrics(), 3,
+    )
+
+    assert record["quote_gold_fact_rate"] is None
+    assert record["quote_gold_facts_total"] is None
+
+
+def test_summary_aggregates_and_comparison_carries_quote_gold_fact_rate():
+    hit = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "…… 金标事实句子 ……"}]
+    cover = score_query(_fact_item(), hit, metrics(), 3)
+    miss_same_question = score_query(_fact_item(), [dict(hit[0], quote="干扰")], metrics(), 3)
+
+    report = summarize(
+        [cover, miss_same_question],
+        dataset_version="fixture-v1", k=3,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+    )
+    comparison = paired_comparison([miss_same_question], [cover])
+
+    assert report["quote_gold_fact_rate"] == 0.5
+    assert report["quote_gold_fact_query_count"] == 2
+    assert comparison["quote_gold_fact_rate"]["delta"] == 1.0
+
+
+def _channel_summaries():
+    page_level = {
+        "dataset": LONG_PAGE_V2_VERSION,
+        "dataset_sha256": "frozen-hash",
+        "k": 3,
+        "child_chunk_profile": None,
+        "child_pipeline": None,
+        "configuration": {
+            "embedding_mode": "hashed-local",
+            "reranker": "off",
+            "page_children": "False",
+            "child_chunk_profile": "sentence-400",
+            "child_pipeline": "exact-scan",
+        },
+    }
+    unified = {
+        **page_level,
+        "child_chunk_profile": "sentence-400",
+        "child_pipeline": "unified",
+        "configuration": {
+            **page_level["configuration"],
+            "page_children": "True",
+            "child_pipeline": "unified",
+        },
+    }
+    exact = {
+        **unified,
+        "child_pipeline": "exact-scan",
+        "configuration": {**unified["configuration"], "child_pipeline": "exact-scan"},
+    }
+    return page_level, unified, exact
+
+
+def test_paired_channel_comparison_allows_only_the_child_channel_to_differ():
+    page_level, unified, exact = _channel_summaries()
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+
+    report = paired_channel_comparison(page_level, unified, [row], [row])
+
+    assert report["comparison"] == "child_channel_granularity"
+    assert report["causal_attribution"] == "channel_granularity_within_shared_pipeline"
+    assert report["controls"]["candidate_child_pipeline"] == "unified"
+    # The moving knobs are excluded from the frozen run mode.
+    assert "page_children" not in report["controls"]["run_mode"]
+    assert "child_pipeline" not in report["controls"]["run_mode"]
+
+    with pytest.raises(ValueError, match="unified child pipeline"):
+        paired_channel_comparison(page_level, exact, [row], [row])
+    with pytest.raises(ValueError, match="page-children candidate"):
+        paired_channel_comparison(page_level, page_level, [row], [row])
+
+    other_mode = {**unified, "configuration": {**unified["configuration"], "reranker": "on"}}
+    with pytest.raises(ValueError, match="identical run mode"):
+        paired_channel_comparison(page_level, other_mode, [row], [row])
