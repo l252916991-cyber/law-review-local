@@ -16,6 +16,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -37,7 +38,7 @@ def main() -> int:
     parser.add_argument("--round1-manifest", type=Path, default=ROUND1_DIR / "manifest.json")
     args = parser.parse_args()
 
-    from mlx_lm import load  # training venv
+    from mlx_lm import load  # type: ignore[import-not-found]  # training venv
 
     _, tok = load(str(ROOT / "models/Qwythos-9B-v2-4bit-mlx"))
 
@@ -54,7 +55,7 @@ def main() -> int:
     round1_holdout = [json.loads(line)["text"] for line in (ROUND1_DIR / "holdout.jsonl").read_text().splitlines()]
 
     marker = "<think>\n\n</think>\n\n"
-    stats = {}
+    stats: dict[str, dict[str, Any]] = {}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "dataset").mkdir(exist_ok=True)
     for name, texts in (("train", round1_rows), ("valid", round1_valid), ("holdout", round1_holdout)):
