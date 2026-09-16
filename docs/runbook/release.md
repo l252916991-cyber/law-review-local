@@ -7,7 +7,7 @@ uv run python scripts/package_release.py --dry-run
 uv run python scripts/package_release.py --output dist/lexvault-source.zip
 ```
 
-脚本仅打包明确允许的源码、配置模板、测试和维护文档，拒绝符号链接；不覆盖已存在的 zip，并记录每个成员的 SHA-256。默认不包含模型、案件、checkpoint、导出、凭证、日志、历史评测原始答案或 LawBench。需要随包运行 LawBench 测试时，核对 `benchmarks/lawbench/SOURCE.md` 与原始数据集许可证，再显式增加 `--with-benchmarks`。
+脚本仅打包明确允许的源码、Docker 配置、项目合成样例、配置模板、测试和维护文档，拒绝符号链接；不覆盖已存在的 zip，并记录每个成员的 SHA-256。默认不包含模型、案件、checkpoint、导出、凭证、日志、历史评测原始答案或 LawBench。需要随包运行 LawBench 测试时，核对 `benchmarks/lawbench/SOURCE.md` 与原始数据集许可证，再显式增加 `--with-benchmarks`。接收方从解压包安装与验收的路线见[交付指南](delivery.md)。
 
 `.gitignore` 不是发布权限检查，也不会清除已经跟踪的数据。首次 git 提交前检查暂存区，切勿无检查地执行 `git add .`；发布包仍须人工检查源码/文档中是否有手工粘贴的案件片段。不要把“文件不在 data 目录”当作已经脱敏。
 

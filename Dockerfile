@@ -23,7 +23,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY scripts ./scripts
-COPY benchmarks/lawbench ./benchmarks/lawbench
 RUN uv sync --locked --no-dev
 
 # Non-root runtime identity; /data holds the SQLite database, uploads,

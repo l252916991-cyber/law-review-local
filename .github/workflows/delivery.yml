@@ -1,0 +1,75 @@
+name: LexVault delivery smoke
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Build and verify allowlisted source archive
+        run: |
+          python scripts/package_release.py --output "$RUNNER_TEMP/lexvault-source.zip"
+          python - "$RUNNER_TEMP/lexvault-source.zip" "$RUNNER_TEMP/source" <<'PY'
+          import hashlib, json, pathlib, sys, zipfile
+          path, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          with zipfile.ZipFile(path) as archive:
+              manifest = json.loads(archive.read('RELEASE_MANIFEST.json'))
+              names = set(archive.namelist())
+              assert names == {x['path'] for x in manifest['files']} | {'RELEASE_MANIFEST.json'}
+              for item in manifest['files']:
+                  assert hashlib.sha256(archive.read(item['path'])).hexdigest() == item['sha256']
+              archive.extractall(destination)
+          PY
+      - name: Build extracted Docker context
+        run: docker build -t lexvault-delivery-smoke "$RUNNER_TEMP/source"
+      - name: Run synthetic HTTP acceptance in a disposable token-protected container
+        run: |
+          python - <<'PY'
+          import json, os, secrets
+          token = secrets.token_urlsafe(48)
+          print(f'::add-mask::{token}')
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write('LAW_REVIEW_SMOKE_TOKEN=' + token + '\n')
+              stream.write('LAW_REVIEW_API_TOKENS_JSON=' + json.dumps({token: {
+                  'name': 'Delivery smoke', 'admin': True,
+                  'permissions': ['view', 'edit', 'approve', 'export', 'manage'],
+              }}) + '\n')
+          PY
+      - name: Start container and run offline smoke
+        run: |
+          docker volume create lexvault-delivery-smoke-data
+          docker run -d --name lexvault-delivery-smoke \
+            -p 127.0.0.1:18919:8000 \
+            --mount source=lexvault-delivery-smoke-data,target=/data \
+            --env LAW_REVIEW_AUTH_MODE=token \
+            --env LAW_REVIEW_API_TOKENS_JSON \
+            --env LAW_REVIEW_LLM_URL=http://127.0.0.1:1/v1 \
+            --env LAW_REVIEW_EMBEDDING_URL=http://127.0.0.1:1/v1 \
+            --env LAW_REVIEW_RERANK_URL=http://127.0.0.1:1/v1 \
+            lexvault-delivery-smoke
+          for attempt in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:18919/api/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:18919/api/health >/dev/null
+          python "$RUNNER_TEMP/source/scripts/delivery_smoke.py" \
+            --base-url http://127.0.0.1:18919 --mode offline
+      - name: Inspect service on failure and remove disposable data
+        if: always()
+        run: |
+          docker logs --tail 80 lexvault-delivery-smoke 2>/dev/null || true
+          docker rm -f lexvault-delivery-smoke 2>/dev/null || true
+          docker volume rm lexvault-delivery-smoke-data 2>/dev/null || true

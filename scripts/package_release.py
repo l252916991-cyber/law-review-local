@@ -11,10 +11,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = (
     "README.md", "pyproject.toml", "uv.lock", "requirements.txt", "requirements-dev.txt",
-    ".gitignore", ".env.example", ".pre-commit-config.yaml", "run.sh", "run_worker.sh",
+    ".gitignore", ".env.example", ".pre-commit-config.yaml", ".gitleaksignore",
+    ".dockerignore", "Dockerfile", "docker-compose.yml", "AGENTS.md", "LICENSE",
+    "run.sh", "run_worker.sh",
     "unified_benchmark_runner.py", "verify_benchmark_run.py", "compare_agent_runtimes.py",
     "rag_project_benchmark.py", "BENCHMARK_TEST_PLAN.md",
 )
+EXACT_FIXTURES = ("benchmarks/fewshot/2-2_sft_pool.jsonl",)
 TREE_TYPES = {
     "app": {".py", ".html", ".js", ".css", ".svg"},
     "tests": {".py"},
@@ -26,6 +29,7 @@ TREE_TYPES = {
 
 def source_files(root: Path, with_benchmarks: bool = False) -> list[Path]:
     files = {root / name for name in ROOT_FILES if (root / name).is_file()}
+    files.update(root / name for name in EXACT_FIXTURES if (root / name).is_file())
     for directory, suffixes in TREE_TYPES.items():
         for candidate in (root / directory).rglob("*"):
             relative = candidate.relative_to(root)

@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,13 +24,20 @@ class EngineeringToolTests(unittest.TestCase):
             for name in (
                 "README.md", "app/main.py", "app/main.py.backup", "models/config.json",
                 "data/case.txt", "output/result.json", ".env", ".env.example",
+                "Dockerfile", "docker-compose.yml", ".dockerignore", "LICENSE",
+                "benchmarks/fewshot/2-2_sft_pool.jsonl", "benchmarks/fewshot/private.jsonl",
+                "benchmarks/lawbench/zero_shot/upstream.json",
                 "docs/INTERVIEW_GUIDE.md", "docs/runbook/operations.md",
             ):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("synthetic fixture", encoding="utf-8")
             names = {str(path.relative_to(root)) for path in source_files(root)}
-            self.assertEqual(names, {"README.md", "app/main.py", ".env.example", "docs/runbook/operations.md"})
+            self.assertEqual(names, {
+                "README.md", "app/main.py", ".env.example", "docs/runbook/operations.md",
+                "Dockerfile", "docker-compose.yml", ".dockerignore", "LICENSE",
+                "benchmarks/fewshot/2-2_sft_pool.jsonl",
+            })
 
     def test_release_refuses_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -46,6 +57,26 @@ class EngineeringToolTests(unittest.TestCase):
             fixture.write_text("[]", encoding="utf-8")
             self.assertEqual(source_files(root), [])
             self.assertEqual(source_files(root, True), [fixture])
+
+    def test_actual_release_can_be_extracted_and_compiled(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "release.zip"
+            subprocess.run([sys.executable, str(root / "scripts/package_release.py"),
+                            "--output", str(output)], check=True, capture_output=True)
+            with zipfile.ZipFile(output) as archive:
+                names = set(archive.namelist())
+                self.assertTrue({"Dockerfile", "docker-compose.yml", ".dockerignore", "run.sh",
+                                 "benchmarks/fewshot/2-2_sft_pool.jsonl"} <= names)
+                self.assertFalse(any(name.startswith(("data/", "output/", "models/", "benchmarks/lawbench/"))
+                                     for name in names))
+                manifest = json.loads(archive.read("RELEASE_MANIFEST.json"))
+                self.assertEqual({item["path"] for item in manifest["files"]}, names - {"RELEASE_MANIFEST.json"})
+                for item in manifest["files"]:
+                    self.assertEqual(hashlib.sha256(archive.read(item["path"])).hexdigest(), item["sha256"])
+                archive.extractall(directory)
+            subprocess.run([sys.executable, "-m", "compileall", "-q", "app", "scripts"],
+                           cwd=directory, check=True, capture_output=True)
 
     def test_model_download_rejects_mutable_revision(self) -> None:
         with self.assertRaisesRegex(ValueError, "40-character"):
