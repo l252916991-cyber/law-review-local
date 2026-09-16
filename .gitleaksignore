@@ -1,3 +1,6 @@
 # Synthetic long-pages-v2 case identifier "v2-tender-withdrawal", not a credential.
 # Exact historical finding only; generic-api-key detection remains enabled.
 be469d2796b737e50ccd2eedac3370e9988d90b4:app/rag_benchmark_dataset.py:generic-api-key:207
+# vis-network 9.1.6 minified class method name in {key:..., value:function(...)}.
+# Exact vendored-code historical finding; no path-wide or rule-wide exclusion.
+36eda2d0be4e4fa813ba332986597f89d4a61cb8:app/static/vendor/vis-network.min.js:generic-api-key:32
