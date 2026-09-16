@@ -69,7 +69,12 @@ TASK_GUIDANCE_38 = literal_from_source("app/benchmark_solver.py", "TASK_GUIDANCE
 CLUSTER_THRESHOLD = 0.85
 SIZES = {"holdout": 200, "valid": 200, "train": 3000}
 SEED = "38-sft-v1"
-EMBED_BATCH = 64
+# Only the split-candidate sample is embedded: clusters are computed among the
+# 5,000 candidates, so a paraphrase cluster can never straddle the three
+# splits; unselected pool rows enter no split and need no embedding.
+SAMPLE_FOR_SPLIT = 5000
+EMBED_BATCH_ITEMS = 256
+EMBED_BATCH_CHARS = 12000
 
 
 def clean_pool() -> list[dict]:
@@ -100,26 +105,46 @@ EMBED_MODEL = os.getenv("LAW_REVIEW_EMBEDDING_MODEL", "Qwen3-Embedding-4B-4bit-D
 
 
 def embed_inputs(rows: list[dict]) -> list[list[float]]:
-    """Call the local oMLX /v1/embeddings directly; no app dependency chain."""
+    """Call the local oMLX /v1/embeddings directly; no app dependency chain.
+
+    Batches are bounded by items and characters: real consultation inputs have
+    a long tail, and a batch that overflows the server context window stalls
+    instead of failing.
+    """
     import urllib.request
 
     # urllib honors system proxies; the local oMLX endpoint must bypass them
     # (known 502 failure mode in this environment).
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     endpoint = EMBED_URL.rstrip("/") + "/embeddings"
-    vectors: list[list[float]] = []
-    for start in range(0, len(rows), EMBED_BATCH):
-        batch = [row["input"] for row in rows[start:start + EMBED_BATCH]]
-        body = json.dumps({"model": EMBED_MODEL, "input": batch}).encode()
-        request = urllib.request.Request(endpoint, data=body, headers={"Content-Type": "application/json"})
-        with opener.open(request, timeout=120) as response:
+    batches: list[list[int]] = []
+    current: list[int] = []
+    chars = 0
+    for index, row in enumerate(rows):
+        length = len(row["input"])
+        if current and (len(current) >= EMBED_BATCH_ITEMS or chars + length > EMBED_BATCH_CHARS):
+            batches.append(current)
+            current, chars = [], 0
+        current.append(index)
+        chars += length
+    if current:
+        batches.append(current)
+
+    vectors: list[list[float]] = [[] for _ in rows]
+    for done, batch in enumerate(batches):
+        body = json.dumps({"model": EMBED_MODEL,
+                           "input": [rows[i]["input"] for i in batch]}).encode()
+        request = urllib.request.Request(endpoint, data=body,
+                                         headers={"Content-Type": "application/json"})
+        with opener.open(request, timeout=300) as response:
             payload = json.load(response)
         part = [item["embedding"] for item in payload["data"]]
         if len(part) != len(batch):
-            raise RuntimeError(f"embedding returned {len(part)} for {len(batch)} inputs at {start}")
-        vectors.extend(part)
-        if (start // EMBED_BATCH) % 50 == 0:
-            print(f"embedded {start + len(batch)}/{len(rows)}", flush=True)
+            raise RuntimeError(f"embedding returned {len(part)} for {len(batch)} inputs")
+        for i, vector in zip(batch, part):
+            vectors[i] = vector
+        if done % 10 == 0:
+            print(f"embedded batch {done + 1}/{len(batches)}", flush=True)
     return vectors
 
 
@@ -225,7 +250,11 @@ def main() -> int:
     args = parser.parse_args()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    rows = clean_pool()
+    pool = clean_pool()
+    sample_rng = random.Random(SEED + ":sample")
+    sample_rng.shuffle(pool)
+    rows = pool[:SAMPLE_FOR_SPLIT]
+    print(f"split candidates: {len(rows)} of {len(pool)}", flush=True)
     cache = OUT_DIR / "clusters.json"
     if args.skip_embed and cache.exists():
         cached = json.loads(cache.read_text())
@@ -258,10 +287,13 @@ def main() -> int:
         "clean_rules": {"exam_style_regex": EXAM.pattern, "truncated_answer": True,
                         "leakage_edge_ids": LEAKAGE_EDGE_IDS, "min_input_chars": 10,
                         "citation_rate_used_as": "stratification-record-only"},
-        "pool_size": len(rows),
+        "pool_size": len(pool),
+        "sample_for_split": len(rows),
         "constant_sources": CONSTANT_SOURCES,
         "prompt_sha256": hashlib.sha256((SYSTEM_PROMPT + GUIDED_SYSTEM_SUFFIX + TASK_GUIDANCE_38).encode()).hexdigest(),
-        "embedding": {"model": EMBED_MODEL, "url": EMBED_URL, "batch": EMBED_BATCH,
+        "embedding": {"model": EMBED_MODEL, "url": EMBED_URL,
+                      "batch_items": EMBED_BATCH_ITEMS, "batch_chars": EMBED_BATCH_CHARS,
+                      "sample_for_split": SAMPLE_FOR_SPLIT,
                       "vectors_sha256": vectors_digest},
         "cluster": {"threshold_cosine": CLUSTER_THRESHOLD, "n_clusters": len(clusters),
                     "largest": sizes[:5], "singletons": sum(1 for s in sizes if s == 1)},

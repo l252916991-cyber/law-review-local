@@ -7,9 +7,7 @@
 data/
 output/
 docs/
-benchmarks/*
-!benchmarks/lawbench/
-!benchmarks/lawbench/**
+benchmarks/
 tests/
 __pycache__/
 *.pyc
