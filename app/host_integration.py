@@ -68,6 +68,14 @@ def worker_slot(directory: Path, request_id: str):
 class IsolatedHostIntegration:
     """Engineering API only. Start is accept + drive; no automatic background queue."""
 
+    runtime = ISOLATED_RUNTIME
+    graph_version = GRAPH_VERSION
+    wire_version = WIRE_VERSION
+    app_version = "isolated-host-v1"
+    application_id = "lexvault-host-isolated"
+    profile = "synthetic-v1"
+    port_type = LocalHostWritePort
+
     def __init__(self, *, framework_python: str | Path | None = None, timeout_seconds: float = 120,
                  require_execution_approval: bool = False):
         if not 0 < timeout_seconds <= 600:
@@ -87,7 +95,7 @@ class IsolatedHostIntegration:
     def accept(self, request: RunRequest) -> dict[str, Any]:
         self._path_guard()
         request.validate()
-        if (request.runtime != ISOLATED_RUNTIME or request.execution_mode != "sync"
+        if (request.runtime != self.runtime or request.execution_mode != "sync"
                 or request.model.use_llm or request.model.model is not None
                 or request.model.timeout_seconds is not None or request.use_remote_embeddings
                 or request.budget is not None or request.memory_snapshot is not None):
@@ -95,11 +103,11 @@ class IsolatedHostIntegration:
         principal = current_principal()
         if asdict(request.actor) != {"name": principal.name, "admin": principal.admin, "local": principal.local}:
             raise IdentityMismatchError("asserted actor differs from authenticated actor")
-        port = LocalHostWritePort(request.scope)
+        port = self.port_type(request.scope)
         fingerprint = compute_request_digest(request, principal_name=principal.name,
                                              effective_author=actor_name(request.user_name))
         binding, _ = framework_binding()
-        if request.framework_version not in {"", binding["version_label"]} or request.app_version not in {"", "isolated-host-v1"}:
+        if request.framework_version not in {"", binding["version_label"]} or request.app_version not in {"", self.app_version}:
             raise UnsupportedCapabilityError("unsupported requested application/framework version")
         with transaction() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -109,7 +117,7 @@ class IsolatedHostIntegration:
             existing = conn.execute("SELECT * FROM runtime_requests WHERE request_id=?", (request.request_id,)).fetchone()
             if existing:
                 if (existing["request_digest"] != fingerprint or existing["principal_name"] != principal.name
-                        or existing["case_id"] != request.scope.case_id or existing["runtime"] != ISOLATED_RUNTIME):
+                        or existing["case_id"] != request.scope.case_id or existing["runtime"] != self.runtime):
                     raise RequestConflictError("request identity conflict")
                 link = conn.execute("SELECT * FROM host_runtime_links WHERE request_id=?", (request.request_id,)).fetchone()
                 if link is None or link["source_version"] != version:
@@ -124,16 +132,20 @@ class IsolatedHostIntegration:
             conversation = conn.execute("INSERT INTO conversations(case_id,user_name,title,created_at) VALUES (?,?,?,?)",
                 (request.scope.case_id, actor_name(request.user_name), request.question[:60], now())).lastrowid
             conn.execute("INSERT INTO runtime_requests(request_id,case_id,runtime,protocol_version,run_id,job_id,created_at,request_digest,principal_name) "
-                         "VALUES (?,?,?,?,?,?,?,?,?)", (request.request_id, request.scope.case_id, ISOLATED_RUNTIME,
+                         "VALUES (?,?,?,?,?,?,?,?,?)", (request.request_id, request.scope.case_id, self.runtime,
                          request.protocol_version, run_id, request.request_id, now(), fingerprint, principal.name))
             actions = self._actions(run_id, conversation, request)
             pinned = {"framework": binding["version_label"], "wheel": binding["wheel_sha256"],
-                      "protocol": WIRE_VERSION, "graph": GRAPH_VERSION, "actor": port.principal_key,
-                      "approval": self.require_approval, "timeout_seconds": self.timeout}
+                      "protocol": self.wire_version, "graph": self.graph_version, "actor": port.principal_key,
+                      "approval": self.require_approval, "timeout_seconds": self.timeout,
+                      **self._extra_binding(request)}
             conn.execute("INSERT INTO host_runtime_links(request_id,framework_run_id,conversation_id,source_version,graph_json,binding_json,deadline) "
                          "VALUES (?,?,?,?,?,?,?)", (request.request_id, "host-" + digest([port.principal_key, request.request_id, request.scope.case_id]),
                           conversation, version, canonical(actions), canonical(pinned), time.time() + self.timeout))
             return self._handle(conn, request.request_id)
+
+    def _extra_binding(self, request):
+        return {}
 
     def _actions(self, run_id: int, conversation: int, request: RunRequest) -> list[dict[str, Any]]:
         # Explicit synthetic fixture, NOT the legal review pipeline or a quality result.
@@ -160,25 +172,28 @@ class IsolatedHostIntegration:
     def _load(self, conn, request_id: str, *, writing: bool = False):
         self._path_guard()
         isolated_guard(conn)
-        row = conn.execute("SELECT r.case_id,r.run_id,r.principal_name,l.* FROM runtime_requests r "
+        row = conn.execute("SELECT r.case_id,r.run_id,r.principal_name,r.runtime,l.* FROM runtime_requests r "
                            "JOIN host_runtime_links l USING(request_id) WHERE request_id=?", (request_id,)).fetchone()
-        if row is None:
+        if row is None or row["runtime"] != self.runtime:
             raise AccessDeniedError("request unavailable")
         scope = RunScope(row["case_id"])
         actor = authorize(scope, write=writing)
         binding = json.loads(row["binding_json"])
-        expected = {"protocol": WIRE_VERSION, "graph": GRAPH_VERSION,
+        expected = {"protocol": self.wire_version, "graph": self.graph_version,
                     "framework": self.binding["version_label"], "wheel": self.binding["wheel_sha256"]}
         if any(binding.get(key) != value for key, value in expected.items()):
             raise UnsupportedCapabilityError("saved runtime identity is unsupported; no fallback")
         if actor != binding["actor"] or current_principal().name != row["principal_name"]:
             raise AccessDeniedError("request unavailable")
-        if source_version(conn, scope, writing=writing) != row["source_version"]:
+        if self.port_type._source_version(conn, scope, writing=writing) != row["source_version"]:
             raise RequestConflictError("source changed; historical success is invalid")
         conversation = conn.execute("SELECT archived_at FROM conversations WHERE id=?", (row["conversation_id"],)).fetchone()
         if row["run_id"] is None or conversation is None or conversation[0] is not None:
             raise RequestConflictError("mapped business resources unavailable")
         return row
+
+    def _project_domain(self, conn, row, result):
+        pass
 
     def _handle(self, conn, request_id: str, *, duplicate: bool = False) -> dict[str, Any]:
         row = self._load(conn, request_id)
@@ -246,6 +261,7 @@ class IsolatedHostIntegration:
                 conn.execute("UPDATE agent_runs SET status=?,final_answer=?,finished_at=CASE WHEN finished_at='' THEN ? ELSE finished_at END WHERE id=?",
                     ("completed" if status == "succeeded" else "failed", result.get("final_output") or "",
                      now(), row["run_id"]))
+            self._project_domain(conn, row, result)
 
     def rebuild_projection(self, request_id: str) -> dict[str, Any]:
         return self.drive(request_id, command="inspect", _rebuild=True)
@@ -292,7 +308,7 @@ class IsolatedHostIntegration:
             pinned = json.loads(row["binding_json"])
         binding, wheel = framework_binding()
         expected = {"framework": binding["version_label"], "wheel": binding["wheel_sha256"],
-                    "protocol": WIRE_VERSION, "graph": GRAPH_VERSION}
+                    "protocol": self.wire_version, "graph": self.graph_version}
         if any(pinned.get(key) != value for key, value in expected.items()):
             raise UnsupportedCapabilityError("saved runtime identity is unsupported; no fallback")
         if command == "approve":
@@ -330,7 +346,6 @@ class IsolatedHostIntegration:
             files = {n: hashlib.sha256(archive.read(n)).hexdigest() for n in archive.namelist()
                      if n.startswith("forgeharness/") and n.endswith(".py")}
         scope = RunScope(row["case_id"])
-        port = LocalHostWritePort(scope)
         actions = {a["id"]: a for a in json.loads(row["graph_json"])}
         token = secrets.token_hex(32)
         # Control/reconciliation may run after the original deadline; no new tool
@@ -341,10 +356,11 @@ class IsolatedHostIntegration:
                 cwd=directory, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
                 env={"PATH": os.defpath, "LANG": "C.UTF-8", "PYTHONNOUSERSITE": "1"})
             try:
-                _send(process, {"wire_version": WIRE_VERSION, "token": token, "package_files": files,
+                _send(process, {"wire_version": self.wire_version, "profile": self.profile,
+                    "token": token, "package_files": files,
                     "version": binding["version_label"], "run_id": row["framework_run_id"],
                     "actor_id": pinned["actor"], "case_id": row["case_id"], "source_version": row["source_version"],
-                    "actions": list(actions.values()), "graph_version": GRAPH_VERSION, "command": command,
+                    "actions": list(actions.values()), "graph_version": self.graph_version, "command": command,
                     "timeout_seconds": pinned["timeout_seconds"], "deadline": row["deadline"],
                     "require_approval": pinned["approval"], "cancel": bool(row["cancel_requested"])})
                 seq = 0
@@ -353,7 +369,7 @@ class IsolatedHostIntegration:
                     pending = bytearray()
                     while True:
                         message = _read_message(process, selector, pending, deadline)
-                        if message.get("wire_version") != WIRE_VERSION or message.get("token") != token:
+                        if message.get("wire_version") != self.wire_version or message.get("token") != token:
                             raise SidecarProtocolError("sidecar authentication or version mismatch")
                         if message.get("type") == "result":
                             if message.get("artifact_verified") is not True or message.get("trace_valid") is not True:
@@ -376,24 +392,9 @@ class IsolatedHostIntegration:
                             # Framework invocation key binds the exact saved graph + run.
                             # The host selects the action and payload, never pipe content.
                             key = message.get("key")
-                            namespace = hashlib.sha256(canonical(["lexvault-host-isolated", "lexvault-local"]).encode()).hexdigest()[:24]
-                            internal_id = namespace + "." + hashlib.sha256(row["framework_run_id"].encode()).hexdigest()
-                            if key != internal_id + ":" + action["id"]:
+                            if key != self._invocation_key(row, action["id"]):
                                 raise SidecarProtocolError("invalid invocation key")
-                            if kind == "write":
-                                with transaction() as conn:
-                                    conn.execute("BEGIN IMMEDIATE")
-                                    current = self._load(conn, row["request_id"], writing=True)
-                                    response["cancel"] = bool(current["cancel_requested"])
-                                    if current["cancel_requested"] or time.time() >= row["deadline"]:
-                                        response["denied"] = "cancelled_or_expired"
-                                        receipt = None
-                                    else:
-                                        receipt = port.execute_in(conn, WriteRequest(WriteAction(action["action"]), scope, key,
-                                                                  action["payload"], row["source_version"]))
-                            else:
-                                receipt = port.query_receipt(scope, WriteAction(action["action"]), key)
-                            response["receipt"] = asdict(receipt) if receipt else None
+                            response.update(self._invoke_action(row, action, key, receipt_only=kind == "receipt"))
                         elif kind == "start":
                             with transaction() as conn:
                                 conn.execute("BEGIN IMMEDIATE")
@@ -404,8 +405,8 @@ class IsolatedHostIntegration:
                                     conn.execute("UPDATE host_runtime_links SET start_authorized=1 WHERE request_id=?", (row["request_id"],))
                                 response["start_allowed"] = allowed
                         elif kind != "validate":
-                            raise SidecarProtocolError("unknown sidecar operation")
-                        _send(process, {"wire_version": WIRE_VERSION, "token": token, "seq": seq, **response})
+                            response.update(self._extra_operation(row, kind, message))
+                        _send(process, {"wire_version": self.wire_version, "token": token, "seq": seq, **response})
                 assert process.stdin is not None
                 process.stdin.close()
                 if process.wait(timeout=max(0.1, deadline - time.monotonic())) != 0:
@@ -418,3 +419,30 @@ class IsolatedHostIntegration:
                 for pipe in (process.stdin, process.stdout):
                     if pipe is not None and not pipe.closed:
                         pipe.close()
+
+    def _invocation_key(self, row, node_id):
+        namespace = hashlib.sha256(canonical([self.application_id, "lexvault-local"]).encode()).hexdigest()[:24]
+        internal_id = namespace + "." + hashlib.sha256(row["framework_run_id"].encode()).hexdigest()
+        return internal_id + ":" + node_id
+
+    def _extra_operation(self, row, kind, message):
+        raise SidecarProtocolError("unknown sidecar operation")
+
+    def _invoke_action(self, row, action, key, *, receipt_only):
+        scope = RunScope(row["case_id"])
+        port = self.port_type(scope)
+        response = {}
+        if receipt_only:
+            receipt = port.query_receipt(scope, WriteAction(action["action"]), key)
+        else:
+            with transaction() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                current = self._load(conn, row["request_id"], writing=True)
+                response["cancel"] = bool(current["cancel_requested"])
+                if current["cancel_requested"] or time.time() >= row["deadline"]:
+                    response["denied"] = "cancelled_or_expired"
+                    receipt = None
+                else:
+                    receipt = port.execute_in(conn, WriteRequest(WriteAction(action["action"]), scope, key,
+                                              action["payload"], row["source_version"]))
+        return {**response, "receipt": asdict(receipt) if receipt else None}

@@ -1,7 +1,7 @@
 """Version 2 isolated host-write sidecar; imports only the installed wheel.
 
-This synthetic graph demonstrates the E12/E13 durable boundary. Domain review
-nodes remain on the read-only path until E07/E14 are accepted separately.
+Wire v2 retains the synthetic graph; wire v3 runs registered isolated domain
+nodes. Neither profile is a product entrypoint or a business qualification.
 """
 from __future__ import annotations
 
@@ -13,13 +13,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.forge_sources import verify_statutes  # noqa: E402
+
 import forgeharness
+from forgeharness.applications.legal.lexvault import BundleCitationVerifier, CaseBundle
 from pydantic import BaseModel, ConfigDict
+from forgeharness.tools.base import ToolErrorCode, ToolFailure
 from forgeharness.sdk import (
     Actor, BusinessReceipt, Capability, DurableGraph, DurableNode, DurableOrchestrator, Harness,
     NoopVerifier, PolicyDecision, PolicyDecisionType, ReconciledNode, ResourceScope,
     RiskLevel, RunBudget, RunContext, ToolCall, ToolEffectClass, ToolOutput, ToolSpec, Usage,
-    compose_application, verify_trace,
+    VerificationResult, compose_application, verify_trace,
 )
 
 WIRE_VERSION = 2
@@ -45,16 +50,16 @@ def send(value: dict[str, Any]) -> None:
 
 
 class Channel:
-    def __init__(self, token: str):
-        self.token, self.seq = token, 0
+    def __init__(self, token: str, wire_version: int = WIRE_VERSION):
+        self.token, self.seq, self.wire_version = token, 0, wire_version
         self.cancel_handler = None
         self.handling_cancel = False
 
     def call(self, kind: str, **fields: Any) -> dict[str, Any]:
         self.seq += 1
-        send({"wire_version": WIRE_VERSION, "token": self.token, "seq": self.seq, "type": kind, **fields})
+        send({"wire_version": self.wire_version, "token": self.token, "seq": self.seq, "type": kind, **fields})
         reply = receive()
-        if (reply.get("wire_version") != WIRE_VERSION or reply.get("token") != self.token
+        if (reply.get("wire_version") != self.wire_version or reply.get("token") != self.token
                 or reply.get("seq") != self.seq or reply.get("ok") is not True):
             raise PermissionError("host rejected sidecar operation")
         if reply.get("cancel") and self.cancel_handler is not None and not self.handling_cancel:
@@ -74,6 +79,37 @@ def output_for(receipt: dict[str, Any], source: str) -> ToolOutput:
                                               evidence_refs=("host-receipt:" + receipt["receipt_id"],)))
 
 
+def reply_output(reply, source):
+    output = output_for(reply["receipt"], source)
+    if "content" in reply:
+        output = output.model_copy(update={"content": reply["content"], "ok": reply["tool_ok"],
+            # This tool has no nested dispatch; the SDK accounts for its own
+            # physical call. Explicit zero makes a known rejection measurable.
+            "usage": Usage(), "error": None if reply["tool_ok"] else ToolFailure(
+                code=ToolErrorCode.INVALID_ARGUMENTS, message="domain source or output validation failed",
+                recoverable=False)})
+    return output
+
+
+class DomainVerifier:
+    def __init__(self, channel):
+        self.channel = channel
+
+    async def verify(self, request):
+        reply = self.channel.call("verify")
+        payload = reply["verification"]
+        if request.final.content != payload["strict_answer"]:
+            return VerificationResult(passed=False, reason="final output differs from verified domain result")
+        statutes = payload["statutory_sources"]
+        if statutes or "[statute:" in request.final.content:
+            valid, reason = verify_statutes(request.final.content, statutes, corpus_version=reply["corpus_version"])
+            if not valid:
+                return VerificationResult(passed=False, reason=reason)
+        if not payload["bundle"]["pages"]:
+            return VerificationResult(passed=bool(statutes), reason="statutory sources checked; semantics not assessed")
+        return await BundleCitationVerifier(CaseBundle.model_validate(payload["bundle"]), strict_quotes=True).verify(request)
+
+
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
     node: str
@@ -87,6 +123,8 @@ class HostWriteTool:
 
     def __init__(self, channel: Channel, source: str):
         self.channel, self.source = channel, source
+        if channel.wire_version == 3:
+            self.spec = self.spec.model_copy(update={"description": "Execute one registered isolated legal domain node"})
 
     async def execute(self, arguments, context):
         if not context.idempotency_key:
@@ -94,7 +132,7 @@ class HostWriteTool:
         response = self.channel.call("write", node=arguments.node, key=context.idempotency_key)
         if response.get("denied"):
             return ToolOutput(ok=False, content="host admission cancelled or expired; no business effect")
-        return output_for(response["receipt"], self.source)
+        return reply_output(response, self.source)
 
 
 class Policy:
@@ -119,21 +157,25 @@ class NoModel:
 
 async def main() -> None:
     init = receive()
-    if (init.get("wire_version") != WIRE_VERSION or init.get("version") != forgeharness.__version__
+    domain = init.get("wire_version") == 3 and init.get("profile") == "domain-v1"
+    if ((not domain and (init.get("wire_version") != WIRE_VERSION or init.get("profile", "synthetic-v1") != "synthetic-v1"))
+            or init.get("version") != forgeharness.__version__
             or forgeharness.__version__ != "0.8.3" or sys.version_info[:2] != (3, 12)):
         raise ValueError("unsupported host-write sidecar identity")
     distribution = importlib.metadata.distribution("forgeharness")
     for name, expected in init["package_files"].items():
         if hashlib.sha256(Path(distribution.locate_file(name)).read_bytes()).hexdigest() != expected:
             raise ValueError("installed framework differs from the bound wheel")
-    channel = Channel(init["token"])
+    channel = Channel(init["token"], init["wire_version"])
     tool = HostWriteTool(channel, init["source_version"])
-    nodes = tuple(DurableNode(id=a["id"], kind="tool",
-                             dependencies=("joined",) if set(a["dependencies"]) == {"step", "gap"} else tuple(a["dependencies"]),
+    nodes = tuple(DurableNode(id=a["id"], kind="join", dependencies=tuple(a["dependencies"]))
+                  if a.get("kind") == "join" else DurableNode(id=a["id"], kind="tool",
+                             dependencies=("joined",) if not domain and set(a["dependencies"]) == {"step", "gap"} else tuple(a["dependencies"]),
                              call=ToolCall(id=a["id"], name="host_write", arguments={"node": a["id"]}),
                              max_usage=Usage(tool_calls=1)) for a in init["actions"])
-    nodes += (DurableNode(id="joined", kind="join", dependencies=("step", "gap")),)
-    graph = DurableGraph(version=init["graph_version"], model_identity="disabled-synthetic-v1",
+    if not domain:
+        nodes += (DurableNode(id="joined", kind="join", dependencies=("step", "gap")),)
+    graph = DurableGraph(version=init["graph_version"], model_identity="disabled-domain-v1" if domain else "disabled-synthetic-v1",
         resource_versions={"case": init["source_version"], "deadline": str(init["deadline"]),
                            "actions": hashlib.sha256(json.dumps(init["actions"], sort_keys=True,
                                       ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()},
@@ -144,17 +186,18 @@ async def main() -> None:
         return True
 
     async def reconcile(context, node, key):
-        receipt = channel.call("receipt", node=node.id, key=key)["receipt"]
-        if receipt is None:
+        reply = channel.call("receipt", node=node.id, key=key)
+        if reply["receipt"] is None:
             # No receipt does not prove a dispatched call was never accepted.
             return None
-        return ReconciledNode(output=output_for(receipt, init["source_version"]).model_dump(mode="json"),
-                              usage=Usage(tool_calls=1), evidence_refs=("host-receipt:" + receipt["receipt_id"],))
+        return ReconciledNode(output=reply_output(reply, init["source_version"]).model_dump(mode="json"),
+                              usage=Usage(tool_calls=1), evidence_refs=("host-receipt:" + reply["receipt"]["receipt_id"],))
 
-    app = compose_application(id="lexvault-host-isolated", version="1", policy_version="1",
+    app = compose_application(id="lexvault-domain-isolated" if domain else "lexvault-host-isolated", version="1", policy_version="1",
         model_factory=NoModel, capabilities=(Capability("host-writes-v1", tools=(tool,)),),
-        policy=Policy(channel, init["require_approval"]), verifier=NoopVerifier(),
-        budget=RunBudget(max_steps=1, max_tool_calls=len(init["actions"]), max_wall_seconds=init["timeout_seconds"]))
+        policy=Policy(channel, init["require_approval"]), verifier=DomainVerifier(channel) if domain else NoopVerifier(),
+        budget=RunBudget(max_steps=1, max_tool_calls=sum(a.get("kind") != "join" for a in init["actions"]),
+                         max_wall_seconds=init["timeout_seconds"]))
     # authorize_run is a trusted host callback, independent of tool policy.
     from dataclasses import replace
     app = replace(app, authorize_run=validate)
@@ -177,7 +220,8 @@ async def main() -> None:
             raise ValueError("framework state not yet created")
         if not channel.call("start")["start_allowed"]:
             raise ValueError("missing durable state after start authorization; reconciliation required")
-        result = await harness.run(context=context, task="Synthetic host writes; no legal conclusion or model inference.")
+        result = await harness.run(context=context, task="Isolated domain review; sources require lawyer review." if domain
+                                   else "Synthetic host writes; no legal conclusion or model inference.")
     else:
         if init["cancel"]:
             harness.cancel(context)
@@ -197,7 +241,7 @@ async def main() -> None:
         raise ValueError("invalid framework trace")
     events = [{"host_event_version": 1, **entry["event"]["payload"]} for line in trace_path.read_text().splitlines()
               if (entry := json.loads(line))["event"]["type"] == "orchestration.transition"]
-    send({"wire_version": WIRE_VERSION, "token": init["token"], "type": "result",
+    send({"wire_version": init["wire_version"], "token": init["token"], "type": "result",
           "artifact_verified": True, "trace_valid": True, "events": events,
           "result": {"revision": state.revision, "status": result.status.value, "usage": result.usage.model_dump(mode="json"),
                      "final_output": result.final_output, "error": result.error,

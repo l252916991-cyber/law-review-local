@@ -105,6 +105,8 @@ class ReadonlyCaseSession:
     The framework receives node results, not SQL, database paths or credentials.
     """
 
+    read_port_type = LocalHostReadPort
+
     def __init__(self, request: RunRequest, *, max_pages: int = 500,
                  max_chars: int = 2_000_000) -> None:
         request.validate()
@@ -160,7 +162,7 @@ class ReadonlyCaseSession:
                             columns = ",".join('"' + name.replace('"', '""') + '"' for name in row)
                             markers = ",".join("?" for _ in row)
                             target.execute(f'INSERT INTO "{table}" ({columns}) VALUES ({markers})', tuple(row.values()))
-            self.port = LocalHostReadPort(
+            self.port = self.read_port_type(
                 request.scope,
                 access_recorder=self._record_port_access,
                 expected_source_identity=self._case_identity,

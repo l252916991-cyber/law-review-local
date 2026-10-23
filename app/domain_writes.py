@@ -34,7 +34,8 @@ class DomainHostWritePort(LocalHostWritePort):
         FIELDS[WriteAction.CONVERSATION_MESSAGE][1] | {"strict_answer", "statutory_sources"},
     )
 
-    def _source_version(self, conn, scope, *, writing=False):
+    @classmethod
+    def _source_version(cls, conn, scope, *, writing=False):
         return digest({"domain_source": 1, "host": source_version(conn, scope, writing=writing),
                        "corpus": corpus_identity()})
 

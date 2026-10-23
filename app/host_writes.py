@@ -141,7 +141,7 @@ class LocalHostWritePort:
 
     def __init__(self, scope: RunScope):
         self.scope, self.path = scope, get_db_path().resolve()
-        self.principal_key = authorize(scope, write=True)
+        self.principal_key = authorize(scope)
         with closing(connect()) as conn:
             isolated_guard(conn)
 
@@ -153,7 +153,8 @@ class LocalHostWritePort:
         isolated_guard(conn)
         return self._source_version(conn, scope, writing=write)
 
-    def _source_version(self, conn, scope, *, writing=False):
+    @classmethod
+    def _source_version(cls, conn, scope, *, writing=False):
         return source_version(conn, scope, writing=writing)
 
     def current_version(self) -> str:

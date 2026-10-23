@@ -808,7 +808,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             """
             UPDATE agent_runs SET status='failed', final_answer='服务重启：运行已中断，可安全重试',
                                   finished_at=?, total_ms=0
-            WHERE status='running' AND runtime != 'forgeharness-isolated-v1'
+            WHERE status='running' AND runtime NOT IN ('forgeharness-isolated-v1','forgeharness-domain-isolated-v1')
             """,
                 (now(),),
             )
