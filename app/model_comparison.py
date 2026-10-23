@@ -128,10 +128,17 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
                 failed = conn.execute("SELECT output_json FROM agent_steps WHERE run_id=? "
                     "AND node_name='finish' AND status='failed'", (row["run_id"],)).fetchone()
                 failure_value = json.loads(failed[0])["value"] if failed else {}
+                call_count, input_tokens, output_tokens, unknown_calls = conn.execute(
+                    "SELECT COUNT(*),COALESCE(SUM(input_tokens),0),COALESCE(SUM(output_tokens),0),"
+                    "COALESCE(SUM(status!='completed'),0) FROM host_backend_calls WHERE request_id=?",
+                    (request.request_id,)).fetchone()
+                candidate_usage = {"calls": call_count, "input_tokens": input_tokens,
+                                   "output_tokens": output_tokens, "unknown_usage": unknown_calls}
         if candidate["needs_reconciliation"]:
             raise BackendUnknown("candidate requires reconciliation; comparison stopped without retry")
         retrieval = deepcopy(outputs["retrieve"])
         refusal = failure_value.get("answerability")
+        candidate_decision = (refusal or outputs.get("finish", {}).get("answerability") or {}).get("decision")
         rejected = False
         if refusal and failure_value.get("diagnostic", {}).get("code") == "answerability_rejected":
             measured_decision = parse_decision(outputs["critic-model"]["action"]["content"], retrieval["contexts"])
@@ -206,6 +213,7 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             "local_prompt_version": LOCAL_PROMPT_VERSION, "measurement_valid": models.transport is None,
             "candidate": candidate, "candidate_elapsed_seconds": elapsed,
             "answerability_policy": policy_identity(), "candidate_business_outcome": outcome,
+            "candidate_decision": candidate_decision, "candidate_usage": candidate_usage,
             "native_baseline": native_identity, "candidate_prompt_version": POLICY_VERSION,
             "candidate_refusal": refusal, "candidate_failure": failure_value.get("diagnostic"),
             "candidate_answer": outputs.get("finish", {}).get("answer"),

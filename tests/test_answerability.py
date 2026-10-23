@@ -5,8 +5,10 @@ from contextlib import closing
 
 import pytest
 
-from app.answerability import parse_decision
+from app.answerability import (ANSWERABILITY_GRAMMAR, GRAMMAR_VERSION, answerability_payload,
+                                parse_decision, policy_identity)
 from app.db import connect
+from app.local_backends import LocalModels
 from app.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError, UnsupportedCapabilityError
 from tests.test_candidate_domain import candidate, candidate_request, actual  # noqa: F401
 from tests.test_domain_writes import domain  # noqa: F401
@@ -29,12 +31,37 @@ def test_decision_contract_and_honest_scope(decision):
     assert result["decision"] == decision and not result["semantic_entailment_checked"]
 
 
+def test_grammar_binding_and_payload_are_explicit(local_models):
+    fixture, _ = local_models
+    names = {kind: kind for kind in ("llm", "embedding", "reranker")}
+    plain = LocalModels(endpoint=fixture.endpoint, identities=fixture.identities, models=names)
+    grammar = LocalModels(endpoint=fixture.endpoint, identities=fixture.identities, models=names,
+                          answerability_grammar=True)
+
+    assert "answerability_grammar" not in plain.binding
+    assert grammar.binding["answerability_grammar"] == GRAMMAR_VERSION
+    assert grammar.fingerprint != plain.fingerprint
+    assert "guided_grammar" not in answerability_payload(plain, "问题", "route", CONTEXTS)
+    payload = answerability_payload(grammar, "问题", "route", CONTEXTS)
+    assert payload["guided_grammar"] == ANSWERABILITY_GRAMMAR
+    assert "问题：问题" in payload["messages"][1]["content"]
+    assert "route" not in payload["messages"][1]["content"]
+    assert policy_identity()["grammar_version"] == GRAMMAR_VERSION
+
+
 def test_host_supplies_review_reminder_without_relaxing_model_negation():
     result = parse_decision(json.dumps(verdict()), CONTEXTS)
     assert result["host_review_reminder_added"]
     assert result["answer"].endswith("请律师复核原文与上述结论。")
     with pytest.raises(ContractValidationError):
         parse_decision(json.dumps(verdict(findings=[{"text": "无需律师复核。", "sources": [1]}])), CONTEXTS)
+
+
+def test_explicit_no_record_is_a_supported_limited_scope_answer():
+    decision = verdict(findings=[{"text": "本次材料未见交付回执。", "sources": [1]}])
+    result = parse_decision(json.dumps(decision), CONTEXTS)
+    assert result["decision"] == "supported"
+    assert "未见" in result["answer"] and result["answer_sources"] == [1]
 
 
 def test_sources_are_derived_from_actual_answer_and_range_checked():

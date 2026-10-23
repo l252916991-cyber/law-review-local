@@ -45,8 +45,10 @@ def local_models(domain, tmp_path):
         if kind == "llm":
             answer = "合成审批记录 [资料1]。请律师复核原文与上述结论。"
             if "candidate-answerability-" in payload["messages"][0]["content"]:
-                query = json.loads(payload["messages"][1]["content"])
-                rejected = "量子香蕉" in query["question"] or not query["documents"]
+                user_content = payload["messages"][1]["content"]
+                question = user_content.split("\n", 1)[0].removeprefix("问题：")
+                has_documents = any(line.startswith("[") for line in user_content.splitlines())
+                rejected = "量子香蕉" in question or not has_documents
                 answer = json.dumps({"decision": "unrelated" if rejected else "supported",
                     "reason": "synthetic model decision fixture; not a semantic measurement",
                     "findings": [] if rejected else [{"text": "合成审批记录需核验。", "sources": [1]}]}, ensure_ascii=False)

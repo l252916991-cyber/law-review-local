@@ -24,7 +24,7 @@ class BackendUnknown(RuntimeError):
 
 class LocalModels:
     def __init__(self, *, endpoint, identities, models, temperature=0.2, max_tokens=900, transport=None,
-                 exclusive_residency=False):
+                 exclusive_residency=False, answerability_grammar=False):
         parsed = urlsplit(endpoint)
         if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "::1"}
                 or parsed.username or parsed.password or parsed.query or parsed.fragment
@@ -37,10 +37,13 @@ class LocalModels:
             raise ContractValidationError("all three local backend identities are required")
         if type(exclusive_residency) is not bool:
             raise ContractValidationError("exclusive residency requires explicit trusted host configuration")
+        if type(answerability_grammar) is not bool:
+            raise ContractValidationError("answerability grammar requires explicit trusted host configuration")
         self.endpoint = endpoint.rstrip("/")
         self.models, self.identities = deepcopy(models), deepcopy(identities)
         self.temperature, self.max_tokens, self.transport = temperature, max_tokens, transport
         self.exclusive_residency = exclusive_residency
+        self.answerability_grammar = answerability_grammar
         self._stats = {}
         for name in set(models.values()):
             entry = self.identities[name]
@@ -70,6 +73,8 @@ class LocalModels:
             "measurement_valid": transport is None}
         if self.exclusive_residency:
             self.binding["local_service_policy"] = "omlx-exclusive-residency-v1"
+        if self.answerability_grammar:
+            self.binding["answerability_grammar"] = "omlx-guided-grammar-v1"
         self.fingerprint = digest(self.binding)
 
     @staticmethod
@@ -84,6 +89,8 @@ class LocalModels:
             "measurement_valid": self.transport is None}
         if self.exclusive_residency:
             current["local_service_policy"] = "omlx-exclusive-residency-v1"
+        if self.answerability_grammar:
+            current["answerability_grammar"] = "omlx-guided-grammar-v1"
         if digest(current) != self.fingerprint or digest(self.binding) != self.fingerprint:
             raise RequestConflictError("local backend configuration changed")
         for path, expected in self._stats.items():

@@ -198,8 +198,9 @@ calls = root / 'provider-calls.jsonl'
 def transport(kind,payload,timeout):
     assert kind == 'llm'
     with calls.open('a') as stream: stream.write(json.dumps({'kind':kind}) + '\n')
-    query = json.loads(payload['messages'][1]['content'])
-    refusal = query['question'] == '验证无关材料拒绝'
+    user_content = payload['messages'][1]['content']
+    question = user_content.split('\n', 1)[0].removeprefix('问题：')
+    refusal = question == '验证无关材料拒绝'
     content = {'decision':'unrelated' if refusal else 'supported','reason':'release protocol fixture, not a semantic measurement',
                'findings':[] if refusal else [{'text':'审批记录尚需核验。','sources':[1]}]}
     return {'model':'llm','choices':[{'finish_reason':'stop','message':{'content':json.dumps(content,ensure_ascii=False)}}],

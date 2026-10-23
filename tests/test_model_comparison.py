@@ -33,6 +33,8 @@ def test_paired_models_keep_source_unchanged_and_separate_measurements(local_mod
     assert report["engineering_passed"], json.dumps(report, ensure_ascii=False, indent=2)
     assert report["source_unchanged"] and not report["g2_accepted"] and not report["measurement_valid"]
     assert report["candidate"]["status"] == ("succeeded" if expected == "success" else "failed")
+    assert report["candidate_usage"]["calls"] >= 3 and report["candidate_usage"]["unknown_usage"] == 0
+    assert report["candidate_decision"] == ("supported" if expected == "success" else "unrelated")
     shared, independent = report["comparisons"]
     assert shared["mode"] == "shared_retrieval_and_memory_snapshot"
     assert independent["mode"] == "independent_retrieval_and_memory"
