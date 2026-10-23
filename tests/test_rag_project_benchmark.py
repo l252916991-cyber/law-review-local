@@ -1,0 +1,642 @@
+from __future__ import annotations
+
+from app.rag_benchmark_dataset import (
+    LONG_PAGE_V2_VERSION,
+    LONG_PAGE_VERSION,
+    build_long_page_benchmark,
+    build_long_page_v2_benchmark,
+)
+from app.rag_chunks import page_chunks
+from rag_project_benchmark import (
+    paired_channel_comparison,
+    paired_comparison,
+    paired_run_comparison,
+    paired_window_comparison,
+    score_query,
+    summarize,
+)
+import pytest
+
+
+def item(expected):
+    return {
+        "id": "RAG-01-Q01",
+        "template_id": "Q01",
+        "case_key": "RAG-01",
+        "challenge": "multi_source" if expected else "hard_unanswerable",
+        "query": "测试问题",
+        "expected": expected,
+    }
+
+
+def metrics():
+    return {
+        "degraded": True,
+        "embedding": {"backend": "hashed-local"},
+        "reranker": {"enabled": False},
+    }
+
+
+def full_metrics():
+    return {
+        "degraded": False,
+        "embedding": {"backend": "omlx"},
+        "reranker": {"enabled": True},
+    }
+
+
+def test_answerable_pass_requires_complete_page_recall():
+    expected = [{"document": "a.txt", "page": 1}, {"document": "a.txt", "page": 2}]
+    hits = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}]
+
+    record = score_query(item(expected), hits, metrics(), 3)
+
+    assert record["recall_at_k"] == 0.5
+    assert record["page_precision_at_k"] == 1.0
+    assert record["within_document_page_precision"] == 1.0
+    assert record["complete_recall"] is False
+    assert record["passed"] is False
+
+
+def test_paired_comparison_rejects_changed_labels():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    assert paired_comparison([row], [row])["recall_at_k"]["delta"] == 0
+    assert paired_comparison([row], [row])["recall_at_k"]["paired_query_count"] == 1
+    with pytest.raises(ValueError, match="labels differ"):
+        paired_comparison([row], [{**row, "expected": []}])
+    with pytest.raises(ValueError, match="unique identical"):
+        paired_comparison([row, row], [row])
+
+
+def test_paired_run_comparison_requires_only_page_children_to_differ():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    baseline_summary = {
+        "dataset": LONG_PAGE_VERSION,
+        "dataset_sha256": "frozen-hash",
+        "k": 2,
+        "configuration": {
+            "embedding_mode": "hashed-local",
+            "reranker": "off",
+            "page_children": "False",
+        },
+    }
+    candidate_summary = {
+        **baseline_summary,
+        "configuration": {**baseline_summary["configuration"], "page_children": "True"},
+    }
+
+    report = paired_run_comparison(baseline_summary, candidate_summary, [row], [row])
+
+    assert report["comparison"] == "two_complete_retrieval_paths_diagnostic"
+    assert report["causal_attribution"] == "not_a_pure_chunking_ablation"
+    assert report["controls"]["k"] == 2
+    assert report["controls"]["dataset_sha256"] == "frozen-hash"
+    assert report["metrics"]["recall_at_k"]["paired_query_count"] == 1
+
+    for changed, message in (
+        ({**candidate_summary, "k": 3}, "identical k"),
+        ({**candidate_summary, "dataset_sha256": "changed"}, "dataset_sha256"),
+        (
+            {
+                **candidate_summary,
+                "configuration": {**candidate_summary["configuration"], "reranker": "on"},
+            },
+            "run mode",
+        ),
+        ({**candidate_summary, "configuration": baseline_summary["configuration"]}, "page-level baseline"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            paired_run_comparison(baseline_summary, changed, [row], [row])
+
+    missing_hash = {key: value for key, value in candidate_summary.items() if key != "dataset_sha256"}
+    with pytest.raises(ValueError, match="present dataset_sha256"):
+        paired_run_comparison(baseline_summary, missing_hash, [row], [row])
+
+    changed_runtime = {**row, "retrieval": full_metrics()}
+    with pytest.raises(ValueError, match="actual runtime"):
+        paired_run_comparison(baseline_summary, candidate_summary, [row], [changed_runtime])
+
+    missing_runtime = {**row, "retrieval": {"embedding": {"backend": "hashed-local"}}}
+    with pytest.raises(ValueError, match="runtime telemetry"):
+        paired_run_comparison(baseline_summary, candidate_summary, [row], [missing_runtime])
+
+
+def test_long_page_v2_dataset_is_frozen_deep_and_chunk_triggering():
+    rows = build_long_page_v2_benchmark()
+
+    assert len(rows) == 24
+    assert len({row["id"] for row in rows}) == 24
+    assert len({row["query"] for row in rows}) == 24
+    assert len({row["cluster_id"] for row in rows}) == 8
+    # Exactly one template per case, so the template-cluster bootstrap is also a
+    # per-case cluster bootstrap for this suite.
+    assert {row["template_id"] for row in rows} == {row["cluster_id"] for row in rows}
+    assert {row["challenge"] for row in rows} == {
+        "long_page_dilution",
+        "similar_neighbor_interference",
+        "cross_page_two_aspects",
+    }
+
+    for row in rows:
+        pages_by_document = {document["name"]: document["pages"] for document in row["documents"]}
+        expected = {(gold["document"], gold["page"]) for gold in row["expected"]}
+        facts = {(fact["document"], fact["page"]) for fact in row["gold_facts"]}
+        assert expected == facts
+        for fact in row["gold_facts"]:
+            page_text = pages_by_document[fact["document"]][fact["page"] - 1]
+            assert page_text.count(fact["text"]) == 1
+
+    for row in (row for row in rows if row["challenge"] == "long_page_dilution"):
+        page_text = row["documents"][0]["pages"][0]
+        fact = row["gold_facts"][0]
+        assert len(page_text) >= 2000
+        # The gold fact is past the first 400-character chunk window and the page
+        # really does split, so scoring a child hit is not a no-op on this suite.
+        assert page_text.index(fact["text"]) >= 400
+        assert len(page_chunks(page_text)) > 1
+
+    children_per_case = {
+        row["case_key"]: sum(len(page_chunks(page)) for page in row["documents"][0]["pages"])
+        for row in rows
+    }
+    # Every case must fit the exact-scan budget, and the distractor pages must be
+    # numerous enough that k is smaller than the candidate pool.
+    assert max(children_per_case.values()) < 10_000
+    assert min(len(row["documents"][0]["pages"]) for row in rows) >= 8
+
+
+def test_long_page_dataset_is_frozen_and_fact_grounded():
+    rows = build_long_page_benchmark()
+
+    assert len(rows) == 12
+    assert len({row["id"] for row in rows}) == 12
+    assert len({row["query"] for row in rows}) == 12
+    assert len({row["cluster_id"] for row in rows}) == 4
+    assert {row["template_id"] for row in rows} == {row["cluster_id"] for row in rows}
+    assert {row["diagnostic_provenance"] for row in rows} == {
+        "synthetic_long_page_diagnostic"
+    }
+    assert {row["challenge"] for row in rows} == {
+        "long_page_dilution",
+        "similar_neighbor_interference",
+        "cross_page_two_aspects",
+    }
+
+    for row in rows:
+        pages_by_document = {
+            document["name"]: document["pages"] for document in row["documents"]
+        }
+        expected = {(gold["document"], gold["page"]) for gold in row["expected"]}
+        facts = {(fact["document"], fact["page"]) for fact in row["gold_facts"]}
+        assert expected == facts
+        for fact in row["gold_facts"]:
+            pages = pages_by_document[fact["document"]]
+            assert 1 <= fact["page"] <= len(pages)
+            page_text = pages[fact["page"] - 1]
+            assert page_text.count(fact["text"]) == 1
+
+    long_page_rows = [row for row in rows if row["challenge"] == "long_page_dilution"]
+    assert len(long_page_rows) == 4
+    for row in long_page_rows:
+        fact = row["gold_facts"][0]
+        page_text = row["documents"][0]["pages"][fact["page"] - 1]
+        fact_offset = page_text.index(fact["text"])
+        assert len(page_text) > 1200
+        assert fact_offset >= 400
+        assert page_text.count("\n\n") >= 8
+
+    cross_page_rows = [row for row in rows if row["challenge"] == "cross_page_two_aspects"]
+    assert len(cross_page_rows) == 4
+    assert all(len({gold["page"] for gold in row["expected"]}) == 2 for row in cross_page_rows)
+
+
+def test_hard_unanswerable_requires_empty_retrieval():
+    hits = [{"name": "similar.txt", "page_no": 1, "rank": 1, "quote": "词面相似"}]
+
+    record = score_query(item([]), hits, metrics(), 3)
+
+    assert record["recall_at_k"] is None
+    assert record["mrr"] is None
+    assert record["within_document_page_precision"] is None
+    assert record["unanswerable_correctly_empty"] is False
+    assert record["passed"] is False
+
+
+def test_within_document_page_precision_excludes_other_documents():
+    expected = [
+        {"document": "gold.txt", "page": 1},
+        {"document": "gold.txt", "page": 3},
+    ]
+    hits = [
+        {"name": "gold.txt", "page_no": 1, "rank": 1, "quote": "命中"},
+        {"name": "gold.txt", "page_no": 2, "rank": 2, "quote": "同文档错页"},
+        {"name": "other.txt", "page_no": 1, "rank": 3, "quote": "跨文档"},
+    ]
+
+    record = score_query(item(expected), hits, metrics(), 3)
+
+    assert record["recall_at_k"] == 0.5
+    assert record["page_precision_at_k"] == 0.3333
+    assert record["within_document_page_precision"] == 0.5
+
+
+def test_within_document_page_precision_is_null_without_gold_document_hit():
+    expected = [{"document": "gold.txt", "page": 1}]
+    hits = [{"name": "other.txt", "page_no": 1, "rank": 1, "quote": "跨文档"}]
+
+    record = score_query(item(expected), hits, metrics(), 3)
+    empty_record = score_query(item(expected), [], metrics(), 3)
+
+    assert record["page_precision_at_k"] == 0.0
+    assert record["within_document_page_precision"] is None
+    assert empty_record["page_precision_at_k"] == 0.0
+    assert empty_record["within_document_page_precision"] is None
+
+
+def test_summary_reports_observed_runtime_and_cluster_interval():
+    first = score_query(
+        item([{"document": "a.txt", "page": 1}]),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}],
+        metrics(),
+        3,
+    )
+    second_item = {**item([]), "id": "RAG-01-Q02", "template_id": "Q02"}
+    second = score_query(second_item, [], metrics(), 5)
+
+    report = summarize(
+        [first, second],
+        dataset_version="fixture-v1",
+        k=5,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+    )
+
+    assert report["complete_recall_rate"] == 1.0
+    assert report["unanswerable_empty_rate"] == 1.0
+    assert report["observed"]["embedding_backends"] == {"hashed-local": 2}
+    assert report["observed"]["degraded_queries"] == 2
+    assert report["observed"]["reranker_enabled_queries"] == 0
+    assert report["template_cluster_bootstrap_95ci"]["recall_at_k"] == [1.0, 1.0]
+    runtime = report["by_runtime"]["embedding=hashed-local|degraded=true|reranker=false"]
+    assert runtime["embedding_backend"] == "hashed-local"
+    assert runtime["degraded"] is True
+    assert runtime["reranker_enabled"] is False
+    assert runtime["queries"] == 2
+    assert runtime["within_document_page_precision"] == 1.0
+    assert runtime["within_document_page_precision_query_count"] == 1
+
+
+def test_summary_separates_mixed_observed_runtimes():
+    expected = [{"document": "a.txt", "page": 1}]
+    hit = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}]
+    degraded = score_query(item(expected), hit, metrics(), 3)
+    full_item = {**item(expected), "id": "RAG-02-Q01", "case_key": "RAG-02"}
+    full = score_query(full_item, hit, full_metrics(), 4)
+
+    report = summarize(
+        [degraded, full],
+        dataset_version="fixture-v1",
+        k=5,
+        configuration={"embedding_mode": "model", "reranker": "on"},
+        dataset_sha256="fixture",
+    )
+
+    assert list(report["by_runtime"]) == [
+        "embedding=hashed-local|degraded=true|reranker=false",
+        "embedding=omlx|degraded=false|reranker=true",
+    ]
+    assert report["by_runtime"]["embedding=hashed-local|degraded=true|reranker=false"]["queries"] == 1
+    assert report["by_runtime"]["embedding=omlx|degraded=false|reranker=true"]["queries"] == 1
+    assert report["observed"]["degraded_queries"] == 1
+    assert report["observed"]["reranker_enabled_queries"] == 1
+
+
+@pytest.mark.parametrize("unknown_metrics", [
+    {"embedding": {"backend": "omlx"}},
+    {
+        "degraded": None,
+        "embedding": {"backend": "omlx"},
+        "reranker": {"enabled": None},
+    },
+])
+def test_summary_does_not_merge_unknown_runtime_telemetry_with_explicit_false(unknown_metrics):
+    expected = [{"document": "a.txt", "page": 1}]
+    hit = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}]
+    explicit = score_query(item(expected), hit, {
+        "degraded": False,
+        "embedding": {"backend": "omlx"},
+        "reranker": {"enabled": False},
+    }, 3)
+    unknown_item = {**item(expected), "id": "RAG-02-Q01", "case_key": "RAG-02"}
+    unknown = score_query(unknown_item, hit, unknown_metrics, 4)
+
+    report = summarize(
+        [explicit, unknown],
+        dataset_version="fixture-v1",
+        k=5,
+        configuration={"embedding_mode": "model", "reranker": "off"},
+        dataset_sha256="fixture",
+    )
+
+    assert set(report["by_runtime"]) == {
+        "embedding=omlx|degraded=false|reranker=false",
+        "embedding=omlx|degraded=unknown|reranker=unknown",
+    }
+    unknown_group = report["by_runtime"]["embedding=omlx|degraded=unknown|reranker=unknown"]
+    assert unknown_group["degraded"] is None
+    assert unknown_group["reranker_enabled"] is None
+    assert unknown_group["queries"] == 1
+
+
+def test_new_metric_ignores_missing_legacy_values_in_summaries_and_comparison():
+    expected = [{"document": "a.txt", "page": 1}]
+    hit = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}]
+    current = score_query(item(expected), hit, metrics(), 3)
+    legacy = {key: value for key, value in current.items() if key != "within_document_page_precision"}
+
+    report = summarize(
+        [legacy],
+        dataset_version="fixture-v1",
+        k=5,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+    )
+    comparison = paired_comparison([legacy], [current])
+
+    assert report["within_document_page_precision"] is None
+    assert report["template_cluster_bootstrap_95ci"]["within_document_page_precision"] is None
+    runtime = report["by_runtime"]["embedding=hashed-local|degraded=true|reranker=false"]
+    assert runtime["within_document_page_precision"] is None
+    assert comparison["within_document_page_precision"] == {
+        "delta": None,
+        "cluster_bootstrap_95ci": None,
+        "paired_query_count": 0,
+    }
+
+
+@pytest.mark.parametrize(("results", "k", "message"), [([], 5, "results"), ([{}], 0, "k")])
+def test_summary_rejects_invalid_benchmark_boundaries(results, k, message):
+    with pytest.raises(ValueError, match=message):
+        summarize(
+            results,
+            dataset_version="fixture-v1",
+            k=k,
+            configuration={},
+            dataset_sha256="fixture",
+        )
+
+
+def _child_metrics(**overrides):
+    metrics = {
+        "degraded": True,
+        "embedding": {"backend": "hashed-local"},
+        "reranker": {"enabled": False},
+        "child_count": 12,
+        "embedded_child_count": 12,
+        "reused_child_count": 0,
+        "rerank_candidate_count": 12,
+        "index_search": "exact_scan",
+        "index_storage": "sqlite_persistent",
+        "child_retrieval": {"requested": True, "used": True},
+    }
+    metrics.update(overrides)
+    return metrics
+
+
+def _child_row(question_id, *, latency, cold, metrics=None):
+    row = score_query(
+        item([{"document": "a.txt", "page": 1}]),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "命中"}],
+        metrics if metrics is not None else _child_metrics(),
+        latency,
+        child_index_cold=cold,
+    )
+    return {**row, "id": question_id}
+
+
+def test_summary_reports_percentiles_and_cold_warm_latency_split():
+    results = [
+        _child_row("Q1", latency=100, cold=True),
+        _child_row("Q2", latency=10, cold=False),
+        _child_row("Q3", latency=12, cold=False),
+        _child_row("Q4", latency=14, cold=False),
+    ]
+
+    report = summarize(
+        results,
+        dataset_version=LONG_PAGE_V2_VERSION,
+        k=3,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+        child_chunk_profile="sentence-400",
+    )
+
+    latency = report["latency"]
+    assert latency["cold_query_count"] == 1
+    assert latency["cold_average_latency_ms"] == 100
+    assert latency["warm_average_latency_ms"] == 12
+    # The mean is dragged up by the single cold query, which is exactly why the
+    # split and p95 are reported alongside it.
+    assert latency["average_latency_ms"] == 34
+    assert latency["p50_latency_ms"] == 12
+    assert latency["p95_latency_ms"] == 100
+    assert report["child_chunk_profile"] == "sentence-400"
+    assert report["child_index"]["case_count"] == 1
+    assert report["child_index"]["cases"]["RAG-01"]["child_count"] == 12
+    assert report["child_retrieval_runtime"] == {"child_used_queries": 4, "fallback_reasons": {}}
+
+
+def test_summary_counts_page_level_child_fallbacks():
+    fallen_back = _child_metrics(
+        child_retrieval={
+            "requested": True, "used": False, "fallback_reason": "child_scan_budget_exceeded",
+        },
+    )
+    results = [
+        _child_row("Q1", latency=5, cold=False, metrics=fallen_back),
+        _child_row("Q2", latency=7, cold=False),
+    ]
+
+    report = summarize(
+        results,
+        dataset_version=LONG_PAGE_V2_VERSION,
+        k=3,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+        child_chunk_profile="sentence-400",
+    )
+
+    assert report["child_retrieval_runtime"] == {
+        "child_used_queries": 1,
+        "fallback_reasons": {"child_scan_budget_exceeded": 1},
+    }
+
+
+def _children_summary(profile, **overrides):
+    summary = {
+        "dataset": LONG_PAGE_V2_VERSION,
+        "dataset_sha256": "frozen-hash",
+        "k": 3,
+        "child_chunk_profile": profile,
+        "configuration": {
+            "embedding_mode": "hashed-local",
+            "reranker": "off",
+            "page_children": "True",
+            "child_chunk_profile": profile,
+        },
+    }
+    summary.update(overrides)
+    return summary
+
+
+def test_paired_window_comparison_isolates_the_chunk_window():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    baseline = _children_summary("whole-page")
+    candidate = _children_summary("sentence-400")
+
+    report = paired_window_comparison(baseline, candidate, [row], [row])
+
+    assert report["comparison"] == "child_chunk_window_ablation"
+    assert report["controls"]["baseline_child_chunk_profile"] == "whole-page"
+    assert report["controls"]["candidate_child_chunk_profile"] == "sentence-400"
+    assert report["metrics"]["recall_at_k"]["paired_query_count"] == 1
+
+    for changed, message in (
+        (_children_summary("whole-page", k=5), "identical k"),
+        (
+            {
+                **candidate,
+                "configuration": {**candidate["configuration"], "page_children": "False"},
+            },
+            "page-children candidate",
+        ),
+        (_children_summary("whole-page", child_chunk_profile="whole-page"), "two different chunk profiles"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            paired_window_comparison(baseline, changed, [row], [row])
+
+
+def test_paired_window_comparison_rejects_page_level_baseline():
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+    page_level = _children_summary(None)
+    page_level["configuration"] = {
+        "embedding_mode": "hashed-local", "reranker": "off", "page_children": "False",
+    }
+    page_level.pop("child_chunk_profile")
+
+    with pytest.raises(ValueError, match="page-children baseline"):
+        paired_window_comparison(page_level, _children_summary("sentence-400"), [row], [row])
+
+
+def _fact_item():
+    return {
+        **item([{"document": "a.txt", "page": 1}]),
+        "gold_facts": [{"document": "a.txt", "page": 1, "text": "金标事实句子"}],
+    }
+
+
+def test_quote_gold_fact_rate_requires_the_fact_inside_the_quote_window():
+    covered = score_query(
+        _fact_item(),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "…… 金标事实句子 ……",
+          "char_start": 10, "char_end": 60}],
+        metrics(), 3,
+    )
+    missed = score_query(
+        _fact_item(),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "无关键句的干扰窗口",
+          "char_start": 0, "char_end": 40}],
+        metrics(), 3,
+    )
+
+    assert covered["quote_gold_fact_rate"] == 1.0
+    assert covered["max_quote_chars"] == len("…… 金标事实句子 ……")
+    assert covered["returned"][0]["char_start"] == 10
+    assert missed["quote_gold_fact_rate"] == 0.0
+    # Presence alone cannot tell these apart, which is why the span metric exists.
+    assert covered["quote_presence_rate"] == missed["quote_presence_rate"] == 1.0
+
+
+def test_quote_gold_fact_rate_is_null_without_gold_facts():
+    record = score_query(
+        item([{"document": "a.txt", "page": 1}]),
+        [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "窗口"}],
+        metrics(), 3,
+    )
+
+    assert record["quote_gold_fact_rate"] is None
+    assert record["quote_gold_facts_total"] is None
+
+
+def test_summary_aggregates_and_comparison_carries_quote_gold_fact_rate():
+    hit = [{"name": "a.txt", "page_no": 1, "rank": 1, "quote": "…… 金标事实句子 ……"}]
+    cover = score_query(_fact_item(), hit, metrics(), 3)
+    miss_same_question = score_query(_fact_item(), [dict(hit[0], quote="干扰")], metrics(), 3)
+
+    report = summarize(
+        [cover, miss_same_question],
+        dataset_version="fixture-v1", k=3,
+        configuration={"embedding_mode": "hashed-local", "reranker": "off"},
+        dataset_sha256="fixture",
+    )
+    comparison = paired_comparison([miss_same_question], [cover])
+
+    assert report["quote_gold_fact_rate"] == 0.5
+    assert report["quote_gold_fact_query_count"] == 2
+    assert comparison["quote_gold_fact_rate"]["delta"] == 1.0
+
+
+def _channel_summaries():
+    page_level = {
+        "dataset": LONG_PAGE_V2_VERSION,
+        "dataset_sha256": "frozen-hash",
+        "k": 3,
+        "child_chunk_profile": None,
+        "child_pipeline": None,
+        "configuration": {
+            "embedding_mode": "hashed-local",
+            "reranker": "off",
+            "page_children": "False",
+            "child_chunk_profile": "sentence-400",
+            "child_pipeline": "exact-scan",
+        },
+    }
+    unified = {
+        **page_level,
+        "child_chunk_profile": "sentence-400",
+        "child_pipeline": "unified",
+        "configuration": {
+            **page_level["configuration"],
+            "page_children": "True",
+            "child_pipeline": "unified",
+        },
+    }
+    exact = {
+        **unified,
+        "child_pipeline": "exact-scan",
+        "configuration": {**unified["configuration"], "child_pipeline": "exact-scan"},
+    }
+    return page_level, unified, exact
+
+
+def test_paired_channel_comparison_allows_only_the_child_channel_to_differ():
+    page_level, unified, exact = _channel_summaries()
+    row = score_query(item([{"document": "a.txt", "page": 1}]), [], metrics(), 0)
+
+    report = paired_channel_comparison(page_level, unified, [row], [row])
+
+    assert report["comparison"] == "child_channel_granularity"
+    assert report["causal_attribution"] == "channel_granularity_within_shared_pipeline"
+    assert report["controls"]["candidate_child_pipeline"] == "unified"
+    # The moving knobs are excluded from the frozen run mode.
+    assert "page_children" not in report["controls"]["run_mode"]
+    assert "child_pipeline" not in report["controls"]["run_mode"]
+
+    with pytest.raises(ValueError, match="unified child pipeline"):
+        paired_channel_comparison(page_level, exact, [row], [row])
+    with pytest.raises(ValueError, match="page-children candidate"):
+        paired_channel_comparison(page_level, page_level, [row], [row])
+
+    other_mode = {**unified, "configuration": {**unified["configuration"], "reranker": "on"}}
+    with pytest.raises(ValueError, match="identical run mode"):
+        paired_channel_comparison(page_level, other_mode, [row], [row])

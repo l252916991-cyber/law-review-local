@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "package": "forgeharness",
+  "version_label": "0.8.3",
+  "sdk_api": 1,
+  "purpose": "Final R2 explicit durable DAG engineering candidate; host remains an offline read-only integration without persistent host recovery or writes.",
+  "runtime_requirements_file": "vendor/forgeharness-runtime-requirements.txt",
+  "runtime_requirements_sha256": "454c749ec8bc8055e558929f26de6013ba364a5b56d1504e8dc1f68f1f1d4666",
+  "wheel_sha256": "1d5880ed2ba1cabcb20b0970a55727bcca7b68f9b4beace70ce7600d58ba7555",
+  "sdist_sha256": "c4a22a1542898011ed5eb75231dc0058ea1bc6965c5a95f932b04579f03ff314",
+  "source": "/Users/xiaoy/Documents/多agent协作/reports/release-0.8.3-r1/verification/runs/20261023T053220Z-20d732c5/dist/forgeharness-0.8.3-py3-none-any.whl",
+  "source_identity": "a124764a94b5c519f9efa051b682cae782913028557db24bd8abe54e56ecb6cf",
+  "source_files": 429,
+  "source_manifest": "/Users/xiaoy/Documents/多agent协作/reports/release-0.8.3-r1/source.json",
+  "verification": {
+    "run": "/Users/xiaoy/Documents/多agent协作/reports/release-0.8.3-r1/verification/runs/20261023T053220Z-20d732c5/summary.json",
+    "date": "2026-10-23",
+    "gates_total": 92,
+    "gates_passed": 92,
+    "gates_failed": 0,
+    "qualified": true,
+    "dependency_fixes": "No dependency changes. Existing locked core/extras and the sole accepted NLTK FH-019 advisory retained.",
+    "prior_candidates": "0.8.0-r1: six release fixture/allowlist tests failed. 0.8.1-r1: automated 92/92 then post-gate active identity defect R2-005 reproduced. 0.8.2-r1: automated 92/92 then zero-step allowance defect R2-006 reproduced. All retained; 0.8.3 fixes both with regressions.",
+    "source_tests": {
+      "tests": 1178,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "clean_tests": {
+      "tests": 1178,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "pure_branch_coverage_percent": 85.9375,
+    "source_unchanged": true
+  },
+  "qualification": {
+    "engineering_qualified": true,
+    "business_qualified": false,
+    "production_qualified": false,
+    "business_reason": "Synthetic/scripted contracts only; actual models, materials and professional evaluation remain pending."
+  },
+  "capabilities": {
+    "custom_read_only": true,
+    "shared_tool_executor": true,
+    "custom_write": true,
+    "custom_approve": true,
+    "custom_resume": true,
+    "scope": "Explicit DurableOrchestrator graphs only; arbitrary one-shot kernels remain read-only.",
+    "durable_parallel_join": true,
+    "parallel_external_dispatch": false,
+    "sdk_events": 1,
+    "graph_definition": 1,
+    "r2_checkpoint": 2,
+    "r2_recovery": 4,
+    "react_checkpoint": 1,
+    "react_recovery": 3
+  },
+  "install_check": {
+    "date": "2026-10-23",
+    "status": "passed",
+    "method": "New separate Python3.12 environment from exact wheel and hashed core requirements; Python3.11/3.12/3.14 offline matrix, SDK smoke and actual extracted-source worker with unchanged source business data passed. Host dependencies reused; not a fresh host install.",
+    "evidence": "output/migration/r2-execution-20261023/package-083-initial/deployment.log",
+    "final_package_recheck": "output/migration/r2-execution-20261023/package-083-final/deployment.log",
+    "fresh_framework_environment": true,
+    "fresh_host_environment": false
+  },
+  "previous_binding": {
+    "version_label": "0.7.1",
+    "wheel_sha256": "1db08d3d0dece82b7af3dabd306c6a6dca9b11e1f021b16e0b40e72d438c1eec",
+    "source_identity": "838f2cd2e3156570e48f9d5a52ee6458d1d9aa4e02b0b9c1c5d1a54c18a58177",
+    "verification_run": "/Users/xiaoy/Documents/多agent协作/reports/release-0.7.1-r1/verification/runs/20261022T200722Z-168f26fb/summary.json"
+  },
+  "integration_updated": "2026-10-23",
+  "integration": "Qualified R2 framework artifact; existing independent Python3.12 offline read-only worker, source validation and model fixtures retained. No host E12/E13/E14 capability is enabled by this binding.",
+  "binding_history": [
+    {
+      "version_label": "0.6.0",
+      "wheel_sha256": "69ce604c51325085ae179917605c9479e423c1d437970758733d4f580e367a16",
+      "source_identity": "13d50704639062208558cc6b94670808d071f6ad1c0a6b1f154380d1d458f39c",
+      "verification_run": "/Users/xiaoy/Documents/多agent协作/reports/release-0.6.0-r1/verification/runs/20261021T125950Z-8663a4b9/summary.json"
+    },
+    {
+      "version_label": "0.7.0",
+      "wheel_sha256": "2ec05cb54a5ced1812149dd4e365a81b793327bf3ff77bc2a6177d72c9b656ba",
+      "source_identity": "b22e6b100caa1c5a071eea7964788d6758aa12e78121032974fdb0f2585031f3",
+      "verification_run": "/Users/xiaoy/Documents/多agent协作/reports/release-0.7.0-r2/verification/runs/20261022T195246Z-b6587451/summary.json"
+    },
+    {
+      "version_label": "0.7.1",
+      "wheel_sha256": "1db08d3d0dece82b7af3dabd306c6a6dca9b11e1f021b16e0b40e72d438c1eec",
+      "source_identity": "838f2cd2e3156570e48f9d5a52ee6458d1d9aa4e02b0b9c1c5d1a54c18a58177",
+      "verification_run": "/Users/xiaoy/Documents/多agent协作/reports/release-0.7.1-r1/verification/runs/20261022T200722Z-168f26fb/summary.json"
+    }
+  ],
+  "host_integration": {
+    "runtime": "forgeharness-readonly",
+    "durable_resume": false,
+    "persistent_inspect": false,
+    "background_status": false,
+    "business_writes": false,
+    "formal_entrypoints_switched": false,
+    "protocol": 2,
+    "events": 2,
+    "result": 1
+  }
+}
