@@ -13,7 +13,7 @@
 | S03 “未见记录”判断边界 | 协议升级为 `candidate-answerability-v9-grammar`，区分明确未见、未提及、有记录和要求认定未发生 | `app/answerability.py`、`tests/test_answerability.py` |
 | S04 用量压缩 | 结构化语法约束输出形状；系统提示和用户输入去除重复排版与 route/文件元数据；实际 39 次评估全部逐题及总量 ≤1.10 | `s05/actual-summary.json`、`s05/latency-usage-summary.json` |
 | S05 冻结方案与合成复验 | 39 次题目评估、78 条双对照；25 成功 / 14 业务拒绝 / 0 系统失败，全部符合预期，unknown=0，源库不变 | `s05/final-full19/`、`s05/stability-holdout/`、`s05/final-blockers-repeat*/` |
-| S06 工程、发布与新进程复用 | 三版 Python 各 987 passed / 0 failed / 3 skipped；静态、依赖 Export、发布允许清单及发布包重建流程通过 | `s06/tests-311|312|314/`、`s06/static-312-final/`、`s06/release-312-final/` |
+| S06 工程、发布与新进程复用 | 三版 Python 各 987 passed / 0 failed / 3 skipped；静态、依赖 Export、发布允许清单及发布包重建流程通过 | `s06/tests-311|312|314/`、`s06/static-312-final/`、`s06/release-312-final/`、`s06/package-final/` |
 | S07 真实材料 E07 | 未执行，等待材料目录、使用范围、快照和评审责任落实 | 无 |
 
 ## 2. S01 四道阻塞题归因
@@ -82,9 +82,9 @@ v8 十九题实际结果为 17/19 符合预期，38 条双对照中 34 条通过
 
 静态与工程检查通过：`doctor`、compileall、Ruff、Mypy（42 文件）、`uv pip check`、三份 requirements 导出一致性、四份前端脚本 Node 22 语法、发布允许清单 272 文件；私有运行数据与 LawBench 未进入发布包。
 
-发布包重建验证 PASS：从源码包新建带 hash 宿主/框架环境；领域只读对照源库不变；宿主持久化结果由新进程复用；候选成功和业务拒绝由两次全新宿主进程复用相同 run/result，提供方调用、业务效果和回执不重复。该流程使用显式离线替身，`measurement_valid=false`，不构成真实模型质量通过。
+发布包重建验证 PASS：从源码包新建带 hash 宿主/框架环境；领域只读对照源库不变；宿主持久化结果由新进程复用；候选成功和业务拒绝由两次全新宿主进程复用相同 run/result，提供方调用、业务效果和回执不重复。该流程使用显式离线替身，`measurement_valid=false`，不构成真实模型质量通过。最终源码包保存在 `output/migration/g2-stability-20261024/s06/package-final/lexvault-source.zip`，272 个允许清单文件，SHA-256 `fe91a2b554341d5a9b8239f3771c2646b39964ecbbdee9f84223f4dbaf38f4c3`，同包验证结果 PASS。
 
-最终候选身份为 `candidate-answerability-v9-grammar`，提示摘要 `e1fa56c02689e21c3d40ec719217bf1e7805ccbe28414b41caee0d133a4bcb45`，语法版本 `omlx-guided-grammar-v1`，语法摘要 `8112a8673333f3f7981a3535a66bf8590e669ebb0fd832ebec0d675a95d91ba3`。模型权重、数据库、原始响应、日志和最终发布包身份保存在 Git 忽略私有目录；最终代码提交后以其文件摘要为准。
+最终候选身份为 `candidate-answerability-v9-grammar`，提示摘要 `e1fa56c02689e21c3d40ec719217bf1e7805ccbe28414b41caee0d133a4bcb45`，语法版本 `omlx-guided-grammar-v1`，语法摘要 `8112a8673333f3f7981a3535a66bf8590e669ebb0fd832ebec0d675a95d91ba3`。模型权重、数据库、原始响应、日志和最终发布包身份保存在 Git 忽略私有目录；最终代码提交后以其文件摘要为准。汇总身份见 `s06/final-identity.json`。
 
 ## 7. 遗留与下一步
 
