@@ -189,7 +189,7 @@ def test_opt_in_and_schema_migration(tmp_path, monkeypatch):
         init_db(seed=False)
         init_db(seed=False)
         with closing(connect()) as conn:
-            assert conn.execute("PRAGMA user_version").fetchone()[0] == 16
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == 17
             assert conn.execute("SELECT COUNT(*) FROM host_write_receipts").fetchone()[0] == 0
         with pytest.raises(AccessDeniedError, match="synthetic"):
             LocalHostWritePort(RunScope(1))

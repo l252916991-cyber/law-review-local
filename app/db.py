@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -772,6 +772,26 @@ END;
 """)
 
 
+def _migrate_v17(conn: sqlite3.Connection) -> None:
+    _execute_script(conn, """
+CREATE TABLE host_backend_calls (
+    request_id TEXT NOT NULL REFERENCES host_runtime_links(request_id) ON DELETE CASCADE,
+    call_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    request_digest TEXT NOT NULL,
+    model_identity TEXT NOT NULL,
+    input_chars INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('dispatched','unknown','response_known_usage_unknown','completed')),
+    response_json TEXT,
+    response_digest TEXT,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(request_id,call_id)
+);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -793,7 +813,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         migrations = (
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
-            _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16,
+            _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

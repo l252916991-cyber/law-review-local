@@ -22,6 +22,12 @@ from .runtime_ports import (
 )
 
 
+class DomainNodeRejected(ValueError):
+    def __init__(self, error, backend_calls):
+        super().__init__(type(error).__name__)
+        self.backend_calls = deepcopy(backend_calls)
+
+
 def input_rows(rows):
     """Exclude this runtime's outputs, retaining source memories and their FK runs."""
     rows["memories"] = [r for r in rows["memories"] if r["kind"] != "runtime_draft"]
@@ -93,6 +99,8 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
         outputs, completed = {}, set()
         port = self.port_type(RunScope(row["case_id"]))
         for action in json.loads(row["graph_json"]):
+            if action.get("kind") == "model":
+                continue
             if action.get("kind") == "join":
                 if set(action["dependencies"]) <= completed:
                     completed.add(action["id"])
@@ -130,10 +138,13 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
         request = RunRequest(request_id=row["request_id"], scope=RunScope(row["case_id"]),
             actor=current_actor_identity(), question=binding["question"], runtime="forgeharness-readonly",
             model=ModelConfig(use_llm=False), use_remote_embeddings=False, persist_memory=False)
-        with DomainSession(request) as session:
-            session.outputs = deepcopy(outputs)
+        with self._session(row, request, action) as session:
+            session.outputs = self._prepare_outputs(row, action, outputs)
             session.backends.set_deadline(time.monotonic() + max(0, row["deadline"] - time.time()))
-            value = session.call(name)
+            try:
+                value = session.call(name)
+            except (ValueError, ContractValidationError) as error:
+                raise DomainNodeRejected(error, session.backends.events) from error
             backend_calls = deepcopy(session.backends.events)
             if name == "planner" and canonical(value) != canonical(action["frozen_plan"]):
                 raise RequestConflictError("planner differs from the saved graph")
@@ -145,6 +156,12 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
                 self._load(conn, row["request_id"])
                 self.port_type(RunScope(row["case_id"])).verify_sources(conn, self._message(row, value))
         return value, backend_calls
+
+    def _session(self, row, request, action):
+        return DomainSession(request)
+
+    def _prepare_outputs(self, row, action, outputs):
+        return deepcopy(outputs)
 
     def _effects(self, row, action, outputs, value):
         if action["id"] == "audit":
@@ -201,7 +218,7 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
             value, backend_calls = self._compute(row, action, outputs)
         except (ValueError, ContractValidationError) as error:
             status, value = "failed", {"diagnostic": {"code": "domain_validation_failed", "type": type(error).__name__}}
-            backend_calls = []
+            backend_calls = getattr(error, "backend_calls", [])
         with transaction() as conn:
             conn.execute("BEGIN IMMEDIATE")
             current = self._load(conn, row["request_id"], writing=True)

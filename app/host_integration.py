@@ -95,14 +95,21 @@ class IsolatedHostIntegration:
     def accept(self, request: RunRequest) -> dict[str, Any]:
         self._path_guard()
         request.validate()
+        self._validate_request(request)
+
+        principal = current_principal()
+        if asdict(request.actor) != {"name": principal.name, "admin": principal.admin, "local": principal.local}:
+            raise IdentityMismatchError("asserted actor differs from authenticated actor")
+        return self._accept_validated(request, principal)
+
+    def _validate_request(self, request):
         if (request.runtime != self.runtime or request.execution_mode != "sync"
                 or request.model.use_llm or request.model.model is not None
                 or request.model.timeout_seconds is not None or request.use_remote_embeddings
                 or request.budget is not None or request.memory_snapshot is not None):
             raise UnsupportedCapabilityError("isolated fixture supports only fixed offline engineering execution")
-        principal = current_principal()
-        if asdict(request.actor) != {"name": principal.name, "admin": principal.admin, "local": principal.local}:
-            raise IdentityMismatchError("asserted actor differs from authenticated actor")
+
+    def _accept_validated(self, request, principal):
         port = self.port_type(request.scope)
         fingerprint = compute_request_digest(request, principal_name=principal.name,
                                              effective_author=actor_name(request.user_name))
@@ -350,7 +357,7 @@ class IsolatedHostIntegration:
         token = secrets.token_hex(32)
         # Control/reconciliation may run after the original deadline; no new tool
         # is then admitted. This finite pipe deadline does not renew the run budget.
-        deadline = time.monotonic() + min(60, pinned["timeout_seconds"] + 5)
+        deadline = time.monotonic() + max(60, min(pinned["timeout_seconds"] + 5, row["deadline"] - time.time() + 5))
         with (directory / "stderr.log").open("ab") as stderr:
             process = subprocess.Popen([str(python), "-I", str(ROOT / "app/host_integration_worker.py")],
                 cwd=directory, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
@@ -362,7 +369,8 @@ class IsolatedHostIntegration:
                     "actor_id": pinned["actor"], "case_id": row["case_id"], "source_version": row["source_version"],
                     "actions": list(actions.values()), "graph_version": self.graph_version, "command": command,
                     "timeout_seconds": pinned["timeout_seconds"], "deadline": row["deadline"],
-                    "require_approval": pinned["approval"], "cancel": bool(row["cancel_requested"])})
+                    "require_approval": pinned["approval"], "cancel": bool(row["cancel_requested"]),
+                    **self._worker_configuration(row)})
                 seq = 0
                 with selectors.DefaultSelector() as selector:
                     selector.register(process.stdout, selectors.EVENT_READ)
@@ -427,6 +435,9 @@ class IsolatedHostIntegration:
 
     def _extra_operation(self, row, kind, message):
         raise SidecarProtocolError("unknown sidecar operation")
+
+    def _worker_configuration(self, row):
+        return {}
 
     def _invoke_action(self, row, action, key, *, receipt_only):
         scope = RunScope(row["case_id"])

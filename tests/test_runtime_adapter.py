@@ -821,7 +821,7 @@ class SchemaMigrationTests(LegacyRuntimeControlTestBase):
         with closing(connect()) as conn:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(runtime_requests)")}
             version = conn.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(version, 16)
+        self.assertEqual(version, 17)
         self.assertTrue({
             "request_id", "case_id", "runtime", "protocol_version", "run_id", "job_id",
             "created_at", "request_digest", "principal_name",
