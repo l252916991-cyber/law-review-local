@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from .agents import PlannerAgent
 from .db import connect, transaction
-from .domain_writes import DOMAIN_GRAPH, DOMAIN_RUNTIME, DomainHostWritePort, corpus_identity
+from .domain_writes import CANDIDATE_RUNTIME, DOMAIN_GRAPH, DOMAIN_RUNTIME, DomainHostWritePort, corpus_identity
 from .forge_bridge import SidecarProtocolError
 from .forge_readonly import ReadonlyCaseSession
 from .host_integration import IsolatedHostIntegration
@@ -33,7 +33,7 @@ def input_rows(rows):
     rows["memories"] = [r for r in rows["memories"] if r["kind"] != "runtime_draft"]
     referenced = {r["source_run_id"] for r in rows["memories"]}
     runs = {r["id"] for r in rows["agent_runs"]
-            if r["runtime"] in {DOMAIN_RUNTIME, ISOLATED_RUNTIME} and r["id"] not in referenced}
+            if r["runtime"] in {DOMAIN_RUNTIME, CANDIDATE_RUNTIME, ISOLATED_RUNTIME} and r["id"] not in referenced}
     rows["agent_runs"] = [r for r in rows["agent_runs"] if r["id"] not in runs]
     rows["gap_detections"] = [r for r in rows["gap_detections"] if r["run_id"] not in runs]
     return rows

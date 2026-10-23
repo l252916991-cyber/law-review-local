@@ -138,19 +138,20 @@ class LocalHostWritePort:
     receipt_version = WRITE_SCHEMA_VERSION
     max_write_bytes = MAX_WRITE_BYTES
     fields = FIELDS
+    _database_guard = staticmethod(isolated_guard)
 
     def __init__(self, scope: RunScope):
         self.scope, self.path = scope, get_db_path().resolve()
         self.principal_key = authorize(scope)
         with closing(connect()) as conn:
-            isolated_guard(conn)
+            self._database_guard(conn)
 
     def _guard(self, conn: sqlite3.Connection, scope: RunScope, *, write: bool) -> str:
         if scope != self.scope or get_db_path().resolve() != self.path:
             raise AccessDeniedError("port binding changed")
         if authorize(scope, write=write) != self.principal_key:
             raise AccessDeniedError("principal binding changed")
-        isolated_guard(conn)
+        self._database_guard(conn)
         return self._source_version(conn, scope, writing=write)
 
     @classmethod

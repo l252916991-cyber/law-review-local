@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from app.db import db_scope
+from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
 from app.local_backends import LocalModels
 from app.model_domain import LocalModelDomainIntegration
 from app.runtime_ports import ModelConfig
@@ -37,8 +38,17 @@ def main():
         identities=json.loads((path.parent / "model-identities.json").read_text()),
         models={kind: kind for kind in ("llm", "embedding", "reranker")}, transport=transport)
     with db_scope(path):
-        control = LocalModelDomainIntegration(models=models)
-        control.accept(request(model=ModelConfig(use_llm=True), persist_memory=False))
+        config = path.parent / "candidate-deployment.json"
+        if config.exists():
+            values = json.loads(config.read_text())
+            values["database"] = Path(values["database"])
+            values["file_identity"], values["case_ids"] = tuple(values["file_identity"]), tuple(values["case_ids"])
+            control = CandidateDomainIntegration(deployment=CandidateDeployment(**values), models=models)
+        else:
+            control = LocalModelDomainIntegration(models=models)
+        control.accept(request(runtime=control.runtime, model=ModelConfig(use_llm=True), persist_memory=False))
+        if mode == "accept":
+            crash()
         if mode == "response":
             original = control._extra_operation
 

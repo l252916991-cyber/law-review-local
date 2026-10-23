@@ -75,6 +75,7 @@ class IsolatedHostIntegration:
     application_id = "lexvault-host-isolated"
     profile = "synthetic-v1"
     port_type = LocalHostWritePort
+    _database_guard = staticmethod(isolated_guard)
 
     def __init__(self, *, framework_python: str | Path | None = None, timeout_seconds: float = 120,
                  require_execution_approval: bool = False):
@@ -86,7 +87,7 @@ class IsolatedHostIntegration:
         self.require_approval = require_execution_approval
         self.binding = framework_binding()[0]
         with closing(connect()) as conn:
-            isolated_guard(conn)
+            self._database_guard(conn)
 
     def _path_guard(self) -> None:
         if self.path != get_db_path().resolve():
@@ -178,7 +179,7 @@ class IsolatedHostIntegration:
 
     def _load(self, conn, request_id: str, *, writing: bool = False):
         self._path_guard()
-        isolated_guard(conn)
+        self._database_guard(conn)
         row = conn.execute("SELECT r.case_id,r.run_id,r.principal_name,r.runtime,l.* FROM runtime_requests r "
                            "JOIN host_runtime_links l USING(request_id) WHERE request_id=?", (request_id,)).fetchone()
         if row is None or row["runtime"] != self.runtime:
@@ -212,11 +213,13 @@ class IsolatedHostIntegration:
                 "engineering_only": True}
 
     def status(self, request_id: str) -> dict[str, Any]:
+        self._path_guard()
         with closing(connect()) as conn:
             conn.execute("BEGIN")
             return self._handle(conn, request_id)
 
     def cancel(self, request_id: str) -> dict[str, Any]:
+        self._path_guard()
         with transaction() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = self._load(conn, request_id, writing=True)
@@ -284,7 +287,7 @@ class IsolatedHostIntegration:
         if not current_principal().admin:
             raise AccessDeniedError("global isolated cleanup requires an administrator")
         with closing(connect()) as conn:
-            isolated_guard(conn)
+            self._database_guard(conn)
             rows = conn.execute("SELECT * FROM host_runtime_cleanup").fetchall()
         removed = 0
         for row in rows:
@@ -307,6 +310,7 @@ class IsolatedHostIntegration:
 
     def drive(self, request_id: str, *, command: str = "recover", _rebuild: bool = False) -> dict[str, Any]:
         """New process always uses find/inspect before start; absence alone never retries a tool."""
+        self._path_guard()
         if command not in {"recover", "inspect", "approve"}:
             raise ContractValidationError("unsupported isolated control command")
         with closing(connect()) as conn:

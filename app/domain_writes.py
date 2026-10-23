@@ -13,6 +13,7 @@ from .runtime_ports import AccessDeniedError, ContractValidationError, RequestCo
 
 DOMAIN_RUNTIME = "forgeharness-domain-isolated-v1"
 DOMAIN_GRAPH = "legal-review-isolated-v1"
+CANDIDATE_RUNTIME = "forgeharness-domain-candidate-v1"
 
 
 def corpus_identity():

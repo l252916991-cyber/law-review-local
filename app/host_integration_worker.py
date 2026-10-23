@@ -179,7 +179,8 @@ class HostModel:
 
 async def main() -> None:
     init = receive()
-    local_models = init.get("wire_version") == 4 and init.get("profile") == "domain-local-v1"
+    candidate = init.get("wire_version") == 5 and init.get("profile") == "domain-candidate-v1"
+    local_models = candidate or (init.get("wire_version") == 4 and init.get("profile") == "domain-local-v1")
     domain = local_models or (init.get("wire_version") == 3 and init.get("profile") == "domain-v1")
     if ((not domain and (init.get("wire_version") != WIRE_VERSION or init.get("profile", "synthetic-v1") != "synthetic-v1"))
             or init.get("version") != forgeharness.__version__
@@ -230,7 +231,8 @@ async def main() -> None:
                               usage=Usage(**{**nested, "tool_calls": 1 + nested.get("tool_calls", 0)}),
                               evidence_refs=("host-receipt:" + reply["receipt"]["receipt_id"],))
 
-    application_id = "lexvault-domain-local" if local_models else "lexvault-domain-isolated" if domain else "lexvault-host-isolated"
+    application_id = ("lexvault-domain-candidate" if candidate else "lexvault-domain-local" if local_models
+                      else "lexvault-domain-isolated" if domain else "lexvault-host-isolated")
     budget = {"max_steps": 1, "max_tool_calls": sum(n.max_usage.tool_calls for n in nodes),
               "max_wall_seconds": init["timeout_seconds"]}
     if local_models:
