@@ -11,7 +11,7 @@ uv run python scripts/package_release.py --output dist/lexvault-source.zip
 
 `.gitignore` 不是发布权限检查，也不会清除已经跟踪的数据。首次 git 提交前检查暂存区，切勿无检查地执行 `git add .`；发布包仍须人工检查源码/文档中是否有手工粘贴的案件片段。不要把“文件不在 data 目录”当作已经脱敏。
 
-框架接入另精确包含 `vendor/FRAMEWORK_BINDING.json`、最终绑定的 0.8.3 wheel 和 `vendor/forgeharness-runtime-requirements.txt`，不遍历整个 vendor；旧 wheel 在本机保留，发布仅交付当前精确版本。`uv run --locked python -m scripts.verify_deployment_release` 校验摘要、安装独立框架环境，并以解压后的宿主源码执行合成 M2 对照；宿主依赖使用当前环境，不能将其描述为全新宿主安装。当前候选与兼容边界见 [R2 记录](../migration/r2-execution-20261023.md)，早期接入证据见 [M2 记录](../migration/m2-engineering-20261022.md)。
+框架接入另精确包含 `vendor/FRAMEWORK_BINDING.json`、最终绑定的 0.8.3 wheel 和 `vendor/forgeharness-runtime-requirements.txt`，不遍历整个 vendor；旧 wheel 在本机保留，发布仅交付当前精确版本。`uv run --locked python -m scripts.verify_deployment_release` 校验摘要，并分别从解压源码的带 hash requirements 和 vendor 依赖安装全新宿主、独立框架环境。随后执行只读合成 M2、隔离宿主、候选成功与业务拒绝流程，通过两次全新宿主进程核对结果、调用及回执不重复。候选模型使用离线替身，`measurement_valid=false`；该命令不验证真实模型效果、目标生产环境或 HTTP/UI。实现与证据见 [G2 修复记录](../migration/g2-remediation-execution-20261024.md)；框架兼容边界见 [R2 记录](../migration/r2-execution-20261023.md)。
 
 ## 单进程运行与升级边界
 

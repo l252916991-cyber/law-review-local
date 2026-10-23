@@ -13,6 +13,9 @@ Steps:
 5. Smoke: import forgeharness + SDK surface from the installed wheel, and
    exercise app/runtime_ports.py from the extracted tree (stdlib-only, so it
    runs on the framework venv without LexVault dependencies).
+6. Install a fresh host venv from the extracted hashed requirements.
+7. Run readonly, isolated host, and candidate success/refusal flows from the
+   extracted tree; repeat host processes to prove durable result reuse.
 
 Network (or a warm uv cache) is required for step 4 dependency resolution.
 
@@ -104,7 +107,7 @@ with closing(connect()) as conn:
     assert before == tuple(conn.iterdump())
 print(json.dumps({"status": report["status"], "domain_comparison": True,
                   "source_unchanged": True, "source_tree": "extracted release",
-                  "host_dependencies": "current host environment; not a fresh host install",
+                  "host_dependencies": "fresh host venv from extracted hashed requirements",
                   "framework_dependencies": "fresh separate venv from hashed runtime requirements"}))
 """
 
@@ -143,6 +146,87 @@ with db_scope(path):
             assert conn.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == expected, table
     print(json.dumps({'source_tree':'extracted release','status':result['status'],'run_id':result['run_id'],
         'framework_run_id':result['framework_run_id'],'duplicate':accepted['duplicate'],'result':result['result']}))
+"""
+
+
+_CANDIDATE_PROGRAM = r"""
+import json, os, sys, hashlib
+from pathlib import Path
+from dataclasses import asdict
+from contextlib import closing
+release, framework, root = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+sys.path.insert(0, str(release))
+root.mkdir(parents=True, exist_ok=True)
+os.environ.update({'LAW_REVIEW_DATA_DIR':str(root), 'LAW_REVIEW_AUTH_MODE':'local',
+                   'LAW_REVIEW_LEGAL_CORPUS_DIR':'', 'LAW_REVIEW_LLM_URL':'http://127.0.0.1:1/v1'})
+import app
+assert Path(app.__file__).resolve().is_relative_to(release.resolve())
+from app.answerability import policy_identity
+from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from app.db import connect, db_scope, transaction, now
+from app.host_writes import digest
+from app.local_backends import LocalModels
+from app.runtime_adapter import current_actor_identity
+from app.runtime_ports import ModelConfig, RunRequest, RunScope
+config = root / 'deployment.json'
+if not config.exists():
+    deployment = CandidateDeployment.create_new(root / 'host.sqlite')
+    values = asdict(deployment)
+    values['database'] = str(values['database'])
+    config.write_text(json.dumps(values))
+    with db_scope(deployment.database), transaction() as conn:
+        conn.execute("INSERT INTO cases(title,created_at,updated_at) VALUES ('Synthetic release case',?,?)",(now(),now()))
+        doc = conn.execute("INSERT INTO documents(case_id,name,stored_path,mime_type,pages,created_at,updated_at) "
+            "VALUES (1,'合成审批记录','','text/plain',1,?,?)",(now(),now())).lastrowid
+        conn.execute("INSERT INTO pages(document_id,page_no,text) VALUES (?,1,'合成审批记录：该转款仍需核验审批。')",(doc,))
+values = json.loads(config.read_text())
+values['database'] = Path(values['database'])
+values['file_identity'],values['case_ids'] = tuple(values['file_identity']),tuple(values['case_ids'])
+deployment = CandidateDeployment(**values)
+identities = {}
+for name in ('llm','embedding','reranker'):
+    folder = root / ('fixture-' + name)
+    folder.mkdir(exist_ok=True)
+    entries = {}
+    for filename,body in [('config.json',b'{"synthetic":true}'),('model.safetensors',b'release protocol fixture')]:
+        path = folder / filename
+        if not path.exists(): path.write_bytes(body)
+        entries[filename] = {'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                             'bytes':path.stat().st_size,'mtime_ns':path.stat().st_mtime_ns}
+    identities[name] = {'path':str(folder),'files':entries,'identity':'local-sha256:' + digest(entries)}
+calls = root / 'provider-calls.jsonl'
+def transport(kind,payload,timeout):
+    assert kind == 'llm'
+    with calls.open('a') as stream: stream.write(json.dumps({'kind':kind}) + '\n')
+    query = json.loads(payload['messages'][1]['content'])
+    refusal = query['question'] == '验证无关材料拒绝'
+    content = {'decision':'unrelated' if refusal else 'supported','reason':'release protocol fixture, not a semantic measurement',
+               'findings':[] if refusal else [{'text':'审批记录尚需核验。','sources':[1]}]}
+    return {'model':'llm','choices':[{'finish_reason':'stop','message':{'content':json.dumps(content,ensure_ascii=False)}}],
+            'usage':{'prompt_tokens':24,'completion_tokens':8}}
+models = LocalModels(endpoint='http://127.0.0.1:1/v1', identities=identities,
+                     models={k:k for k in identities},transport=transport)
+with db_scope(deployment.database):
+    control = CandidateDomainIntegration(deployment=deployment,models=models,framework_python=framework)
+    results = []
+    for name,question,expected in [('positive','合成审批记录','succeeded'),('refusal','验证无关材料拒绝','failed')]:
+        request = RunRequest(request_id=name,scope=RunScope(1),actor=current_actor_identity(),question=question,
+            runtime=control.runtime,model=ModelConfig(use_llm=True),use_remote_embeddings=False,persist_memory=False)
+        accepted = control.accept(request)
+        result = control.drive(name)
+        assert result['status'] == expected and not result['needs_reconciliation'],result
+        results.append({'duplicate':accepted['duplicate'],'framework_run_id':result['framework_run_id'],
+                        'result':result['result']})
+    with closing(connect()) as conn:
+        failed = json.loads(conn.execute("SELECT output_json FROM agent_steps WHERE node_name='finish' AND status='failed'").fetchone()[0])['value']
+        assert failed['diagnostic']['code'] == 'answerability_rejected'
+        assert conn.execute("SELECT COUNT(*) FROM messages WHERE role='assistant'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0] == 0
+        counts = {name:conn.execute('SELECT COUNT(*) FROM ' + name).fetchone()[0] for name in
+                  ('agent_runs','agent_steps','messages','memories','gap_detections','host_write_receipts')}
+assert len(calls.read_text().splitlines()) == 2
+print(json.dumps({'results':results,'counts':counts,'provider_calls':2,'policy':policy_identity(),
+                  'source_tree':'extracted release','measurement_valid':False}))
 """
 
 
@@ -212,10 +296,17 @@ def verify(archive: Path) -> dict[str, Any]:
             ]
         )
         report["smoke"] = json.loads(smoke.stdout.strip().splitlines()[-1])
-        m2 = _run([sys.executable, "-I", "-c", _M2_PROGRAM, str(extracted),
+        host_venv = workdir / "host-venv"
+        _run([uv, "venv", str(host_venv), "--python", "3.12"])
+        host_python = str(host_venv / "bin/python")
+        _run([uv, "pip", "install", "--python", host_python, "--require-hashes",
+              "-r", str(extracted / "requirements.txt")])
+        _run([uv, "pip", "check", "--python", host_python])
+        report["fresh_host_requirements_sha256"] = _sha256(extracted / "requirements.txt")
+        m2 = _run([host_python, "-I", "-c", _M2_PROGRAM, str(extracted),
                    str(venv / "bin/python"), str(workdir / "synthetic-data")], cwd=workdir)
         report["m2_extracted_source_smoke"] = json.loads(m2.stdout.strip().splitlines()[-1])
-        host_command = [sys.executable, "-I", "-c", _HOST_PROGRAM, str(extracted),
+        host_command = [host_python, "-I", "-c", _HOST_PROGRAM, str(extracted),
                         str(venv / "bin/python"), str(workdir / "isolated-host-data")]
         first = json.loads(_run(host_command, cwd=workdir).stdout.strip().splitlines()[-1])
         restarted = json.loads(_run(host_command, cwd=workdir).stdout.strip().splitlines()[-1])
@@ -227,6 +318,20 @@ def verify(archive: Path) -> dict[str, Any]:
             "status": restarted["status"], "new_host_process_reused_result": True,
             "unique_effects_and_receipts": True, "engineering_only": True,
         }
+        candidate_command = [host_python, "-I", "-c", _CANDIDATE_PROGRAM, str(extracted),
+                             str(venv / "bin/python"), str(workdir / "candidate-data")]
+        candidate_first = json.loads(_run(candidate_command, cwd=workdir).stdout.strip().splitlines()[-1])
+        candidate_restarted = json.loads(_run(candidate_command, cwd=workdir).stdout.strip().splitlines()[-1])
+        if (any(r["duplicate"] for r in candidate_first["results"])
+                or not all(r["duplicate"] for r in candidate_restarted["results"])
+                or candidate_first["counts"] != candidate_restarted["counts"]
+                or any(a["framework_run_id"] != b["framework_run_id"] or a["result"] != b["result"]
+                       for a, b in zip(candidate_first["results"], candidate_restarted["results"]))):
+            raise RuntimeError("extracted candidate restart changed decisions, calls or effects")
+        report["candidate_extracted_source_smoke"] = {"supported": True, "explicit_refusal": True,
+            "new_host_process_reused_results": True, "provider_calls": candidate_restarted["provider_calls"],
+            "unique_effects_and_receipts": True, "measurement_valid": False,
+            "policy": candidate_restarted["policy"]}
         report["result"] = "PASS"
     return report
 

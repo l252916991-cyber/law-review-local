@@ -248,7 +248,7 @@ uv run --locked python -m scripts.migration_source_manifest --output "$validatio
 
 Python 3.11/3.14 宿主矩阵与独立 Python 3.12 框架环境分别准备；最终候选按目标部署环境复验。缺少框架解释器而跳过实际进程测试不算集成通过。测试数量随实现变化，不把当前 775 项写成固定通过目标。
 
-发布重建检查另执行 `uv run --locked python -m scripts.verify_deployment_release`，它可能需要网络或完整依赖缓存。当前脚本新建框架环境但复用宿主依赖；E16 必须另外验证从允许清单源码包安装全新宿主环境。不得把现有脚本 PASS 直接写成全新宿主安装通过。
+发布重建检查另执行 `uv run --locked python -m scripts.verify_deployment_release`，它可能需要网络或完整依赖缓存。2026-10-24 更新：脚本已从提取源码的带 hash requirements 新建宿主与独立框架环境，并验证合成只读、隔离宿主及候选成功/拒绝的跨进程复用，见 [G2 修复记录](g2-remediation-execution-20261024.md)。E16 仍须针对最终目标部署完成全范围检查；脚本中的离线模型替身和新环境安装不能替代真实模型、生产数据或 HTTP/UI 验收。
 
 框架侧按其 Makefile、CI 与剩余计划执行全部适用门禁，新增候选重新冻结，输出新证据目录。电商侧按其当前统一检查入口及升级后的实际流程复验。文档修订只验证内容、路径、命令和差异，不运行无关业务测试。
 
