@@ -676,8 +676,11 @@ def read_json_with_deadline(
         transport = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
         if transport is not None:
             transport.settimeout(remaining)
+        reader = getattr(response, "read1", None)
+        if not callable(reader):
+            reader = response.read
         try:
-            chunk = response.read1(64 * 1024)
+            chunk = reader(64 * 1024)
         except TimeoutError as exc:
             response.close()
             raise TimeoutError(f"超过 {timeout} 秒总时限") from exc

@@ -8,7 +8,7 @@
 
 2026-10-23 领域接入执行更新：[实施记录](domain-integration-execution-20261023.md)、[设计](domain-integration-design-20261023.md)。D00–D05 已交付来源记录、领域写契约/持久图、本机后端治理及受信候选边界；本机三版各 940/0/3，实际进程故障、领域引用及 500 页/200 万字符整图边界通过。原 Qwen3.6 35B 在合成隔离库实测成功。真实材料 G2、生产 E12/E13 全验收及正式路由继续按独立条件，未放行。
 
-2026-10-23 续行计划：[未完成事项续行计划](domain-integration-continuation-plan-20261023.md)。D06 对照实现尚未验证/提交，D07 尚未开始；用户指定后续本机对照生成模型改用现有 Qwythos 9B。E07/G2、E12/E13 全验收、专业终评和 E14 仍未完成。
+2026-10-23 D06 更新：[实施记录](domain-integration-execution-20261023.md) D06 节、[续行计划](domain-integration-continuation-plan-20261023.md)。D06 对照工具已收敛并通过 30 项针对性测试、Ruff/Mypy；本机 Qwythos 9B 五题合成双对照实测完成，常规/矛盾/证据缺口/空案件工程检查通过，无关查询负例被候选错误接受并阻止 G2 通过；测量有效、无未知用量，原始证据在私有 `output/migration/domain-integration-20261023/d06-qwythos9b/`。D07 尚未执行，E07/G2、E12/E13 全验收、专业终评和 E14 仍未完成。
 
 2026-10-23 Git 与后续计划更新：律所已按用户授权建立本地 `main` 基线 `54b7d7c9d4eee2e3c3ade9d633324a3519231f0b`，仓库级作者 `Codex <codex@local.invalid>`；范围及验证见 [Git 初始化记录](git-initialization-20261023.md)。此前“无 Git”保留为历史状态，本次不推定框架侧 Git 条件已解决。新编[下一步计划书](domain-integration-plan-20261023.md)安排 D00–D07：来源记录、领域写契约与持久图、模型治理、双对照和验收收口；本次仅编制文档，E12 全范围、E13 实际领域链路、E07/G2、E14 状态不变。
 
@@ -135,7 +135,7 @@ LexVault 源码身份口径：`scripts/migration_source_manifest.py`（与发布
 | E04 HostReadPort 七方法 + 框架版 RuntimeControl | **完成** 2026-10-22 | [e04-host-ports-20261022.md](e04-host-ports-20261022.md)；[app/host_ports.py](../../app/host_ports.py)（类型化读端口：逐调用授权与版本检查、边界与显式拒绝、访问记录）；[app/forge_runtime.py](../../app/forge_runtime.py)（`FrameworkReadonlyControl`：诚实能力声明 + `start` + inspect/resume/status 显式拒绝 + 未知结果对账）；M2 试点会话改经端口；30 项新测试（`tests/test_host_ports.py`、`tests/test_forge_runtime.py`）；**805 passed / 0 failed / 3 skipped**，覆盖率 86.77%，ruff/mypy(41)/compileall/node/发布清单全过；收口清单 `2fb2794363cf45bb51f7adb2ffb35f0b42aad947484b665240e833805ebb2ae2`（228 文件；相对 M2 收口 +9/−0/~4，逐项见 `output/migration/e04-host-ports-20261022/diff-vs-m2.txt`；适用范围：E04 验证与文档收口后的内容状态，其后仅台账自身的本次编辑会改变摘要，以清单文件本身为准） |
 | E05 模型治理 | **本机合成候选通过；正式入口待 E14** 2026-10-23 | D04 本机实际权重/参数绑定、SDK model 节点、受控检索、持久调用/用量/unknown 已验证；不覆盖外发、付费、真实材料和旧正式入口旁路，见领域实施记录 |
 | E06 来源/规模兼容 | **完成（工程边界）** 2026-10-23 | 案件/法条独立来源、纯法条、语料/引文校验、页/快照/包精确边界及实际大页包；生产容量承诺仍待 PM |
-| E07 两类完整对照 | D06 工具开发中；对照及验收未完成 | 依赖 E05/E06 的适用能力及 E03 对应材料/模型条件；后续合成对照生成模型指定为本机 Qwythos 9B |
+| E07 两类完整对照 | **D06 合成双对照已执行；G2 未通过** 2026-10-23 | 工具与 Qwythos 9B 实际五题合成对照；常规/矛盾/证据缺口/空案件工程检查通过，无关查询负例错误接受，G2 被阻止；真实开发材料与专业终评未提供，见 [实施记录 D06](domain-integration-execution-20261023.md) |
 | E08 / N01–N03 共享执行器 | **完成（R1 工程）** 2026-10-23 | ADR 030、ToolExecutor、ReAct/kernel 共用；0.7.1 为 R1 历史收口，R2 显式图能力后续由 E09–E11 验收 |
 | E09 / P00–P02 R2 协议与持久状态 | **完成（框架工程）** 2026-10-23 | ADR 031、图 v1 / checkpoint v2 / 恢复 v4，精确身份与预算/审批/owner/事件事务；旧状态明确拒绝或保持原路径，见 [R2 记录](r2-execution-20261023.md) |
 | E10 / P03–P05 审批、恢复与 join | **完成（适用框架契约）** 2026-10-23 | 43 项 R2 专项映射 F01–F10 与补充窗口；新进程恢复、未知效果/费用对账、精确额度、单 owner 和 join；真实宿主效果仍随 E12–E16 验收 |

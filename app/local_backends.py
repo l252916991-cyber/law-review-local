@@ -7,7 +7,8 @@ import time
 from contextlib import closing
 from copy import deepcopy
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
+from urllib.error import HTTPError
 from urllib.request import Request
 
 from .db import connect, db_scope, now, transaction
@@ -22,7 +23,8 @@ class BackendUnknown(RuntimeError):
 
 
 class LocalModels:
-    def __init__(self, *, endpoint, identities, models, temperature=0.2, max_tokens=900, transport=None):
+    def __init__(self, *, endpoint, identities, models, temperature=0.2, max_tokens=900, transport=None,
+                 exclusive_residency=False):
         parsed = urlsplit(endpoint)
         if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "::1"}
                 or parsed.username or parsed.password or parsed.query or parsed.fragment
@@ -33,9 +35,12 @@ class LocalModels:
             raise ContractValidationError("invalid local model generation bound")
         if set(models) != {"llm", "embedding", "reranker"}:
             raise ContractValidationError("all three local backend identities are required")
+        if type(exclusive_residency) is not bool:
+            raise ContractValidationError("exclusive residency requires explicit trusted host configuration")
         self.endpoint = endpoint.rstrip("/")
         self.models, self.identities = deepcopy(models), deepcopy(identities)
         self.temperature, self.max_tokens, self.transport = temperature, max_tokens, transport
+        self.exclusive_residency = exclusive_residency
         self._stats = {}
         for name in set(models.values()):
             entry = self.identities[name]
@@ -63,6 +68,8 @@ class LocalModels:
             kind: {"name": name, "identity": self.identities[name]["identity"]} for kind, name in self.models.items()},
             "temperature": temperature, "max_tokens": max_tokens,
             "measurement_valid": transport is None}
+        if self.exclusive_residency:
+            self.binding["local_service_policy"] = "omlx-exclusive-residency-v1"
         self.fingerprint = digest(self.binding)
 
     @staticmethod
@@ -75,6 +82,8 @@ class LocalModels:
             kind: {"name": name, "identity": self.identities[name]["identity"]} for kind, name in self.models.items()},
             "temperature": self.temperature, "max_tokens": self.max_tokens,
             "measurement_valid": self.transport is None}
+        if self.exclusive_residency:
+            current["local_service_policy"] = "omlx-exclusive-residency-v1"
         if digest(current) != self.fingerprint or digest(self.binding) != self.fingerprint:
             raise RequestConflictError("local backend configuration changed")
         for path, expected in self._stats.items():
@@ -91,11 +100,39 @@ class LocalModels:
         route = {"llm": "chat/completions", "embedding": "embeddings", "reranker": "rerank"}[kind]
         if self.transport is not None:
             return self.transport(kind, deepcopy(payload), timeout)
+        deadline = time.monotonic() + timeout
+        if self.exclusive_residency:
+            self._release_registered_models(deadline)
+        timeout = max(0.01, deadline - time.monotonic())
         request = Request(self.endpoint + "/" + route, data=canonical(payload).encode(),
                           headers={"Content-Type": "application/json"}, method="POST")
-        deadline = time.monotonic() + timeout
         with egress_opener().open(request, timeout=timeout) as response:
             return read_json_with_deadline(response, timeout, deadline=deadline)
+
+    def _release_registered_models(self, deadline):
+        """Opt-in for an exclusively owned oMLX service; never a product default.
+
+        These are administrative unloads, not inference/retry calls. Only the
+        three frozen model names may be addressed; memory guards stay enabled.
+        """
+        for name in sorted(set(self.models.values())):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("local residency admission exceeded the original deadline")
+            request = Request(self.endpoint + "/models/" + quote(name, safe="") + "/unload", data=b"", method="POST")
+            try:
+                with egress_opener().open(request, timeout=remaining) as response:
+                    read_json_with_deadline(response, remaining, deadline=deadline)
+            except HTTPError as error:
+                try:
+                    body = read_json_with_deadline(error, remaining, deadline=deadline)
+                    detail = body.get("detail")
+                    if detail is None and isinstance(body.get("error"), dict):
+                        detail = body["error"].get("message")
+                    if error.code != 400 or detail != f"Model not loaded: {name}":
+                        raise RuntimeError("dedicated local service rejected model residency admission") from None
+                finally:
+                    error.close()
 
 
 def measured_usage(kind, body):
@@ -221,11 +258,13 @@ class GovernedRetrievalLedger(BackendLedger):
                 return []
             payload = {"model": self.gate.models.models[kind], "query": query, "documents": documents}
         call_id = self.node_id + ":backend:" + str(len(self.events))
+        started = time.monotonic()
         record = self.gate.call(kind, payload, call_id)
         event = {"kind": kind, "call_id": call_id, "model": payload["model"], "backend": "local-pinned",
                  "input_tokens": record["input_tokens"], "output_tokens": record["output_tokens"],
                  "input_chars": record["input_chars"], "usage_known": record["status"] == "completed",
                  "measurement_valid": self.gate.models.transport is None, "executed": True,
+                 "elapsed_seconds": round(time.monotonic() - started, 6),
                  "request_sha256": record["request_digest"], "response_sha256": record["response_digest"]}
         self.events.append(event)
         if record["status"] != "completed":

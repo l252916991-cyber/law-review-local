@@ -1,0 +1,182 @@
+"""Two local-model comparisons on disposable copies; never write the source DB."""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import time
+from contextlib import closing
+from copy import deepcopy
+from pathlib import Path
+
+from . import agents
+from .candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from .db import connect, db_scope
+from .domain_integration import DomainSession
+from .host_writes import digest
+from .local_backends import BackendUnknown, GovernedRetrievalLedger
+from .model_domain import LOCAL_PROMPT_VERSION, local_model_payload
+from .runtime_adapter import current_actor_identity
+from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, RunScope
+from .services import PROMPT_VERSION
+
+
+def private_report(path, value):
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+
+
+def clone_snapshot(source, target):
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with closing(sqlite3.connect(f"file:{source.as_posix()}?mode=ro", uri=True)) as original, closing(sqlite3.connect(target)) as copy:
+        original.backup(copy)
+
+
+class NativeMeasurementLedger(GovernedRetrievalLedger):
+    """Observe the native reference through the same pinned local backend setup."""
+    def invoke(self, kind, client, args, kwargs, operation):
+        if getattr(self, "unresolved", False):
+            raise BackendUnknown("native comparison stopped after an unknown backend call")
+        started = time.monotonic()
+        try:
+            return self._invoke(kind, client, args, kwargs, operation)
+        except BackendUnknown:
+            self.unresolved = True
+            elapsed = round(time.monotonic() - started, 6)
+            if self.events and self.events[-1].get("kind") == kind and not self.events[-1]["usage_known"]:
+                self.events[-1]["outcome"] = "unknown"
+                self.events[-1].setdefault("elapsed_seconds", elapsed)
+            else:
+                self.events.append({"kind": kind, "backend": "local-pinned", "usage_known": False,
+                    "input_tokens": None, "output_tokens": None, "measurement_valid": False,
+                    "outcome": "unknown", "executed": True, "elapsed_seconds": elapsed})
+            raise
+
+    def _invoke(self, kind, client, args, kwargs, operation):
+        if kind != "llm":
+            return super().invoke(kind, client, args, kwargs, operation)
+        self.authorize()
+        question, route, contexts = args[:3]
+        payload = local_model_payload(self.gate.models, question, route, contexts)
+        started = time.monotonic()
+        record = self.gate.call("llm", payload, self.node_id + ":backend:" + str(len(self.events)))
+        self.events.append({"kind": "llm", "backend": "local-pinned", "input_tokens": record["input_tokens"],
+            "output_tokens": record["output_tokens"], "usage_known": record["status"] == "completed",
+            "measurement_valid": self.gate.models.transport is None,
+            "elapsed_seconds": round(time.monotonic() - started, 6),
+            "request_sha256": record["request_digest"], "response_sha256": record["response_digest"]})
+        reply = self.gate.control._model_reply(record)
+        if reply.get("model_error"):
+            raise RuntimeError("native measured model response rejected")
+        if reply.get("model_result") is None:
+            raise BackendUnknown("native model usage unknown; no replay")
+        return reply["model_result"]["action"]["content"]
+
+
+def _page_keys(contexts):
+    return [(c["document_id"], c["page_no"]) for c in contexts]
+
+
+def compare_local_models(*, case_id, question, models, framework_python, output, expected="success"):
+    if expected not in {"success", "source_rejection"}:
+        raise ContractValidationError("comparison requires an explicit expected outcome")
+    output = Path(output).absolute()
+    output.mkdir(parents=True, mode=0o700)  # refuse an existing run; never resend it implicitly
+    source_request = RunRequest(request_id="readonly-local-comparison", scope=RunScope(case_id),
+        actor=current_actor_identity(), question=question, runtime="forgeharness-readonly",
+        model=ModelConfig(use_llm=False), use_remote_embeddings=False, persist_memory=False)
+    with DomainSession(source_request) as source:
+        source_identity = source.source_identity
+        deployment = CandidateDeployment.create_new(output / "candidate" / "host.sqlite", case_ids=(case_id,))
+        clone_snapshot(source.snapshot, deployment.database)
+        with db_scope(deployment.database):
+            control = CandidateDomainIntegration(deployment=deployment, models=models, framework_python=framework_python)
+            request = RunRequest(request_id="candidate-local-comparison", scope=RunScope(case_id),
+                actor=current_actor_identity(), question=question, runtime=control.runtime,
+                model=ModelConfig(use_llm=True), use_remote_embeddings=True, persist_memory=False)
+            control.accept(request)
+            started = time.monotonic()
+            candidate = control.drive(request.request_id)
+            elapsed = time.monotonic() - started
+            with closing(connect()) as conn:
+                row = control._load(conn, request.request_id)
+                outputs, _ = control._read_outputs(conn, row)
+        if candidate["needs_reconciliation"]:
+            raise BackendUnknown("candidate requires reconciliation; comparison stopped without retry")
+        retrieval = deepcopy(outputs["retrieve"])
+        comparisons = []
+        for shared in (True, False):
+            mode = "shared_retrieval_and_memory_snapshot" if shared else "independent_retrieval_and_memory"
+            native_db = output / mode / "host.sqlite"
+            clone_snapshot(source.snapshot, native_db)
+            with db_scope(deployment.database):
+                measurement_request = RunRequest(request_id=mode, scope=RunScope(case_id),
+                    actor=current_actor_identity(), question=question, runtime=control.runtime,
+                    model=ModelConfig(use_llm=True), use_remote_embeddings=True, persist_memory=False)
+                control.accept(measurement_request)
+                with closing(connect()) as conn:
+                    row = control._load(conn, mode)
+                ledger = NativeMeasurementLedger(source.assert_current, control._gate(row), "native-" + mode)
+                ledger.set_deadline(time.monotonic() + max(0, row["deadline"] - time.time()))
+
+            class FrozenRetrieval:
+                def retrieve(self, query, limit=6):
+                    return deepcopy(retrieval)
+
+            started = time.monotonic()
+            with db_scope(native_db), ledger.activate():
+                native = agents.LawReviewCoordinator(case_id, True)
+                native.statutory_conflict_agent = source._statutory_agent()
+                native.critic_agent.model = models.models["llm"]
+                if shared:
+                    native.retrieval_agent = FrozenRetrieval()
+                result = native.process_query(question, use_llm=True, persist_memory=False,
+                    memory_snapshot=deepcopy(outputs["memory_recall"]["items"]) if shared else None)
+                trace = agents.get_run_trace(result["run_id"])
+            native_elapsed = time.monotonic() - started
+            source.assert_current()
+            steps = {step["node_name"]: step["output"] for step in trace["steps"]}
+            specialists = {name: value for name, value in steps.items() if name in source.specs}
+            known = all(e["usage_known"] for e in ledger.events if e["backend"] == "local-pinned")
+            invalid = any(e.get("invalid_response") for e in ledger.events)
+            if not known:
+                private_report(output / "failure.json", {"mode": mode, "outcome": "unknown_usage",
+                    "native_backend_calls": ledger.events, "source_business_writes": 0,
+                    "provider_calls_not_retried": True, "g2_accepted": False})
+                raise BackendUnknown("native usage remains unknown; evidence retained without retry")
+            success = candidate["status"] == "succeeded" and result["llm_used"] and result["validation"]["valid"]
+            rejected = (candidate["status"] == "failed" and not retrieval["contexts"]
+                        and not result["validation"]["valid"] and not result["citations"])
+            checks = {"expected_outcome": bool(success if expected == "success" else rejected),
+                "specialists_equal": specialists == {name: outputs[name] for name in specialists},
+                "retrieved_pages_equal": _page_keys(steps["retrieve"]["contexts"]) == _page_keys(retrieval["contexts"]),
+                "known_usage": known, "no_invalid_backend_fallback": not invalid}
+            measured = [e for e in ledger.events if e["backend"] == "local-pinned"]
+            comparison = {"mode": mode, "checks": checks, "engineering_passed": all(checks.values()),
+                "answer_equal": result["answer"] == outputs.get("finish", {}).get("answer"),
+                "candidate_outcome": candidate["status"], "native_llm_used": result["llm_used"],
+                "native_validation": result["validation"], "native_answer": result["answer"],
+                "native_citations": result["citations"], "native_specialists": specialists,
+                "native_backend_calls": deepcopy(ledger.events), "native_elapsed_seconds": native_elapsed,
+                "native_usage": {"calls": len(measured), "input_tokens": sum(e["input_tokens"] for e in measured),
+                    "output_tokens": sum(e["output_tokens"] for e in measured)},
+                "source_business_writes": 0, "model_quality_assessed": False}
+            private_report(output / f"{mode}.json", comparison)
+            comparisons.append(comparison)
+            with db_scope(deployment.database):
+                control.cancel(mode)  # measurement handle was never sent to the framework
+        source.assert_current()
+        report = {"schema_version": 1, "source_identity": source_identity, "question": question,
+            "expected": expected, "models": deepcopy(models.binding), "prompt_version": PROMPT_VERSION,
+            "local_prompt_version": LOCAL_PROMPT_VERSION, "measurement_valid": models.transport is None,
+            "candidate": candidate, "candidate_elapsed_seconds": elapsed,
+            "candidate_answer": outputs.get("finish", {}).get("answer"),
+            "candidate_citations": outputs.get("finish", {}).get("citations", []),
+            "candidate_retrieval_digest": digest(retrieval), "comparisons": comparisons,
+            "source_unchanged": True, "engineering_passed": all(c["engineering_passed"] for c in comparisons),
+            "g2_accepted": False, "g2_pending": ["authorized representative development materials", "quality review"],
+            "semantic_entailment_checked": False, "lawyer_review_required": True}
+        private_report(output / "report.json", report)
+        return report

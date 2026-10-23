@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import json
+import os
+from contextlib import closing
+
+import pytest
+
+from app.db import connect
+from app.model_comparison import compare_local_models
+from app.local_backends import BackendUnknown
+from app.runtime_ports import AccessDeniedError
+from app.security import Principal, _principal
+from tests.test_domain_writes import domain  # noqa: F401
+from tests.test_host_writes import isolated  # noqa: F401
+from tests.test_local_backends import local_models  # noqa: F401
+
+actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="installed framework Python3.12 required")
+
+
+@actual
+@pytest.mark.parametrize("case_id,question,expected", [
+    (1, "合成审批记录的事实和证据是否完整，有哪些疏漏？", "success"),
+    (2, "量子香蕉完全无关资料", "source_rejection"),
+])
+def test_paired_models_keep_source_unchanged_and_separate_measurements(local_models, tmp_path, case_id, question, expected):
+    models, calls = local_models
+    with closing(connect()) as conn:
+        before = tuple(conn.iterdump())
+    output = tmp_path / "comparison"
+    report = compare_local_models(case_id=case_id, question=question, models=models,
+        framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=output, expected=expected)
+    assert report["engineering_passed"], json.dumps(report, ensure_ascii=False, indent=2)
+    assert report["source_unchanged"] and not report["g2_accepted"] and not report["measurement_valid"]
+    assert report["candidate"]["status"] == ("succeeded" if expected == "success" else "failed")
+    shared, independent = report["comparisons"]
+    assert shared["mode"] == "shared_retrieval_and_memory_snapshot"
+    assert independent["mode"] == "independent_retrieval_and_memory"
+    assert shared["native_usage"]["calls"] == 1
+    assert independent["native_usage"]["calls"] > shared["native_usage"]["calls"]
+    assert all(c["source_business_writes"] == 0 for c in report["comparisons"])
+    assert all(not c["model_quality_assessed"] for c in report["comparisons"])
+    with closing(connect()) as conn:
+        assert tuple(conn.iterdump()) == before
+    assert (output / "report.json").stat().st_mode & 0o777 == 0o600
+    observed = list(calls)
+    with pytest.raises(FileExistsError):
+        compare_local_models(case_id=1, question=question, models=models,
+            framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=output, expected=expected)
+    assert calls == observed
+
+
+@actual
+def test_unrelated_dense_retrieval_is_reported_as_a_failed_negative_control(local_models, tmp_path):
+    # The deliberately constant embedding fixture retrieves an unrelated page.
+    # This must fail the expected refusal, even when both answers look identical.
+    models, _ = local_models
+    report = compare_local_models(case_id=1, question="量子香蕉完全无关资料", models=models,
+        framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=tmp_path / "negative-control",
+        expected="source_rejection")
+    assert report["candidate"]["status"] == "succeeded"
+    assert not report["engineering_passed"] and not report["g2_accepted"]
+    assert all(not c["checks"]["expected_outcome"] for c in report["comparisons"])
+
+
+@actual
+@pytest.mark.parametrize("fault", ["disconnect", "missing_usage"])
+def test_unknown_native_usage_stops_before_another_comparison(local_models, tmp_path, fault):
+    models, calls = local_models
+    original = models.transport
+    llm_calls = 0
+    def unknown_native(kind, payload, timeout):
+        nonlocal llm_calls
+        if kind == "llm":
+            llm_calls += 1
+            if llm_calls == 2 and fault == "disconnect":
+                calls.append("llm")
+                raise OSError("synthetic lost response")
+        body = original(kind, payload, timeout)
+        if kind == "llm" and llm_calls == 2:
+            body.pop("usage")
+        return body
+    models.transport = unknown_native
+    output = tmp_path / "unknown-native"
+    with closing(connect()) as conn:
+        before = tuple(conn.iterdump())
+    with pytest.raises(BackendUnknown, match="evidence retained"):
+        compare_local_models(case_id=1, question="合成审批记录", models=models,
+            framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=output)
+    assert llm_calls == 2 and not (output / "independent_retrieval_and_memory").exists()
+    failure = json.loads((output / "failure.json").read_text())
+    assert failure["outcome"] == "unknown_usage" and failure["provider_calls_not_retried"]
+    assert sum(not e["usage_known"] for e in failure["native_backend_calls"]) == 1
+    with closing(connect()) as conn:
+        assert tuple(conn.iterdump()) == before
+
+
+def test_comparison_does_not_escalate_a_view_only_actor(local_models, tmp_path, monkeypatch):
+    models, calls = local_models
+    token = "comparison-view-token-" + "x" * 32
+    monkeypatch.setenv("LAW_REVIEW_AUTH_MODE", "token")
+    monkeypatch.setenv("LAW_REVIEW_API_TOKENS_JSON", json.dumps({token: {
+        "name": "只读评测人", "case_ids": [1], "permissions": ["view"]}}))
+    marker = _principal.set(Principal("只读评测人", False, (1,), permissions=frozenset({"view"})))
+    try:
+        with pytest.raises(AccessDeniedError):
+            compare_local_models(case_id=1, question="合成审批记录", models=models,
+                framework_python="/unneeded", output=tmp_path / "view-only")
+    finally:
+        _principal.reset(marker)
+    assert not calls

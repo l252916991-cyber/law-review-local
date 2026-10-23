@@ -20,6 +20,16 @@ LOCAL_PROMPT_SUFFIX = (
 )
 
 
+def local_model_payload(models, question, route, contexts):
+    context = "\n\n".join(f"[资料{i}｜{item['name']}｜第{item['page_no']}页]\n{item['quote']}"
+                          for i, item in enumerate(contexts, 1))
+    return {"model": models.models["llm"], "messages": [
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT + LOCAL_PROMPT_SUFFIX},
+        {"role": "user", "content": f"检索路由：{route}\n问题：{question}\n\n卷宗片段：\n{context}"}],
+        "temperature": models.temperature, "max_tokens": models.max_tokens,
+        "stream": False, "chat_template_kwargs": {"enable_thinking": False}}
+
+
 class LocalModelSession(DomainSession):
     def _call(self, node):
         if self.network_retrieval and node == "memory_recall":
@@ -181,14 +191,9 @@ class LocalModelDomainIntegration(IsolatedDomainIntegration):
         experts = [a["id"] for a in json.loads(row["graph_json"]) if a["id"] in {
             "facts", "evidence", "contradiction", "gap_detection", "statutory_conflict"}]
         summary = "；".join(outputs[name].get("summary", "") for name in sorted(experts))
-        context = "\n\n".join(f"[资料{i}｜{item['name']}｜第{item['page_no']}页]\n{item['quote']}"
-                              for i, item in enumerate(outputs["retrieve"]["contexts"], 1))
         question = f"{binding['question']}\n专家节点摘要：{summary}。请只输出给律师的最终结论。"
-        return {"model": self.models.models["llm"], "messages": [
-            {"role": "system", "content": CHAT_SYSTEM_PROMPT + LOCAL_PROMPT_SUFFIX},
-            {"role": "user", "content": f"检索路由：Multi-Agent/{outputs['planner']['route']}\n问题：{question}\n\n卷宗片段：\n{context}"}],
-            "temperature": self.models.temperature, "max_tokens": self.models.max_tokens,
-            "stream": False, "chat_template_kwargs": {"enable_thinking": False}}
+        return local_model_payload(self.models, question, f"Multi-Agent/{outputs['planner']['route']}",
+                                   outputs["retrieve"]["contexts"])
 
     def _receipt_reply(self, receipt, action):
         reply = super()._receipt_reply(receipt, action)

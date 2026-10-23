@@ -66,6 +66,16 @@ E12：六动作、非空引用、同事务回执、已确认容量与受信候�
 
 最终针对性测试 **70 passed**；完整本机离线 Python 3.11/3.12/3.14 各 **940 passed / 3 skipped**，覆盖率 84.67% / 84.69% / 84.68%，原跳过原因不变。Ruff、Mypy、compileall、发布允许清单通过，锁文件/依赖未变，导出及 Node22 检查沿用 D04。证据为 `d05/`、`d05-311/`、`d05-312/`、`d05-314/`。
 
-## 8. 后续状态
+## 8. D06：Qwythos 9B 双对照工具与五题合成对照
 
-D06 对照工具已开始实现，但工作区中的改动尚未完成最终验证或提交；D07 候选冻结与发布重建尚未开始。后续任务和顺序见[未完成事项续行计划](domain-integration-continuation-plan-20261023.md)。用户已将后续本机对照的生成模型指定为现有 Qwythos 9B；此前 35B 实测仅保留为 D04 历史证据，不代表 D06 选择。真实模型仍限于本机服务与合成材料；E07/G2 和 E14 按其单独前置验收，不能据候选工程验证宣称正式产品已接入。
+已收敛未提交实现：新增 `app/model_comparison.py`、`scripts/compare_local_models.py`、`tests/test_model_comparison.py` 和 `tests/test_local_backends_exclusive.py`；`LocalModels` 增加显式 `exclusive_residency`，每次推理前仅卸载已登记的三个模型角色，未知卸载错误、超时和身份绑定均不降级；`local_model_payload` 统一候选与原生对照的请求构造；`read_json_with_deadline` 兼容实际 oMLX `HTTPError` 响应体。新增 6 项独占驻留测试和原有模型/对照测试合计 **30 passed**；Ruff、Mypy（42 个脚本）通过。
+
+本机身份清单在私有证据 `output/migration/domain-integration-20261023/d06-qwythos9b/local-model/` 重新计算，生成模型固定为 `Qwythos-9B-v2-OptiQ-4bit`，embedding/reranker 分别固定为 `Qwen3-Embedding-4B-4bit-DWQ`、`bge-reranker-v2-m3-mlx`。模型均记录完整顶层文件 SHA-256、字节数和本地身份摘要；上游 revision 与转换可复现性仍标为未证实。临时 oMLX 0.7.0 服务仅监听 `127.0.0.1:18083`，`--memory-guard safe`、`--max-concurrent-requests 1`，未修改项目默认模型，未调用外部或付费推理服务。服务日志观察到生成模型多次加载/卸载，验证开始下一次推理前释放已登记模型；实际生成引擎为 VLM 发现失败后回退的 LLM BatchedEngine，约 6.95GB。
+
+五题合成对照实际完成（原始 `report.json`、逐题比较和服务器日志在私有证据目录）：**常规、矛盾、证据缺口**三题候选均 `succeeded`，原生共享/独立两类对照工程检查通过；**空案件**候选 `failed`、原生未生成有效法律结论，工程检查通过；**无关查询**候选 `succeeded` 并对本案卷宗给出带引用法律结论，未按预期拒绝，`expected_outcome=false`，因此该负例失败并**阻止 G2 通过**。所有对照 `measurement_valid=true`，逐题记录实际后端调用、服务报告用量和调用延迟，无未知用量；源案件身份摘要前后一致，源库报告 `source_unchanged=true`。这只能证明对应推理和工程对照发生，不证明答案法律质量、语义蕴含或真实案件适用性。
+
+**D06 结论**：工程实现与测量有效性通过；负例失败使 G2 不能通过，未改题、未删除失败记录。真实开发材料授权、专业律师终评和 E14 正式路由仍未满足。D07 候选冻结与发布重建待执行。
+
+## 9. 后续状态
+
+D07 尚未开始；E07/G2、E12/E13 全验收、专业终评和 E14 仍未完成。用户已将后续本机对照生成模型指定为现有 Qwythos 9B；此前 35B 实测仅保留为 D04 历史证据，不代表 D06 选择。真实模型仍限于本机服务与合成材料；E07/G2 和 E14 按其单独前置验收，不能据候选工程验证宣称正式产品已接入。
