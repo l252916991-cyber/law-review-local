@@ -73,6 +73,30 @@ def exact_quote(text: str, display: str) -> str:
     return span
 
 
+def capture_corpus() -> tuple[str, LegalCorpus | None]:
+    """Validate the exact current public corpus without creating a case session."""
+    configured = os.getenv("LAW_REVIEW_LEGAL_CORPUS_DIR", "").strip()
+    if not configured:
+        return "unconfigured", None
+    directory = Path(configured).resolve(strict=True)
+    manifest_path = directory / "manifest.json"
+    if manifest_path.stat().st_size > 1_000_000:
+        raise ValueError("public statute manifest exceeds the pilot bound")
+    raw = manifest_path.read_bytes()
+    manifest = json.loads(raw)
+    if len(manifest["documents"]) > 1000:
+        raise ValueError("too many public statute documents")
+    paths = [directory / item["document_file"] for item in manifest["documents"]]
+    if any(path.resolve().parent != directory for path in paths):
+        raise ValueError("statute document is outside its corpus")
+    if sum(path.stat().st_size for path in paths) > 20_000_000:
+        raise ValueError("public statute corpus exceeds the pilot bound")
+    corpus = LegalCorpus(directory)
+    if manifest_path.read_bytes() != raw:
+        raise SnapshotChangedError("public statute manifest changed while reading")
+    return hashlib.sha256(raw).hexdigest(), corpus
+
+
 class ReadonlyCaseSession:
     """One trusted request, one case snapshot, fixed allowlisted domain nodes.
 
@@ -209,26 +233,7 @@ class ReadonlyCaseSession:
             raise SnapshotChangedError("public statute corpus changed")
 
     def _capture_corpus(self) -> tuple[str, LegalCorpus | None]:
-        configured = os.getenv("LAW_REVIEW_LEGAL_CORPUS_DIR", "").strip()
-        if not configured:
-            return "unconfigured", None
-        directory = Path(configured).resolve(strict=True)
-        manifest_path = directory / "manifest.json"
-        if manifest_path.stat().st_size > 1_000_000:
-            raise ValueError("public statute manifest exceeds the pilot bound")
-        raw = manifest_path.read_bytes()
-        manifest = json.loads(raw)
-        if len(manifest["documents"]) > 1000:
-            raise ValueError("too many public statute documents")
-        paths = [directory / item["document_file"] for item in manifest["documents"]]
-        if any(path.resolve().parent != directory for path in paths):
-            raise ValueError("statute document is outside its corpus")
-        if sum(path.stat().st_size for path in paths) > 20_000_000:
-            raise ValueError("public statute corpus exceeds the pilot bound")
-        corpus = LegalCorpus(directory)  # validates each exact document digest
-        if manifest_path.read_bytes() != raw:
-            raise SnapshotChangedError("public statute manifest changed while reading")
-        return hashlib.sha256(raw).hexdigest(), corpus
+        return capture_corpus()
 
     def _statutory_agent(self) -> agents.StatutoryConflictAgent:
         if self._corpus is None:

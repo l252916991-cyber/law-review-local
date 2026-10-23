@@ -134,6 +134,11 @@ FIELDS = {
 class LocalHostWritePort:
     """Trusted host object; DB path, actor and scope never come from the pipe."""
 
+    runtime = ISOLATED_RUNTIME
+    receipt_version = WRITE_SCHEMA_VERSION
+    max_write_bytes = MAX_WRITE_BYTES
+    fields = FIELDS
+
     def __init__(self, scope: RunScope):
         self.scope, self.path = scope, get_db_path().resolve()
         self.principal_key = authorize(scope, write=True)
@@ -146,7 +151,10 @@ class LocalHostWritePort:
         if authorize(scope, write=write) != self.principal_key:
             raise AccessDeniedError("principal binding changed")
         isolated_guard(conn)
-        return source_version(conn, scope, writing=write)
+        return self._source_version(conn, scope, writing=write)
+
+    def _source_version(self, conn, scope, *, writing=False):
+        return source_version(conn, scope, writing=writing)
 
     def current_version(self) -> str:
         with closing(connect()) as conn:
@@ -160,10 +168,10 @@ class LocalHostWritePort:
                 or not request.idempotency_key.isascii() or not request.idempotency_key.isprintable()):
             raise ContractValidationError("invalid idempotency key")
         raw = canonical(request.payload)
-        if len(raw.encode()) > MAX_WRITE_BYTES:
+        if len(raw.encode()) > self.max_write_bytes:
             raise ContractValidationError("write exceeds payload bound")
         payload = json.loads(raw)  # freeze caller-owned mutable dictionaries
-        required, allowed = FIELDS[request.action]
+        required, allowed = self.fields[request.action]
         if not isinstance(payload, dict) or not required <= payload.keys() or payload.keys() - allowed:
             raise ContractValidationError("invalid action fields")
         for name, value in payload.items():
@@ -183,15 +191,18 @@ class LocalHostWritePort:
         if "importance" in payload and (type(payload["importance"]) not in {int, float}
                 or not math.isfinite(payload["importance"]) or not 0 <= payload["importance"] <= 1):
             raise ContractValidationError("importance must be in [0,1]")
-        if "role" in payload and payload["role"] not in {"user", "assistant"}:
+        if request.action == WriteAction.CONVERSATION_MESSAGE and payload.get("role") not in {"user", "assistant"}:
             raise ContractValidationError("invalid message role")
-        if "citations" in payload and payload["citations"] != []:
-            raise ContractValidationError("synthetic prototype does not produce validated citations")
+        self._validate_citation_shape(payload)
         if "affected_evidence_ids" in payload:
             ids = payload["affected_evidence_ids"]
             if not isinstance(ids, list) or len(ids) > 100 or any(type(i) is not int or i < 1 for i in ids):
                 raise ContractValidationError("invalid evidence identities")
         return payload
+
+    def _validate_citation_shape(self, payload):
+        if "citations" in payload and payload["citations"] != []:
+            raise ContractValidationError("synthetic prototype does not produce validated citations")
 
     def execute(self, request: WriteRequest) -> WriteReceipt:
         with transaction() as conn:
@@ -206,7 +217,7 @@ class LocalHostWritePort:
         payload = self._validate(request)
         if request.source_version != current:
             raise RequestConflictError("source version changed")
-        identity = digest({"v": WRITE_SCHEMA_VERSION, "actor": self.principal_key, "scope": asdict(self.scope),
+        identity = digest({"v": self.receipt_version, "actor": self.principal_key, "scope": asdict(self.scope),
                            "action": request.action.value, "source": current, "payload": payload})
         row = conn.execute("SELECT * FROM host_write_receipts WHERE action=? AND idempotency_key=?",
                            (request.action.value, request.idempotency_key)).fetchone()
@@ -261,7 +272,7 @@ class LocalHostWritePort:
 
     def _check_effect(self, conn, row) -> None:
         result = json.loads(row["result_json"])
-        if result.get("schema_version") != WRITE_SCHEMA_VERSION:
+        if result.get("schema_version") != self.receipt_version:
             raise ContractValidationError("unsupported saved receipt schema")
         if self._effect_version(conn, result["table"], result["row_id"]) != result["effect_version"]:
             raise RequestConflictError("receipt effect changed")
@@ -270,12 +281,12 @@ class LocalHostWritePort:
         case, ts = self.scope.case_id, now()
         if "run_id" in p:
             run = conn.execute("SELECT case_id,runtime FROM agent_runs WHERE id=?", (p["run_id"],)).fetchone()
-            if run is None or run["case_id"] != case or run["runtime"] != ISOLATED_RUNTIME:
+            if run is None or run["case_id"] != case or run["runtime"] != self.runtime:
                 raise AccessDeniedError("run unavailable")
         if action == WriteAction.RUN_RECORD:
             row_id = conn.execute(
                 "INSERT INTO agent_runs(case_id,question,route,runtime,created_at) VALUES (?,?,?,?,?)",
-                (case, p["question"], ISOLATED_RUNTIME, ISOLATED_RUNTIME, ts)).lastrowid
+                (case, p["question"], self.runtime, self.runtime, ts)).lastrowid
             table = "agent_runs"
         elif action == WriteAction.STEP_RECORD:
             row_id = conn.execute(
@@ -305,11 +316,11 @@ class LocalHostWritePort:
                 raise AccessDeniedError("conversation unavailable")
             row_id = conn.execute(
                 "INSERT INTO messages(conversation_id,role,content,citations_json,route,created_at) VALUES (?,?,?,?,?,?)",
-                (p["conversation_id"], p["role"], p["content"], canonical(p["citations"]), ISOLATED_RUNTIME, ts)).lastrowid
+                (p["conversation_id"], p["role"], p["content"], canonical(p["citations"]), self.runtime, ts)).lastrowid
             table = "messages"
         else:
             row_id = conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,'隔离宿主写入',?,?)",
                                   (case, canonical({"actor": current_principal().name, "detail": p["detail"]}), ts)).lastrowid
             table = "audit_log"
-        return {"schema_version": WRITE_SCHEMA_VERSION, "table": table, "row_id": row_id,
+        return {"schema_version": self.receipt_version, "table": table, "row_id": row_id,
                 "effect_version": self._effect_version(conn, table, row_id)}
