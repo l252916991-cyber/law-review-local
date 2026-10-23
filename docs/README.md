@@ -3,6 +3,7 @@
 以代码、测试产物与以下维护文档为准；根目录早期报告保留为历史证据，不作为“全部完成”的实时声明。
 
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
+- [2026-10-23 领域接入实施记录](migration/domain-integration-execution-20261023.md)：D00–D07 实际进度、用户确认范围、验证与剩余验收条件。
 - [2026-10-23 下一步计划书：真实领域接入](migration/domain-integration-plan-20261023.md)：Git 基线后的 D00–D07 工作包、领域持久图与写契约、模型治理及双对照、验收矩阵和正式接入前置条件。
 - [2026-10-23 本地 Git 基线初始化](migration/git-initialization-20261023.md)：已审查的源码范围、仓库级作者、既有验证及本地提交规则。
 - [2026-10-23 宿主接入实施记录](migration/host-integration-execution-20261023.md)：六类隔离写入、持久映射、真实进程恢复、合成双对照与未放行边界。

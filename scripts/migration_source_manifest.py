@@ -1,8 +1,8 @@
 """Freeze a reproducible source manifest for the ForgeHarness migration (M0).
 
-Both this checkout and the ForgeHarness checkout currently lack Git metadata
-(see docs/migration/ledger.md). This script produces the content-addressed
-source identity required by the migration plan instead: every file in the
+This script records Git provenance when available, while the content-addressed
+identity always describes current allowlisted files, including local changes.
+Every file in the
 release allowlist (scripts/package_release.py source_files()) is hashed with
 SHA-256, and a deterministic tree digest is computed over the sorted mapping.
 The algorithm intentionally mirrors ForgeHarness ``benchmarks/
@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,33 @@ from scripts.package_release import source_files
 
 SCHEMA_VERSION = 1
 PROFILE = "lexvault-release-allowlist"
-SOURCE_KIND = "working checkout; no Git metadata"
+
+def source_provenance(root: Path) -> dict[str, Any]:
+    """Do not confuse HEAD, an enclosing repository, or an archive with source bytes."""
+    if not (root / ".git").exists():
+        return {"source_kind": "working checkout; no Git metadata"}
+
+    def git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), *arguments],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+
+    try:
+        top = git("rev-parse", "--show-toplevel")
+        if top.returncode or Path(top.stdout.strip()).resolve() != root.resolve():
+            return {"source_kind": "working checkout; Git provenance unavailable"}
+        head = git("rev-parse", "--verify", "HEAD")
+        status = git("status", "--porcelain=v1", "-z", "--untracked-files=normal")
+        if status.returncode:
+            return {"source_kind": "working checkout; Git provenance unavailable"}
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        return {"source_kind": "working checkout; Git provenance unavailable"}
+    return {
+        "source_kind": "Git working checkout; current release-allowlisted content",
+        "git": {"head_commit": head.stdout.strip() if head.returncode == 0 else None,
+                "working_tree_dirty": bool(status.stdout)},
+    }
 
 
 def build_manifest(root: Path) -> dict[str, Any]:
@@ -50,7 +77,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "profile": PROFILE,
-        "source_kind": SOURCE_KIND,
+        **source_provenance(root),
         "tree_digest": tree_digest,
         "files": dict(sorted(hashes.items())),
     }
