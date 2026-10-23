@@ -6,6 +6,7 @@ This is the E12/E13 adapter candidate; E14 must authorize production admission.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from .db import db_scope, get_db_path, init_db
 from .domain_writes import CANDIDATE_RUNTIME, DomainHostWritePort
 from .host_writes import digest
 from .model_domain import LocalModelDomainIntegration
-from .runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError
+from .model_domain import MODEL_NODE
+from .answerability import SourceRejection, answerability_payload, parse_decision, policy_identity
+from .runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError, UnsupportedCapabilityError
 
 
 @dataclass(frozen=True)
@@ -72,11 +75,63 @@ class CandidateDeployment:
 
 class CandidateDomainIntegration(LocalModelDomainIntegration):
     runtime = CANDIDATE_RUNTIME
-    graph_version = "legal-review-candidate-v1"
+    graph_version = "legal-review-candidate-v2"
     wire_version = 5
-    app_version = "domain-candidate-host-v1"
+    app_version = "domain-candidate-host-v2"
     profile = "domain-candidate-v1"
     application_id = "lexvault-domain-candidate"
+
+    def _model_reply(self, record):
+        # Structured reasons can legitimately contain the legacy scratchpad
+        # heuristic's Chinese markers. Never apply that heuristic to this JSON.
+        if record is None or record["status"] != "completed":
+            return {"model_result": None}
+        usage = {"input_tokens": record["input_tokens"], "output_tokens": record["output_tokens"]}
+        try:
+            body = json.loads(record["response_json"])
+            answer = body["choices"][0]["message"]["content"]
+            if (body.get("model", self.models.models["llm"]) != self.models.models["llm"]
+                    or body["choices"][0].get("finish_reason") not in {None, "stop"}
+                    or not isinstance(answer, str) or not answer.strip()):
+                raise ValueError("invalid structured response")
+        except (ValueError, KeyError, IndexError, TypeError):
+            return {"model_error": "invalid_local_model_response", "usage": usage, "model_result": None}
+        return {"model_result": {"action": {"kind": "final", "content": answer},
+                "usage": usage, "model_name": self.models.models["llm"]}}
+
+    def _validate_request(self, request):
+        super()._validate_request(request)
+        if not request.model.use_llm:
+            raise UnsupportedCapabilityError("candidate v2 requires measured answerability; no rule-only fallback")
+
+    def _model_payload(self, row, outputs, completed):
+        binding = json.loads(row["binding_json"])
+        if "critic" not in completed:
+            raise ContractValidationError("model predecessors have not completed")
+        return answerability_payload(self.models, binding["question"], outputs["planner"]["route"],
+                                     outputs["retrieve"]["contexts"])
+
+    def _prepare_outputs(self, row, action, outputs):
+        result = deepcopy(outputs)
+        if action["id"] == "finish":
+            decision = parse_decision(result[MODEL_NODE]["action"]["content"], result["retrieve"]["contexts"])
+            if decision["decision"] != "supported":
+                raise SourceRejection(decision)
+            result[MODEL_NODE]["action"]["content"] = decision["answer"]
+        return super()._prepare_outputs(row, action, result)
+
+    def _compute(self, row, action, outputs):
+        value, calls = super()._compute(row, action, outputs)
+        if action["id"] == "finish":
+            value["answerability"] = parse_decision(outputs[MODEL_NODE]["action"]["content"],
+                                                    outputs["retrieve"]["contexts"])
+        return value, calls
+
+    def _failed_value(self, error):
+        if isinstance(error, SourceRejection):
+            return {"diagnostic": {"code": "answerability_rejected", "decision": error.decision["decision"]},
+                    "answerability": error.decision}
+        return super()._failed_value(error)
 
     def __init__(self, *, deployment, models, framework_python=None):
         if not isinstance(deployment, CandidateDeployment):
@@ -106,10 +161,13 @@ class CandidateDomainIntegration(LocalModelDomainIntegration):
         super()._path_guard()
 
     def _extra_binding(self, request):
-        return {**super()._extra_binding(request), "deployment": self.deployment.identity}
+        return {**super()._extra_binding(request), "deployment": self.deployment.identity,
+                "answerability_policy": policy_identity()}
 
     def _load(self, conn, request_id, *, writing=False):
         row = super()._load(conn, request_id, writing=writing)
         if json.loads(row["binding_json"]).get("deployment") != self.deployment.identity:
             raise RequestConflictError("trusted candidate deployment changed")
+        if json.loads(row["binding_json"]).get("answerability_policy") != policy_identity():
+            raise RequestConflictError("saved answerability policy changed; no reinterpretation")
         return row

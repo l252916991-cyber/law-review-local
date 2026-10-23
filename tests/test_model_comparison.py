@@ -9,7 +9,7 @@ import pytest
 from app.db import connect
 from app.model_comparison import compare_local_models
 from app.local_backends import BackendUnknown
-from app.runtime_ports import AccessDeniedError
+from app.runtime_ports import AccessDeniedError, ContractValidationError
 from app.security import Principal, _principal
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401
@@ -51,16 +51,19 @@ def test_paired_models_keep_source_unchanged_and_separate_measurements(local_mod
 
 
 @actual
-def test_unrelated_dense_retrieval_is_reported_as_a_failed_negative_control(local_models, tmp_path):
-    # The deliberately constant embedding fixture retrieves an unrelated page.
-    # This must fail the expected refusal, even when both answers look identical.
+def test_unrelated_nonempty_dense_retrieval_is_rejected_without_hiding_native_error(local_models, tmp_path):
+    # Preserve the original false-positive input and constant dense vectors.
+    # An explicit measured refusal, not an empty retrieval, closes this case.
     models, _ = local_models
     report = compare_local_models(case_id=1, question="量子香蕉完全无关资料", models=models,
         framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=tmp_path / "negative-control",
         expected="source_rejection")
-    assert report["candidate"]["status"] == "succeeded"
-    assert not report["engineering_passed"] and not report["g2_accepted"]
-    assert all(not c["checks"]["expected_outcome"] for c in report["comparisons"])
+    assert report["candidate"]["status"] == "failed"
+    assert report["candidate_business_outcome"] == "source_rejection"
+    assert report["engineering_passed"] and not report["g2_accepted"]
+    assert report["candidate_refusal"]["decision"] == "unrelated"
+    assert all(c["checks"]["expected_outcome"] for c in report["comparisons"])
+    assert all(c["native_baseline_negative_accepted"] for c in report["comparisons"])
 
 
 @actual
@@ -109,3 +112,34 @@ def test_comparison_does_not_escalate_a_view_only_actor(local_models, tmp_path, 
     finally:
         _principal.reset(marker)
     assert not calls
+
+
+@actual
+@pytest.mark.parametrize("content", ["not JSON", json.dumps({"decision": "unrelated", "reason": "no source",
+    "findings": [{"text": "仍然给出结论", "sources": [1]}]})])
+def test_system_failure_is_not_counted_as_a_business_refusal(local_models, tmp_path, content):
+    models, _ = local_models
+    original = models.transport
+    def malformed(kind, payload, timeout):
+        body = original(kind, payload, timeout)
+        if kind == "llm" and "candidate-answerability-" in payload["messages"][0]["content"]:
+            body["choices"][0]["message"]["content"] = content
+        return body
+    models.transport = malformed
+    report = compare_local_models(case_id=1, question="量子香蕉完全无关资料", models=models,
+        framework_python=os.environ["LAW_REVIEW_FORGE_PYTHON"], output=tmp_path / "broken-negative",
+        expected="source_rejection")
+    assert report["candidate"]["status"] == "failed"
+    assert report["candidate_business_outcome"] == "system_failure"
+    assert not report["engineering_passed"] and report["candidate_refusal"] is None
+
+
+def test_native_algorithm_drift_is_rejected_before_creating_run(local_models, tmp_path, monkeypatch):
+    from app import model_comparison
+    models, calls = local_models
+    output = tmp_path / "uncreated"
+    monkeypatch.setitem(model_comparison.NATIVE_ALGORITHM_HASHES, "agents.py", "0" * 64)
+    with pytest.raises(ContractValidationError, match="pinned baseline"):
+        compare_local_models(case_id=1, question="合成审批记录", models=models,
+            framework_python="/unused", output=output)
+    assert not output.exists() and not calls

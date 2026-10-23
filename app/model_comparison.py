@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import sqlite3
 import time
@@ -15,10 +16,29 @@ from .db import connect, db_scope
 from .domain_integration import DomainSession
 from .host_writes import digest
 from .local_backends import BackendUnknown, GovernedRetrievalLedger
-from .model_domain import LOCAL_PROMPT_VERSION, local_model_payload
+from .model_domain import LOCAL_PROMPT_VERSION, LocalModelDomainIntegration, local_model_payload
 from .runtime_adapter import current_actor_identity
 from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, RunScope
 from .services import PROMPT_VERSION
+from .answerability import POLICY_VERSION, parse_decision, policy_identity
+
+NATIVE_BASELINE_COMMIT = "d00158efd1f1d637f166f97e6223679c4d2e0d1b"
+NATIVE_ALGORITHM_HASHES = {
+    "agents.py": "f454ba975a444bb2f42017817978be55fb15444f98946a01b559e1c6682b3313",
+    "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
+    "services.py": "6eae76d6118ec5e4f51a690921dc280ec34a17045e148e1c75721ea086ccf23b",
+    "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
+    "statutory_retrieval.py": "49c84f2c3d22d9281ecc9595a3ec57b5081c678c203ff82a0ab873b02593a0bb",
+}
+
+
+def native_baseline_identity():
+    actual = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+              for name in NATIVE_ALGORITHM_HASHES}
+    if actual != NATIVE_ALGORITHM_HASHES:
+        raise ContractValidationError("native comparison algorithms differ from the pinned baseline")
+    return {"commit": NATIVE_BASELINE_COMMIT, "algorithm_files": actual,
+            "scope": "pinned native algorithms and prompt; host governance is current candidate"}
 
 
 def private_report(path, value):
@@ -67,8 +87,9 @@ class NativeMeasurementLedger(GovernedRetrievalLedger):
             "measurement_valid": self.gate.models.transport is None,
             "elapsed_seconds": round(time.monotonic() - started, 6),
             "request_sha256": record["request_digest"], "response_sha256": record["response_digest"]})
-        reply = self.gate.control._model_reply(record)
+        reply = LocalModelDomainIntegration._model_reply(self.gate.control, record)
         if reply.get("model_error"):
+            self.events[-1]["invalid_response"] = True
             raise RuntimeError("native measured model response rejected")
         if reply.get("model_result") is None:
             raise BackendUnknown("native model usage unknown; no replay")
@@ -80,6 +101,7 @@ def _page_keys(contexts):
 
 
 def compare_local_models(*, case_id, question, models, framework_python, output, expected="success"):
+    native_identity = native_baseline_identity()
     if expected not in {"success", "source_rejection"}:
         raise ContractValidationError("comparison requires an explicit expected outcome")
     output = Path(output).absolute()
@@ -103,9 +125,19 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             with closing(connect()) as conn:
                 row = control._load(conn, request.request_id)
                 outputs, _ = control._read_outputs(conn, row)
+                failed = conn.execute("SELECT output_json FROM agent_steps WHERE run_id=? "
+                    "AND node_name='finish' AND status='failed'", (row["run_id"],)).fetchone()
+                failure_value = json.loads(failed[0])["value"] if failed else {}
         if candidate["needs_reconciliation"]:
             raise BackendUnknown("candidate requires reconciliation; comparison stopped without retry")
         retrieval = deepcopy(outputs["retrieve"])
+        refusal = failure_value.get("answerability")
+        rejected = False
+        if refusal and failure_value.get("diagnostic", {}).get("code") == "answerability_rejected":
+            measured_decision = parse_decision(outputs["critic-model"]["action"]["content"], retrieval["contexts"])
+            rejected = (candidate["status"] == "failed" and refusal == measured_decision
+                        and refusal["decision"] in {"unrelated", "insufficient"})
+        outcome = "source_rejection" if rejected else "success" if candidate["status"] == "succeeded" else "system_failure"
         comparisons = []
         for shared in (True, False):
             mode = "shared_retrieval_and_memory_snapshot" if shared else "independent_retrieval_and_memory"
@@ -146,9 +178,7 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
                     "native_backend_calls": ledger.events, "source_business_writes": 0,
                     "provider_calls_not_retried": True, "g2_accepted": False})
                 raise BackendUnknown("native usage remains unknown; evidence retained without retry")
-            success = candidate["status"] == "succeeded" and result["llm_used"] and result["validation"]["valid"]
-            rejected = (candidate["status"] == "failed" and not retrieval["contexts"]
-                        and not result["validation"]["valid"] and not result["citations"])
+            success = outcome == "success" and result["llm_used"] and result["validation"]["valid"]
             checks = {"expected_outcome": bool(success if expected == "success" else rejected),
                 "specialists_equal": specialists == {name: outputs[name] for name in specialists},
                 "retrieved_pages_equal": _page_keys(steps["retrieve"]["contexts"]) == _page_keys(retrieval["contexts"]),
@@ -157,6 +187,9 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             comparison = {"mode": mode, "checks": checks, "engineering_passed": all(checks.values()),
                 "answer_equal": result["answer"] == outputs.get("finish", {}).get("answer"),
                 "candidate_outcome": candidate["status"], "native_llm_used": result["llm_used"],
+                "candidate_business_outcome": outcome,
+                "native_baseline_negative_accepted": expected == "source_rejection" and result["validation"]["valid"],
+                "native_correctness_assessed": False,
                 "native_validation": result["validation"], "native_answer": result["answer"],
                 "native_citations": result["citations"], "native_specialists": specialists,
                 "native_backend_calls": deepcopy(ledger.events), "native_elapsed_seconds": native_elapsed,
@@ -168,10 +201,13 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             with db_scope(deployment.database):
                 control.cancel(mode)  # measurement handle was never sent to the framework
         source.assert_current()
-        report = {"schema_version": 1, "source_identity": source_identity, "question": question,
+        report = {"schema_version": 2, "source_identity": source_identity, "question": question,
             "expected": expected, "models": deepcopy(models.binding), "prompt_version": PROMPT_VERSION,
             "local_prompt_version": LOCAL_PROMPT_VERSION, "measurement_valid": models.transport is None,
             "candidate": candidate, "candidate_elapsed_seconds": elapsed,
+            "answerability_policy": policy_identity(), "candidate_business_outcome": outcome,
+            "native_baseline": native_identity, "candidate_prompt_version": POLICY_VERSION,
+            "candidate_refusal": refusal, "candidate_failure": failure_value.get("diagnostic"),
             "candidate_answer": outputs.get("finish", {}).get("answer"),
             "candidate_citations": outputs.get("finish", {}).get("citations", []),
             "candidate_retrieval_digest": digest(retrieval), "comparisons": comparisons,

@@ -30,8 +30,13 @@ def main():
             os.fsync(stream.fileno())
         if mode == "dispatched":
             crash()
+        answer = "合成审批记录 [资料1]。请律师复核原文与上述结论。"
+        if "candidate-answerability-" in payload["messages"][0]["content"]:
+            rejected = (path.parent / "provider-refusal").exists()
+            answer = json.dumps({"decision": "unrelated" if rejected else "supported", "reason": "synthetic process fixture",
+                "findings": [] if rejected else [{"text": "合成审批记录需核验。", "sources": [1]}]}, ensure_ascii=False)
         return {"model": "llm", "choices": [{"finish_reason": "stop", "message": {
-            "content": "合成审批记录 [资料1]。请律师复核原文与上述结论。"}}],
+            "content": answer}}],
             "usage": {"prompt_tokens": 24, "completion_tokens": 8}}
 
     models = LocalModels(endpoint="http://127.0.0.1:1/v1",

@@ -43,7 +43,14 @@ def local_models(domain, tmp_path):
     def transport(kind, payload, timeout):
         calls.append(kind)
         if kind == "llm":
-            return {"model": "llm", "choices": [{"message": {"content": "合成审批记录 [资料1]。请律师复核原文与上述结论。"}}],
+            answer = "合成审批记录 [资料1]。请律师复核原文与上述结论。"
+            if "candidate-answerability-" in payload["messages"][0]["content"]:
+                query = json.loads(payload["messages"][1]["content"])
+                rejected = "量子香蕉" in query["question"] or not query["documents"]
+                answer = json.dumps({"decision": "unrelated" if rejected else "supported",
+                    "reason": "synthetic model decision fixture; not a semantic measurement",
+                    "findings": [] if rejected else [{"text": "合成审批记录需核验。", "sources": [1]}]}, ensure_ascii=False)
+            return {"model": "llm", "choices": [{"message": {"content": answer}}],
                     "usage": {"prompt_tokens": 24, "completion_tokens": 8}}
         if kind == "embedding":
             return {"model": "embedding", "data": [{"index": i, "embedding": [1.0,0.0]} for i in range(len(payload["input"]))],

@@ -40,6 +40,7 @@ def candidate(local_models, tmp_path):
 
 
 def candidate_request(control, **changes):
+    changes.setdefault("model", ModelConfig(use_llm=True))
     return request(runtime=control.runtime, **changes)
 
 
@@ -143,9 +144,12 @@ def test_candidate_revocation_archive_and_deletion(candidate, monkeypatch):
 
 @actual
 @pytest.mark.parametrize("boundary", ["accept", "dispatched", "response", "journal"])
-def test_candidate_new_process_keeps_scope_identity_and_no_replay(candidate, boundary):
+@pytest.mark.parametrize("refused", [False, True])
+def test_candidate_new_process_keeps_scope_identity_and_no_replay(candidate, boundary, refused):
     control, _ = candidate
     path = control.path
+    if refused:
+        (path.parent / "provider-refusal").touch()
     config = asdict(control.deployment)
     config["database"] = str(config["database"])
     (path.parent / "candidate-deployment.json").write_text(json.dumps(config))
@@ -158,7 +162,7 @@ def test_candidate_new_process_keeps_scope_identity_and_no_replay(candidate, bou
     recovered = invoke("normal")
     assert recovered.returncode == 0, recovered.stderr
     result = json.loads(recovered.stdout)
-    assert result["status"] == ("running" if boundary == "dispatched" else "succeeded"), result
+    assert result["status"] == ("running" if boundary == "dispatched" else "failed" if refused else "succeeded"), result
     assert result["needs_reconciliation"] == (boundary == "dispatched")
     assert len((path.parent / "provider-calls.jsonl").read_text().splitlines()) == 1
     observed = counts()

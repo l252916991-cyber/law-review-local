@@ -163,6 +163,9 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
     def _prepare_outputs(self, row, action, outputs):
         return deepcopy(outputs)
 
+    def _failed_value(self, error):
+        return {"diagnostic": {"code": "domain_validation_failed", "type": type(error).__name__}}
+
     def _effects(self, row, action, outputs, value):
         if action["id"] == "audit":
             return [("audit", WriteAction.AUDIT_ENTRY, {"detail": "隔离领域审查 " + row["request_id"]})]
@@ -217,7 +220,7 @@ class IsolatedDomainIntegration(IsolatedHostIntegration):
         try:
             value, backend_calls = self._compute(row, action, outputs)
         except (ValueError, ContractValidationError) as error:
-            status, value = "failed", {"diagnostic": {"code": "domain_validation_failed", "type": type(error).__name__}}
+            status, value = "failed", self._failed_value(error)
             backend_calls = getattr(error, "backend_calls", [])
         with transaction() as conn:
             conn.execute("BEGIN IMMEDIATE")
