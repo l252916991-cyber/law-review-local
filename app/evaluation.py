@@ -9,6 +9,7 @@ from typing import Any
 
 from .db import connect, now, transaction
 from .rag import HybridRetriever
+from .llm_usage import usage_summary
 from .services import rowdict
 
 
@@ -199,6 +200,7 @@ def platform_metrics(case_id: int) -> dict[str, Any]:
         ]
     finally:
         conn.close()
+    llm_usage = usage_summary(case_id)
     for run in recent_runs:
         run["resumable"] = False
         if run["runtime"] == "langgraph" and run["status"] == "failed":
@@ -224,6 +226,7 @@ def platform_metrics(case_id: int) -> dict[str, Any]:
         }
     return {
         "agent_runs": runs,
+        "llm_usage": llm_usage,
         "vector_index": vectors,
         "memory_count": memory_count,
         "evaluation": evaluation,

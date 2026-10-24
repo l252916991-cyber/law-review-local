@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -805,6 +805,35 @@ ALTER TABLE agent_runs ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}';
 """)
 
 
+def _migrate_v19(conn: sqlite3.Connection) -> None:
+    """Per-call model accounting.
+
+    Chat turns do not create ``agent_runs`` rows, so token and latency cost
+    cannot live only on that table: the main answer path would be invisible.
+    ``run_id``/``conversation_id`` are nullable references because a call may
+    happen before the conversation or run exists, and both are detached rather
+    than deleted when their owner disappears.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    run_id INTEGER REFERENCES agent_runs(id) ON DELETE SET NULL,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    kind TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    ttft_ms INTEGER,
+    latency_ms INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ok' CHECK(status IN ('ok','failed')),
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_case ON llm_calls(case_id, id);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_run ON llm_calls(run_id);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -827,7 +856,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18,
+            _migrate_v18, _migrate_v19,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

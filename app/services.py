@@ -767,6 +767,8 @@ def call_local_llm(
     )
     opener = egress_opener()
     deadline = time.monotonic() + timeout
+    started = time.perf_counter()
+    _last_llm_usage.set(None)
     try:
         with opener.open(req, timeout=timeout) as response:
             payload = read_json_with_deadline(response, timeout, deadline=deadline)
@@ -774,6 +776,14 @@ def call_local_llm(
         if not answer:
             raise RuntimeError("本地模型返回了推理草稿或空正文")
         _last_llm_provenance.set(llm_provenance(route, model))
+        _last_llm_usage.set(
+            {
+                "usage": payload.get("usage") if isinstance(payload, dict) else None,
+                "model": model,
+                "latency_ms": int((time.perf_counter() - started) * 1000),
+                "ttft_ms": None,
+            }
+        )
         return answer
     except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as exc:
         logger.warning("Local model response failed error_type=%s", type(exc).__name__)
@@ -792,6 +802,38 @@ CHAT_SYSTEM_PROMPT = (
     "最后必须原样写出：请律师复核原文与上述结论。即使没有其他待复核事项也保留这句话。"
 )
 _last_llm_provenance: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_last_llm_provenance", default=None)
+# Identity and size of the exact inference call behind the last answer.
+_last_llm_usage: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_last_llm_usage", default=None)
+
+
+def _account_llm_call(
+    case_id: int,
+    kind: str,
+    started: float,
+    status: str,
+    *,
+    run_id: int | None = None,
+    conversation_id: int | None = None,
+) -> None:
+    """Persist one call without letting accounting break the answer path."""
+    from .llm_usage import record_llm_call
+
+    observed = _last_llm_usage.get() or {}
+    try:
+        record_llm_call(
+            case_id=case_id,
+            kind=kind,
+            model=str(observed.get("model") or ""),
+            usage=observed.get("usage"),
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            ttft_ms=observed.get("ttft_ms"),
+            status=status,
+            run_id=run_id,
+            conversation_id=conversation_id,
+        )
+    except Exception as exc:  # accounting must never fail a case workflow
+        logger.warning("LLM call accounting failed error_type=%s", type(exc).__name__)
+
 
 
 def llm_provenance(route: str, model: str) -> dict[str, Any]:
@@ -980,6 +1022,7 @@ def chat(
                 require_history=bool(history_text),
             )
             context_meta["memory"] = memory_clues["meta"]
+            llm_started = time.perf_counter()
             try:
                 answer = call_local_llm(
                     question, route, contexts, history=history_text,
@@ -989,12 +1032,18 @@ def chat(
                 if candidate_validation["valid"]:
                     llm_used = True
                     provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
+                    _account_llm_call(
+                        case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
+                    )
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
                     logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
                     raise RuntimeError("model_output_failed_validation")
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
+                _account_llm_call(
+                    case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
+                )
                 diagnostic = failure_diagnostic(exc, "chat_llm")
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
                 raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc

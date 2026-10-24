@@ -28,7 +28,7 @@ from .context import (
 )
 from .db import connect, now, transaction
 from .rag import HybridRetriever, recall_memories, remember
-from .services import call_local_llm, concise, detect_route, rowdict
+from .services import _account_llm_call, call_local_llm, concise, detect_route, rowdict
 from .statutory_retrieval import retrieve_statutory
 
 
@@ -581,9 +581,11 @@ class GapDetectionAgent:
 class CriticAgent:
     role = "审校 Agent"
 
-    def __init__(self):
+    def __init__(self, case_id: int | None = None):
         from .config import LLMConfig
 
+        self.case_id = case_id
+        self.run_id: int | None = None
         config = LLMConfig.load()
         self.model = os.getenv("LAW_REVIEW_AGENT_CRITIC_MODEL", config.model)
         self.timeout = int(os.getenv("LAW_REVIEW_AGENT_CRITIC_TIMEOUT", str(config.timeout)))
@@ -605,6 +607,7 @@ class CriticAgent:
         if use_llm:
             expert_summary = "；".join(specialist_outputs[name].get("summary", "") for name in sorted(specialist_outputs))
             grounded_question = f"{question}\n专家节点摘要：{expert_summary}。请只输出给律师的最终结论。"
+            started = time.perf_counter()
             try:
                 answer = call_local_llm(
                     grounded_question,
@@ -618,6 +621,10 @@ class CriticAgent:
                 )
                 validation = validate_review_answer(answer, contexts)
                 if validation["valid"]:
+                    if self.case_id is not None:
+                        _account_llm_call(
+                            self.case_id, "critic", started, "ok", run_id=self.run_id,
+                        )
                     return {
                         "answer": answer, "llm_used": True, "llm_model": self.model,
                         "fallback_reason": None, "citation_check": "passed",
@@ -625,10 +632,18 @@ class CriticAgent:
                         "llm_attempted": True, "failure_diagnostic": None,
                     }
                 failed_validation = validation
+                if self.case_id is not None:
+                    _account_llm_call(
+                        self.case_id, "critic", started, "failed", run_id=self.run_id,
+                    )
                 failure = "模型输出未通过格式/来源校验：" + ", ".join(validation["issues"])
                 diagnostic = {"phase": "critic_validation", "code": "invalid_answer_contract"}
                 logger.warning("critic_validation_failed issues=%s", ",".join(validation["issues"]))
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
+                if self.case_id is not None:
+                    _account_llm_call(
+                        self.case_id, "critic", started, "failed", run_id=self.run_id,
+                    )
                 diagnostic = failure_diagnostic(exc, "critic_llm")
                 logger.warning("critic_llm_failed error_type=%s", type(exc).__name__)
                 failure = f"本地模型不可用或响应异常（{self.timeout} 秒总时限，{type(exc).__name__}）"
@@ -693,7 +708,7 @@ class LawReviewCoordinator:
         self.gap_detection_agent = GapDetectionAgent(case_id)
         self.analysis_agent = AnalysisAgent(case_id)
         self.cross_exam_agent = CrossExaminationAgent(case_id, prefer_remote_embeddings)
-        self.critic_agent = CriticAgent()
+        self.critic_agent = CriticAgent(case_id)
 
     def _start_run(self, question: str, route: str, *, context: dict[str, Any] | None = None) -> int:
         context = context or {}
@@ -788,6 +803,9 @@ class LawReviewCoordinator:
             context_identity = {}
         route, plan = self.planner_agent.build_plan(retrieval_question)
         run_id = self._start_run(question, route, context=context_identity)
+        # Attach the durable run id before the critic spends tokens, so the
+        # accounting row can be joined back to this run.
+        self.critic_agent.run_id = run_id
         steps = []
         active_node, active_role, active_started = "planner", "规划 Agent", now()
         try:
