@@ -5,8 +5,9 @@ from contextlib import closing
 
 import pytest
 
-from app.answerability import (ANSWERABILITY_GRAMMAR, GRAMMAR_VERSION, ContentFreeFinding, answer_body,
-                                answerability_payload, content_free_finding, parse_decision, policy_identity)
+from app.answerability import (ANSWERABILITY_GRAMMAR, GRAMMAR_VERSION, POLICY_VERSION, SYSTEM_PROMPT,
+                                ContentFreeFinding, answer_body, answerability_payload, content_free_finding,
+                                parse_decision, policy_identity)
 from app.db import connect
 from app.local_backends import LocalModels
 from app.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError, UnsupportedCapabilityError
@@ -31,6 +32,26 @@ def verdict(decision="supported", **changes):
 def test_decision_contract_and_honest_scope(decision):
     result = parse_decision(json.dumps(verdict(decision)), CONTEXTS, question=QUESTION)
     assert result["decision"] == decision and not result["semantic_entailment_checked"]
+
+
+def test_specificity_contract_names_every_required_question_dimension():
+    """v11: the prompt must demand the recorded item the question asks for.
+
+    The host cannot judge from a short answer whether, say, a company category
+    or a holding conclusion was omitted, so the only enforceable place for this
+    requirement is the frozen protocol text itself. These assertions fail if a
+    later edit silently drops one of the dimensions.
+    """
+    for dimension in ("时间", "地点", "金额", "数量", "公司或主体类别", "认定结论"):
+        assert dimension in SYSTEM_PROMPT
+    for conclusion in ("无效", "属于陷阱条款", "支持", "驳回"):
+        assert conclusion in SYSTEM_PROMPT
+    for vague_substitute in ("很远", "关联公司", "转嫁风险"):
+        assert vague_substitute in SYSTEM_PROMPT
+    assert "只输出 JSON" in SYSTEM_PROMPT
+    identity = policy_identity()
+    assert identity["version"] == POLICY_VERSION == "candidate-answerability-v11-detail"
+    assert identity["grammar_version"] == GRAMMAR_VERSION
 
 
 def test_grammar_binding_and_payload_are_explicit(local_models):
