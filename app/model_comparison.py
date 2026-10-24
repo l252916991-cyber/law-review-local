@@ -20,7 +20,7 @@ from .model_domain import LOCAL_PROMPT_VERSION, LocalModelDomainIntegration, loc
 from .runtime_adapter import current_actor_identity
 from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, RunScope
 from .services import PROMPT_VERSION
-from .answerability import POLICY_VERSION, parse_decision, policy_identity
+from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
 
 NATIVE_BASELINE_COMMIT = "d00158efd1f1d637f166f97e6223679c4d2e0d1b"
 NATIVE_ALGORITHM_HASHES = {
@@ -138,10 +138,12 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             raise BackendUnknown("candidate requires reconciliation; comparison stopped without retry")
         retrieval = deepcopy(outputs["retrieve"])
         refusal = failure_value.get("answerability")
-        candidate_decision = (refusal or outputs.get("finish", {}).get("answerability") or {}).get("decision")
+        decision_record = refusal or outputs.get("finish", {}).get("answerability") or {}
+        candidate_decision = decision_record.get("decision")
         rejected = False
         if refusal and failure_value.get("diagnostic", {}).get("code") == "answerability_rejected":
-            measured_decision = parse_decision(outputs["critic-model"]["action"]["content"], retrieval["contexts"])
+            measured_decision = parse_decision(outputs["critic-model"]["action"]["content"], retrieval["contexts"],
+                                               question=question)
             rejected = (candidate["status"] == "failed" and refusal == measured_decision
                         and refusal["decision"] in {"unrelated", "insufficient"})
         outcome = "source_rejection" if rejected else "success" if candidate["status"] == "succeeded" else "system_failure"
@@ -217,6 +219,8 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             "native_baseline": native_identity, "candidate_prompt_version": POLICY_VERSION,
             "candidate_refusal": refusal, "candidate_failure": failure_value.get("diagnostic"),
             "candidate_answer": outputs.get("finish", {}).get("answer"),
+            "candidate_answer_body": answer_body(decision_record),
+            "candidate_findings": deepcopy(decision_record.get("findings", [])),
             "candidate_citations": outputs.get("finish", {}).get("citations", []),
             "candidate_retrieval_digest": digest(retrieval), "comparisons": comparisons,
             "source_unchanged": True, "engineering_passed": all(c["engineering_passed"] for c in comparisons),

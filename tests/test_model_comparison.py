@@ -35,6 +35,16 @@ def test_paired_models_keep_source_unchanged_and_separate_measurements(local_mod
     assert report["candidate"]["status"] == ("succeeded" if expected == "success" else "failed")
     assert report["candidate_usage"]["calls"] >= 3 and report["candidate_usage"]["unknown_usage"] == 0
     assert report["candidate_decision"] == ("supported" if expected == "success" else "unrelated")
+    # Content acceptance must judge the model's own sentences, not the host quotes.
+    assert report["candidate_answer_body"] == ("合成审批记录需核验。" if expected == "success" else "")
+    assert "[资料" not in report["candidate_answer_body"]
+    assert "请律师复核" not in report["candidate_answer_body"]
+    assert report["candidate_findings"] == ([{"text": "合成审批记录需核验。", "sources": [1]}] if expected == "success" else [])
+    if expected == "success":
+        assert "[资料1]" in report["candidate_answer"]
+        assert report["candidate_answer_body"] in report["candidate_answer"]
+    else:
+        assert not report["candidate_answer"] and not report["candidate_findings"]
     shared, independent = report["comparisons"]
     assert shared["mode"] == "shared_retrieval_and_memory_snapshot"
     assert independent["mode"] == "independent_retrieval_and_memory"

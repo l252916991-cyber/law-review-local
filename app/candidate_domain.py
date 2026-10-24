@@ -15,7 +15,7 @@ from .domain_writes import CANDIDATE_RUNTIME, DomainHostWritePort
 from .host_writes import digest
 from .model_domain import LocalModelDomainIntegration
 from .model_domain import MODEL_NODE
-from .answerability import SourceRejection, answerability_payload, parse_decision, policy_identity
+from .answerability import ContentFreeFinding, SourceRejection, answerability_payload, parse_decision, policy_identity
 from .runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError, UnsupportedCapabilityError
 
 
@@ -114,7 +114,9 @@ class CandidateDomainIntegration(LocalModelDomainIntegration):
     def _prepare_outputs(self, row, action, outputs):
         result = deepcopy(outputs)
         if action["id"] == "finish":
-            decision = parse_decision(result[MODEL_NODE]["action"]["content"], result["retrieve"]["contexts"])
+            question = json.loads(row["binding_json"])["question"]
+            decision = parse_decision(result[MODEL_NODE]["action"]["content"], result["retrieve"]["contexts"],
+                                      question=question)
             if decision["decision"] != "supported":
                 raise SourceRejection(decision)
             result[MODEL_NODE]["action"]["content"] = decision["answer"]
@@ -124,13 +126,16 @@ class CandidateDomainIntegration(LocalModelDomainIntegration):
         value, calls = super()._compute(row, action, outputs)
         if action["id"] == "finish":
             value["answerability"] = parse_decision(outputs[MODEL_NODE]["action"]["content"],
-                                                    outputs["retrieve"]["contexts"])
+                                                    outputs["retrieve"]["contexts"],
+                                                    question=json.loads(row["binding_json"])["question"])
         return value, calls
 
     def _failed_value(self, error):
         if isinstance(error, SourceRejection):
             return {"diagnostic": {"code": "answerability_rejected", "decision": error.decision["decision"]},
                     "answerability": error.decision}
+        if isinstance(error, ContentFreeFinding):
+            return {"diagnostic": {"code": "content_free_finding", "finding_index": error.index}}
         return super()._failed_value(error)
 
     def __init__(self, *, deployment, models, framework_python=None):
