@@ -11,9 +11,11 @@ expose.
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Iterable, Sequence
 
 from .db import now, transaction
+from .pricing import DISPLAY_QUANTUM, call_cost, format_money, load_pricing
 
 
 PROMPT_KEYS: tuple[str, ...] = ("prompt_tokens", "input_tokens")
@@ -65,14 +67,28 @@ def record_llm_call(
     status: str = "ok",
     run_id: int | None = None,
     conversation_id: int | None = None,
+    turn_key: str | None = None,
 ) -> None:
-    """Append one inference call. Never raises into the answer path."""
+    """Append one inference call with the price snapshot used to price it.
+
+    Never raises into the answer path: a missing or unusable pricing
+    configuration still records the call, with a ``NULL`` snapshot (cost unknown).
+    """
     input_tokens, output_tokens = token_counts(usage)
+    snapshot, error = load_pricing()
+    if error:
+        snapshot = None
+    pricing_column = snapshot.column_for(model) if snapshot is not None else None
+    # Agent runs already carry a run id; other turns use the client request id or
+    # a per-turn key, so both can be grouped as one logical question.
+    if turn_key is None and run_id is not None:
+        turn_key = f"run:{run_id}"
     with transaction() as conn:
         conn.execute(
             """INSERT INTO llm_calls(case_id,run_id,conversation_id,kind,model,input_tokens,
-                                     output_tokens,ttft_ms,latency_ms,status,created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                                     output_tokens,ttft_ms,latency_ms,status,created_at,
+                                     pricing_json,turn_key)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 case_id,
                 run_id,
@@ -85,6 +101,8 @@ def record_llm_call(
                 max(0, int(latency_ms)),
                 status if status in {"ok", "failed"} else "failed",
                 now(),
+                pricing_column,
+                turn_key,
             ),
         )
 
@@ -132,6 +150,119 @@ def _group(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
     ]
 
 
+def _cost_of(row: dict[str, Any]) -> tuple[Decimal | None, str | None]:
+    """Per-call cost and its currency; ``(None, None)`` when it cannot be priced."""
+    column = row.get("pricing_json")
+    if not column:
+        return None, None
+    import json
+
+    currency = json.loads(column).get("currency")
+    return call_cost(column, row.get("input_tokens"), row.get("output_tokens")), currency
+
+
+def _money(amount: Decimal | None, currency: str | None) -> str | None:
+    return format_money(amount, currency)
+
+
+def _cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Call-level cost with an explicit unknown bucket.
+
+    ``total`` is only present when every call could be priced; otherwise the
+    known part is reported as a floor with its coverage. Costs are never summed
+    across currencies — that would be an invented exchange rate.
+    """
+    snapshot, error = load_pricing()
+    priced: list[tuple[Decimal, str]] = []
+    no_price = 0
+    no_usage = 0
+    currencies: set[str] = set()
+    versions: set[str] = set()
+    sources: set[str] = set()
+    units: set[int] = set()
+    for row in rows:
+        cost, currency = _cost_of(row)
+        if row.get("pricing_json"):
+            import json
+
+            payload = json.loads(row["pricing_json"])
+            versions.add(str(payload.get("version") or ""))
+            sources.add(str(payload.get("source") or ""))
+            units.add(int(payload.get("unit_tokens") or 0))
+        if cost is None:
+            if not row.get("pricing_json"):
+                no_price += 1
+            else:
+                no_usage += 1
+            continue
+        assert currency is not None
+        currencies.add(currency)
+        priced.append((cost, currency))
+    calls = len(rows)
+    known = len(priced)
+    single_currency = next(iter(currencies)) if len(currencies) == 1 else None
+    # Summing different currencies would invent an exchange rate, so a mixed set
+    # reports no subtotal at all rather than a number with a missing unit.
+    partial_total = (
+        sum((amount for amount, _ in priced), Decimal(0))
+        if priced and single_currency is not None else None
+    )
+    complete = bool(calls) and known == calls and single_currency is not None
+    return {
+        "configured": snapshot is not None or bool(known) or no_price < calls,
+        "config_error": error,
+        "currency": single_currency,
+        "mixed_currency": len(currencies) > 1,
+        # The panel describes recorded calls, so the unit comes from the stored
+        # snapshots rather than the current configuration.
+        "unit_tokens": next(iter(units)) if len(units) == 1 else
+        (snapshot.unit_tokens if snapshot is not None and not units else None),
+        "version": next(iter(versions)) if len(versions) == 1 else None,
+        "versions": sorted(value for value in versions if value),
+        "source": next(iter(sources)) if len(sources) == 1 else None,
+        "calls": calls,
+        "known_calls": known,
+        "no_price_calls": no_price,
+        "usage_missing_calls": no_usage,
+        "partial_total": _money(partial_total, single_currency),
+        "total": _money(partial_total, single_currency) if complete else None,
+    }
+
+
+def _turn_rows(rows: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[str, Any]], int]:
+    """Group calls by the logical question they belong to.
+
+    Unattributed calls are reported separately instead of being hidden in a
+    turn: the sum of turn costs is allowed to be smaller than the call total.
+    """
+    grouped: dict[str | None, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(row.get("turn_key"), []).append(row)
+    turns: list[dict[str, Any]] = []
+    for key, items in grouped.items():
+        costs = [_cost_of(item) for item in items]
+        currencies = {currency for _, currency in costs if currency is not None}
+        known = [cost for cost, _ in costs if cost is not None]
+        single_currency = next(iter(currencies)) if len(currencies) == 1 else None
+        total = sum(known, Decimal(0)) if known else None
+        turns.append({
+            "turn_key": key,
+            "calls": len(items),
+            "kinds": sorted({str(item.get("kind") or "") for item in items}),
+            "models": sorted({str(item.get("model") or "") for item in items}),
+            "input_tokens": _sum_known([item.get("input_tokens") for item in items]),
+            "output_tokens": _sum_known([item.get("output_tokens") for item in items]),
+            "known_calls": len(known),
+            "unknown_calls": len(items) - len(known),
+            "mixed_currency": len(currencies) > 1,
+            "cost": _money(total, single_currency) if len(known) == len(items) and single_currency else None,
+            "partial_cost": _money(total, single_currency) if known else None,
+        })
+    # Newest turn first: call rows arrive in order, so the last item is the latest.
+    turns.sort(key=lambda item: item["turn_key"] or "", reverse=True)
+    return turns[:limit], len(turns)
+
+
 def usage_summary(case_id: int) -> dict[str, Any]:
     """Case-scoped cost and latency summary.
 
@@ -145,7 +276,8 @@ def usage_summary(case_id: int) -> dict[str, Any]:
         rows = [
             dict(row)
             for row in conn.execute(
-                """SELECT kind, model, input_tokens, output_tokens, ttft_ms, latency_ms, status
+                """SELECT kind, model, input_tokens, output_tokens, ttft_ms, latency_ms, status,
+                          pricing_json, turn_key
                    FROM llm_calls WHERE case_id=? ORDER BY id""",
                 (case_id,),
             ).fetchall()
@@ -167,10 +299,21 @@ def usage_summary(case_id: int) -> dict[str, Any]:
             "latency_p95_ms": None,
             "by_kind": [],
             "by_model": [],
+            "cost": {
+                "configured": load_pricing()[0] is not None,
+                "config_error": load_pricing()[1],
+                "currency": None, "mixed_currency": False, "unit_tokens": None,
+                "version": None, "versions": [], "source": None,
+                "calls": 0, "known_calls": 0, "no_price_calls": 0,
+                "usage_missing_calls": 0, "partial_total": None, "total": None,
+            },
+            "turn_count": 0,
+            "turns": [],
         }
     input_values = [row["input_tokens"] for row in rows]
     output_values = [row["output_tokens"] for row in rows]
     ttft_values = [row["ttft_ms"] for row in rows]
+    turns, turn_count = _turn_rows(rows)
     return {
         "calls": calls,
         "failed": sum(1 for row in rows if row["status"] != "ok"),
@@ -186,4 +329,7 @@ def usage_summary(case_id: int) -> dict[str, Any]:
         "latency_p95_ms": percentile([row["latency_ms"] for row in rows], 0.95),
         "by_kind": _group(rows, "kind"),
         "by_model": _group(rows, "model"),
+        "cost": _cost_summary(rows),
+        "turn_count": turn_count,
+        "turns": turns,
     }

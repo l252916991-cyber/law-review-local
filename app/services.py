@@ -974,6 +974,14 @@ def last_llm_usage() -> dict[str, Any] | None:
     return _last_llm_usage.get()
 
 
+_active_turn_key: ContextVar[str | None] = ContextVar("lexvault_active_turn_key", default=None)
+
+
+def current_turn_key() -> str | None:
+    """The logical-question key for calls made inside the current turn."""
+    return _active_turn_key.get()
+
+
 def _account_llm_call(
     case_id: int,
     kind: str,
@@ -982,6 +990,7 @@ def _account_llm_call(
     *,
     run_id: int | None = None,
     conversation_id: int | None = None,
+    turn_key: str | None = None,
 ) -> None:
     """Persist one call without letting accounting break the answer path."""
     from .llm_usage import record_llm_call
@@ -998,6 +1007,7 @@ def _account_llm_call(
             status=status,
             run_id=run_id,
             conversation_id=conversation_id,
+            turn_key=turn_key if turn_key is not None else _active_turn_key.get(),
         )
     except Exception as exc:  # accounting must never fail a case workflow
         logger.warning("LLM call accounting failed error_type=%s", type(exc).__name__)
@@ -1072,6 +1082,12 @@ def chat(
     # Per-turn observation: a request context reused by the test client (or a
     # worker context copied from it) must not report the previous turn's usage.
     _last_llm_usage.set(None)
+    # One logical-question key for every call this turn: tool rounds, primary and
+    # fallback model calls all land under it. A retried request reuses its id.
+    _active_turn_key.set(
+        f"request:{request_key[1]}" if request_key is not None
+        else f"turn-{uuid.uuid4().hex[:16]}"
+    )
     question = question.strip()
     if not question:
         raise ValueError("问题不能为空")

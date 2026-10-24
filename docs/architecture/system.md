@@ -18,6 +18,17 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 引用格式有效与证据支持事实是两个指标。最终答案、来源文档、页码、节点输出与耗时供律师复核，不保存/展示模型隐藏思维链。自动金额/疏漏规则只是线索，不是法律事实裁定。
 
+## 估算费用与定价快照（A02.2）
+
+费用是"token 数 × 配置单价"，是估算值，不是账单。`app/pricing.py` 从 `LAW_REVIEW_PRICING_JSON`（内联 JSON）或 `LAW_REVIEW_PRICING_FILE` 读取价目表：`version`、`currency`、`unit_tokens`、`source` 和每个模型的输入/输出单价。
+
+- 绑定快照：`llm_calls.pricing_json` 在写入时复制当时的价目快照（版本、币种、单位、来源、单价），改价不会重算历史；`usage_summary` 因此能同时报出历史与当前版本。
+- 未知不入账：缺 usage 或该模型未配置单价时，单次费用未知，不进合计；`cost` 块分别给出 `no_price_calls` 与 `usage_missing_calls`，只有全部调用可计价时才有 `total`，否则只给 `partial_total`（已知部分）与覆盖计数。
+- 不跨币种求和：出现多种币种时 `mixed_currency=true`、不给出小计，也不假设汇率。
+- 问答级：`llm_calls.turn_key` 把一次提问的调用归组（聊天用 `request:<request_id>` 或每次生成的 turn 键，Agent 用 `run:<run_id>`）；`turns` 给出每次问答的调用数、模型、token、已知/未知调用数与费用，`turn_count` 与调用级合计分开报告。
+- 舍入固定：内部 8 位小数（ROUND_HALF_UP），展示 4 位小数并带币种；未配置定价时显示"未配置成本"，不写 0。
+- 配置不可用时失败关闭：报 `config_error`，所有费用保持未知，不影响问答本身。
+
 ## Agent 只读工具循环（A04.1）
 
 原生 DAG 的审校节点（`app/agents.py` 的 `CriticAgent`）在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/tool_loop.py`，不复制第二套参数校验或出口实现：

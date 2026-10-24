@@ -188,6 +188,8 @@ def run_tool_loop(
     history: str = "",
     memory: str = "",
     object_note: str = "",
+    run_id: int | None = None,
+    turn_key: str | None = None,
     executor: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run up to ``max_rounds`` model turns with read-only tools."""
@@ -227,6 +229,7 @@ def run_tool_loop(
                 case_id=case_id, kind="tool_loop", model=model, usage=None,
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 status="failed", conversation_id=conversation_id,
+                run_id=run_id, turn_key=turn_key,
             )
             raise RuntimeError(f"本地模型调用失败（{type(exc).__name__}）") from exc
         usage = payload.get("usage") if isinstance(payload, dict) else None
@@ -235,7 +238,7 @@ def run_tool_loop(
         record_llm_call(
             case_id=case_id, kind="tool_loop", model=model, usage=usage,
             latency_ms=int((time.perf_counter() - started) * 1000),
-            conversation_id=conversation_id,
+            conversation_id=conversation_id, run_id=run_id, turn_key=turn_key,
         )
         choice = (payload.get("choices") or [{}])[0].get("message") or {}
         tool_calls = choice.get("tool_calls") or []

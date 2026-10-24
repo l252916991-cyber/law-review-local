@@ -300,7 +300,16 @@
               <section><h4>按调用类型</h4><div id="usage-by-kind" class="usage-table"><p class="usage-empty">尚无调用记录</p></div></section>
               <section><h4>按模型</h4><div id="usage-by-model" class="usage-table"><p class="usage-empty">尚无调用记录</p></div></section>
             </div>
-            <p class="usage-footnote">口径：首 token 与单次调用延迟都按一次模型调用计，分母是有记录的调用次数；tokens 只在服务端返回 usage 时计入，缺 usage 的调用保持未知且不按 0 计。整次问答延迟与浏览器首字可见时间尚未采集，不与以上数字混用。本面板不含金额。</p>
+            <section class="usage-costs">
+              <div class="usage-cost-head"><h4>问答级估算费用</h4><span id="usage-cost-scope" class="dataset-chip">未配置成本</span></div>
+              <div class="usage-grid usage-cost-grid">
+                <div class="usage-stat"><span>按调用合计（估算）</span><strong id="usage-cost-total">—</strong><small id="usage-cost-note">未配置成本</small></div>
+                <div class="usage-stat"><span>覆盖调用</span><strong id="usage-cost-coverage">—</strong><small id="usage-cost-coverage-note">尚无调用</small></div>
+                <div class="usage-stat"><span>问答数</span><strong id="usage-turn-count">0</strong><small id="usage-turn-note">尚无问答</small></div>
+              </div>
+              <div id="usage-turns" class="usage-table"><p class="usage-empty">尚无问答</p></div>
+            </section>
+            <p class="usage-footnote">口径：首 token 与单次调用延迟都按一次模型调用计，分母是有记录的调用次数；tokens 只在服务端返回 usage 时计入，缺 usage 的调用保持未知且不按 0 计。费用=token 数×调用当时绑定的配置单价，是按调用的估算值，不是账单；缺 usage、未配置单价或跨币种时不合计，也不按 0 计。整次问答延迟与浏览器首字可见时间尚未采集，不与以上数字混用。</p>
           </article>
 
           <article class="panel trace-panel">

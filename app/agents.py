@@ -638,6 +638,7 @@ class CriticAgent:
                     history=history,
                     memory=memory,
                     object_note=object_note,
+                    run_id=self.run_id,
                 )
             except ToolsUnsupportedError:
                 # No tool calling at this endpoint: fall back explicitly and say so.

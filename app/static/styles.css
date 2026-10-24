@@ -216,6 +216,12 @@ tbody tr:last-child td { border-bottom: 0; } tbody tr:hover { background: #fbfdf
 .usage-head { background: transparent !important; color: var(--muted); font-size: 11px; font-weight: 700; }
 .usage-head > b { font-weight: 700; }
 .usage-empty { margin: 0; padding: 8px; color: var(--muted); font-size: 12px; }
+.usage-costs { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.usage-cost-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.usage-cost-head h4 { margin: 0; color: #3d4f4a; font-size: 13px; }
+.usage-cost-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+#usage-turns { margin-top: 10px; }
+#usage-turns .usage-row { grid-template-columns: minmax(90px, 1.6fr) 44px minmax(70px, 1.4fr) 44px 90px; }
 .usage-footnote { margin: 14px 0 0; color: #8b9793; font-size: 11px; line-height: 1.65; }
 
 @media (max-width: 1100px) {

@@ -35,6 +35,19 @@ if str(ROOT) not in sys.path:
 
 _NO_PROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+# Test-double price sheet: the numbers are chosen so the panel's arithmetic is
+# reproducible by hand (120k input @2.0/1M + 40k output @8.0/1M = 0.56).
+PRICING = {
+    "version": "flow-2026-10-25.1",
+    "currency": "CNY",
+    "unit_tokens": 1000000,
+    "source": "页面流程验证用价目表（测试配置）",
+    "models": {
+        "local-a": {"input": "2.0", "output": "8.0"},
+        "local-b": {"input": "2.0", "output": "8.0"},
+    },
+}
+
 # Shared helpers injected into every step. Everything the assertions read comes
 # from the rendered DOM, never from module internals.
 PRELUDE = r"""
@@ -77,9 +90,9 @@ BODY_OPEN_METRICS = r"""  await waitFor("案件列表加载", () => document.que
 BODY_PARTIAL = r"""  await waitFor("面板仍显示本案调用", () => (text("#usage-scope") || "").includes("次调用"));
   expect("调用数", text("#usage-calls"), "3");
   expect("失败数", text("#usage-failed"), "失败 1 次");
-  expect("输入 tokens 为已知下界", text("#usage-input-tokens"), "≥30");
+  expect("输入 tokens 为已知下界", text("#usage-input-tokens"), "≥200,000");
   expect("输入 tokens 覆盖说明", text("#usage-input-note"), "已知部分 · 2/3 次调用有 usage");
-  expect("输出 tokens", text("#usage-output-tokens"), "≥10");
+  expect("输出 tokens", text("#usage-output-tokens"), "≥60,000");
   expect("首 token P50", text("#usage-ttft-p50"), "50ms");
   expect("首 token P95", text("#usage-ttft-p95"), "59ms");
   expect("首 token 样本数", text("#usage-ttft-note"), "可用样本 2/3");
@@ -93,7 +106,16 @@ BODY_PARTIAL = r"""  await waitFor("面板仍显示本案调用", () => (text("#
   const models = rows("#usage-by-model");
   if (models.length !== 2) failures.push(`按模型分组应有 2 行，实际 ${models.length}`);
   expectMatch("按模型分组含模型名", models.join(" | "), /local-a/);
-  return {failures, notes, rows: {kinds, models}};
+  expect("估算费用为已知下界", text("#usage-cost-total"), "≥0.8800 CNY");
+  expect("费用覆盖说明", text("#usage-cost-note"), "已知部分 · 2/3 次调用可计价");
+  expect("费用覆盖计数", text("#usage-cost-coverage"), "2/3");
+  expect("定价版本", text("#usage-cost-scope"), "定价版本 flow-2026-10-25.1");
+  expect("问答数", text("#usage-turn-count"), "2");
+  const turns = rows("#usage-turns");
+  if (turns.length !== 2) failures.push(`问答级明细应有 2 行，实际 ${turns.length}`);
+  expectMatch("问答 1 部分费用", turns.join(" | "), /request:demo-0001/);
+  expectMatch("问答 2 闭合费用", turns.join(" | "), /0.3200 CNY/);
+  return {failures, notes, rows: {kinds, models, turns}};
 """
 
 BODY_EMPTY_CASE = r"""  const created = await (await fetch("/api/cases", {
@@ -107,6 +129,9 @@ BODY_EMPTY_CASE = r"""  const created = await (await fetch("/api/cases", {
   expect("空案件输入 tokens", text("#usage-input-tokens"), "—");
   expect("空案件输入说明", text("#usage-input-note"), "尚无调用");
   expect("空案件延迟", text("#usage-latency-p50"), "—");
+  expect("空案件费用", text("#usage-cost-total"), "—");
+  expect("空案件费用说明", text("#usage-cost-note"), "尚无调用");
+  expect("空案件问答数", text("#usage-turn-count"), "0");
   expectMatch("空案件分组", html("#usage-by-kind"), /尚无调用记录/);
   return {failures, notes, empty_case_id: created.id};
 """
@@ -143,7 +168,8 @@ BODY_RECOVERY = r"""  window.fetch = window.__realFetch;
   await selectCase(window.__demoCaseId);
   await waitFor("恢复后重新显示用量", () => (text("#usage-scope") || "").includes("次调用"));
   expect("恢复后调用数", text("#usage-calls"), "3");
-  expect("恢复后输入 tokens", text("#usage-input-tokens"), "≥30");
+  expect("恢复后输入 tokens", text("#usage-input-tokens"), "≥200,000");
+  expect("恢复后费用", text("#usage-cost-total"), "≥0.8800 CNY");
   return {failures, notes};
 """
 
@@ -190,18 +216,21 @@ def _seed_usage(data_dir: Path, case_id: int) -> None:
     TTFT 40/60 -> P50 50, P95 59; latency 100/200/300 -> P50 200, P95 290.
     """
     os.environ["LAW_REVIEW_DATA_DIR"] = str(data_dir)
+    # The records must be priced with the same sheet the server reports.
+    os.environ["LAW_REVIEW_PRICING_JSON"] = json.dumps(PRICING, ensure_ascii=False)
     from app.db import db_scope
     from app.llm_usage import record_llm_call
 
     with db_scope(data_dir / "law_review.db"):
         record_llm_call(case_id=case_id, kind="chat", model="local-a",
-                        usage={"prompt_tokens": 10, "completion_tokens": 4},
-                        latency_ms=100, ttft_ms=40)
+                        usage={"prompt_tokens": 120000, "completion_tokens": 40000},
+                        latency_ms=100, ttft_ms=40, turn_key="request:demo-0001")
         record_llm_call(case_id=case_id, kind="chat", model="local-a",
-                        usage=None, latency_ms=300)
+                        usage=None, latency_ms=300, turn_key="request:demo-0001")
         record_llm_call(case_id=case_id, kind="critic", model="local-b",
-                        usage={"prompt_tokens": 20, "completion_tokens": 6},
-                        latency_ms=200, ttft_ms=60, status="failed")
+                        usage={"prompt_tokens": 80000, "completion_tokens": 20000},
+                        latency_ms=200, ttft_ms=60, status="failed",
+                        turn_key="request:demo-0002")
 
 
 def _api_json(base_url: str, path: str) -> Any:
@@ -436,6 +465,7 @@ def main() -> int:
         "LAW_REVIEW_AUTH_MODE": "local",
         "LAW_REVIEW_LLM_URL": "http://127.0.0.1:1/v1",
         "REDIS_URL": "redis://127.0.0.1:1/0",
+        "LAW_REVIEW_PRICING_JSON": json.dumps(PRICING, ensure_ascii=False),
     }
     log_path = output_dir / "server.log"
     steps: list[dict[str, Any]] = []

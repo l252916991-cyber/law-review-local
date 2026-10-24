@@ -421,6 +421,71 @@ function usageGroupRows(rows) {
   }).join("");
 }
 
+function usageMoneyText(cost) {
+  if (!cost || !cost.configured) return "—";
+  if (cost.total) return cost.total;
+  if (cost.partial_total) return `≥${cost.partial_total}`;
+  return "—";
+}
+
+function usageCostNote(cost) {
+  if (!cost) return "未配置成本";
+  if (cost.config_error) return cost.config_error;
+  if (cost.mixed_currency) return "多币种不可合计";
+  if (!cost.calls) return cost.configured ? "尚无调用" : "未配置成本";
+  if (cost.total) return `全部 ${cost.calls} 次调用`;
+  if (cost.partial_total) return `已知部分 · ${cost.known_calls}/${cost.calls} 次调用可计价`;
+  if (cost.no_price_calls && cost.usage_missing_calls) {
+    return `${cost.no_price_calls} 次未配置单价 · ${cost.usage_missing_calls} 次缺 usage`;
+  }
+  if (cost.no_price_calls) return `${cost.no_price_calls} 次调用无单价（未配置成本）`;
+  return `${cost.usage_missing_calls} 次调用缺 usage，费用未知`;
+}
+
+function usageTurnRows(turns) {
+  if (!Array.isArray(turns) || !turns.length) return '<p class="usage-empty">尚无问答</p>';
+  const head = '<div class="usage-row usage-head"><span>问答</span><b>调用</b><span>模型</span><b>未知</b><span>估算费用</span></div>';
+  return head + turns.map((turn) => {
+    const key = String(turn.turn_key || "未归属");
+    const label = key.length > 22 ? `${key.slice(0, 22)}…` : key;
+    const models = (turn.models || []).join(" / ");
+    const money = turn.cost ? turn.cost : (turn.partial_cost ? `≥${turn.partial_cost}` : "—");
+    return `<div class="usage-row"><span title="${escapeHtml(key)}">${escapeHtml(label)}</span>`
+      + `<b>${Number(turn.calls) || 0}</b><span>${escapeHtml(models)}</span>`
+      + `<b>${Number(turn.unknown_calls) || 0}</b><span>${escapeHtml(money)}</span></div>`;
+  }).join("");
+}
+
+function renderCost(summary) {
+  const missing = !summary || typeof summary !== "object";
+  if (missing) {
+    $("#usage-cost-total").textContent = "—";
+    $("#usage-cost-note").textContent = "指标缺失";
+    $("#usage-cost-scope").textContent = "指标不可用";
+    $("#usage-cost-coverage").textContent = "—";
+    $("#usage-cost-coverage-note").textContent = "指标缺失";
+    $("#usage-turn-count").textContent = "—";
+    $("#usage-turn-note").textContent = "指标缺失";
+    $("#usage-turns").innerHTML = '<p class="usage-empty">指标缺失</p>';
+    return;
+  }
+  const cost = summary.cost && typeof summary.cost === "object" ? summary.cost : null;
+  const calls = Number(summary.calls) || 0;
+  $("#usage-cost-scope").textContent = cost && cost.configured
+    ? (cost.version ? `定价版本 ${cost.version}` : "已配置单价")
+    : (cost && cost.config_error ? "定价配置不可用" : "未配置成本");
+  $("#usage-cost-total").textContent = usageMoneyText(cost);
+  $("#usage-cost-note").textContent = usageCostNote(cost);
+  $("#usage-cost-coverage").textContent = cost ? `${cost.known_calls}/${cost.calls}` : "—";
+  $("#usage-cost-coverage-note").textContent = cost
+    ? `未配置单价 ${cost.no_price_calls} · 缺 usage ${cost.usage_missing_calls}`
+    : "尚无调用";
+  $("#usage-turn-count").textContent = String(Number(summary.turn_count) || 0);
+  $("#usage-turn-note").textContent = Number(summary.turn_count) ? "按提问聚合的已发生调用" : "尚无问答";
+  $("#usage-turns").innerHTML = usageTurnRows(summary.turns);
+  return;
+}
+
 function renderUsage(summary) {
   const missing = !summary || typeof summary !== "object";
   const calls = missing ? 0 : Number(summary.calls) || 0;
@@ -440,6 +505,7 @@ function renderUsage(summary) {
     $("#usage-latency-p95-note").textContent = USAGE_NO_CALLS;
     $("#usage-by-kind").innerHTML = '<p class="usage-empty">尚无调用记录</p>';
     $("#usage-by-model").innerHTML = '<p class="usage-empty">尚无调用记录</p>';
+    renderCost(summary);
     return;
   }
   $("#usage-input-tokens").textContent = usageTokenText(summary.input_tokens, summary.input_tokens_known_calls, calls);
@@ -456,6 +522,7 @@ function renderUsage(summary) {
   $("#usage-latency-p95-note").textContent = `全部 ${calls} 次调用`;
   $("#usage-by-kind").innerHTML = usageGroupRows(summary.by_kind);
   $("#usage-by-model").innerHTML = usageGroupRows(summary.by_model);
+  renderCost(summary);
 }
 
 function renderUsagePending() {
@@ -473,6 +540,10 @@ function renderUsagePending() {
   $("#usage-latency-p95-note").textContent = "加载中…";
   $("#usage-by-kind").innerHTML = '<p class="usage-empty">加载中…</p>';
   $("#usage-by-model").innerHTML = '<p class="usage-empty">加载中…</p>';
+  for (const id of ["usage-cost-total", "usage-cost-coverage"]) $(`#${id}`).textContent = "—";
+  $("#usage-cost-note").textContent = "加载中…";
+  $("#usage-turn-count").textContent = "—";
+  $("#usage-turns").innerHTML = '<p class="usage-empty">加载中…</p>';
 }
 
 function renderUsageError(error) {
@@ -487,6 +558,12 @@ function renderUsageError(error) {
     "usage-ttft-p95-note", "usage-latency-note", "usage-latency-p95-note"]) $(`#${id}`).textContent = unavailable;
   $("#usage-by-kind").innerHTML = '<p class="usage-empty">用量指标加载失败；重新选择案件或刷新页面可重试。</p>';
   $("#usage-by-model").innerHTML = '<p class="usage-empty">未知数据不按 0 显示。</p>';
+  $("#usage-cost-total").textContent = "—";
+  $("#usage-cost-coverage").textContent = "—";
+  $("#usage-cost-note").textContent = "指标不可用";
+  $("#usage-turn-count").textContent = "—";
+  $("#usage-turn-note").textContent = "指标不可用";
+  $("#usage-turns").innerHTML = '<p class="usage-empty">指标不可用</p>';
 }
 
 

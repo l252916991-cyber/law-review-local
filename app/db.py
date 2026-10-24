@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -859,6 +859,19 @@ CREATE INDEX IF NOT EXISTS idx_chat_requests_status ON chat_requests(status, upd
 CREATE INDEX IF NOT EXISTS idx_chat_requests_updated ON chat_requests(updated_at);
 """)
 
+def _migrate_v21(conn: sqlite3.Connection) -> None:
+    """Cost attribution: bound price snapshot and logical-question key.
+
+    The price snapshot is copied onto every call row at write time, so a later
+    rate change cannot silently re-price history. ``turn_key`` groups the calls
+    of one logical question (chat request or agent run) for turn-level reports.
+    """
+    _execute_script(conn, """
+ALTER TABLE llm_calls ADD COLUMN pricing_json TEXT;
+ALTER TABLE llm_calls ADD COLUMN turn_key TEXT;
+CREATE INDEX IF NOT EXISTS idx_llm_calls_turn ON llm_calls(case_id, turn_key);
+""")
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -881,7 +894,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
