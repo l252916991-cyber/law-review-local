@@ -42,3 +42,16 @@ jobs:
       - name: Audit frontend dependencies
         working-directory: frontend
         run: pnpm audit
+      - name: Install test browser and verify real page flows
+        working-directory: frontend
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:e2e
+      - name: Upload failed browser evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: frontend-browser-failures
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

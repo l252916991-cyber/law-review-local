@@ -1,0 +1,79 @@
+import { test, expect, type Page } from '@playwright/test';
+
+async function login(page: Page) {
+  await page.goto('/');
+  await page.getByLabel('访问令牌').fill(process.env.LEXVAULT_E2E_TOKEN!);
+  await page.getByRole('button', { name: '登录工作空间' }).click();
+  await expect(page.getByRole('navigation', { name: '案件列表' })).toBeVisible();
+}
+test('authentication, create case, upload, calibrate directory and original page', async ({ page }) => {
+  await login(page);
+  await page.getByRole('button', { name: '＋ 新建案件', exact: true }).click();
+  const title = `E2E 合成案件 ${Date.now()}`;
+  const dialog = page.getByRole('dialog', { name: '新建案件' });
+  await dialog.getByLabel('案件名称').fill(title);
+  await dialog.getByRole('button', { name: '创建案件', exact: true }).click();
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '卷宗目录', exact: true }).click();
+  await page.getByLabel('上传卷宗', { exact: true }).setInputFiles({ name: '合成笔录.txt', mimeType: 'text/plain', buffer: Buffer.from('张某批准了年化12%的固定回报宣传。此为合成测试材料。') });
+  await expect(page.getByRole('status')).toContainText('导入完成：1 个文件');
+  await page.getByRole('button', { name: '校准目录', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('涉及人员').fill('张某');
+  await page.getByRole('button', { name: '保存校准', exact: true }).click();
+  await expect(page.getByRole('cell', { name: '张某', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '合成笔录.txt', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: '卷宗原文' })).toContainText('年化12%');
+  await page.getByRole('button', { name: '关闭原文' }).click();
+  await page.getByRole('button', { name: '退出', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '登录律所工作空间' })).toBeVisible();
+  expect((await page.request.get('/api/cases')).status()).toBe(401);
+});
+test('streamed answer, citation preview, rejection and clean new conversation', async ({ page }) => {
+  await login(page);
+  await page.getByRole('navigation', { name: '案件列表' }).getByRole('button').filter({ hasText: '（演示）' }).first().click();
+  await page.getByRole('button', { name: 'AI 阅卷', exact: true }).click();
+  await page.getByLabel('向卷宗提问').fill('张某如何参与年化12%固定回报宣传？');
+  await page.getByRole('button', { name: '发送 ↑' }).click();
+  await expect(page.locator('.message.assistant .citation').first()).toBeVisible();
+  await expect(page.locator('.message.assistant')).toContainText('请律师复核');
+  await page.locator('.message.assistant .citation').first().click();
+  await expect(page.getByRole('complementary', { name: '卷宗原文' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭原文' }).click();
+  await page.getByRole('button', { name: '＋ 新建问答' }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(0);
+  await page.getByLabel('向卷宗提问').fill('拒答校验：张某如何参与年化12%固定回报宣传？');
+  await page.getByRole('button', { name: '发送 ↑' }).click();
+  await expect(page.getByRole('button', { name: '发送 ↑' })).toBeVisible();
+  await expect(page.locator('.draft')).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: '已撤回未校验草稿' })).toBeVisible();
+  await expect(page.locator('.message.assistant')).toHaveCount(0);
+  await expect(page.getByText('材料可以支持这个结论', { exact: false })).toHaveCount(0);
+});
+
+test('network retry reuses one request key and replay never writes a second turn', async ({ page }) => {
+  await login(page);
+  await page.getByRole('navigation', { name: '案件列表' }).getByRole('button').filter({ hasText: '（演示）' }).first().click();
+  await page.getByRole('button', { name: 'AI 阅卷', exact: true }).click();
+  const requests: { request_id: string }[] = [];
+  let replayPath = '';
+  await page.route('**/api/cases/*/chat/stream', async route => {
+    requests.push(route.request().postDataJSON());
+    replayPath = new URL(route.request().url()).pathname;
+    if (requests.length === 1) await route.abort('connectionreset');
+    else await route.continue();
+  });
+  await page.getByLabel('向卷宗提问').fill('张某如何参与年化12%固定回报宣传？');
+  await page.getByRole('button', { name: '发送 ↑' }).click();
+  await expect(page.locator('.message.assistant .citation').first()).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[0].request_id).toBe(requests[1].request_id);
+  const replay = await page.request.post(replayPath, { data: requests[1] });
+  expect(replay.status()).toBe(200);
+  const raw = await replay.text();
+  expect(raw).toContain('replayed');
+  const final = raw.split('\n\n').find(frame => frame.startsWith('event: final'))!;
+  const answer = JSON.parse(final.split('data: ')[1]);
+  const history = await page.request.get(`/api/conversations/${answer.conversation_id}/messages`);
+  const messages = await history.json();
+  expect(messages).toHaveLength(2);
+});
