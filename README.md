@@ -187,6 +187,7 @@ docker compose up -d
 | `LAW_REVIEW_JSON_LOGS` / `LAW_REVIEW_LOG_LEVEL` | 结构化日志开关与级别 |
 | `LAW_REVIEW_TOOL_LOOP` | 可选：开启原生 tool calling（默认 `off`）；端点拒绝 `tools` 参数时自动回退单次问答 |
 | `LAW_REVIEW_MCP_CASE_ID` | MCP stdio 服务绑定的案件 id，配合 `python -m app.mcp_server`；见 [MCP 接入](docs/runbook/mcp.md) |
+| `LAW_REVIEW_LLM_FALLBACK*` | 可选回退模型：主模型回答未通过引用校验时重试一次，回退答案须通过同一校验 |
 
 ## 8. 运维
 

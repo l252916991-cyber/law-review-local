@@ -807,11 +807,13 @@ def call_local_llm(
     memory: str = "",
     object_note: str = "",
     on_token: Callable[[str], None] | None = None,
+    base_url_override: str | None = None,
 ) -> str:
     llm = LLMConfig.load()
+    base_url = (base_url_override or llm.base_url).rstrip("/")
     timeout = llm.timeout if timeout is None else timeout
     try:
-        assert_model_endpoint_allowed(llm.base_url)
+        assert_model_endpoint_allowed(base_url)
     except ValueError as exc:
         logger.error("Model egress rejected: %s", exc)
         raise RuntimeError(str(exc)) from exc
@@ -1204,10 +1206,44 @@ def chat(
                         memory=memory_clues["text"], object_note=note, on_token=on_token,
                     )
                 candidate_validation = validate_review_answer(answer, contexts)
+                route_note = None
+                if not candidate_validation["valid"]:
+                    # One bounded fallback attempt. The replacement answer must
+                    # pass the very same contract; a fallback is not an exemption.
+                    from .model_router import fallback_target
+
+                    target = fallback_target()
+                    if target is not None:
+                        fallback_started = time.perf_counter()
+                        # Never name this ``fallback_answer``: that is the
+                        # module-level rule-summary function used below.
+                        retry_answer = call_local_llm(
+                            question, route, contexts, history=history_text,
+                            memory=memory_clues["text"], object_note=note,
+                            model_override=target.model, base_url_override=target.base_url,
+                        )
+                        fallback_validation = validate_review_answer(retry_answer, contexts)
+                        if fallback_validation["valid"]:
+                            _account_llm_call(
+                                case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
+                            )
+                            _account_llm_call(
+                                case_id, "chat_fallback", fallback_started, "ok",
+                                conversation_id=conversation_id,
+                            )
+                            rejected_validation = candidate_validation
+                            answer, candidate_validation = retry_answer, fallback_validation
+                            route_note = {
+                                "fallback": True,
+                                "reason": "primary_failed_validation",
+                                "model": target.model,
+                            }
                 if candidate_validation["valid"]:
                     llm_used = True
                     provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
-                    if not tool_loop_used:
+                    if route_note:
+                        provenance["route"] = route_note
+                    if not tool_loop_used and not route_note:
                         _account_llm_call(
                             case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
                         )
