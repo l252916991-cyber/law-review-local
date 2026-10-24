@@ -21,7 +21,6 @@ from typing import Any, Literal
 
 from fastapi import Body, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
@@ -90,7 +89,6 @@ from .review_jobs import router as review_job_router, shutdown_review_executor, 
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
 
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
 access_logger = logging.getLogger("law_review.access")
 
 
@@ -2079,14 +2077,22 @@ async def system_health():
     }, status_code=200 if ready else 503)
 
 
-app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
+@app.get("/_next/{asset_path:path}", include_in_schema=False)
+def next_frontend_asset(asset_path: str):
+    from .frontend import frontend_asset
+
+    return frontend_asset(asset_path)
 
 
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    from .frontend import frontend_shell
+
+    return frontend_shell()
 
 
 @app.get("/mobile", include_in_schema=False)
 def mobile():
-    return FileResponse(STATIC_DIR / "mobile.html")
+    from .frontend import frontend_shell
+
+    return frontend_shell()

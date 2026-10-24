@@ -29,7 +29,13 @@ function Shell({
   logout: () => Promise<void>;
 }) {
   const cases = useData("/api/cases");
-  const [selected, select] = useState<number | null>(null),
+  const [selected, select] = useState<number | null>(() => {
+      if (typeof window === "undefined") return null;
+      const value = Number(
+        new URLSearchParams(window.location.search).get("case"),
+      );
+      return Number.isSafeInteger(value) && value > 0 ? value : null;
+    }),
     [search, setSearch] = useState(""),
     [create, setCreate] = useState(false),
     [storage, setStorage] = useState<"archived" | "trash" | null>(null),
@@ -204,10 +210,34 @@ function CaseWorkspace({
   const caseId = id(caseRow.id),
     detail = useData(`/api/cases/${caseId}`),
     audit = useData(`/api/cases/${caseId}/audit`);
-  const [view, setView] = useState("overview"),
+  const [view, setView] = useState(() => {
+      const value =
+        typeof window === "undefined"
+          ? ""
+          : new URLSearchParams(window.location.search).get("view");
+      return [
+        "overview",
+        "documents",
+        "evidence",
+        "chat",
+        "agent",
+        "metrics",
+        "search",
+        "export",
+        "settings",
+      ].includes(value || "")
+        ? value!
+        : "overview";
+    }),
     [page, setPage] = useState<PageTarget | null>(null),
     [error, setError] = useState("");
   const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("case", String(caseId));
+    url.searchParams.set("view", view);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [caseId, view]);
   useEffect(() => {
     Promise.resolve().then(() => {
       try {

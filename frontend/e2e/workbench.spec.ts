@@ -1,6 +1,33 @@
 import { test, expect } from '@playwright/test';
 import { login, demoCase } from './helpers';
 
+test('failed node diagnostics stay inspectable without displaying hidden reasoning', async ({ page }) => {
+  await login(page); await demoCase(page);
+  await page.getByRole('button', { name: '阅卷任务', exact: true }).click();
+  const failed = page.locator('.row').filter({ hasText: '合成失败节点验收' });
+  await failed.getByRole('button', { name: '查看轨迹' }).click();
+  const trace = page.getByRole('region', { name: '执行轨迹' });
+  await expect(trace).toContainText('证据 Agent');
+  await trace.locator('summary').click();
+  await expect(trace).toContainText('synthetic_node_failure');
+  await expect(page.getByText('NEVER_RENDER_PRIVATE_REASONING', { exact: false })).toHaveCount(0);
+});
+
+test('resume a real checkpoint and compare both runtimes without model calls', async ({ page }, info) => {
+  await login(page); await demoCase(page);
+  await page.getByRole('button', { name: '阅卷任务', exact: true }).click();
+  const interrupted = page.locator('.row').filter({ hasText: `合成断点恢复验收 ${info.project.name}` });
+  await interrupted.getByRole('button', { name: '恢复运行' }).click();
+  await expect(page.getByRole('region', { name: '审校结果' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '执行轨迹' })).toContainText('completed');
+  await page.getByLabel('使用模型', { exact: true }).uncheck();
+  await page.getByLabel('审校问题').fill('张某如何参与年化12%固定回报宣传？');
+  await page.getByRole('button', { name: '分析方式对比', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '运行方式对比', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^native ·/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^langgraph ·/ })).toBeVisible();
+});
+
 test('background agent tool loop, fallback, trace and usage stay in the selected case', async ({ page }) => {
   await login(page); await demoCase(page);
   await page.getByRole('button', { name: '阅卷任务', exact: true }).click();

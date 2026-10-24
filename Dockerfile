@@ -1,6 +1,17 @@
+# Next.js is built once; the runtime remains a single Python API process.
+ARG NODE_IMAGE=node:24.22.1-bookworm-slim
+ARG PYTHON_IMAGE=python:3.12-slim
+FROM ${NODE_IMAGE} AS frontend
+WORKDIR /build/frontend
+RUN npm install --global pnpm@11.25.0
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml frontend/.npmrc frontend/.node-version ./
+RUN pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm build:static
+
 # LexVault single-process container. The model service stays an explicit
 # external dependency: nothing downloads weights at startup.
-FROM python:3.12-slim
+FROM ${PYTHON_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -23,7 +34,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY scripts ./scripts
-RUN uv sync --locked --no-dev
+COPY --from=frontend /build/frontend/out ./frontend/out
+RUN uv sync --locked --no-dev \
+    && chmod -R a+rX /app
 
 # Non-root runtime identity; /data holds the SQLite database, uploads,
 # exports and checkpoints.

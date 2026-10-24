@@ -132,10 +132,15 @@ LexVault 的检索目标不是单纯提高召回率，而是在法律场景下�
 python3 -m pip install uv==0.12.0
 uv sync --locked --group dev
 uv run python scripts/doctor.py            # 环境自检
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8765
+# 首次运行或更新前端后，使用 frontend/.node-version 的 Node 和 packageManager 指定的 pnpm
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend build:static
+./run.sh
 ```
 
 打开 <http://127.0.0.1:8765>。模型功能需要可用的本地服务；无模型演示应显式关闭 LLM 并选择离线检索配置，不能依赖模型请求失败后的自动回退。配置参考 [.env.example](.env.example)——应用不隐式加载 dotenv，需显式注入环境并重启服务。
+
+正式界面为 Next.js + React + TypeScript 的静态构建，由 FastAPI 同源托管；`/` 与 `/mobile` 使用同一套响应式界面。Node/pnpm 用于构建，运行时仍只需 Python。开发时可用 `pnpm --dir frontend dev` 启动 Next 开发入口，其 API 代理要求后端 token 模式。构建、回滚和页面验证见[前端运行手册](docs/runbook/frontend.md)。
 
 OCR 依赖：
 
@@ -208,6 +213,13 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests scripts/test_engin
   scripts/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
 for script in app/static/*.js; do node --check "$script"; done
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend contract:check
+pnpm --dir frontend typecheck
+pnpm --dir frontend lint
+pnpm --dir frontend test
+pnpm --dir frontend build:static
+pnpm --dir frontend test:e2e
 ```
 
 - **评测分层**（四层指标不可互相替代，详见[评测协议](docs/benchmarks/README.md)）：

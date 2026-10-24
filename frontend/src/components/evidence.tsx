@@ -4,6 +4,7 @@ import { api, jsonBody } from "@/lib/api";
 import { id, message, object, text, type Row } from "@/lib/data";
 import { Empty, ErrorBox, Modal, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
+import { materialTimeline } from "@/lib/timeline";
 
 const categories = [
   "书证",
@@ -30,7 +31,11 @@ function Select({
   return (
     <label>
       {label}
-      <select aria-label={label} name={name} defaultValue={text(value) || options[0]}>
+      <select
+        aria-label={label}
+        name={name}
+        defaultValue={text(value) || options[0]}
+      >
         {options.map((item) => (
           <option key={item}>{item}</option>
         ))}
@@ -245,6 +250,21 @@ export function Evidence({
             </article>
           ))}
       </div>
+      <details className="card">
+        <summary>材料日期时间线</summary>
+        <p>
+          按来源卷宗所载日期排列，保留时间范围精度；未记录日期的不推断为事实发生时间。
+        </p>
+        {materialTimeline(items, list(documents.data)).map((item) => (
+          <div className="row" key={id(item.evidence.id)}>
+            <time>{item.dateRange || "未记录日期"}</time>
+            <span>
+              {text(item.evidence.title)}
+              <small>{text(item.evidence.category)}</small>
+            </span>
+          </div>
+        ))}
+      </details>
       <details className="card">
         <summary>证据录入时间线</summary>
         <p>按系统录入时间排列，不推断事实发生时间。</p>

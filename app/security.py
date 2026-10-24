@@ -249,9 +249,10 @@ def apply_security_headers(response: Response, path: str) -> Response:
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if path in {"/", "/mobile"} or path.startswith("/assets/"):
-        response.headers["Cache-Control"] = "no-cache"
-        response.headers["Content-Security-Policy"] = (
+    if path in {"/", "/mobile"} or path.startswith(("/assets/", "/_next/")):
+        if not path.startswith("/_next/"):
+            response.headers["Cache-Control"] = "no-cache"
+        response.headers["Content-Security-Policy"] = response.headers.get("Content-Security-Policy") or (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         )

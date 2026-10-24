@@ -27,11 +27,11 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 - Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行关键语法/未定义名检查；不宣称全套风格规则已达标。
 - mypy：先纳管 `scripts/`，要求函数类型；历史业务模块的类型迁移逐步扩大，不用全仓 `ignore_errors` 掩盖问题。
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
-- 前端至少执行 `node --check app/static/app.js`；交互、恢复与窄屏需独立浏览器验收。
+- 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`；`app/static/*.js` 作为历史回滚参考保留时继续语法检查。详见[前端运行手册](frontend.md)。
 
 ## 真实页面流程验证
 
-`scripts/page_flow_check.py` 用一个已安装的 Chromium 内核浏览器（Edge/Chrome/Chromium，或 `LAW_REVIEW_BROWSER` 指定路径）在隔离数据目录里启动真实 FastAPI 进程、播种合成演示案件、驱动页面并断言渲染结果；`scripts/browser_driver.py` 是仅依赖标准库的 CDP + WebSocket 客户端，不引入 npm 依赖。
+2026-10-25 起，`scripts/page_flow_check.py` 是当前 Playwright 验收的兼容入口：启动隔离 FastAPI、合成数据与模型测试替身，加载当前静态构建。保留 flow 名称，计数与历史 CDP 步骤数不可互换；`--data-dir` 不再复用数据。先安装锁定前端依赖并 `pnpm --dir frontend build:static`，浏览器通过 `--browser`、`LEXVAULT_BROWSER_PATH` 或 Playwright Chromium 指定。历史 CDP 驱动保留为工具源码，正式 UI 不使用旧 DOM 流程。
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \

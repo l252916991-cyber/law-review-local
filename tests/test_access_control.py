@@ -39,12 +39,24 @@ class AccessControlTests(unittest.TestCase):
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
     def test_app_assets_revalidate_after_updates(self):
-        for path in ("/", "/assets/app.js", "/assets/styles.css"):
-            with self.subTest(path=path):
+        public = self.root / "ui"
+        (public / "_next/static").mkdir(parents=True)
+        (public / "index.html").write_text('<html><script src="/_next/static/ui-a1.js"></script></html>')
+        (public / "_next/static/ui-a1.js").write_text("console.log('synthetic');")
+        (public / "_next/static/ui-a1.css").write_text("body {color: black}")
+        with patch.dict(os.environ, {"LAW_REVIEW_FRONTEND_DIR": str(public)}):
+            for path in ("/", "/mobile"):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers["cache-control"], "no-cache")
                 self.assertIn("script-src 'self'", response.headers["content-security-policy"])
+            for path in ("/_next/static/ui-a1.js", "/_next/static/ui-a1.css"):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["cache-control"], "public, max-age=31536000, immutable")
+                self.assertIn("script-src 'self'", response.headers["content-security-policy"])
+            self.assertEqual(self.client.get("/assets/app.js").status_code, 404)
+            self.assertEqual(self.client.get("/api/cases").status_code, 401)
 
     def test_lifecycle_lists_and_restore_preserve_case_scope(self):
         admin = {"Authorization": f"Bearer {self.admin_token}"}

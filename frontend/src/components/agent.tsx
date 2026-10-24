@@ -41,6 +41,9 @@ export function Trace({ runId }: { runId: number }) {
               <dt>失败 / 校验</dt>
               <dd>
                 {text(step.error || output.error) ||
+                  (output.diagnostic
+                    ? text(object(output.diagnostic).code)
+                    : "") ||
                   (Array.isArray(output.issues)
                     ? output.issues.map(text).join("；")
                     : "无")}

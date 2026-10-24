@@ -92,9 +92,15 @@ export function Auth({
           </form>
         )}
         {identity?.oidc_enabled ? (
-          <form action="/api/auth/oidc/login" method="GET">
-            <button>使用律所账号登录</button>
-          </form>
+          <button
+            onClick={() =>
+              window.location.assign(
+                new URL("/api/auth/oidc/login", window.location.origin).href,
+              )
+            }
+          >
+            使用律所账号登录
+          </button>
         ) : null}
         <button onClick={() => void check()}>重新检查</button>
         <small>

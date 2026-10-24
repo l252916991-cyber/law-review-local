@@ -36,6 +36,9 @@ node_modules/
 *.tsbuildinfo
 playwright-report/
 test-results/
+/frontend/out/
+/frontend/out.previous/
+/frontend/.export-*/
 *.log
 *.backup
 *.before_extraction_fix

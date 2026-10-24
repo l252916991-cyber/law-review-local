@@ -18,6 +18,10 @@ test('authentication, create case, upload, calibrate directory and original page
   await page.getByRole('button', { name: '合成笔录.txt', exact: true }).click();
   await expect(page.getByRole('complementary', { name: '卷宗原文' })).toContainText('年化12%');
   await page.getByRole('button', { name: '关闭原文' }).click();
+  await expect(page).toHaveURL(/case=\d+.*view=documents/);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '合成笔录.txt', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await expect(page.getByRole('heading', { name: '登录律所工作空间' })).toBeVisible();
   expect((await page.request.get('/api/cases')).status()).toBe(401);

@@ -49,6 +49,36 @@ class EngineeringToolTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "symbolic link"):
                 source_files(root)
 
+    def test_frontend_build_requires_exact_public_digest_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            public = root / "frontend/out"
+            public.mkdir(parents=True)
+            index = public / "index.html"
+            index.write_text("synthetic UI")
+            binding = public / "build-info.json"
+            binding.write_text(json.dumps({"format_version": 1, "assets": [
+                {"path": "index.html", "sha256": hashlib.sha256(index.read_bytes()).hexdigest()},
+            ]}))
+            (public / "private.json").write_text("not a build output")
+            self.assertEqual(source_files(root), [])
+            self.assertEqual(set(source_files(root, with_frontend=True)), {index, binding})
+            index.write_text("tampered")
+            with self.assertRaisesRegex(ValueError, "digest mismatch"):
+                source_files(root, with_frontend=True)
+
+    def test_frontend_build_binding_rejects_private_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            public = root / "frontend/out"
+            public.mkdir(parents=True)
+            for name in ("../private.js", "/tmp/private.js", ".env", "_next/private.json"):
+                (public / "build-info.json").write_text(json.dumps({"format_version": 1, "assets": [
+                    {"path": name, "sha256": "0" * 64},
+                ]}))
+                with self.subTest(path=name), self.assertRaises(ValueError):
+                    source_files(root, with_frontend=True)
+
     def test_frontend_release_excludes_dependencies_builds_and_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

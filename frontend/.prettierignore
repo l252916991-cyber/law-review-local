@@ -1,5 +1,8 @@
 node_modules/
 .next/
+out/
+out.previous/
+.export-*/
 pnpm-lock.yaml
 src/lib/schema.d.ts
 next-env.d.ts

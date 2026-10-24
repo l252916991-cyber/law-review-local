@@ -1,7 +1,6 @@
 """Mobile entry, shared helpers and desktop race regressions without a browser."""
 import json
 import os
-import re
 import subprocess
 import tempfile
 import unittest
@@ -24,7 +23,12 @@ class MobileRouteTests(unittest.TestCase):
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
         init_db(seed=False)
+        public = Path(directory.name) / "ui"
+        (public / "_next/static").mkdir(parents=True)
+        (public / "index.html").write_text('<html><script src="/_next/static/ui-a1b2.js"></script><body>合成统一前端</body></html>')
+        (public / "_next/static/ui-a1b2.js").write_text("console.log('synthetic shell');")
         env = patch.dict(os.environ, {
+            "LAW_REVIEW_FRONTEND_DIR": str(public),
             "LAW_REVIEW_AUTH_MODE": "token",
             "LAW_REVIEW_ALLOWED_HOSTS": "testserver",
             "LAW_REVIEW_API_TOKENS_JSON": json.dumps({"m" * 40: {"name": "测试", "admin": True}}),
@@ -36,7 +40,7 @@ class MobileRouteTests(unittest.TestCase):
 
     def test_public_shells_and_assets_have_same_security_policy(self):
         desktop = self.client.get("/")
-        for path in ("/mobile", "/assets/entry.js", "/assets/shared.js", "/assets/mobile.js", "/assets/mobile.css"):
+        for path in ("/", "/mobile"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
@@ -46,17 +50,16 @@ class MobileRouteTests(unittest.TestCase):
                 self.assertEqual(response.headers["x-content-type-options"], "nosniff")
         mobile = self.client.get("/mobile?auth_error=expired")
         self.assertIn("text/html", mobile.headers["content-type"])
-        self.assertIn('/assets/mobile.js', mobile.text)
-        self.assertNotIn('/assets/app.js', mobile.text)
-        for html, app_script in ((desktop.text, '/assets/app.js'), (mobile.text, '/assets/mobile.js')):
-            self.assertLess(html.index('/assets/entry.js'), html.index('</head>'))
-            self.assertLess(html.index('/assets/shared.js'), html.index(app_script))
-        self.assertGreaterEqual(desktop.text.count('/mobile?ui=mobile'), 2)
-        for asset in ("entry.js", "shared.js", "app.js"):
-            # Require a cache-busting version token without pinning its value,
-            # so a legitimate version bump does not break the security checks.
-            self.assertRegex(desktop.text, rf'/assets/{re.escape(asset)}\?v=[0-9A-Za-z._-]+')
-        self.assertIn('?ui=desktop', mobile.text + (ROOT / "app/static/mobile.js").read_text())
+        self.assertEqual(mobile.text, desktop.text)
+        self.assertIn('/_next/static/ui-a1b2.js', desktop.text)
+        self.assertNotIn('/assets/', desktop.text)
+        asset = self.client.get('/_next/static/ui-a1b2.js')
+        self.assertEqual(asset.status_code, 200)
+        self.assertIn('immutable', asset.headers['cache-control'])
+        self.assertEqual(asset.headers['x-content-type-options'], 'nosniff')
+        self.assertEqual(asset.headers['x-frame-options'], 'DENY')
+        for retired in ('entry.js', 'shared.js', 'app.js', 'mobile.js', 'mobile.css'):
+            self.assertEqual(self.client.get('/assets/' + retired).status_code, 404)
 
     def test_mobile_shell_does_not_bypass_api_or_host_security(self):
         self.assertEqual(self.client.get("/mobile").status_code, 200)
