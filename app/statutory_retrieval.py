@@ -113,3 +113,70 @@ def retrieve_statutory(question: str, *, limit: int = 5, corpus: LegalCorpus | N
         return _review("法条存在多个版本，必须指定适用版本", str(exc))
     except (OSError, ValueError, KeyError) as exc:
         return _review("法条语料不可用或完整性校验失败", type(exc).__name__)
+
+def verify_citation(
+    law_name: str,
+    article_number: int,
+    version_date: str | None = None,
+    *,
+    corpus: "LegalCorpus | None" = None,
+) -> dict[str, Any]:
+    """Structured exact lookup for a tool call.
+
+    Unlike :func:`retrieve_statutory` this never parses a natural-language
+    question: the caller already supplies a law name and an article number. It
+    keeps the same fail-closed outcome: ``ok`` requires exactly one statute and
+    exactly one resolvable article; an ambiguous or missing reference is
+    ``needs_review`` and is never replaced by a lexically similar article.
+    """
+    if not isinstance(law_name, str) or not law_name.strip():
+        return _review("法名不能为空", "请提供完整法名与条号。")
+    if type(article_number) is not int or article_number < 1:
+        return _review("条号必须是正整数", "请提供具体条号，不接受文本检索结果。")
+    try:
+        corpus = corpus if corpus is not None else _configured_corpus()
+    except (OSError, ValueError, KeyError) as exc:
+        return _review("法条语料不可用或完整性校验失败", type(exc).__name__)
+    if corpus is None:
+        return _review("未配置法条语料，无法核验法律依据", "请律师核验法条版本与正文。")
+    try:
+        hits, unresolved = _resolve(corpus, [(law_name.strip(), article_number)], version_date)
+    except VersionAmbiguityError as exc:
+        return _review("法条存在多个版本，必须指定适用版本", str(exc))
+    except (OSError, ValueError, KeyError) as exc:
+        return _review("法条语料不可用或完整性校验失败", type(exc).__name__)
+    if unresolved or not hits:
+        return _review(
+            f"无法唯一核验《{law_name.strip()}》第{article_number}条",
+            "未找到与引用精确对应的法条，不得以相近法条替代；请律师核验法名、条号与版本。",
+        )
+    return {
+        "status": "ok",
+        "mode": "citation",
+        "summary": f"精确核验到 {len(hits)} 条法条",
+        "hits": _public(hits),
+        "warning": None,
+    }
+
+
+def search_statute_text(query: str, *, limit: int = 5) -> dict[str, Any]:
+    """Discovery only: a text match can never become a verified citation."""
+    if not isinstance(query, str) or not 1 <= len(query.strip()) <= 500:
+        return _review("检索词长度必须为 1 至 500 个字符", "请提供法条关键词。")
+    try:
+        corpus = _configured_corpus()
+    except (OSError, ValueError, KeyError) as exc:
+        return _review("法条语料不可用或完整性校验失败", type(exc).__name__)
+    if corpus is None:
+        return _review("未配置法条语料，无法检索法条材料", "请律师核验法条版本与正文。")
+    try:
+        hits = _public(corpus.search(query.strip(), limit=limit))
+    except (OSError, ValueError, KeyError) as exc:
+        return _review("法条语料不可用或完整性校验失败", type(exc).__name__)
+    return {
+        "status": "candidate" if hits else "needs_review",
+        "mode": "discovery",
+        "summary": f"检索到 {len(hits)} 条法条候选材料（不构成可核验引用）",
+        "hits": hits,
+        "warning": None if hits else "未检索到相关法条材料，请律师补充法名与条号。",
+    }

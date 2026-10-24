@@ -26,9 +26,9 @@ NATIVE_BASELINE_COMMIT = "99d28619e538fea6322449ebe3af3cbe4a6b007a"
 NATIVE_ALGORITHM_HASHES = {
     "agents.py": "31f3a6ffa22ccca7b2beb958935c0ee5f9ae0533f1049ac897d19ca232f9173b",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
-    "services.py": "36030dd8ba1a6b0c40a180e8ddc095feb4f9c45e95c2abad9e230b4be4fd1ed8",
+    "services.py": "93f63f2aa92d51be9de5699d798de91d0abff1ade6a079739bb78b8e79312a2f",
     "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
-    "statutory_retrieval.py": "49c84f2c3d22d9281ecc9595a3ec57b5081c678c203ff82a0ab873b02593a0bb",
+    "statutory_retrieval.py": "d9d2f60c01ac03f405ca4e1da593ff049a32cd6e072d3fa4bcb98f8be4b9fbe8",
 }
 
 

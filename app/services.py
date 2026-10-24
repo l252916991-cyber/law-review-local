@@ -858,7 +858,9 @@ def call_local_llm(
     deadline = time.monotonic() + timeout
     started = time.perf_counter()
     _last_llm_usage.set(None)
-    started_at = time.monotonic()
+    # perf_counter for latency measurement; monotonic stays reserved for the
+    # absolute request deadline so the two budgets cannot be confused.
+    started_at = time.perf_counter()
     first_token_at: list[float] = []
     raw_parts: list[str] = []
     emitted = 0
@@ -884,7 +886,7 @@ def call_local_llm(
             if start <= emitted:
                 return
             if not first_token_at:
-                first_token_at.append(time.monotonic())
+                first_token_at.append(time.perf_counter())
             assert on_token is not None
             on_token(tail)
             emitted = len(full)
