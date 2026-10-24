@@ -387,7 +387,13 @@ class IsolatedHostIntegration:
                             if message.get("artifact_verified") is not True or message.get("trace_valid") is not True:
                                 raise SidecarProtocolError("artifact or trace verification failed")
                             if message.get("result", {}).get("status") == "succeeded" and time.time() >= row["deadline"]:
-                                raise TimeoutError("late framework completion requires reconciliation")
+                                # The execution deadline does not expire an identical,
+                                # already projected success. Artifact/trace verification
+                                # and current authorization still apply to every read.
+                                known_success = (row["status"] == "succeeded"
+                                    and json.loads(row["result_json"]) == message["result"])
+                                if not known_success:
+                                    raise TimeoutError("late framework completion requires reconciliation")
                             break
                         if message.get("seq") != seq + 1:
                             raise SidecarProtocolError("sidecar sequence mismatch")

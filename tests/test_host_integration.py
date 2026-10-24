@@ -242,6 +242,73 @@ def test_original_absolute_deadline_never_renewed(isolated):
 
 
 @actual
+@pytest.mark.parametrize("command", ["recover", "inspect", "rebuild"])
+def test_verified_historical_success_remains_readable_after_deadline(isolated, monkeypatch, command):
+    import app.host_integration as integration
+
+    control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
+    control.accept(request())
+    original = control.drive("process-request")
+    observed = counts()
+    with closing(connect()) as conn:
+        deadline = conn.execute("SELECT deadline FROM host_runtime_links").fetchone()[0]
+    monkeypatch.setattr(integration.time, "time", lambda: deadline + 1)
+    restarted = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
+    result = (restarted.rebuild_projection("process-request") if command == "rebuild"
+              else restarted.drive("process-request", command=command))
+    assert result["status"] == "succeeded" and not result["needs_reconciliation"]
+    assert result["result"] == original["result"]
+    assert result["framework_run_id"] == original["framework_run_id"]
+    assert counts() == observed
+    with closing(connect()) as conn:
+        assert conn.execute("SELECT deadline FROM host_runtime_links").fetchone()[0] == deadline
+
+
+@actual
+def test_different_historical_result_is_not_released_after_deadline(isolated, monkeypatch):
+    import app.host_integration as integration
+
+    control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
+    control.accept(request())
+    original = control.drive("process-request")
+    changed = {**original["result"], "final_output": "changed host projection"}
+    with transaction() as conn:
+        deadline = conn.execute("SELECT deadline FROM host_runtime_links").fetchone()[0]
+        conn.execute("UPDATE host_runtime_links SET result_json=?", (json.dumps(changed),))
+    observed = counts()
+    monkeypatch.setattr(integration.time, "time", lambda: deadline + 1)
+    with pytest.raises(TimeoutError, match="late framework completion"):
+        control.drive("process-request", command="inspect")
+    assert counts() == observed
+
+
+@actual
+def test_first_success_received_after_deadline_still_requires_reconciliation(isolated, monkeypatch):
+    import app.host_integration as integration
+
+    control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
+    control.accept(request())
+    with closing(connect()) as conn:
+        deadline = conn.execute("SELECT deadline FROM host_runtime_links").fetchone()[0]
+    read_message = integration._read_message
+
+    def delayed_result(*args, **kwargs):
+        message = read_message(*args, **kwargs)
+        if message.get("type") == "result":
+            monkeypatch.setattr(integration.time, "time", lambda: deadline + 1)
+        return message
+
+    monkeypatch.setattr(integration, "_read_message", delayed_result)
+    with pytest.raises(TimeoutError, match="late framework completion"):
+        control.drive("process-request")
+    result = control.status("process-request")
+    assert result["status"] == "unknown" and result["needs_reconciliation"]
+    assert result["result"] == {}
+    with closing(connect()) as conn:
+        assert conn.execute("SELECT deadline FROM host_runtime_links").fetchone()[0] == deadline
+
+
+@actual
 def test_delete_cascade_and_framework_state_erasure(isolated):
     result = process(isolated, "normal")
     directory = isolated.parent / "host-framework-state" / result["framework_run_id"]
