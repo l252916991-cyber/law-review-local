@@ -1227,6 +1227,32 @@ async function streamChat(payload, onEvent) {
   if (buffer.trim()) dispatch(buffer);
 }
 
+function newChatRequestId() {
+  // The server accepts [A-Za-z0-9_-]{8,64}; a UUID satisfies it and stays unique
+  // per submission, which is what the retry below depends on.
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  const buffer = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) window.crypto.getRandomValues(buffer);
+  else for (let index = 0; index < buffer.length; index += 1) buffer[index] = Math.floor(Math.random() * 256);
+  return Array.from(buffer, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function annotateStreamDone(done) {
+  if (!done || done.ttft_ms == null) return;
+  const messages = $$("#chat-messages .message.assistant");
+  const last = messages.length ? messages[messages.length - 1] : null;
+  // A retracted draft is not an answer: timing it would imply the draft was used.
+  if (!last || last.classList.contains("retracted")) return;
+  const meta = last.querySelector(".answer-meta");
+  if (!meta || meta.querySelector("[data-ttft]")) return;
+  // First token is measured server-side; label it so it is not read as total time.
+  const badge = document.createElement("span");
+  badge.className = "route-badge secondary";
+  badge.dataset.ttft = "1";
+  badge.textContent = `首字 ${(Number(done.ttft_ms) / 1000).toFixed(1)}s`;
+  meta.append(badge);
+}
+
 async function sendChat(event) {
   event?.preventDefault();
   const input = $("#chat-input"), question = input.value.trim();
@@ -1235,22 +1261,58 @@ async function sendChat(event) {
   appendMessage("user", question); input.value = ""; appendTyping();
   const button = $(".send-button"); button.disabled = true;
   const provisional = appendStreamingMessage();
+  const payload = {
+    question,
+    user_name: $("#user-name").value || "本机律师",
+    conversation_id: state.conversationId,
+    use_llm: $("#llm-toggle").checked,
+    // One key per submit: an automatic retry after a dropped connection replays
+    // the committed turn instead of asking the same question twice.
+    request_id: newChatRequestId(),
+  };
   let settled = false;
-  try {
-    await streamChat({ question, user_name: $("#user-name").value || "本机律师", conversation_id: state.conversationId, use_llm: $("#llm-toggle").checked }, ({ type, data }) => {
-      if (type === "status") provisional.note("检索中…");
-      else if (type === "token") { $("#typing-message")?.remove(); provisional.note("生成中"); provisional.append(data.text); }
-      else if (type === "retract") { settled = true; $("#typing-message")?.remove(); provisional.fail(data.message || "模型调用失败，已撤回未校验草稿"); }
-      else if (type === "final") {
+  let doneFrame = null;
+  const handle = ({ type, data }) => {
+    if (type === "status") {
+      const phases = { retrieval: "检索中…", generating: "生成中", validating: "校验引用…", replayed: "重放已完成的回答" };
+      provisional.note(phases[data?.phase] || "处理中…");
+    } else if (type === "token") {
+      $("#typing-message")?.remove();
+      provisional.note("生成中（草稿待校验）");
+      provisional.append(data.text);
+    } else if (type === "citations") {
+      if (!settled) provisional.note(`引用已校验 ${Number(data?.count) || 0} 条`);
+    } else if (type === "retract") {
+      settled = true;
+      $("#typing-message")?.remove();
+      provisional.fail(data.message || "模型调用失败，已撤回未校验草稿");
+    } else if (type === "final") {
+      settled = true;
+      $("#typing-message")?.remove();
+      provisional.remove();
+      state.conversationId = data.conversation_id;
+      appendMessage("assistant", data.answer, data.route, data.citations, data.semantic_expansion, data.llm_used, data.clarification, data.context?.tools || null);
+      $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
+    } else if (type === "done") {
+      doneFrame = data;
+      if (data?.status === "failed" && !settled) {
         settled = true;
-        $("#typing-message")?.remove();
-        provisional.remove();
-        state.conversationId = data.conversation_id;
-        appendMessage("assistant", data.answer, data.route, data.citations, data.semantic_expansion, data.llm_used, data.clarification, data.context?.tools || null);
-        $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
+        provisional.fail(data.message || "问答失败，本轮未写入记录");
       }
-    });
+    }
+  };
+  try {
+    try {
+      await streamChat(payload, handle);
+    } catch (error) {
+      // Network-level failure only: an HTTP error already carries the server's
+      // explanation and must not be retried blindly.
+      if (settled || error.status) throw error;
+      provisional.note("连接中断，正在重试…");
+      await streamChat(payload, handle);
+    }
     if (!settled) provisional.fail("连接中断，请重试");
+    if (doneFrame) annotateStreamDone(doneFrame);
     if (settled && state.conversationId) {
       state.conversations = await api(`/api/cases/${state.caseId}/conversations`); renderConversations();
     }

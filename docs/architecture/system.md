@@ -18,4 +18,18 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 引用格式有效与证据支持事实是两个指标。最终答案、来源文档、页码、节点输出与耗时供律师复核，不保存/展示模型隐藏思维链。自动金额/疏漏规则只是线索，不是法律事实裁定。
 
+## 聊天流式协议（A01.1）
+
+`POST /api/cases/{case_id}/chat/stream` 使用 SSE，每帧一个事件。客户端可提交 `request_id`（`[A-Za-z0-9][A-Za-z0-9_-]{7,63}`）作为幂等键。
+
+成功顺序：`status(phase=retrieval)` → `status(phase=generating)`（有模型调用时）→ `token`* → `status(phase=validating)` → `citations` → `final` → `done(status=ok)`。失败顺序：`status` →（可能的 `token`*）→ `retract` → `done(status=failed)`；失败路径不发送 `citations`/`final`，也不在 `retract` 之后发送成功帧。
+
+- `token` 是**未校验草稿**（`provisional: true`），只用于打字机展示；答案正文可能自带 `[资料N]` 标记，与"引用对象延后挂载"是两件事，前者不构成校验结论。
+- `citations` 只在整段答案通过引用校验后发出，携带结构化来源；它和 `final.citations` 内容一致。
+- `final` 保留为兼容帧：旧桌面客户端靠它渲染完整答案。新客户端应同时处理 `citations` 与 `done`，但不得因为收到 `final` 就跳过 `done` 的终态判断。
+- `done` 携带 `status`、`conversation_id`、`message_id`、`answer_status`、`citation_check`、`llm_used`、`ttft_ms`（服务端首个 token 到达时间，无 token 时为 null）、`usage`（上游未返回 usage 时为 null）与 `request_id`。聊天不创建 `agent_runs`，因此 `done` 不含 `run_id`。
+- 重放：同一 `request_id` 再次提交且已提交过时，服务端回放 `status(phase=replayed)` → `citations` → `final` → `done(replayed: true)`，不重复调用模型、不重复写消息；重放帧不重新报告 TTFT/usage，逐次用量仍以 `llm_calls` 为准。
+- 并发重复：同一 `request_id` 正在处理中时返回 409；中断在提交边界之前的请求标记为 `cancelled`，可以用同一键重试。提交边界是 `record_turn` 的单事务：消息、审计与幂等记录一起提交，所以"取消"与"提交"竞争的结果只会是"整轮写入"或"完全没有写入"。
+- 断连：工作线程在模型调用前和提交前检查协作取消标志；已发生的模型调用仍写入 `llm_calls`，不因断连删除账本。底层 HTTP 读取不被强制打断，仍受既有绝对超时约束。
+
 长期记忆、checkpoint、导出与日志都可能含案件信息，不能仅清理上传目录。批量导入和 Web 应用必须使用同一个数据目录；案件级权限应覆盖关联文档、证据、运行轨迹和导出，不能只保护案件列表。

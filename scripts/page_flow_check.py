@@ -209,15 +209,17 @@ def _api_json(base_url: str, path: str) -> Any:
         return json.loads(response.read())
 
 
-def _run_step(session: Any, name: str, script: str, output_dir: Path, shot: bool) -> dict[str, Any]:
+def _run_step(session: Any, name: str, script: str, output_dir: Path, shot: bool,
+              clip: str = "") -> dict[str, Any]:
     result = session.evaluate(script)
     failures = list(result.get("failures") or []) if isinstance(result, dict) else ["步骤未返回结果"]
     if shot:
         session.screenshot(output_dir / f"{name}.png")
-        try:
-            session.screenshot(output_dir / f"{name}-panel.png", selector="#usage-panel")
-        except RuntimeError:
-            pass
+        if clip:
+            try:
+                session.screenshot(output_dir / f"{name}-clip.png", selector=clip)
+            except RuntimeError:
+                pass
     for failure in failures:
         print(f"  [FAIL] {name}: {failure}", file=sys.stderr)
     if not failures:
@@ -225,7 +227,106 @@ def _run_step(session: Any, name: str, script: str, output_dir: Path, shot: bool
     return {"step": name, "failures": failures, "result": result}
 
 
-FLOWS = ("metrics",)
+BODY_CHAT_OPEN = r"""
+  await waitFor("案件列表加载", () => document.querySelector(".case-item"));
+  document.querySelector(".case-item").click();
+  await waitFor("案件标题", () => (text("#case-title") || "").includes("合成演示"));
+  document.querySelector('.nav-item[data-view="assistant"]').click();
+  await sleep(150);
+  const input = document.querySelector("#chat-input");
+  input.value = "张某是否批准了年化12%的固定回报宣传？";
+  document.querySelector("#chat-form").dispatchEvent(new Event("submit", {cancelable: true, bubbles: true}));
+  await waitFor("流式回答出现引用", () => document.querySelectorAll("#chat-messages .message.assistant .citation").length > 0);
+  const answer = text("#chat-messages .message.assistant .answer-text") || "";
+  expectMatch("回答含引用标记", answer, /资料1/);
+  const citations = Array.from(document.querySelectorAll("#chat-messages .message.assistant .citation")).map((node) => node.textContent.replace(/\s+/g, " ").trim());
+  if (!citations.length) failures.push("没有渲染结构化引用");
+  const badges = Array.from(document.querySelectorAll("#chat-messages .message.assistant [data-ttft]")).map((node) => node.textContent);
+  if (!badges.length) failures.push("没有显示首字耗时标记");
+  const drafts = document.querySelectorAll("#chat-messages .message.assistant.retracted").length;
+  expect("草稿未被撤回", drafts, 0);
+  // Open the cited page: the citation must land on the original text.
+  document.querySelector("#chat-messages .citation").click();
+  await waitFor("原文页打开", () => {
+    const dialog = document.querySelector("#page-dialog");
+    return dialog && dialog.open;
+  });
+  const pageText = text("#page-dialog-text") || "";
+  expectMatch("原文页正文", pageText, /\S/);
+  notes.push(`citations=${citations.length}`);
+  notes.push(`ttft=${badges[0] || ""}`);
+  document.querySelector("#page-dialog .close-button")?.click();
+  document.querySelector("#chat-messages").scrollTop = document.querySelector("#chat-messages").scrollHeight;
+  return {failures, notes, citations};
+"""
+
+BODY_CHAT_RETRACT = r"""
+  const before = document.querySelectorAll("#chat-messages .message.assistant:not(.retracted) .answer-text").length;
+  const input = document.querySelector("#chat-input");
+  input.value = "拒答校验：请复述张某的批复结论";
+  document.querySelector("#chat-form").dispatchEvent(new Event("submit", {cancelable: true, bubbles: true}));
+  await waitFor("草稿被撤回", () => document.querySelectorAll("#chat-messages .message.assistant.retracted").length > 0);
+  const retracted = document.querySelector("#chat-messages .message.assistant.retracted");
+  expectMatch("撤回提示", retracted ? retracted.textContent : "", /已撤回/);
+  await sleep(800);
+  const after = document.querySelectorAll("#chat-messages .message.assistant:not(.retracted) .answer-text").length;
+  expect("撤回后没有新增正式回答", after, before);
+  document.querySelector("#chat-messages").scrollTop = document.querySelector("#chat-messages").scrollHeight;
+  return {failures, notes};
+"""
+
+BODY_CHAT_REPLAY = r"""
+  const call = async (requestId) => {
+    const response = await fetch(`/api/cases/${window.__demoCaseId}/chat/stream`, {
+      method: "POST", credentials: "same-origin",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question: "账户流水与宣传金额是否一致？", user_name: "流程验证",
+                            use_llm: true, request_id: requestId}),
+    });
+    if (!response.ok) return {status: response.status, events: []};
+    const raw = await response.text();
+    return {status: response.status, events: raw.split("\n\n").filter(Boolean).map((frame) => {
+      const event = (frame.match(/^event: (.*)$/m) || [])[1];
+      const data = (frame.match(/^data: (.*)$/m) || [])[1];
+      return {event, data: data ? JSON.parse(data) : null};
+    })};
+  };
+  const requestId = "flow-" + Date.now().toString(36) + "-retry";
+  const first = await call(requestId);
+  const second = await call(requestId);
+  const firstDone = first.events.find((item) => item.event === "done");
+  const secondStatus = second.events.find((item) => item.event === "status");
+  const secondDone = second.events.find((item) => item.event === "done");
+  if (!firstDone || firstDone.data.status !== "ok") failures.push("首次流式未成功结束");
+  if (!secondStatus || secondStatus.data.phase !== "replayed") failures.push("重试未回放已完成结果");
+  if (!secondDone || secondDone.data.replayed !== true) failures.push("重试 done 未标记 replayed");
+  if (secondDone && firstDone && secondDone.data.message_id !== firstDone.data.message_id) {
+    failures.push("重试返回了不同的消息标识");
+  }
+  const kinds = first.events.map((item) => item.event).join(",");
+  expectMatch("首次事件序列", kinds, /status.*citations.*final.*done/);
+  return {failures, notes: [kinds]};
+"""
+
+BODY_CHAT_DB_STATE = r"""
+  const history = await (await fetch(`/api/cases/${window.__demoCaseId}/conversations`)).json();
+  if (!history.length) failures.push("没有会话记录");
+  const baseline = new Set(window.__conversationBaseline || []);
+  let total = 0;
+  const roles = [];
+  for (const conversation of history.filter((item) => !baseline.has(item.id))) {
+    const messages = await (await fetch(`/api/conversations/${conversation.id}/messages`)).json();
+    total += messages.length;
+    roles.push(messages.map((item) => item.role).join(","));
+  }
+  // Exactly one turn from the UI stream and one from the replayed retry; the
+  // rejected answer must not have left a half-written turn behind.
+  if (total !== 4) failures.push(`消息总数应为 4（两次成功轮次），实际 ${total}`);
+  if (!roles.every((value) => value === "user,assistant")) failures.push(`会话角色序列异常：${roles.join(" | ")}`);
+  return {failures, notes: [String(total), roles.join(" | ")]};
+"""
+
+FLOWS = ("metrics", "chat")
 
 
 def main() -> int:
@@ -269,11 +370,24 @@ def main() -> int:
     steps: list[dict[str, Any]] = []
     session = None
     process = None
+    stub = None
     try:
         print(f"[1/4] 准备隔离数据目录 {data_dir}")
         _seed_demo(data_dir)
-        _seed_usage(data_dir, 1)
         print(f"[2/4] 启动应用服务 {base_url}")
+        if args.flow in ("chat", "all"):
+            from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, StubModel
+
+            stub = StubModel().__enter__()
+            environment.update({
+                "LAW_REVIEW_LLM_URL": stub.base_url,
+                "LAW_REVIEW_LLM_MODEL": CHAT_MODEL,
+                "LAW_REVIEW_EMBEDDING_URL": stub.base_url,
+                "LAW_REVIEW_EMBEDDING_MODEL": EMBEDDING_MODEL,
+            })
+            print(f"      模型测试替身：{stub.base_url}（固定答案，不是真实模型）")
+        else:
+            _seed_usage(data_dir, 1)
         with log_path.open("wb") as log:
             process = subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)],
@@ -284,23 +398,34 @@ def main() -> int:
             if not cases:
                 raise RuntimeError("the seeded demo case is missing")
             demo_id = int(cases[0]["id"])
-            usage = _api_json(base_url, f"/api/cases/{demo_id}/platform-metrics")["llm_usage"]
-            if usage["calls"] != 3:
-                raise RuntimeError(f"unexpected seeded usage: {usage}")
+            if args.flow == "metrics":
+                usage = _api_json(base_url, f"/api/cases/{demo_id}/platform-metrics")["llm_usage"]
+                if usage["calls"] != 3:
+                    raise RuntimeError(f"unexpected seeded usage: {usage}")
             print(f"[3/4] 启动真实浏览器（{Path(browser).name}）执行 {args.flow} 流程")
             with BrowserSession(base_url + "/", browser=browser) as opened:
                 session = opened
                 session.wait_until("document.readyState === 'complete'")
                 session.evaluate(f"window.__demoCaseId = {demo_id}; window.__emptyCaseId = null;")
-                steps.append(_run_step(session, "00-open", _script(BODY_OPEN_METRICS), output_dir, False))
-                steps.append(_run_step(session, "01-partial", _script(BODY_PARTIAL), output_dir, True))
-                steps.append(_run_step(session, "02-empty", _script(BODY_EMPTY_CASE), output_dir, True))
-                steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True))
-                steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True))
-                steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True))
+                if args.flow in ("metrics", "all"):
+                    steps.append(_run_step(session, "00-open", _script(BODY_OPEN_METRICS), output_dir, False))
+                    steps.append(_run_step(session, "01-partial", _script(BODY_PARTIAL), output_dir, True, "#usage-panel"))
+                    steps.append(_run_step(session, "02-empty", _script(BODY_EMPTY_CASE), output_dir, True, "#usage-panel"))
+                    steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True, "#usage-panel"))
+                    steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True, "#usage-panel"))
+                    steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True, "#usage-panel"))
+                if args.flow in ("chat", "all"):
+                    baseline = [int(item["id"]) for item in _api_json(base_url, f"/api/cases/{demo_id}/conversations")]
+                    session.evaluate(f"window.__conversationBaseline = {json.dumps(baseline)};")
+                    steps.append(_run_step(session, "chat-01-answer", _script(BODY_CHAT_OPEN), output_dir, True, ".chat-panel"))
+                    steps.append(_run_step(session, "chat-02-retract", _script(BODY_CHAT_RETRACT), output_dir, True, ".chat-panel"))
+                    steps.append(_run_step(session, "chat-03-replay", _script(BODY_CHAT_REPLAY), output_dir, False))
+                    steps.append(_run_step(session, "chat-04-state", _script(BODY_CHAT_DB_STATE), output_dir, False))
     finally:
         if session is not None:
             session.close()
+        if stub is not None:
+            stub.__exit__(None, None, None)
         if process is not None and process.poll() is None:
             process.terminate()
             try:
@@ -312,6 +437,7 @@ def main() -> int:
     report = {
         "ok": not failures,
         "flow": args.flow,
+        "model": "stub" if args.flow in ("chat", "all") else "not used",
         "base_url": base_url,
         "browser": browser,
         "source_head": _source_head(),

@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -834,6 +834,31 @@ CREATE INDEX IF NOT EXISTS idx_llm_calls_run ON llm_calls(run_id);
 """)
 
 
+def _migrate_v20(conn: sqlite3.Connection) -> None:
+    """Idempotent chat submission.
+
+    A client that disconnects mid-answer cannot tell whether the turn was
+    written, so the retry needs a durable answer: this table records one row per
+    client-generated ``request_id`` and is committed in the same transaction as
+    the messages it describes. The key is per case, so a request id reused in
+    another case cannot replay foreign content.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS chat_requests (
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    request_id TEXT NOT NULL,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    status TEXT NOT NULL CHECK(status IN ('in_progress','committed','failed','cancelled')),
+    result_json TEXT,
+    message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(case_id, request_id)
+);
+CREATE INDEX IF NOT EXISTS idx_chat_requests_status ON chat_requests(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_chat_requests_updated ON chat_requests(updated_at);
+""")
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -856,7 +881,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19,
+            _migrate_v18, _migrate_v19, _migrate_v20,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

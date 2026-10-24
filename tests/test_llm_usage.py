@@ -54,7 +54,9 @@ class AccountingTests(unittest.TestCase):
         ) as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             columns = {row[1] for row in conn.execute("PRAGMA table_info(llm_calls)")}
-        self.assertEqual(version, 19)
+        # The latest migration number is asserted on purpose: a schema bump must
+        # update this test rather than silently passing on an old database.
+        self.assertEqual(version, 20)
         self.assertTrue({"case_id", "run_id", "input_tokens", "ttft_ms", "kind"} <= columns)
 
     def test_unknown_usage_keeps_average_unknown(self):

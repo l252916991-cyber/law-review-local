@@ -41,6 +41,7 @@ from .context import (
     object_note,
     prepare_memory_clues,
     record_turn,
+    record_turn_with_id,
     render_history,
     resolve_question,
     unsupported_clause_topic,
@@ -968,6 +969,11 @@ _last_llm_provenance: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_l
 _last_llm_usage: ContextVar[dict[str, Any] | None] = ContextVar("lexvault_last_llm_usage", default=None)
 
 
+def last_llm_usage() -> dict[str, Any] | None:
+    """The most recent model call observation in this context, if any."""
+    return _last_llm_usage.get()
+
+
 def _account_llm_call(
     case_id: int,
     kind: str,
@@ -1029,6 +1035,15 @@ def fallback_answer(question: str, route: str, contexts: list[dict[str, Any]], s
     return prefix + "\n".join(lines)
 
 
+def _request_payload(result: dict[str, Any]) -> Callable[[int, int | None], dict[str, Any]]:
+    """Replay payload factory: the commit adds the ids it has just generated."""
+
+    def build(conversation_id: int, message_id: int | None) -> dict[str, Any]:
+        return {**result, "conversation_id": conversation_id, "message_id": message_id}
+
+    return build
+
+
 def chat(
     case_id: int,
     question: str,
@@ -1037,10 +1052,26 @@ def chat(
     use_llm: bool,
     use_remote_embeddings: bool = True,
     on_token: Callable[[str], None] | None = None,
+    on_phase: Callable[[str], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    request_key: tuple[int, str] | None = None,
 ) -> dict[str, Any]:
     # Local import avoids the services -> agents -> services import cycle.
     from .agents import failure_diagnostic, validate_review_answer
 
+    def phase(name: str) -> None:
+        if on_phase is not None:
+            on_phase(name)
+
+    def check_cancelled() -> None:
+        if should_cancel is not None and should_cancel():
+            from .chat_idempotency import ChatCancelled
+
+            raise ChatCancelled("客户端已断开，停止本轮后续处理")
+
+    # Per-turn observation: a request context reused by the test client (or a
+    # worker context copied from it) must not report the previous turn's usage.
+    _last_llm_usage.set(None)
     question = question.strip()
     if not question:
         raise ValueError("问题不能为空")
@@ -1074,12 +1105,7 @@ def chat(
             "resolution": resolution_meta,
             "clarification": clarification,
         }
-        conversation_id = record_turn(
-            case_id, conversation_id, question=question, answer=answer, citations=[],
-            route="需要澄清", provenance=provenance, user_name=user_name or "本机律师",
-            kind="clarification", audit=audit,
-        )
-        return {
+        result = {
             "conversation_id": conversation_id,
             "answer": answer,
             "answer_status": "clarification",
@@ -1097,6 +1123,16 @@ def chat(
             "retrieval_metrics": {"retrieval_mode": "not_started", "source_count": 0},
             "context": context_meta,
         }
+        turn = record_turn_with_id(
+            case_id, conversation_id, question=question, answer=answer, citations=[],
+            route="需要澄清", provenance=provenance, user_name=user_name or "本机律师",
+            kind="clarification", audit=audit, should_cancel=should_cancel,
+            request_key=request_key,
+            request_result=_request_payload(result) if request_key is not None else None,
+        )
+        result["conversation_id"] = turn.conversation_id
+        result["message_id"] = turn.message_id
+        return result
 
     route = detect_route(resolution.retrieval_query)
     fallback_reason, diagnostic, rejected_validation = None, None, None
@@ -1149,13 +1185,8 @@ def chat(
                 "resolution": resolution_meta,
                 "clarification": insufficient,
             }
-            conversation_id = record_turn(
-                case_id, conversation_id, question=question, answer=answer, citations=[],
-                route="资料不足", provenance=provenance, user_name=user_name or "本机律师",
-                kind="insufficient_evidence", audit=audit,
-            )
             context_meta["history"] = history.as_dict(used=False)
-            return {
+            result = {
                 "conversation_id": conversation_id,
                 "answer": answer,
                 "answer_status": "insufficient_evidence",
@@ -1173,6 +1204,16 @@ def chat(
                 "retrieval_metrics": retrieval_metrics,
                 "context": context_meta,
             }
+            turn = record_turn_with_id(
+                case_id, conversation_id, question=question, answer=answer, citations=[],
+                route="资料不足", provenance=provenance, user_name=user_name or "本机律师",
+                kind="insufficient_evidence", audit=audit, should_cancel=should_cancel,
+                request_key=request_key,
+                request_result=_request_payload(result) if request_key is not None else None,
+            )
+            result["conversation_id"] = turn.conversation_id
+            result["message_id"] = turn.message_id
+            return result
         note = object_note(resolution, documents_by_id)
         scope_label = "、".join(
             f"《{documents_by_id[document_id]['name']}》"
@@ -1185,6 +1226,10 @@ def chat(
                 require_history=bool(history_text),
             )
             context_meta["memory"] = memory_clues["meta"]
+            # A disconnect noticed before the model call saves the compute; the
+            # call already in flight is never interrupted, only the commit is.
+            check_cancelled()
+            phase("generating")
             llm_started = time.perf_counter()
             tool_loop_used = False
             try:
@@ -1219,6 +1264,7 @@ def chat(
                         question, route, contexts, history=history_text,
                         memory=memory_clues["text"], object_note=note, on_token=on_token,
                     )
+                phase("validating")
                 candidate_validation = validate_review_answer(answer, contexts)
                 route_note = None
                 if not candidate_validation["valid"]:
@@ -1305,18 +1351,7 @@ def chat(
         }
         for i, item in enumerate(contexts[:6], 1)
     ]
-    conversation_id = record_turn(
-        case_id,
-        conversation_id,
-        question=question,
-        answer=answer,
-        citations=citations,
-        route=route,
-        provenance=provenance,
-        user_name=user_name or "本机律师",
-        audit=audit,
-    )
-    return {
+    result = {
         "conversation_id": conversation_id,
         "answer": answer,
         "answer_status": answer_status,
@@ -1334,6 +1369,23 @@ def chat(
         "retrieval_metrics": retrieval_metrics,
         "context": context_meta,
     }
+    turn = record_turn_with_id(
+        case_id,
+        conversation_id,
+        question=question,
+        answer=answer,
+        citations=citations,
+        route=route,
+        provenance=provenance,
+        user_name=user_name or "本机律师",
+        audit=audit,
+        should_cancel=should_cancel,
+        request_key=request_key,
+        request_result=_request_payload(result) if request_key is not None else None,
+    )
+    result["conversation_id"] = turn.conversation_id
+    result["message_id"] = turn.message_id
+    return result
 
 
 MAX_GAP_ANALYSIS_PAGES = 2000

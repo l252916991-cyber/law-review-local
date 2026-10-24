@@ -14,8 +14,9 @@ import logging
 import os
 import re
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Callable
 
+from .chat_idempotency import ChatCancelled, commit as commit_request
 from .db import connect, now, transaction
 
 logger = logging.getLogger(__name__)
@@ -444,6 +445,14 @@ def _title(question: str, limit: int = 30) -> str:
     return text[:limit]
 
 
+@dataclass(frozen=True)
+class TurnRecord:
+    """Identifiers of the committed turn; ``message_id`` stays ``None`` for replays."""
+
+    conversation_id: int
+    message_id: int | None = None
+
+
 def record_turn(
     case_id: int,
     conversation_id: int | None,
@@ -457,17 +466,53 @@ def record_turn(
     kind: str = "answer",
     source_run_id: int | None = None,
     audit: tuple[str, str] | None = None,
+    request_key: tuple[int, str] | None = None,
+    request_result: Callable[[int, int | None], dict[str, Any]] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> int:
+    """Write one turn and return its conversation id (historical contract)."""
+    return record_turn_with_id(
+        case_id, conversation_id, question=question, answer=answer, citations=citations,
+        route=route, provenance=provenance, user_name=user_name, kind=kind,
+        source_run_id=source_run_id, audit=audit, request_key=request_key,
+        request_result=request_result, should_cancel=should_cancel,
+    ).conversation_id
+
+
+def record_turn_with_id(
+    case_id: int,
+    conversation_id: int | None,
+    *,
+    question: str,
+    answer: str,
+    citations: list[dict[str, Any]],
+    route: str,
+    provenance: dict[str, Any],
+    user_name: str,
+    kind: str = "answer",
+    source_run_id: int | None = None,
+    audit: tuple[str, str] | None = None,
+    request_key: tuple[int, str] | None = None,
+    request_result: Callable[[int, int | None], dict[str, Any]] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> TurnRecord:
     """Write one question/answer turn once, re-checking access at commit time.
 
     ``source_run_id`` makes Agent turns idempotent: a resumed or retried run
-    cannot append the same answer twice.
+    cannot append the same answer twice. ``request_key`` extends that guarantee
+    to a client-supplied request id for the streaming chat path: the idempotency
+    row is updated in this same transaction, so a retry either replays the whole
+    turn or starts from nothing. ``should_cancel`` is consulted before the
+    transaction opens; a disconnect that lands after this point loses the race
+    on purpose (the commit wins and the retry replays).
     """
     if kind not in TURN_KINDS:
         raise ValueError(f"未知的轮次类型：{kind}")
     stripped_question = question.strip()
     if not stripped_question:
         raise ValueError("问题不能为空")
+    if should_cancel is not None and should_cancel():
+        raise ChatCancelled("客户端已断开，未写入本轮问答")
     ts = now()
     with transaction() as conn:
         if conversation_id is not None:
@@ -485,16 +530,16 @@ def record_turn(
             ).lastrowid
         if source_run_id is not None:
             existing = conn.execute(
-                "SELECT conversation_id FROM messages WHERE source_run_id=?", (source_run_id,)
+                "SELECT id, conversation_id FROM messages WHERE source_run_id=?", (source_run_id,)
             ).fetchone()
             if existing is not None:
-                return int(existing["conversation_id"])
+                return TurnRecord(int(existing["conversation_id"]), int(existing["id"]))
         conn.execute(
             """INSERT INTO messages(conversation_id, role, content, citations_json, route, kind, created_at)
                VALUES (?, 'user', ?, '[]', ?, 'answer', ?)""",
             (conversation_id, stripped_question, route, ts),
         )
-        conn.execute(
+        answer_cursor = conn.execute(
             """INSERT INTO messages(conversation_id, role, content, citations_json, route, provenance_json,
                                     kind, source_run_id, created_at)
                VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?)""",
@@ -515,7 +560,14 @@ def record_turn(
                 "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, ?, ?, ?)",
                 (case_id, action, detail, ts),
             )
-    return int(conversation_id)
+        message_id = int(answer_cursor.lastrowid) if answer_cursor.lastrowid else None
+        if request_key is not None and request_result is not None:
+            commit_request(
+                conn, int(request_key[0]), str(request_key[1]),
+                conversation_id=int(conversation_id), message_id=message_id,
+                result=request_result(int(conversation_id), message_id),
+            )
+    return TurnRecord(int(conversation_id), message_id)
 
 
 # ---------------------------------------------------------------------------

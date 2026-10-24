@@ -39,6 +39,17 @@ from .db import (
     transaction,
 )
 from .logger import request_id as logger_request_id
+from .llm_usage import token_counts
+from .chat_idempotency import (
+    CANCELLED as CHAT_REQUEST_CANCELLED,
+    COMMITTED as CHAT_REQUEST_COMMITTED,
+    FAILED as CHAT_REQUEST_FAILED,
+    REQUEST_ID_PATTERN,
+    ChatCancelled,
+    RequestInProgress,
+    begin as begin_chat_request,
+    finish as finish_chat_request,
+)
 from .context import (
     agent_clarification_result,
     prepare_turn,
@@ -374,6 +385,9 @@ class ChatRequest(BaseModel):
     conversation_id: int | None = None
     use_llm: bool = True
     use_remote_embeddings: bool = True
+    # Optional idempotency key. The desktop client reuses one key for its
+    # automatic retry so a disconnect cannot produce a duplicate turn.
+    request_id: str | None = Field(default=None, pattern=REQUEST_ID_PATTERN)
 
 
 class ReadonlyToolCall(BaseModel):
@@ -1370,18 +1384,47 @@ def conversation_messages(conversation_id: int):
         conn.close()
 
 
+def _mark_chat_request(case_id: int, request_id: str, status: str) -> None:
+    """Best-effort bookkeeping; never mask the real error with a marker failure."""
+    try:
+        finish_chat_request(case_id, request_id, status)
+    except Exception:  # pragma: no cover - the original exception matters more
+        access_logger.exception("Could not mark the chat request as %s", status)
+
+
+def _replay_chat_result(began: Any) -> dict[str, Any]:
+    stored = dict(began.result or {})
+    stored["request_id_replayed"] = True
+    return stored
+
+
 @app.post("/api/cases/{case_id}/chat")
 def case_chat(case_id: int, payload: ChatRequest):
     require_case(case_id)
+    request_id = payload.request_id
     try:
-        return chat(
-            case_id,
-            payload.question,
-            actor_name(payload.user_name),
-            payload.conversation_id,
-            payload.use_llm,
-            payload.use_remote_embeddings,
-        )
+        if request_id is not None:
+            began = begin_chat_request(case_id, request_id)
+            if began.state == CHAT_REQUEST_COMMITTED:
+                # A retry after a lost response returns the stored turn: the
+                # client gets its answer and the database keeps one message pair.
+                return _replay_chat_result(began)
+        try:
+            return chat(
+                case_id,
+                payload.question,
+                actor_name(payload.user_name),
+                payload.conversation_id,
+                payload.use_llm,
+                payload.use_remote_embeddings,
+                request_key=(case_id, request_id) if request_id is not None else None,
+            )
+        except Exception:
+            if request_id is not None:
+                _mark_chat_request(case_id, request_id, CHAT_REQUEST_FAILED)
+            raise
+    except RequestInProgress as exc:
+        raise HTTPException(409, "同一请求正在处理，请勿重复提交") from exc
     except ArchivedConversationError as exc:
         raise HTTPException(409, str(exc)) from exc
     except ConversationNotFoundError as exc:
@@ -1396,22 +1439,133 @@ def _sse_frame(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _stream_usage_payload() -> dict[str, Any] | None:
+    """Usage actually reported for this turn; unknown stays ``None``."""
+    from .services import last_llm_usage
+
+    observed = last_llm_usage() or {}
+    input_tokens, output_tokens = token_counts(observed.get("usage"))
+    if input_tokens is None and output_tokens is None:
+        return None
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "model": observed.get("model") or None,
+    }
+
+
+def _stream_done(result: dict[str, Any], *, ttft_ms: int | None, request_id: str | None,
+                 message_id: int | None) -> dict[str, Any]:
+    """Terminal success frame. Chat turns have no ``run_id``; never invent one."""
+    return {
+        "status": "ok",
+        "conversation_id": result.get("conversation_id"),
+        "message_id": message_id,
+        "answer_status": result.get("answer_status"),
+        "citation_check": result.get("citation_check"),
+        "llm_used": bool(result.get("llm_used")),
+        "ttft_ms": ttft_ms,
+        "usage": _stream_usage_payload(),
+        "request_id": request_id,
+    }
+
+
+def _stream_failure(code: str, message: str, *, ttft_ms: int | None,
+                    request_id: str | None) -> list[tuple[str, dict[str, Any]]]:
+    return [
+        ("retract", {"code": code, "message": message}),
+        ("done", {
+            "status": "failed",
+            "code": code,
+            "retracted": True,
+            "conversation_id": None,
+            "message_id": None,
+            "ttft_ms": ttft_ms,
+            "usage": None,
+            "request_id": request_id,
+        }),
+    ]
+
+
+def _replay_frames(result: dict[str, Any], *, request_id: str, message_id: int | None) -> Any:
+    """Re-emit a committed turn. Per-turn TTFT/usage are not re-invented."""
+    citations = list(result.get("citations") or [])
+    yield _sse_frame("status", {"phase": "replayed", "request_id": request_id})
+    yield _sse_frame("citations", {"citations": citations, "count": len(citations)})
+    yield _sse_frame("final", result)
+    yield _sse_frame("done", {
+        "status": "ok",
+        "replayed": True,
+        "conversation_id": result.get("conversation_id"),
+        "message_id": message_id,
+        "answer_status": result.get("answer_status"),
+        "citation_check": result.get("citation_check"),
+        "llm_used": bool(result.get("llm_used")),
+        "ttft_ms": None,
+        "usage": None,
+        "request_id": request_id,
+    })
+
+
 @app.post("/api/cases/{case_id}/chat/stream")
 async def case_chat_stream(case_id: int, payload: ChatRequest, request: Request):
     """Token stream for one turn; the answer contract still validates in full.
 
+    Event contract (A01.1):
+
+    ``status``    ``phase`` = retrieval / generating / validating / replayed
+    ``token``     provisional draft text (``provisional: true``); never a fact
+    ``citations`` structured citations, emitted only after the contract passed
+    ``final``     the complete answer payload; kept for older desktop builds
+    ``retract``   failure terminal: discard the draft, nothing was committed
+    ``done``      always last; ``status`` ok|failed, ids, ``ttft_ms``, ``usage``
+
     Tokens are provisional: they reach the browser before ``validate_review_answer``
-    has run. A failed contract therefore emits ``retract`` and the client must
-    discard what it rendered. Streaming must never be a way to publish an answer
-    that the non-streaming path would have rejected.
+    has run. Streaming must never publish an answer that the non-streaming path
+    would have rejected. A disconnect stops further business writes (the worker
+    checks a cancel flag at the commit boundary); if the commit already happened,
+    a retry with the same ``request_id`` replays the stored turn instead of
+    appending a second one.
     """
     require_case(case_id)
+    request_id = payload.request_id
+    headers = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
+    if request_id is not None:
+        try:
+            began = begin_chat_request(case_id, request_id)
+        except RequestInProgress as exc:
+            raise HTTPException(409, "同一请求正在处理，请勿重复提交") from exc
+        if began.state == CHAT_REQUEST_COMMITTED and began.result is not None:
+            return StreamingResponse(
+                _replay_frames(began.result, request_id=request_id,
+                               message_id=began.result.get("message_id") or began.message_id),
+                media_type="text/event-stream", headers=headers,
+            )
+
     events: "queue.Queue[tuple[str, Any]]" = queue.Queue()
+    cancelled = threading.Event()
+    timing: dict[str, int | None] = {"ttft_ms": None}
 
     def emit(kind: str, data: Any) -> None:
         events.put((kind, data))
 
     def worker() -> None:
+        started = time.perf_counter()
+
+        def on_token(text: str) -> None:
+            if timing["ttft_ms"] is None:
+                timing["ttft_ms"] = int((time.perf_counter() - started) * 1000)
+            emit("token", {"text": text, "provisional": True})
+
+        def on_phase(name: str) -> None:
+            emit("status", {"phase": name})
+
+        def fail(code: str, message: str) -> None:
+            if request_id is not None:
+                _mark_chat_request(case_id, request_id, CHAT_REQUEST_FAILED)
+            for kind, data in _stream_failure(code, message, ttft_ms=timing["ttft_ms"], request_id=request_id):
+                emit(kind, data)
+
         try:
             result = chat(
                 case_id,
@@ -1420,23 +1574,42 @@ async def case_chat_stream(case_id: int, payload: ChatRequest, request: Request)
                 payload.conversation_id,
                 payload.use_llm,
                 payload.use_remote_embeddings,
-                on_token=lambda text: emit("token", {"text": text, "provisional": True}),
+                on_token=on_token,
+                on_phase=on_phase,
+                should_cancel=cancelled.is_set,
+                request_key=(case_id, request_id) if request_id is not None else None,
             )
-            emit("final", result)
+        except ChatCancelled:
+            # The disconnect won the race: no messages were written, so the id
+            # is released for a clean retry. Model usage already recorded stays.
+            if request_id is not None:
+                _mark_chat_request(case_id, request_id, CHAT_REQUEST_CANCELLED)
+            emit("done", {"status": "cancelled", "request_id": request_id})
+            return
         except ArchivedConversationError as exc:
-            emit("retract", {"code": "archived_conversation", "message": str(exc)})
+            fail("archived_conversation", str(exc))
+            return
         except ConversationNotFoundError as exc:
-            emit("retract", {"code": "conversation_not_found", "message": str(exc)})
+            fail("conversation_not_found", str(exc))
+            return
         except ValueError as exc:
-            emit("retract", {"code": "invalid_request", "message": str(exc)})
+            fail("invalid_request", str(exc))
+            return
         except RuntimeError:
             access_logger.warning("Streaming chat failed")
-            emit("retract", {"code": "model_error", "message": "模型调用失败，已撤回未校验草稿"})
+            fail("model_error", "模型调用失败，已撤回未校验草稿")
+            return
         except Exception:
             access_logger.exception("Streaming chat crashed")
-            emit("retract", {"code": "internal_error", "message": "问答失败，请查看服务端诊断事件"})
-        finally:
-            emit("done", {})
+            fail("internal_error", "问答失败，请查看服务端诊断事件")
+            return
+        citations = list(result.get("citations") or [])
+        emit("citations", {"citations": citations, "count": len(citations)})
+        emit("final", result)
+        emit("done", _stream_done(
+            result, ttft_ms=timing["ttft_ms"], request_id=request_id,
+            message_id=result.get("message_id"),
+        ))
 
     # A worker thread starts with an empty context. Copy the request context so
     # the scoped database path, the authenticated principal and the request id
@@ -1448,25 +1621,26 @@ async def case_chat_stream(case_id: int, payload: ChatRequest, request: Request)
     async def generator():
         # One status frame before the first token: the client can show progress
         # instead of an empty bubble while retrieval runs.
-        yield _sse_frame("status", {"phase": "retrieval"})
-        while True:
-            if await request.is_disconnected():
-                return
-            try:
-                kind, data = await asyncio.to_thread(events.get, True, 15)
-            except queue.Empty:
-                # Comment frames keep intermediaries from closing an idle stream.
-                yield ": keepalive\n\n"
-                continue
-            if kind == "done":
-                return
-            yield _sse_frame(kind, data if isinstance(data, dict) else {"value": data})
+        try:
+            yield _sse_frame("status", {"phase": "retrieval"})
+            while True:
+                if await request.is_disconnected():
+                    return
+                try:
+                    kind, data = await asyncio.to_thread(events.get, True, 15)
+                except queue.Empty:
+                    # Comment frames keep intermediaries from closing an idle stream.
+                    yield ": keepalive\n\n"
+                    continue
+                yield _sse_frame(kind, data if isinstance(data, dict) else {"value": data})
+                if kind == "done":
+                    return
+        finally:
+            # Runs on normal completion too; the worker is already past its
+            # commit boundary there, so the flag is only consulted on the way out.
+            cancelled.set()
 
-    return StreamingResponse(
-        generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
-    )
+    return StreamingResponse(generator(), media_type="text/event-stream", headers=headers)
 
 
 class AgentChatRequest(BaseModel):
