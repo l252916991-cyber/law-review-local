@@ -18,7 +18,11 @@ ROOT_FILES = (
     "rag_project_benchmark.py", "BENCHMARK_TEST_PLAN.md",
 )
 EXACT_FIXTURES = (
+    "frontend/package.json", "frontend/pnpm-lock.yaml", "frontend/pnpm-workspace.yaml",
+    "frontend/.node-version", "frontend/.npmrc", "frontend/tsconfig.json",
+    "frontend/next-env.d.ts", "frontend/next.config.ts", "frontend/eslint.config.mjs",
     "benchmarks/fewshot/2-2_sft_pool.jsonl",
+    "benchmarks/answer_eval/v1/demo-case.json",
     # Frozen experiment configuration (non-sensitive test fixture input);
     # tests/test_statutory_experiment.py fails closed without it. Restored
     # 2026-10-21 from the public origin repository, see docs/migration/ledger.md.
@@ -33,6 +37,9 @@ EXACT_FIXTURES = (
     "vendor/forgeharness-runtime-requirements.txt",
 )
 TREE_TYPES = {
+    "frontend/src": {".ts", ".tsx", ".css", ".svg"},
+    "frontend/scripts": {".mjs"},
+    "frontend/tests": {".ts"},
     "app": {".py", ".html", ".js", ".css", ".svg"},
     "tests": {".py"},
     "scripts": {".py", ".json"},

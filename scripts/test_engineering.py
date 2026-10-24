@@ -49,6 +49,19 @@ class EngineeringToolTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "symbolic link"):
                 source_files(root)
 
+    def test_frontend_release_excludes_dependencies_builds_and_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = {"frontend/package.json", "frontend/pnpm-lock.yaml", "frontend/src/app/page.tsx",
+                        "frontend/scripts/contract.mjs", "frontend/tests/stream.test.ts"}
+            excluded = {"frontend/.env.local", "frontend/node_modules/private.js", "frontend/.next/server.js",
+                        "frontend/test-results/case.json", "frontend/src/private.json"}
+            for name in expected | excluded:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("synthetic fixture", encoding="utf-8")
+            self.assertEqual({str(p.relative_to(root)) for p in source_files(root)}, expected)
+
     def test_lawbench_requires_explicit_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -67,6 +80,7 @@ class EngineeringToolTests(unittest.TestCase):
             with zipfile.ZipFile(output) as archive:
                 names = set(archive.namelist())
                 self.assertTrue({"Dockerfile", "docker-compose.yml", ".dockerignore", "run.sh",
+                                 "benchmarks/answer_eval/v1/demo-case.json",
                                  "benchmarks/fewshot/2-2_sft_pool.jsonl"} <= names)
                 self.assertFalse(any(name.startswith(("data/", "output/", "models/", "benchmarks/lawbench/"))
                                      for name in names))
