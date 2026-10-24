@@ -38,6 +38,7 @@ from .db import (
 from .logger import request_id as logger_request_id
 from .services import (
     ArchivedConversationError,
+    ConversationNotFoundError,
     assert_model_endpoint_allowed,
     auto_analyze_case,
     build_export,
@@ -1374,6 +1375,8 @@ def case_chat(case_id: int, payload: ChatRequest):
         )
     except ArchivedConversationError as exc:
         raise HTTPException(409, str(exc)) from exc
+    except ConversationNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except RuntimeError as exc:

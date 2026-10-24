@@ -28,12 +28,16 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
+from .context import (
+    ArchivedConversationError,
+    ConversationNotFoundError,
+    context_policy,
+    load_history,
+    record_turn,
+    validate_conversation,
+)
 from .forge_governance import governed_backend
 from .bank_transactions import PARSER_VERSION, parse_csv, parse_spreadsheet
-
-
-class ArchivedConversationError(ValueError):
-    """Raised when a read-only archived conversation is used for new chat."""
 
 
 LOCAL_LLM_URL = LLMConfig.from_env().base_url
@@ -807,6 +811,13 @@ def chat(
     question = question.strip()
     if not question:
         raise ValueError("问题不能为空")
+    # An explicitly supplied conversation must be validated before history,
+    # retrieval or a model call: unknown, cross-case and archived sessions are
+    # rejected instead of silently becoming a new conversation.
+    policy = context_policy()
+    if conversation_id is not None:
+        validate_conversation(case_id, conversation_id)
+    history = load_history(case_id, conversation_id, policy=policy)
     route = detect_route(question)
     fallback_reason, diagnostic, rejected_validation = None, None, None
     if route == "目录统计":
@@ -870,33 +881,17 @@ def chat(
         }
         for i, item in enumerate(contexts[:6], 1)
     ]
-    ts = now()
-    with transaction() as conn:
-        if conversation_id:
-            valid = conn.execute(
-                "SELECT id, archived_at FROM conversations WHERE id = ? AND case_id = ?", (conversation_id, case_id)
-            ).fetchone()
-            if not valid:
-                conversation_id = None
-            elif valid["archived_at"] is not None:
-                raise ArchivedConversationError("该会话已归档，只能查看历史记录；如需继续提问，请新建会话")
-        if not conversation_id:
-            conversation_id = conn.execute(
-                "INSERT INTO conversations(case_id, user_name, title, created_at) VALUES (?, ?, ?, ?)",
-                (case_id, user_name or "本机律师", concise(question, 30), ts),
-            ).lastrowid
-        conn.execute(
-            "INSERT INTO messages(conversation_id, role, content, citations_json, route, created_at) VALUES (?, 'user', ?, '[]', ?, ?)",
-            (conversation_id, question, route, ts),
-        )
-        conn.execute(
-            "INSERT INTO messages(conversation_id, role, content, citations_json, route, provenance_json, created_at) VALUES (?, 'assistant', ?, ?, ?, ?, ?)",
-            (conversation_id, answer, json.dumps(citations, ensure_ascii=False), route, json.dumps(provenance, ensure_ascii=False), ts),
-        )
-        conn.execute(
-            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, 'AI阅卷问答', ?, ?)",
-            (case_id, f"{user_name or '本机律师'}：{concise(question, 60)}", ts),
-        )
+    conversation_id = record_turn(
+        case_id,
+        conversation_id,
+        question=question,
+        answer=answer,
+        citations=citations,
+        route=route,
+        provenance=provenance,
+        user_name=user_name or "本机律师",
+        audit=("AI阅卷问答", f"{user_name or '本机律师'}：{concise(question, 60)}"),
+    )
     return {
         "conversation_id": conversation_id,
         "answer": answer,
@@ -911,6 +906,11 @@ def chat(
         "fallback_reason": fallback_reason,
         "failure_diagnostic": diagnostic,
         "retrieval_metrics": retrieval_metrics,
+        "context": {
+            "policy": policy.as_dict(),
+            "history": history.as_dict(),
+            "resolution": None,
+        },
     }
 
 

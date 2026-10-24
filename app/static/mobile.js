@@ -250,7 +250,17 @@
         state.conversationId = result.conversation_id; input.value = ""; $("#chat-title").textContent = question.slice(0, 30);
         const messages = await api(`/api/conversations/${result.conversation_id}/messages`);
         if (!visible(ctx) || seq !== state.chatEpoch) return; renderMessages(messages); $("#chat-error").textContent = ""; $("#main").scrollTop = $("#main").scrollHeight;
-      } catch (error) { if (visible(ctx) && seq === state.chatEpoch) $("#chat-error").textContent = `发送未确认：${error.message}。请检查会话历史后再决定重发。`; }
+      } catch (error) {
+        if (visible(ctx) && seq === state.chatEpoch) {
+          if ([404, 409].includes(error.status)) {
+            state.conversationId = null;
+            archived = false;
+            $("#chat-form button").disabled = !allowed("edit");
+            $("#new-chat").disabled = !allowed("edit");
+          }
+          $("#chat-error").textContent = `发送未确认：${error.message}。请检查会话历史后再决定重发。`;
+        }
+      }
       finally { busy = false; if (visible(ctx)) { button.disabled = !allowed("edit"); $("#new-chat").disabled = !allowed("edit"); $("#chat-history").disabled = false; } }
     });
     if (state.conversationId) await load(state.conversationId);

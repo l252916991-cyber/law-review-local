@@ -1002,7 +1002,16 @@ async function sendChat(event) {
     appendMessage("assistant", result.answer, result.route, result.citations, result.semantic_expansion, result.llm_used);
     $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
     state.conversations = await api(`/api/cases/${state.caseId}/conversations`); renderConversations();
-  } catch (error) { $("#typing-message")?.remove(); appendMessage("assistant", `处理失败：${error.message}`, "系统提示"); }
+  } catch (error) {
+    $("#typing-message")?.remove();
+    // An explicitly supplied conversation that is gone or archived must not be
+    // silently replaced: stop reusing it and show the server's explanation.
+    if ([404, 409].includes(error.status) && state.conversationId) {
+      state.conversationId = null;
+      renderConversations();
+    }
+    appendMessage("assistant", `处理失败：${error.message}`, "系统提示");
+  }
   finally { button.disabled = false; }
 }
 
