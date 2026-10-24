@@ -25,6 +25,8 @@
 
 执行证据见[实施记录](ai-application-upgrade-execution-20261024.md)。
 
+后续收尾范围、验收缺口和执行顺序见[下一步计划书](ai-application-upgrade-continuation-plan-20261024.md)。上表“完成”仅代表本计划所列实现范围，不等同于原始目标全部验收或真实模型验证通过。
+
 ## 2. 每包的验收口径
 
 | 包 | 通过条件 |
