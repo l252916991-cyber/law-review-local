@@ -44,7 +44,7 @@ class FakeCoordinator:
         self.principal = None
         self.start_value = None
 
-    def _start_run(self, question, route):
+    def _start_run(self, question, route, *, context=None):
         with transaction() as conn:
             run_id = conn.execute(
                 "INSERT INTO agent_runs(case_id,question,route,status,runtime,created_at) VALUES (?,?,?,'running',?,?)",
@@ -52,7 +52,8 @@ class FakeCoordinator:
             ).lastrowid
         return (run_id, f"agent-run-{run_id}") if self.runtime == "langgraph" else run_id
 
-    def process_query(self, question, user_name, use_llm):
+    def process_query(self, question, user_name, use_llm, **kwargs):
+        self.context = kwargs.get("context")
         self.principal = current_principal()
         self.start_value = self._start_run(question, "general")
         run_id = self.start_value[0] if isinstance(self.start_value, tuple) else self.start_value
@@ -62,7 +63,11 @@ class FakeCoordinator:
             raise ValueError("sensitive implementation detail must not leak")
         with transaction() as conn:
             conn.execute("UPDATE agent_runs SET status='completed' WHERE id=?", (run_id,))
+        conversation_id = self.context.conversation_id if self.context is not None else None
         return {"answer": "测试回答，需律师复核", "route": "general", "citations": [],
+                "answer_status": "answered", "clarification": None,
+                "conversation_id": conversation_id,
+                "context": {"available": self.context is not None, "conversation_id": conversation_id},
                 "run_id": run_id, "runtime": self.runtime, "llm_used": False}
 
 
@@ -172,6 +177,80 @@ class ReviewJobTests(unittest.TestCase):
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["run_id"], coordinator.start_value)
         self.assertNotIn("sensitive", json.dumps(payload))
+        self.assert_all_slots_available()
+
+    def conversation_with_turn(self):
+        with transaction() as conn:
+            conversation_id = conn.execute(
+                "INSERT INTO conversations(case_id, user_name, title, created_at) VALUES (1, '本机律师', '既有会话', ?)",
+                (now(),),
+            ).lastrowid
+            conn.execute(
+                """INSERT INTO messages(conversation_id, role, content, citations_json, route, created_at)
+                   VALUES (?, 'user', '甲公司采购合同的付款期限？', '[]', '事实检索', ?)""",
+                (conversation_id, now()),
+            )
+            conn.execute(
+                """INSERT INTO messages(conversation_id, role, content, citations_json, route, provenance_json, created_at)
+                   VALUES (?, 'assistant', '付款期限为验收合格后60日内[资料1]。', ?, '事实检索', '{}', ?)""",
+                (conversation_id, json.dumps([{"index": 1, "document_id": 1, "document_name": "01_起诉意见书.txt",
+                                               "page": 1}], ensure_ascii=False), now()),
+            )
+        return conversation_id
+
+    def test_background_job_continues_explicit_conversation(self):
+        conversation_id = self.conversation_with_turn()
+        coordinator = FakeCoordinator(1)
+        job_id = self.submit(conversation_id=conversation_id)
+        with patch("app.agents.create_coordinator", return_value=coordinator):
+            self.executor.run_next()
+        payload = self.status(job_id)
+        self.assertEqual(payload["status"], "completed", payload)
+        self.assertEqual(payload["result"]["conversation_id"], conversation_id)
+        self.assertEqual(payload["result"]["context"]["conversation_id"], conversation_id)
+        self.assertIsNotNone(coordinator.context)
+        self.assertEqual(coordinator.context.conversation_id, conversation_id)
+        with closing(connect()) as conn:
+            messages = conn.execute(
+                "SELECT role, kind FROM messages WHERE conversation_id=? ORDER BY id", (conversation_id,)
+            ).fetchall()
+        self.assertEqual([row["role"] for row in messages], ["user", "assistant", "user", "assistant"])
+        self.assertEqual(messages[-1]["kind"], "answer")
+        self.assert_all_slots_available()
+
+    def test_background_job_rejects_missing_or_archived_conversation_at_submit(self):
+        with closing(connect()) as conn:
+            before = conn.execute("SELECT COUNT(*) FROM review_jobs").fetchone()[0]
+        missing = self.client.post("/api/cases/1/agent-jobs", json={"question": "请求", "conversation_id": 999999})
+        self.assertEqual(missing.status_code, 404, missing.text)
+        archived = self.conversation_with_turn()
+        with transaction() as conn:
+            conn.execute(
+                "UPDATE conversations SET archived_at=?, archive_expires_at=? WHERE id=?",
+                (now(), 2**62, archived),
+            )
+        rejected = self.client.post("/api/cases/1/agent-jobs", json={"question": "请求", "conversation_id": archived})
+        self.assertEqual(rejected.status_code, 409, rejected.text)
+        with closing(connect()) as conn:
+            after = conn.execute("SELECT COUNT(*) FROM review_jobs").fetchone()[0]
+        self.assertEqual(after, before)
+
+    def test_background_job_clarification_completes_without_agent_run(self):
+        job_id = self.submit(question="它的付款期限呢？")
+        with patch("app.agents.create_coordinator", side_effect=AssertionError("must not run")):
+            self.executor.run_next()
+        payload = self.status(job_id)
+        self.assertEqual(payload["status"], "completed", payload)
+        self.assertEqual(payload["result"]["answer_status"], "clarification")
+        self.assertIsNone(payload["run_id"])
+        conversation_id = payload["result"]["conversation_id"]
+        self.assertGreater(conversation_id, 0)
+        with closing(connect()) as conn:
+            messages = conn.execute(
+                "SELECT role, kind FROM messages WHERE conversation_id=? ORDER BY id", (conversation_id,)
+            ).fetchall()
+        self.assertEqual([row["role"] for row in messages], ["user", "assistant"])
+        self.assertEqual(messages[-1]["kind"], "clarification")
         self.assert_all_slots_available()
 
     def test_queue_full_returns_429_without_extra_database_row(self):

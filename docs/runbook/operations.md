@@ -61,6 +61,8 @@ token 模式的 `LAW_REVIEW_API_TOKENS_JSON` 是“随机 token → principal �
 
 服务重启将未完成后台任务标记 interrupted；有有效 LangGraph checkpoint 时可通过原 run 恢复，原生运行不具备 checkpoint 续跑。同步 `agent-chat` 仍保留向后兼容，双版本 `agent-compare` 与 `resume` 仍为同步响应，尚未提供 SSE token 流。
 
+同步 `agent-chat` 与后台 `agent-jobs` 均接受可选 `conversation_id`：显式提供但不存在、跨案或不可访问时分别在受理阶段返回 `404`，归档会话返回 `409`；省略时仍新建会话。成功回答与澄清消息写入该会话并返回实际 `conversation_id`，同一 `run_id` 通过唯一索引只写一次。`agent_runs.context_json` 保存当次冻结的上下文身份（策略版本、历史摘要与截止点、解析对象、检索问题）；LangGraph 恢复复用该快照，并在消费重试前重新校验会话访问、历史消息数量与逐页资料来源。会话被删除、归档、撤权或资料页被删除时拒绝恢复，绝不把新历史拼进旧运行；无快照的旧运行按“无上下文”恢复，不用当前历史回填。
+
 ## 恢复演练（每季度至少一次，E18）
 
 前置：在独立目录演练，禁止触碰真实案件数据。记录每次演练的实际数据损失窗口与总耗时。

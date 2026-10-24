@@ -19,6 +19,13 @@ from typing import Annotated, Any, Callable, TypedDict
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
+from .context import (
+    TurnContext,
+    context_result,
+    limit_contexts,
+    source_pages_exist,
+    validate_resume_identity,
+)
 from .agents import (
     CriticAgent,
     EvidenceAgent,
@@ -44,6 +51,10 @@ def _merge_dicts(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     return {**(left or {}), **(right or {})}
 
 
+def _retrieval_question(state: ReviewState) -> str:
+    return str(state.get("retrieval_question") or state["question"])
+
+
 def _with_database_scope(method):
     """Keep every orchestration read/write on the coordinator's captured DB."""
     @wraps(method)
@@ -57,6 +68,10 @@ class ReviewState(TypedDict, total=False):
     case_id: int
     run_id: int
     question: str
+    retrieval_question: str
+    context: dict[str, Any]
+    history_text: str
+    object_note: str
     user_name: str
     use_llm: bool
     prefer_remote_embeddings: bool
@@ -109,12 +124,17 @@ class LangGraphCoordinator:
         configured = os.getenv("LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB", "").strip()
         self.checkpoint_path = Path(checkpoint_path or configured or self.db_path.parent / "langgraph_checkpoints.sqlite")
 
-    def _start_run(self, question: str, route: str) -> tuple[int, str]:
+    def _start_run(
+        self, question: str, route: str, *, context: dict[str, Any] | None = None
+    ) -> tuple[int, str]:
+        context = context or {}
         with db_scope(self.db_path), transaction() as conn:
             run_id = conn.execute(
-                """INSERT INTO agent_runs(case_id, question, route, status, runtime, created_at)
-                   VALUES (?, ?, ?, 'running', 'langgraph', ?)""",
-                (self.case_id, question, route, now()),
+                """INSERT INTO agent_runs(case_id, question, route, status, runtime, conversation_id,
+                                        context_json, created_at)
+                   VALUES (?, ?, ?, 'running', 'langgraph', ?, ?, ?)""",
+                (self.case_id, question, route, context.get("conversation_id"),
+                 json.dumps(context, ensure_ascii=False), now()),
             ).lastrowid
             thread_id = f"agent-run-{run_id}"
             conn.execute(
@@ -219,7 +239,7 @@ class LangGraphCoordinator:
 
     def _planner_node(self, state: ReviewState) -> dict[str, Any]:
         def run() -> dict[str, Any]:
-            route, nodes = PlannerAgent().build_plan(state["question"])
+            route, nodes = PlannerAgent().build_plan(_retrieval_question(state))
             plan = [
                 {
                     "name": node.name,
@@ -232,7 +252,8 @@ class LangGraphCoordinator:
             return {"summary": f"生成 {len(plan)} 节点 DAG", "route": route, "plan": plan}
 
         output = self._run_node(
-            state, "planner", "规划 Agent", {"question": state["question"]}, run
+            state, "planner", "规划 Agent",
+            {"question": state["question"], "retrieval_question": _retrieval_question(state)}, run
         )
         return {"route": output["route"], "plan": output["plan"]}
 
@@ -240,14 +261,14 @@ class LangGraphCoordinator:
         def run() -> dict[str, Any]:
             items = deepcopy(state["memory_snapshot"]) if "memory_snapshot" in state else recall_memories(
                 state["case_id"],
-                state["question"],
+                _retrieval_question(state),
                 3,
                 state["prefer_remote_embeddings"],
             )
             return {"items": items, "summary": f"召回 {len(items)} 条案件长期记忆"}
 
         output = self._run_node(
-            state, "memory_recall", "记忆 Agent", {"query": state["question"]}, run
+            state, "memory_recall", "记忆 Agent", {"query": _retrieval_question(state)}, run
         )
         return {"memory_hits": output["items"]}
 
@@ -255,12 +276,16 @@ class LangGraphCoordinator:
         def run() -> dict[str, Any]:
             output = RetrievalAgent(
                 state["case_id"], state["prefer_remote_embeddings"]
-            ).retrieve(state["question"], 6)
+            ).retrieve(_retrieval_question(state), 6)
+            resolution = (state.get("context") or {}).get("resolution") or {}
+            output["contexts"] = limit_contexts(
+                output["contexts"], resolution.get("object_document_ids") or ()
+            )
             output["summary"] = f"双路召回后融合 {len(output['contexts'])} 条页级证据"
             return output
 
         output = self._run_node(
-            state, "retrieve", "检索 Agent", {"query": state["question"]}, run
+            state, "retrieve", "检索 Agent", {"query": _retrieval_question(state)}, run
         )
         return {"contexts": output["contexts"], "retrieval_metrics": output["metrics"]}
 
@@ -270,7 +295,7 @@ class LangGraphCoordinator:
             "facts",
             "事实 Agent",
             {"context_count": len(state.get("contexts", [])), "input_scope": "all_case_pages", "output_schema": "facts-v1"},
-            lambda: validate_specialist_output(FactAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="facts-v1"),
+            lambda: validate_specialist_output(FactAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="facts-v1"),
         )
         return {"specialist_outputs": {"facts": output}}
 
@@ -280,7 +305,7 @@ class LangGraphCoordinator:
             "evidence",
             "证据 Agent",
             {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "evidence-v1"},
-            lambda: validate_specialist_output(EvidenceAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="evidence-v1"),
+            lambda: validate_specialist_output(EvidenceAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="evidence-v1"),
         )
         return {"specialist_outputs": {"evidence": output}}
 
@@ -292,7 +317,7 @@ class LangGraphCoordinator:
             "contradiction",
             "矛盾 Agent",
             {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "contradiction-v1"},
-            lambda: validate_specialist_output(ContradictionAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="contradiction-v1"),
+            lambda: validate_specialist_output(ContradictionAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="contradiction-v1"),
         )
         return {"specialist_outputs": {"contradiction": output}}
 
@@ -308,7 +333,7 @@ class LangGraphCoordinator:
                 "dependencies": sorted(state.get("specialist_outputs", {})),
             },
             lambda: validate_specialist_output(GapDetectionAgent(state["case_id"]).run(
-                state["question"], state.get("contexts", [])
+                _retrieval_question(state), state.get("contexts", [])
             ), state.get("contexts", []), schema="gap-v1"),
         )
         return {"specialist_outputs": {"gap_detection": output}}
@@ -319,7 +344,7 @@ class LangGraphCoordinator:
         output = self._run_node(
             state, "statutory_conflict", "法条核验 Agent",
             {"input_scope": "legal_corpus", "output_schema": "statutory-v1"},
-            lambda: validate_specialist_output(StatutoryConflictAgent().run(state["question"], state.get("contexts", [])), state.get("contexts", []), schema="statutory-v1"),
+            lambda: validate_specialist_output(StatutoryConflictAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="statutory-v1"),
         )
         return {"specialist_outputs": {"statutory_conflict": output}}
 
@@ -331,6 +356,8 @@ class LangGraphCoordinator:
                 state.get("contexts", []),
                 state.get("specialist_outputs", {}),
                 state["use_llm"],
+                history=str(state.get("history_text") or ""),
+                object_note=str(state.get("object_note") or ""),
             )
             output["summary"] = (
                 f"引用检查 {output['citation_check']}，LLM={'on' if output['llm_used'] else 'off'}"
@@ -485,7 +512,9 @@ class LangGraphCoordinator:
             if conn is not None:
                 conn.close()
 
-    def _complete(self, state: ReviewState, total_ms: int, thread_id: str) -> dict[str, Any]:
+    def _complete(
+        self, state: ReviewState, total_ms: int, thread_id: str, *, restored: bool = False
+    ) -> dict[str, Any]:
         contexts = state.get("contexts", [])
         citations = [_citation(item, index) for index, item in enumerate(contexts, 1)]
         critic = state["critic"]
@@ -506,9 +535,12 @@ class LangGraphCoordinator:
                 "SELECT resume_count FROM agent_runs WHERE id=?", (state["run_id"],)
             ).fetchone()
         specialists = state.get("specialist_outputs", {})
+        context_identity = state.get("context") or {}
         return {
             "run_id": state["run_id"],
             "answer": critic["answer"],
+            "answer_status": "answered",
+            "clarification": None,
             "route": state["route"],
             "agent_type": "LangGraph Multi-Agent",
             "plan": state.get("plan", []),
@@ -536,6 +568,8 @@ class LangGraphCoordinator:
             "runtime": "langgraph",
             "mode": "langgraph",
             "user_name": state["user_name"],
+            "conversation_id": context_identity.get("conversation_id"),
+            "context": context_result(context_identity, restored=restored),
             "checkpoint_thread_id": thread_id,
             "checkpoint_size_bytes": self.checkpoint_size_bytes(),
             "resumable": False,
@@ -550,13 +584,29 @@ class LangGraphCoordinator:
         use_llm: bool = True,
         persist_memory: bool = True,
         memory_snapshot: list[dict[str, Any]] | None = None,
+        *,
+        context: TurnContext | None = None,
     ) -> dict[str, Any]:
-        route, _ = PlannerAgent().build_plan(question)
-        run_id, thread_id = self._start_run(question, route)
+        context_identity: dict[str, Any] = {}
+        if context is not None:
+            if context.resolution.needs_clarification:
+                raise ValueError("该请求需要先澄清所指对象，不能启动 Agent 运行")
+            question = context.question
+            retrieval_question = context.retrieval_question
+            context_identity = context.identity()
+            user_name = context.user_name or user_name
+        else:
+            retrieval_question = question
+        route, _ = PlannerAgent().build_plan(retrieval_question)
+        run_id, thread_id = self._start_run(question, route, context=context_identity)
         initial: ReviewState = {
             "case_id": self.case_id,
             "run_id": run_id,
             "question": question,
+            "retrieval_question": retrieval_question,
+            "context": context_identity,
+            "history_text": str(context_identity.get("history_text") or ""),
+            "object_note": str(context_identity.get("object_note") or ""),
             "user_name": user_name,
             "use_llm": use_llm,
             "prefer_remote_embeddings": self.prefer_remote_embeddings,
@@ -606,6 +656,12 @@ class LangGraphCoordinator:
         if not self.checkpoint_available(thread_id):
             raise ValueError("运行没有可用的 LangGraph checkpoint")
 
+        # Frozen context identity: re-check conversation access and history
+        # identity before consuming a retry. Legacy runs have no snapshot and
+        # resume without ever being retro-fitted with current history.
+        identity = json.loads(run["context_json"] or "{}")
+        validate_resume_identity(self.case_id, identity)
+
         # A restored/misconfigured checkpoint database must not execute another
         # case's saved state under this run. Validate before consuming a retry.
         validation_conn = self._checkpoint_connection()
@@ -616,6 +672,10 @@ class LangGraphCoordinator:
             saved = snapshot.values
             if saved.get("run_id") != run_id or saved.get("case_id") != self.case_id or saved.get("question") != run["question"]:
                 raise ValueError("Checkpoint 与运行记录不一致，拒绝恢复")
+            if identity and (saved.get("context") or {}) != identity:
+                raise ValueError("Checkpoint 上下文与运行记录不一致，拒绝恢复")
+            if not source_pages_exist(self.case_id, list(saved.get("contexts") or [])):
+                raise ValueError("运行依据的资料页已被删除或不可访问，拒绝恢复")
         finally:
             validation_conn.close()
 
@@ -635,7 +695,7 @@ class LangGraphCoordinator:
             graph = self._build_graph(SqliteSaver(conn))
             state = graph.invoke(None, {"configurable": {"thread_id": thread_id}})
             total_ms = previous_ms + round((time.perf_counter() - started) * 1000)
-            return self._complete(state, total_ms, thread_id)
+            return self._complete(state, total_ms, thread_id, restored=True)
         except Exception as exc:
             total_ms = previous_ms + round((time.perf_counter() - started) * 1000)
             diagnostic = failure_diagnostic(exc, "langgraph_resume")

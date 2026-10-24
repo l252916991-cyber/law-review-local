@@ -18,6 +18,7 @@ from contextvars import copy_context
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .context import TurnContext, context_result, limit_contexts
 from .db import connect, now, transaction
 from .rag import HybridRetriever, recall_memories, remember
 from .services import call_local_llm, concise, detect_route, rowdict
@@ -587,6 +588,9 @@ class CriticAgent:
         contexts: list[dict[str, Any]],
         specialist_outputs: dict[str, dict[str, Any]],
         use_llm: bool,
+        *,
+        history: str = "",
+        object_note: str = "",
     ) -> dict[str, Any]:
         failed_validation = None
         diagnostic = None
@@ -600,6 +604,8 @@ class CriticAgent:
                     contexts,
                     timeout=self.timeout,
                     model_override=self.model,
+                    history=history,
+                    object_note=object_note,
                 )
                 validation = validate_review_answer(answer, contexts)
                 if validation["valid"]:
@@ -680,12 +686,15 @@ class LawReviewCoordinator:
         self.cross_exam_agent = CrossExaminationAgent(case_id, prefer_remote_embeddings)
         self.critic_agent = CriticAgent()
 
-    def _start_run(self, question: str, route: str) -> int:
+    def _start_run(self, question: str, route: str, *, context: dict[str, Any] | None = None) -> int:
+        context = context or {}
         with transaction() as conn:
             run_id = conn.execute(
-                """INSERT INTO agent_runs(case_id, question, route, status, runtime, created_at)
-                   VALUES (?, ?, ?, 'running', 'native', ?)""",
-                (self.case_id, question, route, now()),
+                """INSERT INTO agent_runs(case_id, question, route, status, runtime, conversation_id,
+                                        context_json, created_at)
+                   VALUES (?, ?, ?, 'running', 'native', ?, ?, ?)""",
+                (self.case_id, question, route, context.get("conversation_id"),
+                 json.dumps(context, ensure_ascii=False), now()),
             ).lastrowid
         if self.on_run_started is not None:
             self.on_run_started(int(run_id))
@@ -755,10 +764,21 @@ class LawReviewCoordinator:
         use_llm: bool = True,
         persist_memory: bool = True,
         memory_snapshot: list[dict[str, Any]] | None = None,
+        *,
+        context: TurnContext | None = None,
     ) -> dict[str, Any]:
         total_started = time.perf_counter()
-        route, plan = self.planner_agent.build_plan(question)
-        run_id = self._start_run(question, route)
+        if context is not None:
+            if context.resolution.needs_clarification:
+                raise ValueError("该请求需要先澄清所指对象，不能启动 Agent 运行")
+            question = context.question
+            retrieval_question = context.retrieval_question
+            context_identity = context.identity()
+        else:
+            retrieval_question = question
+            context_identity = {}
+        route, plan = self.planner_agent.build_plan(retrieval_question)
+        run_id = self._start_run(question, route, context=context_identity)
         steps = []
         active_node, active_role, active_started = "planner", "规划 Agent", now()
         try:
@@ -775,16 +795,21 @@ class LawReviewCoordinator:
             active_node, active_role, active_started = "memory_recall", "记忆 Agent", now()
             memories, memory_ms, memory_started = self._timed(
                 lambda: {"items": deepcopy(memory_snapshot) if memory_snapshot is not None else
-                         recall_memories(self.case_id, question, 3, self.prefer_remote_embeddings)}
+                         recall_memories(self.case_id, retrieval_question, 3, self.prefer_remote_embeddings)}
             )
             memories["summary"] = f"召回 {len(memories['items'])} 条案件长期记忆"
-            steps.append(self._record_step(run_id, "memory_recall", "记忆 Agent", "completed", {"query": question}, memories, memory_started, memory_ms))
+            steps.append(self._record_step(run_id, "memory_recall", "记忆 Agent", "completed", {"query": retrieval_question}, memories, memory_started, memory_ms))
 
             active_node, active_role, active_started = "retrieve", "检索 Agent", now()
-            retrieval, retrieval_ms, retrieval_started = self._timed(lambda: self.retrieval_agent.retrieve(question, 6))
-            contexts = retrieval["contexts"]
+            retrieval, retrieval_ms, retrieval_started = self._timed(
+                lambda: self.retrieval_agent.retrieve(retrieval_question, 6)
+            )
+            contexts = limit_contexts(
+                retrieval["contexts"], context.resolution.object_document_ids if context is not None else ()
+            )
+            retrieval["contexts"] = contexts
             retrieval["summary"] = f"双路召回后融合 {len(contexts)} 条页级证据"
-            steps.append(self._record_step(run_id, "retrieve", "检索 Agent", "completed", {"query": question}, retrieval, retrieval_started, retrieval_ms))
+            steps.append(self._record_step(run_id, "retrieve", "检索 Agent", "completed", {"query": retrieval_question}, retrieval, retrieval_started, retrieval_ms))
 
             specialists: dict[str, SubAgentSpec] = specialist_specs(self)
             specialists = {name: spec for name, spec in specialists.items() if name in {node.name for node in plan}}
@@ -802,7 +827,7 @@ class LawReviewCoordinator:
                     futures = {}
                     for name in ready:
                         spec = specialists[name]
-                        function = lambda spec=spec: spec.runner(question, contexts)
+                        function = lambda spec=spec: spec.runner(retrieval_question, contexts)
                         futures[pool.submit(copy_context().run, self._timed, function)] = (name, spec, now(), time.perf_counter())
                     failures = []
                     for future in as_completed(futures):
@@ -834,8 +859,13 @@ class LawReviewCoordinator:
                     pending.difference_update(ready)
 
             active_node, active_role, active_started = "critic", "审校 Agent", now()
+            history_text = str(context_identity.get("history_text") or "") if context is not None else ""
+            object_note_text = str(context_identity.get("object_note") or "") if context is not None else ""
             critic, critic_ms, critic_started = self._timed(
-                lambda: self.critic_agent.run(question, route, contexts, specialist_outputs, use_llm)
+                lambda: self.critic_agent.run(
+                    question, route, contexts, specialist_outputs, use_llm,
+                    history=history_text, object_note=object_note_text,
+                )
             )
             critic["summary"] = f"引用检查 {critic['citation_check']}，LLM={'on' if critic['llm_used'] else 'off'}"
             steps.append(self._record_step(run_id, "critic", "审校 Agent", "completed", {"specialists": list(specialist_outputs)}, critic, critic_started, critic_ms))
@@ -900,6 +930,8 @@ class LawReviewCoordinator:
             return {
                 "run_id": run_id,
                 "answer": critic["answer"],
+                "answer_status": "answered",
+                "clarification": None,
                 "route": route,
                 "agent_type": "DAG Multi-Agent",
                 "plan": plan_output["nodes"],
@@ -916,6 +948,8 @@ class LawReviewCoordinator:
                 "failure_diagnostic": critic.get("failure_diagnostic"),
                 "memory_persisted": stored["persisted"],
                 "total_ms": total_ms,
+                "conversation_id": context_identity.get("conversation_id"),
+                "context": context_result(context_identity),
                 "runtime": "native",
                 "checkpoint_thread_id": "",
                 "resumable": False,

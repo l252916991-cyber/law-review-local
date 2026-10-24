@@ -17,6 +17,14 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from .context import (
+    ArchivedConversationError,
+    ConversationNotFoundError,
+    agent_clarification_result,
+    prepare_turn,
+    record_agent_turn,
+    validate_conversation,
+)
 from .db import connect, db_scope, get_db_path, now, transaction
 from .security import actor_name, current_principal, require_case_access
 
@@ -46,6 +54,7 @@ def shutdown_review_executor() -> None:
 
 class ReviewJobRequest(BaseModel):
     question: str = Field(min_length=1, max_length=3000)
+    conversation_id: int | None = None
     user_name: str = Field(default="本机律师", max_length=120)
     mode: Literal["multi_agent", "langgraph"] = "multi_agent"
     use_llm: bool = True
@@ -59,41 +68,49 @@ def _execute(job_id: str, case_id: int, body: ReviewJobRequest) -> None:
             claimed = conn.execute("UPDATE review_jobs SET status='running' WHERE id=? AND status='queued'", (job_id,))
             if claimed.rowcount != 1:
                 return
-        if body.mode == "langgraph":
-            from .langgraph_agents import create_langgraph_coordinator as factory
+        context = prepare_turn(
+            case_id, body.question, body.conversation_id,
+            user_name=body.user_name, use_llm=body.use_llm,
+        )
+        if context.resolution.needs_clarification:
+            runtime = "langgraph" if body.mode == "langgraph" else "native"
+            result = agent_clarification_result(context, runtime=runtime)
+            result["conversation_id"] = record_agent_turn(
+                case_id, context.identity(), result, source_run_id=None,
+                audit_action="后台 Agent 阅卷", audit_detail=f"{body.user_name}：任务 {job_id}",
+            )
         else:
-            from .agents import create_coordinator as factory
-        coordinator = factory(case_id, body.use_remote_embeddings)
-        original_start = coordinator._start_run
+            if body.mode == "langgraph":
+                from .langgraph_agents import create_langgraph_coordinator as factory
+            else:
+                from .agents import create_coordinator as factory
+            coordinator = factory(case_id, body.use_remote_embeddings)
+            original_start = coordinator._start_run
 
-        def track_start(*args, **kwargs):
-            nonlocal run_id
-            started = original_start(*args, **kwargs)
-            run_id = started[0] if isinstance(started, tuple) else started
-            with transaction() as conn:
-                conn.execute("UPDATE review_jobs SET run_id=? WHERE id=?", (run_id, job_id))
-            return started
+            def track_start(*args, **kwargs):
+                nonlocal run_id
+                started = original_start(*args, **kwargs)
+                run_id = started[0] if isinstance(started, tuple) else started
+                with transaction() as conn:
+                    conn.execute("UPDATE review_jobs SET run_id=? WHERE id=?", (run_id, job_id))
+                return started
 
-        coordinator._start_run = track_start
-        try:
-            result = coordinator.process_query(body.question, body.user_name, body.use_llm)
-        finally:
-            coordinator._start_run = original_start
+            coordinator._start_run = track_start
+            try:
+                result = coordinator.process_query(body.question, body.user_name, body.use_llm, context=context)
+            finally:
+                coordinator._start_run = original_start
+            result["conversation_id"] = record_agent_turn(
+                case_id, context.identity(), result, source_run_id=result.get("run_id"),
+                audit_action="后台 Agent 阅卷", audit_detail=f"{body.user_name}：任务 {job_id}",
+            )
         result = {**result, "mode": body.mode, "user_name": body.user_name}
         with transaction() as conn:
             job = conn.execute("SELECT status FROM review_jobs WHERE id=?", (job_id,)).fetchone()
             if job is None or job["status"] != "running":
                 return
-            conversation = conn.execute("INSERT INTO conversations(case_id,user_name,title,created_at) VALUES (?,?,?,?)",
-                                        (case_id, body.user_name, body.question[:60], now())).lastrowid
-            for role, content in (("user", body.question), ("assistant", result["answer"])):
-                conn.execute("INSERT INTO messages(conversation_id,role,content,citations_json,route,created_at) VALUES (?,?,?,?,?,?)",
-                             (conversation,role,content,json.dumps(result.get("citations", []) if role == "assistant" else [],ensure_ascii=False),result["route"],now()))
-            result["conversation_id"] = conversation
             conn.execute("UPDATE review_jobs SET status='completed',result_json=?,finished_at=? WHERE id=?",
                          (json.dumps(result,ensure_ascii=False),now(),job_id))
-            conn.execute("INSERT INTO audit_log(case_id,action,detail,created_at) VALUES (?,'后台 Agent 阅卷',?,?)",
-                         (case_id, f"{body.user_name}：任务 {job_id}", now()))
     except Exception as exc:
         diagnostic = {"type": type(exc).__name__, "message": "后台阅卷执行失败，请查看节点轨迹或恢复可用的 LangGraph 运行", "run_id": getattr(exc,"run_id",None) or run_id, "resumable": bool(getattr(exc,"resumable",False))}
         logger.warning("Review job %s failed (%s)", job_id, type(exc).__name__)
@@ -108,6 +125,13 @@ def submit_review(case_id: int, body: ReviewJobRequest):
     with closing(connect()) as conn:
         if not conn.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
             raise HTTPException(404, "案件不存在")
+    if body.conversation_id is not None:
+        try:
+            validate_conversation(case_id, body.conversation_id)
+        except ArchivedConversationError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ConversationNotFoundError as exc:
+            raise HTTPException(404, str(exc)) from exc
     with _lifecycle_lock:
         executor, admission = _executor, _admission
         if executor is None:

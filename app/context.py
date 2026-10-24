@@ -954,3 +954,246 @@ def validate_context_notice(answer: str, kind: str) -> dict[str, Any]:
         "amount_calculations_checked": False,
         "lawyer_review_required": True,
     }
+
+
+# ---------------------------------------------------------------------------
+# Shared turn context for Agent runtimes, background jobs and resume (M04)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TurnContext:
+    """One frozen turn prepared before any runtime executes."""
+
+    case_id: int
+    question: str
+    conversation_id: int | None
+    policy: ContextPolicy
+    history: HistorySnapshot
+    resolution: ResolvedQuestion
+    documents_by_id: dict[int, dict[str, Any]]
+    user_name: str = "本机律师"
+    use_llm: bool = True
+
+    @property
+    def retrieval_question(self) -> str:
+        return self.resolution.retrieval_query
+
+    def identity(self, *, restored: bool = False) -> dict[str, Any]:
+        history_text = (
+            render_history(self.history.turns)
+            if self.use_llm and self.resolution.status == "resolved" and self.history.enabled and self.history.turns
+            else ""
+        )
+        return {
+            "policy_version": self.policy.version,
+            "case_id": self.case_id,
+            "question": self.question,
+            "retrieval_question": self.retrieval_question,
+            "conversation_id": self.conversation_id,
+            "user_name": self.user_name,
+            "history": {
+                "enabled": self.history.enabled,
+                "used": bool(history_text),
+                "digest": self.history.digest,
+                "cutoff_message_id": self.history.cutoff_message_id,
+                "message_count": len(self.history.message_ids),
+                "turns": len(self.history.turns),
+                "chars": self.history.chars,
+                "dropped_turns": self.history.dropped_turns,
+                "truncated": self.history.truncated,
+            },
+            "history_text": history_text,
+            "object_note": object_note(self.resolution, self.documents_by_id),
+            "resolution": self.resolution.as_dict(self.documents_by_id),
+            "restored": restored,
+        }
+
+
+def prepare_turn(
+    case_id: int,
+    question: str,
+    conversation_id: int | None,
+    *,
+    user_name: str = "本机律师",
+    policy: ContextPolicy | None = None,
+    use_llm: bool = True,
+) -> TurnContext:
+    """Validate access, freeze history and resolve objects before any runtime."""
+    question = question.strip()
+    if not question:
+        raise ValueError("问题不能为空")
+    policy = policy or context_policy()
+    if conversation_id is not None:
+        validate_conversation(case_id, conversation_id)
+    history = load_history(case_id, conversation_id, policy=policy)
+    documents = case_documents(case_id)
+    resolution = resolve_question(case_id, question, history, documents=documents, policy=policy)
+    return TurnContext(
+        case_id=case_id,
+        question=question,
+        conversation_id=conversation_id,
+        policy=policy,
+        history=history,
+        resolution=resolution,
+        documents_by_id={document["id"]: document for document in documents},
+        user_name=user_name or "本机律师",
+        use_llm=use_llm,
+    )
+
+
+def context_result(identity: dict[str, Any] | None, *, restored: bool = False) -> dict[str, Any]:
+    """Client/audit-facing metadata; never returns the frozen history text."""
+    if not identity or not identity.get("policy_version"):
+        return {
+            "available": False,
+            "restored": restored,
+            "policy": None,
+            "history": {"enabled": False, "used": False},
+            "resolution": None,
+            "conversation_id": None,
+        }
+    return {
+        "available": True,
+        "restored": restored,
+        "policy_version": identity.get("policy_version"),
+        "conversation_id": identity.get("conversation_id"),
+        "history": dict(identity.get("history") or {}),
+        "resolution": identity.get("resolution"),
+    }
+
+
+def run_context_identity(run_id: int) -> dict[str, Any]:
+    """Read the frozen context snapshot recorded for one Agent run."""
+    conn = connect()
+    try:
+        row = conn.execute("SELECT context_json FROM agent_runs WHERE id=?", (run_id,)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return {}
+    try:
+        value = json.loads(row["context_json"] or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def validate_resume_identity(case_id: int, identity: dict[str, Any]) -> None:
+    """Re-check the frozen conversation before a resumed run may continue.
+
+    Old runs have no identity: they resume without context and are never
+    retro-fitted with the current conversation.
+    """
+    if not identity or not identity.get("policy_version"):
+        return
+    conversation_id = identity.get("conversation_id")
+    if conversation_id is None:
+        return
+    validate_conversation(case_id, int(conversation_id))
+    history_meta = identity.get("history") or {}
+    cutoff = int(history_meta.get("cutoff_message_id") or 0)
+    expected = int(history_meta.get("message_count") or 0)
+    if history_message_count(int(conversation_id), cutoff) != expected:
+        raise ValueError("会话历史在运行期间发生变化，拒绝用新历史恢复旧运行")
+
+
+def source_pages_exist(case_id: int, contexts: list[dict[str, Any]]) -> bool:
+    """Whether every frozen context still points at a current case page."""
+    if not contexts:
+        return True
+    conn = connect()
+    try:
+        for item in contexts:
+            document_id = item.get("document_id")
+            page_no = item.get("page_no")
+            if document_id is None or page_no is None:
+                return False
+            found = conn.execute(
+                """SELECT 1 FROM pages p JOIN documents d ON d.id=p.document_id
+                   WHERE p.document_id=? AND p.page_no=? AND d.case_id=?""",
+                (int(document_id), int(page_no), case_id),
+            ).fetchone()
+            if found is None:
+                return False
+        return True
+    finally:
+        conn.close()
+
+
+def agent_clarification_result(
+    context: TurnContext, *, runtime: str, total_ms: int = 0
+) -> dict[str, Any]:
+    """Non-factual Agent response when the object must be clarified first."""
+    answer, clarification = build_clarification(
+        context.question, context.resolution, context.documents_by_id
+    )
+    validation = validate_context_notice(answer, "clarification")
+    identity = context.identity()
+    return {
+        "run_id": None,
+        "answer": answer,
+        "answer_status": "clarification",
+        "clarification": clarification,
+        "route": "需要澄清",
+        "semantic_expansion": [],
+        "agent_type": "LangGraph Multi-Agent" if runtime == "langgraph" else "DAG Multi-Agent",
+        "plan": [],
+        "steps": [],
+        "tools_used": [],
+        "citations": [],
+        "retrieval_metrics": {"retrieval_mode": "not_started", "source_count": 0},
+        "memory_hits": [],
+        "llm_used": False,
+        "llm_model": "",
+        "fallback_reason": None,
+        "validation": validation,
+        "citation_check": "not_applicable",
+        "failure_diagnostic": None,
+        "memory_persisted": False,
+        "total_ms": total_ms,
+        "runtime": runtime,
+        "checkpoint_thread_id": "",
+        "resumable": False,
+        "resume_count": 0,
+        "conversation_id": context.conversation_id,
+        "context": context_result(identity),
+    }
+
+
+def record_agent_turn(
+    case_id: int,
+    identity: dict[str, Any],
+    result: dict[str, Any],
+    *,
+    source_run_id: int | None,
+    audit_action: str = "Agent 阅卷",
+    audit_detail: str = "",
+) -> int | None:
+    """Persist an Agent answer/clarification once, without inventing a context."""
+    if not identity or not identity.get("policy_version"):
+        # Legacy runs without a frozen snapshot must not create a new turn from
+        # the current conversation.
+        return None
+    status = result.get("answer_status", "answered")
+    kind = "answer" if status == "answered" else status
+    provenance = {
+        "mode": str(result.get("runtime") or "agent"),
+        "run_id": result.get("run_id"),
+        "answer_status": status,
+        "context": result.get("context"),
+        "llm_used": bool(result.get("llm_used")),
+    }
+    return record_turn(
+        case_id,
+        identity.get("conversation_id"),
+        question=str(identity.get("question") or ""),
+        answer=str(result.get("answer") or ""),
+        citations=list(result.get("citations") or []),
+        route=str(result.get("route") or ""),
+        provenance=provenance,
+        user_name=str(identity.get("user_name") or "本机律师"),
+        kind=kind,
+        source_run_id=source_run_id,
+        audit=(audit_action, audit_detail) if audit_action else None,
+    )
