@@ -127,6 +127,16 @@
 
 **复验后的事实：** 回归集按 v12 为 19/22（唯一未过为 `training-facts` 3 次）；新保留集 v4 为 7/7；原保留集转开发材料为 5/6（唯一未过为 `severance-trap-clause`）。35 次评估、70 条双对照中 0 次候选系统失败、0 次未知用量；34/35 为有效配对（`yoga-closure-dates` 一次原生回落单列）。评分口径两处修正均经实测确认：`gym-refund-court-order` 在 v11 清单下通过、v3 开发材料复验通过；`employment-transfer-facts` 由失败转为通过。两类修复没有关闭 `training-facts` 与 `severance-trap-clause` 的 P1。
 
+| 计划 §5 指标 | 本轮结果 | 证据 |
+| --- | --- | --- |
+| 参考清单覆盖 | 31/31 题有原文参考或拒绝依据 | `s14-prep/reference-list.json` |
+| 事实与角色正确 | P0=0；无与原文矛盾、主体错置、引用身份错误；1 条结论有全案依据但显式页未检索，已登记 | `s15-verification/` |
+| 关键事实完整 | 逐题报告：回归 17/18、v4 7/7、v3 5/6 | 6.1～6.3 |
+| 引用可核验 | 全部引用可定位；身份错误 0 | `s15-verification/verification-records.json` |
+| 使用者核验完成 | **未执行** | 6.4 |
+| 专业意见 | **未执行** | 6.4 |
+| 工程与成本 | 有效配对 34/35；总量 token 比 1.0047/1.0016/1.0119 ≤1.10；p95 比 0.8518/0.7243/1.0655 ≤1.20；0 系统失败；0 unknown | 6.1～6.3、`s19-report/valid-pairs.json` |
+
 **本轮不通过项与判定：**
 
 1. 可靠性：P0 = 0；P1 剩 2 项（`training-facts`、`severance-trap-clause`），均确认为**单文档 4 页检索上限**导致事实未进入上下文。该上限来自 `HybridRetriever._select_diverse`（`max(2, ceil(limit*0.6))`）；`app/rag.py` 被原生对照基线锁定，修改需重钉基线并重跑全部对照，属于协议变更。本轮只记录原因、证据与成本，未擅自修改。
