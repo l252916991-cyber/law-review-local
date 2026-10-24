@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, StubModel
+from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, FALLBACK_MODEL, StubModel
 
 
 def main() -> int:
@@ -31,7 +31,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     processes: list[subprocess.Popen[bytes]] = []
-    with tempfile.TemporaryDirectory(prefix="lexvault-next-e2e-") as directory, StubModel() as model:
+    with tempfile.TemporaryDirectory(prefix="lexvault-next-e2e-") as directory, StubModel(repeatable_fallback=True) as model:
         env = {
             **os.environ,
             "LAW_REVIEW_DATA_DIR": directory,
@@ -44,8 +44,12 @@ def main() -> int:
             "LAW_REVIEW_EMBEDDING_MODEL": EMBEDDING_MODEL,
             "LAW_REVIEW_EMBEDDING_BACKEND": "openai",
             "LAW_REVIEW_RERANKER_BACKEND": "heuristic",
-            "LAW_REVIEW_TOOL_LOOP": "off",
-            "LAW_REVIEW_LLM_FALLBACK": "off",
+            "LAW_REVIEW_TOOL_LOOP": "on",
+            "LAW_REVIEW_LLM_FALLBACK": "on",
+            "LAW_REVIEW_LLM_FALLBACK_URL": model.base_url,
+            "LAW_REVIEW_LLM_FALLBACK_MODEL": FALLBACK_MODEL,
+            "LAW_REVIEW_PRICING_JSON": "",
+            "LAW_REVIEW_PRICING_FILE": "",
             "REDIS_URL": "redis://127.0.0.1:1/0",
             "LEXVAULT_API_ORIGIN": "http://127.0.0.1:18765",
             "NEXT_TELEMETRY_DISABLED": "1",

@@ -1,11 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-
-async function login(page: Page) {
-  await page.goto('/');
-  await page.getByLabel('访问令牌').fill(process.env.LEXVAULT_E2E_TOKEN!);
-  await page.getByRole('button', { name: '登录工作空间' }).click();
-  await expect(page.getByRole('navigation', { name: '案件列表' })).toBeVisible();
-}
+import { test, expect } from '@playwright/test';
+import { login } from './helpers';
 test('authentication, create case, upload, calibrate directory and original page', async ({ page }) => {
   await login(page);
   await page.getByRole('button', { name: '＋ 新建案件', exact: true }).click();

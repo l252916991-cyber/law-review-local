@@ -46,9 +46,11 @@ def _vector(text: str) -> list[float]:
 class StubModel:
     """Threaded test double; records every prompt it was asked to answer."""
 
-    def __init__(self, *, chunk_delay: float = 0.05, retract_marker: str = "拒答校验") -> None:
+    def __init__(self, *, chunk_delay: float = 0.05, retract_marker: str = "拒答校验",
+                 repeatable_fallback: bool = False) -> None:
         self.chunk_delay = chunk_delay
         self.retract_marker = retract_marker
+        self.repeatable_fallback = repeatable_fallback
         self.prompts: list[str] = []
         self.mode = "stub"
         # The fallback scenario needs one rejected answer before the next call
@@ -145,7 +147,7 @@ class StubModel:
         if payload.get("stream") is False:
             self._json_answer(handler, prompt, messages, payload)
             return
-        answer = self._pick_answer(prompt)
+        answer = self._pick_answer(prompt, str(payload.get("model") or ""))
         chunks = [answer[index:index + 8] for index in range(0, len(answer), 8)] or [answer]
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream")
@@ -168,8 +170,10 @@ class StubModel:
         handler.wfile.flush()
         handler.close_connection = True
 
-    def _pick_answer(self, prompt: str) -> str:
+    def _pick_answer(self, prompt: str, model_name: str = "") -> str:
         """Choose the scripted answer; the fallback scenario rejects once."""
+        if "回退验证" in prompt and self.repeatable_fallback:
+            return VALID_ANSWER if model_name == FALLBACK_MODEL else INVALID_ANSWER
         if "回退验证" in prompt and self.invalid_served < 1:
             self.invalid_served += 1
             return INVALID_ANSWER
@@ -194,7 +198,7 @@ class StubModel:
                 }],
             }
         else:
-            message["content"] = self._pick_answer(prompt)
+            message["content"] = self._pick_answer(prompt, str(payload.get("model") or ""))
         body = json.dumps({
             "id": "stub-json-1", "object": "chat.completion", "model": CHAT_MODEL,
             "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],

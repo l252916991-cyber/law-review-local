@@ -21,7 +21,7 @@ EXACT_FIXTURES = (
     "frontend/package.json", "frontend/pnpm-lock.yaml", "frontend/pnpm-workspace.yaml",
     "frontend/.node-version", "frontend/.npmrc", "frontend/tsconfig.json",
     "frontend/next-env.d.ts", "frontend/next.config.ts", "frontend/eslint.config.mjs",
-    "frontend/playwright.config.ts",
+    "frontend/playwright.config.ts", "frontend/.prettierignore",
     "benchmarks/fewshot/2-2_sft_pool.jsonl",
     "benchmarks/answer_eval/v1/demo-case.json",
     # Frozen experiment configuration (non-sensitive test fixture input);
