@@ -171,11 +171,14 @@ def cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     ``total`` is only present when every call could be priced; otherwise the
     known part is reported as a floor with its coverage. Costs are never summed
     across currencies — that would be an invented exchange rate.
+    A call reporting only input or output tokens contributes its known cost
+    to the floor, but remains a missing-usage call until both sides are known.
     """
     snapshot, error = load_pricing()
     priced: list[tuple[Decimal, str]] = []
     no_price = 0
     no_usage = 0
+    partial_usage = 0
     currencies: set[str] = set()
     versions: set[str] = set()
     sources: set[str] = set()
@@ -196,6 +199,8 @@ def cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 no_usage += 1
             continue
         assert currency is not None
+        if row.get("input_tokens") is None or row.get("output_tokens") is None:
+            partial_usage += 1
         currencies.add(currency)
         priced.append((cost, currency))
     calls = len(rows)
@@ -207,7 +212,7 @@ def cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         sum((amount for amount, _ in priced), Decimal(0))
         if priced and single_currency is not None else None
     )
-    complete = bool(calls) and known == calls and single_currency is not None
+    complete = bool(calls) and known == calls and partial_usage == 0 and single_currency is not None
     return {
         "configured": snapshot is not None or bool(known) or no_price < calls,
         "config_error": error,
@@ -221,9 +226,9 @@ def cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "versions": sorted(value for value in versions if value),
         "source": next(iter(sources)) if len(sources) == 1 else None,
         "calls": calls,
-        "known_calls": known,
+        "known_calls": known - partial_usage,
         "no_price_calls": no_price,
-        "usage_missing_calls": no_usage,
+        "usage_missing_calls": no_usage + partial_usage,
         "partial_total": _money(partial_total, single_currency),
         "total": _money(partial_total, single_currency) if complete else None,
     }
@@ -243,6 +248,10 @@ def _turn_rows(rows: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[st
         costs = [_cost_of(item) for item in items]
         currencies = {currency for _, currency in costs if currency is not None}
         known = [cost for cost, _ in costs if cost is not None]
+        complete_calls = sum(
+            cost is not None and item.get("input_tokens") is not None and item.get("output_tokens") is not None
+            for item, (cost, _) in zip(items, costs)
+        )
         single_currency = next(iter(currencies)) if len(currencies) == 1 else None
         total = sum(known, Decimal(0)) if known else None
         turns.append({
@@ -252,11 +261,11 @@ def _turn_rows(rows: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[st
             "models": sorted({str(item.get("model") or "") for item in items}),
             "input_tokens": _sum_known([item.get("input_tokens") for item in items]),
             "output_tokens": _sum_known([item.get("output_tokens") for item in items]),
-            "known_calls": len(known),
-            "unknown_calls": len(items) - len(known),
+            "known_calls": complete_calls,
+            "unknown_calls": len(items) - complete_calls,
             "mixed_currency": len(currencies) > 1,
-            "cost": _money(total, single_currency) if len(known) == len(items) and single_currency else None,
-            "partial_cost": _money(total, single_currency) if known else None,
+            "cost": _money(total, single_currency) if complete_calls == len(items) and single_currency else None,
+            "partial_cost": _money(total, single_currency) if known and single_currency else None,
         })
     # Newest turn first: call rows arrive in order, so the last item is the latest.
     turns.sort(key=lambda item: item["turn_key"] or "", reverse=True)

@@ -129,6 +129,34 @@ class CostAccountingTests(unittest.TestCase):
         self.assertEqual(cost["no_price_calls"], 1)
         self.assertEqual(cost["usage_missing_calls"], 0)
 
+    def test_one_sided_usage_reports_only_a_lower_bound_for_call_and_turn(self):
+        for usage, expected in (({"prompt_tokens": 1000}, "0.0020 CNY"),
+                                ({"completion_tokens": 500}, "0.0040 CNY")):
+            with self.subTest(usage=usage), pricing_env():
+                with db_scope(Path(self.directory.name) / f"partial-{len(usage)}-{next(iter(usage))}.db"):
+                    init_db(seed=True)
+                    self._call(kind="chat", model="model-a", usage=usage, turn_key="partial-turn")
+                    summary = usage_summary(1)
+                self.assertIsNone(summary["cost"]["total"])
+                self.assertEqual(summary["cost"]["partial_total"], expected)
+                self.assertEqual(summary["cost"]["known_calls"], 0)
+                self.assertEqual(summary["cost"]["usage_missing_calls"], 1)
+                self.assertIsNone(summary["turns"][0]["cost"])
+                self.assertEqual(summary["turns"][0]["partial_cost"], expected)
+                self.assertEqual(summary["turns"][0]["unknown_calls"], 1)
+
+    def test_mixed_currency_turn_has_no_partial_sum(self):
+        other = json.loads(json.dumps(SNAPSHOT))
+        other["currency"] = "USD"
+        with pricing_env():
+            self._call(kind="critic", model="model-a", usage={"prompt_tokens": 10, "completion_tokens": 5}, turn_key="mixed-turn")
+        with pricing_env(other):
+            self._call(kind="critic", model="model-b", usage={"prompt_tokens": 10, "completion_tokens": 5}, turn_key="mixed-turn")
+        turn = usage_summary(1)["turns"][0]
+        self.assertTrue(turn["mixed_currency"])
+        self.assertIsNone(turn["cost"])
+        self.assertIsNone(turn["partial_cost"])
+
     def test_price_changes_do_not_rewrite_history(self):
         with pricing_env():
             self._call(kind="chat", model="model-a", usage={"prompt_tokens": 1000, "completion_tokens": 500}, turn_key="turn-1")
