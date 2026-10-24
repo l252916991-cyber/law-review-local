@@ -18,7 +18,14 @@ from contextvars import copy_context
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from .context import TurnContext, context_result, limit_contexts
+from .context import (
+    TurnContext,
+    context_policy,
+    context_result,
+    limit_contexts,
+    memory_meta,
+    prepare_memory_clues,
+)
 from .db import connect, now, transaction
 from .rag import HybridRetriever, recall_memories, remember
 from .services import call_local_llm, concise, detect_route, rowdict
@@ -590,6 +597,7 @@ class CriticAgent:
         use_llm: bool,
         *,
         history: str = "",
+        memory: str = "",
         object_note: str = "",
     ) -> dict[str, Any]:
         failed_validation = None
@@ -605,6 +613,7 @@ class CriticAgent:
                     timeout=self.timeout,
                     model_override=self.model,
                     history=history,
+                    memory=memory,
                     object_note=object_note,
                 )
                 validation = validate_review_answer(answer, contexts)
@@ -799,6 +808,12 @@ class LawReviewCoordinator:
             )
             memories["summary"] = f"召回 {len(memories['items'])} 条案件长期记忆"
             steps.append(self._record_step(run_id, "memory_recall", "记忆 Agent", "completed", {"query": retrieval_question}, memories, memory_started, memory_ms))
+            policy = context.policy if context is not None else context_policy()
+            memory_clues = prepare_memory_clues(
+                self.case_id, retrieval_question, self.prefer_remote_embeddings, policy,
+                items=memories["items"],
+                require_history=bool((context_identity.get("history") or {}).get("used")),
+            )
 
             active_node, active_role, active_started = "retrieve", "检索 Agent", now()
             retrieval, retrieval_ms, retrieval_started = self._timed(
@@ -864,7 +879,7 @@ class LawReviewCoordinator:
             critic, critic_ms, critic_started = self._timed(
                 lambda: self.critic_agent.run(
                     question, route, contexts, specialist_outputs, use_llm,
-                    history=history_text, object_note=object_note_text,
+                    history=history_text, memory=memory_clues["text"], object_note=object_note_text,
                 )
             )
             critic["summary"] = f"引用检查 {critic['citation_check']}，LLM={'on' if critic['llm_used'] else 'off'}"
@@ -940,6 +955,7 @@ class LawReviewCoordinator:
                 "citations": citations,
                 "retrieval_metrics": retrieval["metrics"],
                 "memory_hits": memories["items"],
+                "memory_meta": memory_clues["meta"],
                 "llm_used": critic["llm_used"],
                 "llm_model": critic["llm_model"],
                 "fallback_reason": critic["fallback_reason"],

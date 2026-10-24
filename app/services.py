@@ -37,7 +37,9 @@ from .context import (
     context_policy,
     limit_contexts,
     load_history,
+    memory_meta,
     object_note,
+    prepare_memory_clues,
     record_turn,
     render_history,
     resolve_question,
@@ -851,10 +853,12 @@ def chat(
         "policy": policy.as_dict(),
         "history": history.as_dict(),
         "resolution": resolution_meta,
+        "memory": memory_meta(policy, reason="not_started"),
     }
     audit = ("AI阅卷问答", f"{user_name or '本机律师'}：{concise(question, 60)}")
 
     if resolution.status == "needs_clarification":
+        context_meta["memory"] = memory_meta(policy, reason="clarification_required")
         answer, clarification = build_clarification(question, resolution, documents_by_id)
         validation = validate_context_notice(answer, "clarification")
         provenance = {
@@ -898,6 +902,7 @@ def chat(
     answer_status = "answered"
     clarification = None
     if route == "目录统计":
+        context_meta["memory"] = memory_meta(policy, reason="route_not_model")
         answer, contexts = statistics_answer(case_id, question)
         answer += "\n\n以上为当前数据库目录统计，请律师核对材料是否完整。"
         llm_used = False
@@ -924,6 +929,7 @@ def chat(
         ).retrieve(resolution.retrieval_query, 6)
         contexts = limit_contexts(contexts, resolution.object_document_ids)
         if not contexts:
+            context_meta["memory"] = memory_meta(policy, reason="insufficient_source")
             answer, insufficient = build_insufficient(question, resolution, documents_by_id)
             validation = validate_context_notice(answer, "insufficient_evidence")
             provenance = {
@@ -964,9 +970,15 @@ def chat(
         )
         llm_used = False
         if use_llm:
+            memory_clues = prepare_memory_clues(
+                case_id, resolution.retrieval_query, use_remote_embeddings, policy,
+                require_history=bool(history_text),
+            )
+            context_meta["memory"] = memory_clues["meta"]
             try:
                 answer = call_local_llm(
-                    question, route, contexts, history=history_text, object_note=note,
+                    question, route, contexts, history=history_text,
+                    memory=memory_clues["text"], object_note=note,
                 )
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:
@@ -982,6 +994,7 @@ def chat(
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
                 raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
         else:
+            context_meta["memory"] = memory_meta(policy, reason="llm_disabled")
             answer = fallback_answer(question, route, contexts, scope_label)
             provenance = {"mode": "rule-retrieval", "llm_attempted": False}
         if fallback_reason:
@@ -996,6 +1009,7 @@ def chat(
             "history_used": bool(history_text),
             "history_digest": history.digest,
             "resolution": resolution_meta,
+            "memory": context_meta["memory"],
         },
     }
     context_meta["history"] = history.as_dict(used=bool(history_text))

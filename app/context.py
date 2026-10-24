@@ -29,6 +29,7 @@ MAX_MEMORY_ITEMS = 3
 MAX_MEMORY_CHARS = 2000
 MAX_CONTEXT_CHARS = 6000
 TURN_KINDS = ("answer", "clarification", "insufficient_evidence")
+CITATION_MARKER = re.compile(r"[\[【［]\s*资料\s*\d+\s*[\]】］]")
 
 TRUNCATION_MARKER = "\n…（历史摘录已截断）"
 
@@ -431,7 +432,8 @@ def render_history(turns: tuple[HistoryTurn, ...] | list[HistoryTurn]) -> str:
             "insufficient_evidence": "此前结论为资料不足，不是事实结论",
         }.get(turn.kind, "此前回答待核验，不是证据")
         lines.append(f"[第{index}轮] 用户：{turn.user_content}")
-        lines.append(f"[第{index}轮] 助手（{marker}）：{turn.assistant_content}")
+        assistant_content = CITATION_MARKER.sub("（历史引用编号已移除）", turn.assistant_content)
+        lines.append(f"[第{index}轮] 助手（{marker}）：{assistant_content}")
     return "\n".join(lines)
 
 
@@ -987,6 +989,7 @@ class TurnContext:
         )
         return {
             "policy_version": self.policy.version,
+            "policy": self.policy.as_dict(),
             "case_id": self.case_id,
             "question": self.question,
             "retrieval_question": self.retrieval_question,
@@ -1039,6 +1042,25 @@ def prepare_turn(
         documents_by_id={document["id"]: document for document in documents},
         user_name=user_name or "本机律师",
         use_llm=use_llm,
+    )
+
+
+def policy_from_identity(identity: dict[str, Any] | None) -> ContextPolicy:
+    """Rebuild the frozen policy; unknown fields fall back to defaults."""
+    data = (identity or {}).get("policy")
+    if not isinstance(data, dict):
+        return context_policy()
+    defaults = ContextPolicy()
+    return ContextPolicy(
+        version=str(data.get("version") or defaults.version),
+        history_enabled=bool(data.get("history_enabled", defaults.history_enabled)),
+        max_history_turns=int(data.get("max_history_turns", defaults.max_history_turns)),
+        max_history_chars=int(data.get("max_history_chars", defaults.max_history_chars)),
+        max_turn_chars=int(data.get("max_turn_chars", defaults.max_turn_chars)),
+        memory_enabled=bool(data.get("memory_enabled", defaults.memory_enabled)),
+        max_memory_items=int(data.get("max_memory_items", defaults.max_memory_items)),
+        max_memory_chars=int(data.get("max_memory_chars", defaults.max_memory_chars)),
+        max_total_chars=int(data.get("max_total_chars", defaults.max_total_chars)),
     )
 
 
@@ -1197,3 +1219,177 @@ def record_agent_turn(
         source_run_id=source_run_id,
         audit=(audit_action, audit_detail) if audit_action else None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Optional draft-memory clues (M05 ablation switch, default off)
+# ---------------------------------------------------------------------------
+
+MEMORY_TRUST = "structural_checks_only_lawyer_review_required"
+MEMORY_HEADER = (
+    "【历史草稿线索｜不可信，非证据；不得作为事实依据或引用来源，只可提示待核验方向】"
+)
+
+
+def _sanitize_clue(text: str) -> str:
+    """A draft may quote an older citation token; strip it so it cannot be reused."""
+    return CITATION_MARKER.sub("（历史引用编号已移除）", text).strip()
+
+
+def _citation_pages_exist(conn: Any, case_id: int, citations: list[dict[str, Any]]) -> str:
+    for citation in citations:
+        document_id = citation.get("document_id")
+        page_no = citation.get("page")
+        if document_id is None or page_no is None:
+            return "source_citation_invalid"
+        found = conn.execute(
+            """SELECT 1 FROM pages p JOIN documents d ON d.id=p.document_id
+               WHERE p.document_id=? AND p.page_no=? AND d.case_id=?""",
+            (int(document_id), int(page_no), case_id),
+        ).fetchone()
+        if found is None:
+            return "source_pages_deleted"
+    return ""
+
+
+def valid_memory_clues(
+    case_id: int, items: list[dict[str, Any]], policy: ContextPolicy
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Keep only drafts whose source run and pages can still be verified.
+
+    A draft never becomes evidence: this only decides whether it may be shown to
+    the model as an untrusted lead. Unknown trust, missing runs, deleted source
+    conversations, missing/stale page citations and budget overruns are excluded
+    with a reason, never silently included.
+    """
+    valid: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    if not policy.memory_enabled or policy.max_memory_items <= 0 or policy.max_memory_chars <= 0:
+        return valid, excluded
+    used_chars = 0
+    conn = connect()
+    try:
+        for item in items:
+            memory_id = item.get("id")
+            if len(valid) >= policy.max_memory_items:
+                excluded.append({"memory_id": memory_id, "reason": "item_budget"})
+                continue
+            if item.get("trust") != MEMORY_TRUST:
+                excluded.append({"memory_id": memory_id, "reason": "trust_marker_missing"})
+                continue
+            try:
+                source_run_id = int(item.get("source_run_id"))
+            except (TypeError, ValueError):
+                excluded.append({"memory_id": memory_id, "reason": "source_run_missing"})
+                continue
+            run = conn.execute(
+                """SELECT case_id, status, conversation_id, citations_json
+                   FROM agent_runs WHERE id=?""",
+                (source_run_id,),
+            ).fetchone()
+            if run is None or int(run["case_id"]) != int(case_id) or run["status"] != "completed":
+                excluded.append({"memory_id": memory_id, "reason": "source_run_invalid"})
+                continue
+            if run["conversation_id"] is not None:
+                conversation = conn.execute(
+                    "SELECT 1 FROM conversations WHERE id=?", (int(run["conversation_id"]),)
+                ).fetchone()
+                if conversation is None:
+                    excluded.append({"memory_id": memory_id, "reason": "source_conversation_deleted"})
+                    continue
+            try:
+                citations = json.loads(run["citations_json"] or "[]")
+            except (TypeError, ValueError):
+                citations = []
+            citations = [entry for entry in citations if isinstance(entry, dict)] if isinstance(citations, list) else []
+            if not citations:
+                excluded.append({"memory_id": memory_id, "reason": "source_citation_missing"})
+                continue
+            citation_problem = _citation_pages_exist(conn, case_id, citations)
+            if citation_problem:
+                excluded.append({"memory_id": memory_id, "reason": citation_problem})
+                continue
+            content = _sanitize_clue(str(item.get("content") or ""))
+            if not content:
+                excluded.append({"memory_id": memory_id, "reason": "empty_content"})
+                continue
+            if used_chars + len(content) > policy.max_memory_chars:
+                excluded.append({"memory_id": memory_id, "reason": "char_budget"})
+                continue
+            used_chars += len(content)
+            valid.append({**item, "content": content})
+    finally:
+        conn.close()
+    return valid, excluded
+
+
+def render_memory(items: list[dict[str, Any]]) -> str:
+    if not items:
+        return ""
+    lines = [MEMORY_HEADER]
+    for item in items:
+        lines.append(
+            f"- [草稿#{item.get('id')}｜结构性校验草稿，需律师复核，非证据] {item['content']}"
+        )
+    return "\n".join(lines)
+
+
+def memory_meta(
+    policy: ContextPolicy,
+    *,
+    items: list[dict[str, Any]] | None = None,
+    excluded: list[dict[str, Any]] | None = None,
+    used: bool = False,
+    reason: str = "",
+) -> dict[str, Any]:
+    items = items or []
+    excluded = excluded or []
+    meta: dict[str, Any] = {
+        "enabled": policy.memory_enabled,
+        "used": used,
+        "count": len(items),
+        "items": [
+            {
+                "memory_id": item.get("id"),
+                "source_run_id": item.get("source_run_id"),
+                "trust": item.get("trust"),
+            }
+            for item in items
+        ],
+        "excluded": excluded,
+        "max_items": policy.max_memory_items,
+        "max_chars": policy.max_memory_chars,
+    }
+    if reason:
+        meta["reason"] = reason
+    return meta
+
+
+def prepare_memory_clues(
+    case_id: int,
+    query: str,
+    prefer_remote_embeddings: bool,
+    policy: ContextPolicy,
+    *,
+    items: list[dict[str, Any]] | None = None,
+    require_history: bool = True,
+) -> dict[str, Any]:
+    """Build optional untrusted draft clues; failures never break the answer."""
+    if not policy.memory_enabled:
+        return {"text": "", "meta": memory_meta(policy, reason="switch_off")}
+    if require_history is False:
+        return {"text": "", "meta": memory_meta(policy, reason="history_required")}
+    if items is None:
+        try:
+            from .rag import recall_memories
+
+            items = recall_memories(case_id, query, policy.max_memory_items, prefer_remote_embeddings)
+        except Exception as exc:  # recall is optional; never fail the answer for a lead
+            logger.warning("Draft memory recall failed error_type=%s", type(exc).__name__)
+            return {"text": "", "meta": memory_meta(policy, reason="recall_failed")}
+    valid, excluded = valid_memory_clues(case_id, list(items or []), policy)
+    text = render_memory(valid)
+    return {
+        "text": text,
+        "meta": memory_meta(policy, items=valid, excluded=excluded, used=bool(text)),
+    }

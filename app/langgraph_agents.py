@@ -23,6 +23,8 @@ from .context import (
     TurnContext,
     context_result,
     limit_contexts,
+    policy_from_identity,
+    prepare_memory_clues,
     source_pages_exist,
     validate_resume_identity,
 )
@@ -79,6 +81,8 @@ class ReviewState(TypedDict, total=False):
     route: str
     plan: list[dict[str, Any]]
     memory_hits: list[dict[str, Any]]
+    memory_text: str
+    memory_meta: dict[str, Any]
     memory_snapshot: list[dict[str, Any]]
     contexts: list[dict[str, Any]]
     retrieval_metrics: dict[str, Any]
@@ -265,12 +269,26 @@ class LangGraphCoordinator:
                 3,
                 state["prefer_remote_embeddings"],
             )
-            return {"items": items, "summary": f"召回 {len(items)} 条案件长期记忆"}
+            clues = prepare_memory_clues(
+                state["case_id"], _retrieval_question(state), state["prefer_remote_embeddings"],
+                policy_from_identity(state.get("context")), items=items,
+                require_history=bool((state.get("context") or {}).get("history", {}).get("used")),
+            )
+            return {
+                "items": items,
+                "summary": f"召回 {len(items)} 条案件长期记忆",
+                "memory_text": clues["text"],
+                "memory_meta": clues["meta"],
+            }
 
         output = self._run_node(
             state, "memory_recall", "记忆 Agent", {"query": _retrieval_question(state)}, run
         )
-        return {"memory_hits": output["items"]}
+        return {
+            "memory_hits": output["items"],
+            "memory_text": output["memory_text"],
+            "memory_meta": output["memory_meta"],
+        }
 
     def _retrieval_node(self, state: ReviewState) -> dict[str, Any]:
         def run() -> dict[str, Any]:
@@ -357,6 +375,7 @@ class LangGraphCoordinator:
                 state.get("specialist_outputs", {}),
                 state["use_llm"],
                 history=str(state.get("history_text") or ""),
+                memory=str(state.get("memory_text") or ""),
                 object_note=str(state.get("object_note") or ""),
             )
             output["summary"] = (
@@ -557,6 +576,7 @@ class LangGraphCoordinator:
             "citations": citations,
             "retrieval_metrics": state.get("retrieval_metrics", {}),
             "memory_hits": state.get("memory_hits", []),
+            "memory_meta": state.get("memory_meta", {}),
             "llm_used": critic["llm_used"],
             "llm_model": critic["llm_model"],
             "fallback_reason": critic["fallback_reason"],
