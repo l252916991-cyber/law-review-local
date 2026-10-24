@@ -587,3 +587,7 @@ html[data-theme="dark"] ::backdrop { background: rgba(0, 0, 0, .62); }
 .clarification-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .clarification-options button { border: 1px solid #cfe0da; background: #f6faf8; color: var(--green); border-radius: 99px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
 .clarification-options button:hover { border-color: #9bcab9; }
+
+/* A provisional answer that failed the citation contract stays visible but is
+   clearly withdrawn; it must never be mistaken for an accepted answer. */
+.message.retracted .bubble { opacity: .55; border: 1px dashed var(--danger, #b42318); }

@@ -999,6 +999,82 @@ function appendTyping() {
   $("#chat-messages").append(node); $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
 }
 
+function appendStreamingMessage() {
+  $("#typing-message")?.remove();
+  const node = document.createElement("div");
+  node.className = "message assistant";
+  node.innerHTML = '<div class="bubble"><div class="answer-meta"><span class="route-badge" data-phase>生成中</span><span class="route-badge secondary">草稿待校验</span></div><div class="answer-text" data-stream-text></div></div>';
+  $("#chat-messages").append(node);
+  $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
+  const text = node.querySelector("[data-stream-text]");
+  const phase = node.querySelector("[data-phase]");
+  return {
+    node,
+    note(value) { phase.textContent = value; },
+    // textContent keeps model output inert while it is still unvalidated.
+    append(value) { text.textContent += value; $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight; },
+    fail(message) {
+      node.classList.add("retracted");
+      phase.textContent = "已撤回";
+      text.textContent = message;
+    },
+    remove() { node.remove(); },
+  };
+}
+
+async function streamChat(payload, onEvent) {
+  const response = await fetch(`/api/cases/${state.caseId}/chat/stream`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let message = `请求失败(${response.status})`;
+    try {
+      const detail = (await response.json()).detail;
+      if (typeof detail === "string") message = detail;
+      else if (detail?.message) message = detail.message;
+    } catch { /* Non-JSON error body. */ }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/event-stream") || !response.body) {
+    // A proxy that buffers or strips the stream still yields a usable answer.
+    onEvent({ type: "final", data: await response.json() });
+    return;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const dispatch = (frame) => {
+    let type = "message";
+    const dataLines = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event: ")) type = line.slice(7).trim();
+      else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+    }
+    if (!dataLines.length) return;
+    let data;
+    try { data = JSON.parse(dataLines.join("\n")); } catch { return; }
+    onEvent({ type, data });
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let index;
+    while ((index = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      dispatch(frame);
+    }
+  }
+  if (buffer.trim()) dispatch(buffer);
+}
+
 async function sendChat(event) {
   event?.preventDefault();
   const input = $("#chat-input"), question = input.value.trim();
@@ -1006,14 +1082,29 @@ async function sendChat(event) {
   if ($(".welcome-message")) $("#chat-messages").innerHTML = "";
   appendMessage("user", question); input.value = ""; appendTyping();
   const button = $(".send-button"); button.disabled = true;
+  const provisional = appendStreamingMessage();
+  let settled = false;
   try {
-    const result = await api(`/api/cases/${state.caseId}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, user_name: $("#user-name").value || "本机律师", conversation_id: state.conversationId, use_llm: $("#llm-toggle").checked }) });
-    $("#typing-message")?.remove(); state.conversationId = result.conversation_id;
-    appendMessage("assistant", result.answer, result.route, result.citations, result.semantic_expansion, result.llm_used, result.clarification);
-    $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
-    state.conversations = await api(`/api/cases/${state.caseId}/conversations`); renderConversations();
+    await streamChat({ question, user_name: $("#user-name").value || "本机律师", conversation_id: state.conversationId, use_llm: $("#llm-toggle").checked }, ({ type, data }) => {
+      if (type === "status") provisional.note("检索中…");
+      else if (type === "token") { $("#typing-message")?.remove(); provisional.note("生成中"); provisional.append(data.text); }
+      else if (type === "retract") { settled = true; $("#typing-message")?.remove(); provisional.fail(data.message || "模型调用失败，已撤回未校验草稿"); }
+      else if (type === "final") {
+        settled = true;
+        $("#typing-message")?.remove();
+        provisional.remove();
+        state.conversationId = data.conversation_id;
+        appendMessage("assistant", data.answer, data.route, data.citations, data.semantic_expansion, data.llm_used, data.clarification);
+        $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
+      }
+    });
+    if (!settled) provisional.fail("连接中断，请重试");
+    if (settled && state.conversationId) {
+      state.conversations = await api(`/api/cases/${state.caseId}/conversations`); renderConversations();
+    }
   } catch (error) {
     $("#typing-message")?.remove();
+    provisional.remove();
     // An explicitly supplied conversation that is gone or archived must not be
     // silently replaced: stop reusing it and show the server's explanation.
     if ([404, 409].includes(error.status) && state.conversationId) {

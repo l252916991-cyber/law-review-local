@@ -22,7 +22,7 @@ from collections import defaultdict
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from docx import Document as DocxDocument
 
@@ -708,6 +708,93 @@ def read_json_with_deadline(
     return json.loads(payload)
 
 
+def read_sse_with_deadline(
+    response: Any,
+    timeout: float,
+    *,
+    deadline: float | None = None,
+    max_bytes: int = 8 * 1024 * 1024,
+    on_event: "Callable[[dict[str, Any]], None] | None" = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Consume an OpenAI-compatible SSE stream under the same guards as JSON reads.
+
+    The deadline is absolute, so a server that keeps a connection alive but never
+    finishes still fails at the configured total limit. ``on_event`` receives each
+    decoded frame; the return value is the concatenated delta text and the last
+    reported ``usage`` object (``None`` when the server never sends one).
+    """
+    deadline = time.monotonic() + timeout if deadline is None else deadline
+    buffer = bytearray()
+    text_parts: list[str] = []
+    usage: dict[str, Any] | None = None
+    finished = False
+
+    def consume(line: bytes) -> None:
+        nonlocal usage, finished
+        # bytearray.partition yields bytearrays, which are unhashable and would
+        # fail the [DONE] set lookup; normalise before parsing.
+        stripped = bytes(line).strip()
+        if not stripped or stripped.startswith(b":"):
+            return
+        if not stripped.startswith(b"data:"):
+            return
+        payload = stripped[5:].strip()
+        if payload in {b"[DONE]", b"[done]"}:
+            finished = True
+            return
+        try:
+            frame = json.loads(payload)
+        except (ValueError, UnicodeDecodeError):
+            return
+        if not isinstance(frame, dict):
+            return
+        if isinstance(frame.get("usage"), dict):
+            usage = frame["usage"]
+        choices = frame.get("choices")
+        if not isinstance(choices, list) or not choices:
+            return
+        delta = choices[0].get("delta") if isinstance(choices[0], dict) else None
+        content = delta.get("content") if isinstance(delta, dict) else None
+        if isinstance(content, str) and content:
+            text_parts.append(content)
+            if on_event is not None:
+                on_event({"content": content})
+
+    reader = getattr(response, "read1", None)
+    if not callable(reader):
+        reader = response.read
+    while not finished:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            response.close()
+            raise TimeoutError(f"超过 {timeout} 秒总时限")
+        transport = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+        if transport is not None:
+            transport.settimeout(remaining)
+        try:
+            chunk = reader(8192)
+        except TimeoutError as exc:
+            response.close()
+            raise TimeoutError(f"超过 {timeout} 秒总时限") from exc
+        if not chunk:
+            break
+        if isinstance(chunk, str):
+            chunk = chunk.encode("utf-8")
+        buffer.extend(chunk)
+        if len(buffer) > max_bytes:
+            response.close()
+            raise ValueError("本地模型响应超过大小限制")
+        while b"\n" in buffer:
+            line, _, rest = buffer.partition(b"\n")
+            buffer = bytearray(rest)
+            consume(line)
+            if finished:
+                break
+    if buffer.strip() and not finished:
+        consume(buffer)
+    return "".join(text_parts), usage
+
+
 @governed_backend("llm")
 def call_local_llm(
     question: str,
@@ -719,6 +806,7 @@ def call_local_llm(
     history: str = "",
     memory: str = "",
     object_note: str = "",
+    on_token: Callable[[str], None] | None = None,
 ) -> str:
     llm = LLMConfig.load()
     timeout = llm.timeout if timeout is None else timeout
@@ -754,8 +842,9 @@ def call_local_llm(
             ],
             "temperature": llm.temperature,
             "max_tokens": llm.max_tokens,
-            "stream": False,
+            "stream": on_token is not None,
             "chat_template_kwargs": {"enable_thinking": False},
+            **({"stream_options": {"include_usage": True}} if on_token is not None else {}),
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -769,19 +858,67 @@ def call_local_llm(
     deadline = time.monotonic() + timeout
     started = time.perf_counter()
     _last_llm_usage.set(None)
+    started_at = time.monotonic()
+    first_token_at: list[float] = []
+    raw_parts: list[str] = []
+    emitted = 0
+
+    def forward(content: str) -> None:
+        """Release only text that is outside a reasoning block.
+
+        The model is asked for ``enable_thinking: false``, but a wrapped chat
+        template can still prepend ``<think>``. Holding the stream while that
+        block is open keeps a scratchpad from being rendered as an answer.
+        """
+        nonlocal emitted
+        raw_parts.append(content)
+        full = "".join(raw_parts)
+        stripped = full.lstrip()
+        if stripped.startswith("<think") and "</think>" not in stripped:
+            return
+        if stripped.startswith("<think>"):
+            head, _, tail = stripped.partition("</think>")
+            if not tail:
+                return
+            start = len(full) - len(tail)
+            if start <= emitted:
+                return
+            if not first_token_at:
+                first_token_at.append(time.monotonic())
+            assert on_token is not None
+            on_token(tail)
+            emitted = len(full)
+            return
+        if len(full) <= emitted:
+            return
+        if not first_token_at:
+            first_token_at.append(time.monotonic())
+        assert on_token is not None
+        on_token(full[emitted:])
+        emitted = len(full)
+
     try:
         with opener.open(req, timeout=timeout) as response:
-            payload = read_json_with_deadline(response, timeout, deadline=deadline)
-        answer = strip_reasoning(payload["choices"][0]["message"]["content"])
+            if on_token is None:
+                payload = read_json_with_deadline(response, timeout, deadline=deadline)
+                answer = strip_reasoning(payload["choices"][0]["message"]["content"])
+                usage = payload.get("usage") if isinstance(payload, dict) else None
+            else:
+                streamed, usage = read_sse_with_deadline(
+                    response, timeout, deadline=deadline, on_event=lambda frame: forward(frame["content"])
+                )
+                answer = strip_reasoning(streamed)
         if not answer:
             raise RuntimeError("本地模型返回了推理草稿或空正文")
         _last_llm_provenance.set(llm_provenance(route, model))
         _last_llm_usage.set(
             {
-                "usage": payload.get("usage") if isinstance(payload, dict) else None,
+                "usage": usage,
                 "model": model,
                 "latency_ms": int((time.perf_counter() - started) * 1000),
-                "ttft_ms": None,
+                "ttft_ms": (
+                    int((first_token_at[0] - started_at) * 1000) if first_token_at else None
+                ),
             }
         )
         return answer
@@ -874,6 +1011,7 @@ def chat(
     conversation_id: int | None,
     use_llm: bool,
     use_remote_embeddings: bool = True,
+    on_token: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     # Local import avoids the services -> agents -> services import cycle.
     from .agents import failure_diagnostic, validate_review_answer
@@ -1026,7 +1164,7 @@ def chat(
             try:
                 answer = call_local_llm(
                     question, route, contexts, history=history_text,
-                    memory=memory_clues["text"], object_note=note,
+                    memory=memory_clues["text"], object_note=note, on_token=on_token,
                 )
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:

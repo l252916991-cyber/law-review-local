@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
+import queue
 import re
 import sqlite3
 import tempfile
+import threading
 import time
 import uuid
 import urllib.parse
@@ -17,7 +20,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import Body, FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
@@ -1387,6 +1390,83 @@ def case_chat(case_id: int, payload: ChatRequest):
         raise HTTPException(400, str(exc)) from exc
     except RuntimeError as exc:
         raise model_operation_error(exc, "问答失败，请查看服务端诊断事件") from exc
+
+
+def _sse_frame(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/cases/{case_id}/chat/stream")
+async def case_chat_stream(case_id: int, payload: ChatRequest, request: Request):
+    """Token stream for one turn; the answer contract still validates in full.
+
+    Tokens are provisional: they reach the browser before ``validate_review_answer``
+    has run. A failed contract therefore emits ``retract`` and the client must
+    discard what it rendered. Streaming must never be a way to publish an answer
+    that the non-streaming path would have rejected.
+    """
+    require_case(case_id)
+    events: "queue.Queue[tuple[str, Any]]" = queue.Queue()
+
+    def emit(kind: str, data: Any) -> None:
+        events.put((kind, data))
+
+    def worker() -> None:
+        try:
+            result = chat(
+                case_id,
+                payload.question,
+                actor_name(payload.user_name),
+                payload.conversation_id,
+                payload.use_llm,
+                payload.use_remote_embeddings,
+                on_token=lambda text: emit("token", {"text": text, "provisional": True}),
+            )
+            emit("final", result)
+        except ArchivedConversationError as exc:
+            emit("retract", {"code": "archived_conversation", "message": str(exc)})
+        except ConversationNotFoundError as exc:
+            emit("retract", {"code": "conversation_not_found", "message": str(exc)})
+        except ValueError as exc:
+            emit("retract", {"code": "invalid_request", "message": str(exc)})
+        except RuntimeError:
+            access_logger.warning("Streaming chat failed")
+            emit("retract", {"code": "model_error", "message": "模型调用失败，已撤回未校验草稿"})
+        except Exception:
+            access_logger.exception("Streaming chat crashed")
+            emit("retract", {"code": "internal_error", "message": "问答失败，请查看服务端诊断事件"})
+        finally:
+            emit("done", {})
+
+    # A worker thread starts with an empty context. Copy the request context so
+    # the scoped database path, the authenticated principal and the request id
+    # stay visible to the same business code that runs in the blocking path.
+    context = contextvars.copy_context()
+    thread = threading.Thread(target=context.run, args=(worker,), name="lexvault-chat-stream", daemon=True)
+    thread.start()
+
+    async def generator():
+        # One status frame before the first token: the client can show progress
+        # instead of an empty bubble while retrieval runs.
+        yield _sse_frame("status", {"phase": "retrieval"})
+        while True:
+            if await request.is_disconnected():
+                return
+            try:
+                kind, data = await asyncio.to_thread(events.get, True, 15)
+            except queue.Empty:
+                # Comment frames keep intermediaries from closing an idle stream.
+                yield ": keepalive\n\n"
+                continue
+            if kind == "done":
+                return
+            yield _sse_frame(kind, data if isinstance(data, dict) else {"value": data})
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 class AgentChatRequest(BaseModel):
