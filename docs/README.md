@@ -8,6 +8,7 @@
 - [AI 应用升级实施记录](migration/ai-application-upgrade-execution-20261024.md)：提交清单、验证结果、关键设计与发现的问题。
 - [AI 应用升级收尾计划书](migration/ai-application-upgrade-continuation-plan-20261024.md)：A-E0、A01.1、A02.1–A02.2、A04.1、A06.1、A09.1 与 A11.1–A11.4 的执行顺序、验收与门禁。
 - [AI 应用升级证据与环境核对](migration/ai-application-upgrade-evidence-20261025.md)：统计口径更正、本机 Node/框架解释器/模型端点/文档工具的事实与环境缺口。
+- [AI 应用升级实施记录（A-E0 至 A06.1）](migration/ai-application-upgrade-execution-20261025.md)：六个收尾包的提交、改动、验证数字、真实缺陷与 A11 阻塞。
 - [MCP 接入](runbook/mcp.md)：只读案件工具的 stdio 启动、客户端配置与安全边界。
 - [2026-10-23 领域接入实施记录](migration/domain-integration-execution-20261023.md)：D00–D07 实际进度、用户确认范围、验证与剩余验收条件。
 - [2026-10-23 领域恢复设计](migration/domain-integration-design-20261023.md)：版本化领域图、前驱结果与复合回执、引用、模型用量和正式接入边界。
