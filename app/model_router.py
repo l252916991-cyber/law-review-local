@@ -1,9 +1,12 @@
 """Optional second model target for answers that fail the citation contract.
 
-Routing is deliberately narrow: the primary model is always tried first, and
-the fallback only runs when the primary answer is unavailable or rejected by
-``validate_review_answer``. It is not a general multi-model scheduler, and it
-never weakens the contract — the fallback answer has to pass the same checks.
+Routing is deliberately narrow: the primary model is always tried first, and the
+fallback runs at most once, only when the primary answer was produced but
+rejected by ``validate_review_answer``. A primary *transport* failure follows the
+existing failure path (rule summary plus diagnostic) instead of a second model;
+that keeps the two failure classes distinguishable. It is not a general
+multi-model scheduler, and it never weakens the contract — the fallback answer
+has to pass the same checks with the same case scope.
 """
 from __future__ import annotations
 

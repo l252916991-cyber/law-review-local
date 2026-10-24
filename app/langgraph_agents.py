@@ -368,7 +368,12 @@ class LangGraphCoordinator:
 
     def _critic_node(self, state: ReviewState) -> dict[str, Any]:
         def run() -> dict[str, Any]:
-            output = CriticAgent().run(
+            critic = CriticAgent(state["case_id"], allow_tool_loop=False)
+            # The run identity lets critic and fallback calls be attributed to
+            # this run; the tool loop stays off because a resume can re-run the
+            # critic and would otherwise spend a second round of tool calls.
+            critic.run_id = state["run_id"]
+            output = critic.run(
                 state["question"],
                 state["route"],
                 state.get("contexts", []),
@@ -577,6 +582,7 @@ class LangGraphCoordinator:
             "retrieval_metrics": state.get("retrieval_metrics", {}),
             "memory_hits": state.get("memory_hits", []),
             "memory_meta": state.get("memory_meta", {}),
+            "tools": critic.get("tools"),
             "llm_used": critic["llm_used"],
             "llm_model": critic["llm_model"],
             "fallback_reason": critic["fallback_reason"],

@@ -496,8 +496,11 @@ function renderAgentResult(result) {
   const citationHtml = result.citations?.length ? `<div class="citations">${result.citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small><em>${escapeHtml(item.retrieval_explain || "")}</em></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
   const modelBadge = result.llm_model ? `<span class="route-badge secondary">${escapeHtml(result.llm_model)}</span>` : "";
   const fallbackBadge = result.fallback_reason ? '<span class="route-badge secondary">规则降级</span>' : "";
+  const route = result.model_route || {};
+  const modelFallbackBadge = route.fallback && route.reason === "primary_failed_validation"
+    ? `<span class="route-badge secondary">回退模型 ${escapeHtml(route.model || "")}</span>` : "";
   const checkpointBadge = result.runtime === "langgraph" ? `<span class="route-badge secondary">恢复记录 ${Number(result.checkpoint_size_bytes || 0).toLocaleString("zh-CN")} B · 恢复 ${result.resume_count || 0} 次</span>` : "";
-  $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
+  $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${modelFallbackBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
   $$('[data-preview]', $("#lab-result")).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   $("#trace-total").textContent = `任务 #${result.run_id} · ${result.total_ms}ms`;
   $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("")

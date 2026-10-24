@@ -1246,6 +1246,9 @@ def chat(
                             contexts=contexts,
                             conversation_id=conversation_id,
                             use_remote_embeddings=use_remote_embeddings,
+                            history=history_text,
+                            memory=memory_clues["text"],
+                            object_note=note,
                         )
                     except ToolsUnsupportedError:
                         logger.info("Endpoint rejected tools; using single-shot answer")

@@ -209,6 +209,15 @@ def _api_json(base_url: str, path: str) -> Any:
         return json.loads(response.read())
 
 
+def _api_post(base_url: str, path: str, payload: dict[str, Any], timeout: float = 120.0) -> Any:
+    request = urllib.request.Request(
+        f"{base_url}{path}", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with _NO_PROXY.open(request, timeout=timeout) as response:
+        return json.loads(response.read())
+
+
 def _run_step(session: Any, name: str, script: str, output_dir: Path, shot: bool,
               clip: str = "") -> dict[str, Any]:
     result = session.evaluate(script)
@@ -326,7 +335,69 @@ BODY_CHAT_DB_STATE = r"""
   return {failures, notes: [String(total), roles.join(" | ")]};
 """
 
-FLOWS = ("metrics", "chat")
+def _agent_flow(base_url: str, case_id: int, model_calls: list[str]) -> list[dict[str, Any]]:
+    """Drive the native DAG agent through the governed tool loop (API level)."""
+    steps: list[dict[str, Any]] = []
+    failures: list[str] = []
+    result = _api_post(base_url, f"/api/cases/{case_id}/agent-chat", {
+        "question": "张某是否批准了年化12%的固定回报宣传？",
+        "user_name": "流程验证", "use_llm": True, "use_remote_embeddings": False,
+        "mode": "multi_agent",
+    })
+    tools = result.get("tools") or {}
+    if not tools.get("enabled"):
+        failures.append(f"Agent 未启用工具循环：{tools.get('reason')}")
+    if int(tools.get("tool_calls") or 0) < 1:
+        failures.append("工具调用次数为 0")
+    trace = tools.get("trace") or []
+    if not trace or trace[0].get("tool") != "get_page" or not trace[0].get("ok"):
+        failures.append(f"工具轨迹不符合预期：{trace}")
+    if result.get("citation_check") != "passed":
+        failures.append(f"引用校验未通过：{result.get('citation_check')}")
+    if not result.get("llm_used"):
+        failures.append("Agent 未使用模型")
+    critic_steps = [step for step in result.get("steps") or [] if step.get("node") == "critic"]
+    if not critic_steps:
+        failures.append("轨迹缺少 critic 节点")
+    steps.append({"step": "agent-01-tool-loop", "failures": failures,
+                  "result": {"run_id": result.get("run_id"), "tools": tools,
+                             "tools_used": result.get("tools_used")}})
+    print("  [ok] agent-01-tool-loop" if not failures else "  [FAIL] agent-01-tool-loop")
+    for failure in failures:
+        print(f"    - {failure}", file=sys.stderr)
+
+    trace_failures: list[str] = []
+    run_trace = _api_json(base_url, f"/api/agent-runs/{result.get('run_id')}")
+    nodes = [step.get("node_name") for step in run_trace.get("steps") or []]
+    for expected in ("planner", "retrieve", "critic"):
+        if expected not in nodes:
+            trace_failures.append(f"运行轨迹缺少 {expected}")
+    critic_output = next(
+        (step.get("output") or {} for step in run_trace.get("steps") or [] if step.get("node_name") == "critic"),
+        {},
+    )
+    if not (critic_output.get("tools") or {}).get("enabled"):
+        trace_failures.append("critic 步骤输出未记录工具状态")
+    if not (critic_output.get("tools") or {}).get("trace"):
+        trace_failures.append("critic 步骤输出缺少工具调用轨迹")
+    steps.append({"step": "agent-02-trace", "failures": trace_failures,
+                  "result": {"nodes": nodes}})
+    print("  [ok] agent-02-trace" if not trace_failures else "  [FAIL] agent-02-trace")
+
+    ledger_failures: list[str] = []
+    metrics = _api_json(base_url, f"/api/cases/{case_id}/platform-metrics")
+    by_kind = {row["kind"]: row["calls"] for row in metrics["llm_usage"]["by_kind"]}
+    if by_kind.get("tool_loop", 0) < 2:
+        ledger_failures.append(f"tool_loop 用量记录不足：{by_kind}")
+    if model_calls and "get_page" not in "\n".join(model_calls):
+        pass  # prompt text is not the contract; the trace above already asserts the call
+    steps.append({"step": "agent-03-accounting", "failures": ledger_failures,
+                  "result": {"by_kind": by_kind}})
+    print("  [ok] agent-03-accounting" if not ledger_failures else "  [FAIL] agent-03-accounting")
+    return steps
+
+
+FLOWS = ("metrics", "chat", "agent")
 
 
 def main() -> int:
@@ -339,8 +410,8 @@ def main() -> int:
 
     from scripts.browser_driver import BrowserSession, find_browser
 
-    browser = find_browser(args.browser)
-    if not browser:
+    browser = find_browser(args.browser) if args.flow != "agent" else None
+    if args.flow != "agent" and not browser:
         print(json.dumps({"ok": False, "reason": "browser unavailable"}, ensure_ascii=False))
         return 2
 
@@ -375,7 +446,7 @@ def main() -> int:
         print(f"[1/4] 准备隔离数据目录 {data_dir}")
         _seed_demo(data_dir)
         print(f"[2/4] 启动应用服务 {base_url}")
-        if args.flow in ("chat", "all"):
+        if args.flow in ("chat", "agent", "all"):
             from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, StubModel
 
             stub = StubModel().__enter__()
@@ -385,6 +456,8 @@ def main() -> int:
                 "LAW_REVIEW_EMBEDDING_URL": stub.base_url,
                 "LAW_REVIEW_EMBEDDING_MODEL": EMBEDDING_MODEL,
             })
+            if args.flow == "agent":
+                environment["LAW_REVIEW_TOOL_LOOP"] = "on"
             print(f"      模型测试替身：{stub.base_url}（固定答案，不是真实模型）")
         else:
             _seed_usage(data_dir, 1)
@@ -402,25 +475,29 @@ def main() -> int:
                 usage = _api_json(base_url, f"/api/cases/{demo_id}/platform-metrics")["llm_usage"]
                 if usage["calls"] != 3:
                     raise RuntimeError(f"unexpected seeded usage: {usage}")
-            print(f"[3/4] 启动真实浏览器（{Path(browser).name}）执行 {args.flow} 流程")
-            with BrowserSession(base_url + "/", browser=browser) as opened:
-                session = opened
-                session.wait_until("document.readyState === 'complete'")
-                session.evaluate(f"window.__demoCaseId = {demo_id}; window.__emptyCaseId = null;")
-                if args.flow in ("metrics", "all"):
-                    steps.append(_run_step(session, "00-open", _script(BODY_OPEN_METRICS), output_dir, False))
-                    steps.append(_run_step(session, "01-partial", _script(BODY_PARTIAL), output_dir, True, "#usage-panel"))
-                    steps.append(_run_step(session, "02-empty", _script(BODY_EMPTY_CASE), output_dir, True, "#usage-panel"))
-                    steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True, "#usage-panel"))
-                    steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True, "#usage-panel"))
-                    steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True, "#usage-panel"))
-                if args.flow in ("chat", "all"):
-                    baseline = [int(item["id"]) for item in _api_json(base_url, f"/api/cases/{demo_id}/conversations")]
-                    session.evaluate(f"window.__conversationBaseline = {json.dumps(baseline)};")
-                    steps.append(_run_step(session, "chat-01-answer", _script(BODY_CHAT_OPEN), output_dir, True, ".chat-panel"))
-                    steps.append(_run_step(session, "chat-02-retract", _script(BODY_CHAT_RETRACT), output_dir, True, ".chat-panel"))
-                    steps.append(_run_step(session, "chat-03-replay", _script(BODY_CHAT_REPLAY), output_dir, False))
-                    steps.append(_run_step(session, "chat-04-state", _script(BODY_CHAT_DB_STATE), output_dir, False))
+            print(f"[3/4] 执行 {args.flow} 流程")
+            if args.flow == "agent":
+                assert stub is not None
+                steps.extend(_agent_flow(base_url, demo_id, stub.prompts))
+            else:
+                with BrowserSession(base_url + "/", browser=browser) as opened:
+                    session = opened
+                    session.wait_until("document.readyState === 'complete'")
+                    session.evaluate(f"window.__demoCaseId = {demo_id}; window.__emptyCaseId = null;")
+                    if args.flow in ("metrics", "all"):
+                        steps.append(_run_step(session, "00-open", _script(BODY_OPEN_METRICS), output_dir, False))
+                        steps.append(_run_step(session, "01-partial", _script(BODY_PARTIAL), output_dir, True, "#usage-panel"))
+                        steps.append(_run_step(session, "02-empty", _script(BODY_EMPTY_CASE), output_dir, True, "#usage-panel"))
+                        steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True, "#usage-panel"))
+                        steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True, "#usage-panel"))
+                        steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True, "#usage-panel"))
+                    if args.flow in ("chat", "all"):
+                        baseline = [int(item["id"]) for item in _api_json(base_url, f"/api/cases/{demo_id}/conversations")]
+                        session.evaluate(f"window.__conversationBaseline = {json.dumps(baseline)};")
+                        steps.append(_run_step(session, "chat-01-answer", _script(BODY_CHAT_OPEN), output_dir, True, ".chat-panel"))
+                        steps.append(_run_step(session, "chat-02-retract", _script(BODY_CHAT_RETRACT), output_dir, True, ".chat-panel"))
+                        steps.append(_run_step(session, "chat-03-replay", _script(BODY_CHAT_REPLAY), output_dir, False))
+                        steps.append(_run_step(session, "chat-04-state", _script(BODY_CHAT_DB_STATE), output_dir, False))
     finally:
         if session is not None:
             session.close()
@@ -437,7 +514,7 @@ def main() -> int:
     report = {
         "ok": not failures,
         "flow": args.flow,
-        "model": "stub" if args.flow in ("chat", "all") else "not used",
+        "model": "stub" if args.flow in ("chat", "agent", "all") else "not used",
         "base_url": base_url,
         "browser": browser,
         "source_head": _source_head(),

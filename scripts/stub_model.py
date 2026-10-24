@@ -5,15 +5,18 @@ question, embeddings are deterministic hashes, and rerank scores are positional.
 It exists so the streaming protocol, the citation contract and the UI can be
 exercised without a real model, and every report that uses it must say so.
 
-Scenarios (selected by the question text):
+Scenarios (selected by the request):
 
 * ordinary question -> an answer with one valid ``[资料1]`` marker and the
   lawyer-review reminder, streamed in several chunks with a usage frame
 * question containing ``拒答校验`` -> an answer with no citation marker, which
   the host's contract must reject and retract
+* a request that offers ``tools`` and has not seen a tool result yet -> one
+  ``get_page`` tool call, so the governed read-only loop can be exercised; the
+  follow-up request carries the tool message and gets the final answer
 
-Endpoints: ``POST /v1/chat/completions`` (SSE), ``POST /v1/embeddings``,
-``POST /v1/rerank``, ``GET /v1/models``.
+Endpoints: ``POST /v1/chat/completions`` (SSE or JSON per ``stream``),
+``POST /v1/embeddings``, ``POST /v1/rerank``, ``GET /v1/models``.
 """
 from __future__ import annotations
 
@@ -87,7 +90,7 @@ class StubModel:
                     return
                 path = self.path.rstrip("/")
                 if path.endswith("/chat/completions"):
-                    model._stream_answer(self, payload)
+                    model._answer(self, payload)
                 elif path.endswith("/embeddings"):
                     inputs = payload.get("input") or []
                     if isinstance(inputs, str):
@@ -130,10 +133,13 @@ class StubModel:
         return "http://" + host + ":" + str(port) + "/v1"
 
     # -- chat --------------------------------------------------------------
-    def _stream_answer(self, handler: BaseHTTPRequestHandler, payload: dict[str, Any]) -> None:
+    def _answer(self, handler: BaseHTTPRequestHandler, payload: dict[str, Any]) -> None:
         messages = payload.get("messages") or []
         prompt = "\n".join(str(item.get("content") or "") for item in messages if isinstance(item, dict))
         self.prompts.append(prompt)
+        if payload.get("stream") is False:
+            self._json_answer(handler, prompt, messages, payload)
+            return
         answer = INVALID_ANSWER if self.retract_marker in prompt else VALID_ANSWER
         chunks = [answer[index:index + 8] for index in range(0, len(answer), 8)] or [answer]
         handler.send_response(200)
@@ -155,4 +161,39 @@ class StubModel:
                "choices": [], "usage": {"prompt_tokens": 128, "completion_tokens": 48}})
         handler.wfile.write(b"data: [DONE]\n\n")
         handler.wfile.flush()
+        handler.close_connection = True
+
+    @staticmethod
+    def _json_answer(handler: BaseHTTPRequestHandler, prompt: str, messages: list[Any],
+                     payload: dict[str, Any]) -> None:
+        """Non-streaming answer: one tool call first, then the grounded answer."""
+        has_tool_result = any(
+            isinstance(item, dict) and item.get("role") == "tool" for item in messages
+        )
+        offers_tools = bool(payload.get("tools"))
+        message: dict[str, Any] = {"role": "assistant", "content": ""}
+        if offers_tools and not has_tool_result:
+            message = {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": "stub-call-1", "type": "function",
+                    "function": {"name": "get_page",
+                                 "arguments": json.dumps({"document_id": 1, "page_no": 1})},
+                }],
+            }
+        elif "拒答校验" in prompt:
+            message["content"] = INVALID_ANSWER
+        else:
+            message["content"] = VALID_ANSWER
+        body = json.dumps({
+            "id": "stub-json-1", "object": "chat.completion", "model": CHAT_MODEL,
+            "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 96, "completion_tokens": 32},
+        }, ensure_ascii=False).encode("utf-8")
+        handler.send_response(200)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
         handler.close_connection = True

@@ -18,6 +18,28 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 引用格式有效与证据支持事实是两个指标。最终答案、来源文档、页码、节点输出与耗时供律师复核，不保存/展示模型隐藏思维链。自动金额/疏漏规则只是线索，不是法律事实裁定。
 
+## Agent 只读工具循环（A04.1）
+
+原生 DAG 的审校节点（`app/agents.py` 的 `CriticAgent`）在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/tool_loop.py`，不复制第二套参数校验或出口实现：
+
+- 案件范围由服务端注入（`CriticAgent.case_id`）；模型给出的 `case_id` 只是惰性参数，工具执行器只接受服务端值并自行反查文档归属。
+- 只读白名单来自 `app/agent_tools.py`；轮次默认 3（上限 5）、工具调用默认 6（上限 10）、单条工具结果 12k 字符上限，超限返回结构化错误而不是继续放大。
+- 工具结果、卷宗正文、历史消息与文件名一律作为不可信数据拼进消息；工具结果带 `data_notice`。
+- 端点拒绝 `tools` 参数时抛 `ToolsUnsupportedError`，审校节点显式回退到单次调用并在 `tools.reason` 记录 `endpoint_rejected_tools`。
+- 工具循环直接向模型端点发请求，因此**在宿主管控作用域内拒绝运行**（`tool_loop_unavailable_under_host_governance`），不绕过准入账本。
+- 轨迹：`tools = {enabled, reason, rounds, tool_calls, trace[{round, tool, ok, latency_ms, count}], model, budget}`，同时进入 `agent_steps` 的 critic 输出与最终结果；工具轮次的用量按每次调用记入 `llm_calls`（`kind=tool_loop`），不再额外记一条 critic 调用。
+- LangGraph 路径的 `CriticAgent` 没有案件作用域（构造时不传 `case_id`），因此记录 `case_scope_unavailable` 并保持单次调用；该路径的工具接入留待单独验收，不声称已接入。
+
+## 审校节点的一次性模型回退（A09.1）
+
+`app/model_router.py` 的策略被审校节点复用：主模型先答，**只有**主答案被 `validate_review_answer` 拒绝时才尝试一次回退模型；传输失败走既有失败路径（规则汇总 + 诊断），不再发起第二次模型调用。不引入"低置信"之类的新阈值。
+
+- 回退使用同一案件范围、同一引用校验；回退答案不过校验就回到规则汇总，`rejected_llm_validation` 保留主答案的失败项。
+- 每次调用分别记账：主调用记 `critic`，回退记 `critic_fallback`，都带同一个 `run_id`；`model_route = {fallback, reason, model}` 进入 critic 输出、`agent_steps` 与最终结果。
+- 半配置或远端未获准的回退端点抛 `FallbackConfigError`，按失败关闭处理并在 `model_route.reason=fallback_misconfigured` 记录原因，不静默退回主模型。
+- 回退只做单次调用，不重复工具循环：工具预算不会在另一个端点上再花一遍。
+- LangGraph 的审校节点现在把 `case_id` 与 `run_id` 传入 `CriticAgent`，用量与回退调用因此可归属；工具循环在该路径按运行时策略关闭（`tools.reason=runtime_policy`），因为恢复会重新执行 critic 节点，不应再花一轮工具调用。
+
 ## 聊天流式协议（A01.1）
 
 `POST /api/cases/{case_id}/chat/stream` 使用 SSE，每帧一个事件。客户端可提交 `request_id`（`[A-Za-z0-9][A-Za-z0-9_-]{7,63}`）作为幂等键。

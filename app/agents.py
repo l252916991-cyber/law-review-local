@@ -581,14 +581,154 @@ class GapDetectionAgent:
 class CriticAgent:
     role = "审校 Agent"
 
-    def __init__(self, case_id: int | None = None):
+    def __init__(self, case_id: int | None = None, *, allow_tool_loop: bool = True):
         from .config import LLMConfig
 
         self.case_id = case_id
         self.run_id: int | None = None
+        # Runtime policy, not a model decision: a path whose resume would re-run
+        # the critic (LangGraph) keeps the tool loop off so a recovery cannot
+        # spend a second round of tool calls.
+        self.allow_tool_loop = allow_tool_loop
+        self.model_route: dict[str, Any] | None = None
         config = LLMConfig.load()
         self.model = os.getenv("LAW_REVIEW_AGENT_CRITIC_MODEL", config.model)
         self.timeout = int(os.getenv("LAW_REVIEW_AGENT_CRITIC_TIMEOUT", str(config.timeout)))
+
+    def _grounded_answer(
+        self,
+        question: str,
+        route: str,
+        contexts: list[dict[str, Any]],
+        *,
+        history: str = "",
+        memory: str = "",
+        object_note: str = "",
+    ) -> tuple[str, dict[str, Any]]:
+        """One answer attempt, reusing the governed read-only tool loop.
+
+        The loop needs a server-injected case scope. The LangGraph critic is
+        built without a case id, so it keeps the single-shot path and records
+        ``case_scope_unavailable`` instead of silently losing the tools.
+        """
+        from .tool_loop import (
+            DEFAULT_MAX_ROUNDS,
+            DEFAULT_MAX_TOOL_CALLS,
+            ToolsUnsupportedError,
+            run_tool_loop,
+            tool_loop_enabled,
+        )
+
+        reason: str | None = None
+        if not self.allow_tool_loop:
+            reason = "runtime_policy"
+        elif not tool_loop_enabled():
+            reason = "tool_loop_disabled"
+        elif self.case_id is None:
+            reason = "case_scope_unavailable"
+        if reason is None:
+            try:
+                loop = run_tool_loop(
+                    case_id=int(self.case_id),  # type: ignore[arg-type]
+                    question=question,
+                    route=f"Multi-Agent/{route}",
+                    contexts=contexts,
+                    timeout=self.timeout,
+                    model_override=self.model,
+                    history=history,
+                    memory=memory,
+                    object_note=object_note,
+                )
+            except ToolsUnsupportedError:
+                # No tool calling at this endpoint: fall back explicitly and say so.
+                reason = "endpoint_rejected_tools"
+                logger.info("critic tool loop unavailable: endpoint rejected tools")
+            else:
+                return loop["answer"], {
+                    "enabled": True,
+                    "reason": None,
+                    "rounds": loop["rounds"],
+                    "tool_calls": loop["tool_calls"],
+                    "trace": loop["tool_trace"],
+                    "model": loop["model"],
+                    "budget": {"max_rounds": DEFAULT_MAX_ROUNDS, "max_tool_calls": DEFAULT_MAX_TOOL_CALLS},
+                }
+        answer = call_local_llm(
+            question,
+            f"Multi-Agent/{route}",
+            contexts,
+            timeout=self.timeout,
+            model_override=self.model,
+            history=history,
+            memory=memory,
+            object_note=object_note,
+        )
+        return answer, {"enabled": False, "reason": reason, "tool_calls": 0, "trace": []}
+
+    def _fallback_answer(
+        self,
+        question: str,
+        route: str,
+        contexts: list[dict[str, Any]],
+        *,
+        history: str = "",
+        memory: str = "",
+        object_note: str = "",
+    ) -> tuple[str, Any, dict[str, Any]] | None:
+        """One bounded fallback after the primary answer fails the contract.
+
+        Only the citation contract triggers it — there is no confidence threshold
+        and no second retry. The fallback runs with the same case scope and the
+        same validation; it is a single call without the tool loop so the tool
+        budget is never re-spent on another endpoint.
+        """
+        from .model_router import FallbackConfigError, fallback_target
+
+        try:
+            target = fallback_target()
+        except FallbackConfigError as exc:
+            # A half-configured fallback must fail closed and say why; silently
+            # degrading to the primary would hide the deployment error.
+            self.model_route = {
+                "fallback": False, "reason": "fallback_misconfigured",
+                "detail": str(exc)[:200],
+            }
+            logger.warning("critic_fallback_misconfigured")
+            return None
+        if target is None:
+            return None
+        started = time.perf_counter()
+        try:
+            answer = call_local_llm(
+                question,
+                f"Multi-Agent/{route}",
+                contexts,
+                timeout=self.timeout,
+                model_override=target.model,
+                base_url_override=target.base_url,
+                history=history,
+                memory=memory,
+                object_note=object_note,
+            )
+        except (RuntimeError, OSError, ValueError, TypeError) as exc:
+            if self.case_id is not None:
+                _account_llm_call(self.case_id, "critic_fallback", started, "failed", run_id=self.run_id)
+            self.model_route = {
+                "fallback": True, "reason": "fallback_failed", "model": target.model,
+                "error_type": type(exc).__name__,
+            }
+            return None
+        validation = validate_review_answer(answer, contexts)
+        if self.case_id is not None:
+            _account_llm_call(
+                self.case_id, "critic_fallback", started, "ok" if validation["valid"] else "failed",
+                run_id=self.run_id,
+            )
+        self.model_route = {
+            "fallback": True, "reason": "primary_failed_validation", "model": target.model,
+            "validation_valid": validation["valid"],
+        }
+        return answer, target, validation
 
     def run(
         self,
@@ -604,24 +744,23 @@ class CriticAgent:
     ) -> dict[str, Any]:
         failed_validation = None
         diagnostic = None
+        tools_attempted: dict[str, Any] = {
+            "enabled": False, "reason": "not_started", "tool_calls": 0, "trace": [],
+        }
         if use_llm:
             expert_summary = "；".join(specialist_outputs[name].get("summary", "") for name in sorted(specialist_outputs))
             grounded_question = f"{question}\n专家节点摘要：{expert_summary}。请只输出给律师的最终结论。"
             started = time.perf_counter()
             try:
-                answer = call_local_llm(
-                    grounded_question,
-                    f"Multi-Agent/{route}",
-                    contexts,
-                    timeout=self.timeout,
-                    model_override=self.model,
-                    history=history,
-                    memory=memory,
-                    object_note=object_note,
+                answer, tools_attempted = self._grounded_answer(
+                    grounded_question, route, contexts,
+                    history=history, memory=memory, object_note=object_note,
                 )
                 validation = validate_review_answer(answer, contexts)
                 if validation["valid"]:
-                    if self.case_id is not None:
+                    # Tool-loop rounds are already accounted per call under
+                    # ``tool_loop``; a second row would double count the answer.
+                    if self.case_id is not None and not tools_attempted["enabled"]:
                         _account_llm_call(
                             self.case_id, "critic", started, "ok", run_id=self.run_id,
                         )
@@ -630,14 +769,42 @@ class CriticAgent:
                         "fallback_reason": None, "citation_check": "passed",
                         "validation": validation, "memory_eligible": True,
                         "llm_attempted": True, "failure_diagnostic": None,
+                        "tools": tools_attempted, "model_route": self.model_route,
                     }
                 failed_validation = validation
-                if self.case_id is not None:
+                if self.case_id is not None and not tools_attempted["enabled"]:
                     _account_llm_call(
                         self.case_id, "critic", started, "failed", run_id=self.run_id,
                     )
-                failure = "模型输出未通过格式/来源校验：" + ", ".join(validation["issues"])
-                diagnostic = {"phase": "critic_validation", "code": "invalid_answer_contract"}
+                fallback = None
+                if self.case_id is not None:
+                    # Attribution needs the run identity; a path without it keeps
+                    # the single primary attempt and records why.
+                    fallback = self._fallback_answer(
+                        grounded_question, route, contexts,
+                        history=history, memory=memory, object_note=object_note,
+                    )
+                else:
+                    self.model_route = {"fallback": False, "reason": "run_attribution_unavailable"}
+                if fallback is not None:
+                    fallback_text, target, fallback_validation = fallback
+                    if fallback_validation["valid"]:
+                        return {
+                            "answer": fallback_text, "llm_used": True, "llm_model": target.model,
+                            "fallback_reason": None, "citation_check": "passed",
+                            "validation": fallback_validation, "memory_eligible": True,
+                            "llm_attempted": True, "failure_diagnostic": None,
+                            "rejected_llm_validation": failed_validation,
+                            "tools": tools_attempted, "model_route": self.model_route,
+                        }
+                    failure = (
+                        f"主模型与回退模型 {target.model} 的输出均未通过格式/来源校验："
+                        + ", ".join(fallback_validation["issues"])
+                    )
+                    diagnostic = {"phase": "critic_validation", "code": "invalid_answer_contract"}
+                else:
+                    failure = "模型输出未通过格式/来源校验：" + ", ".join(validation["issues"])
+                    diagnostic = {"phase": "critic_validation", "code": "invalid_answer_contract"}
                 logger.warning("critic_validation_failed issues=%s", ",".join(validation["issues"]))
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
                 if self.case_id is not None:
@@ -646,8 +813,11 @@ class CriticAgent:
                     )
                 diagnostic = failure_diagnostic(exc, "critic_llm")
                 logger.warning("critic_llm_failed error_type=%s", type(exc).__name__)
+                if tools_attempted.get("reason") == "not_started":
+                    tools_attempted = {**tools_attempted, "reason": "attempt_failed"}
                 failure = f"本地模型不可用或响应异常（{self.timeout} 秒总时限，{type(exc).__name__}）"
         else:
+            tools_attempted = {**tools_attempted, "reason": "llm_disabled"}
             failure = "本次关闭 LLM，由审校节点执行规则汇总"
 
         fact_lines = [
@@ -682,6 +852,8 @@ class CriticAgent:
             "failure_diagnostic": diagnostic,
             "llm_attempted": use_llm,
             "memory_eligible": validation["valid"] and not use_llm,
+            "tools": tools_attempted,
+            "model_route": self.model_route,
         }
 
 
@@ -969,7 +1141,13 @@ class LawReviewCoordinator:
                 "agent_type": "DAG Multi-Agent",
                 "plan": plan_output["nodes"],
                 "steps": steps,
-                "tools_used": ["BM25", "Local Embedding", "RRF", *[spec.role for spec in specialists.values()], "Critic", "Vector Memory"],
+                "tools_used": [
+                    "BM25", "Local Embedding", "RRF",
+                    *([f'Readonly Tools×{critic["tools"]["tool_calls"]}'] if critic.get("tools", {}).get("enabled") else []),
+                    *[spec.role for spec in specialists.values()], "Critic", "Vector Memory",
+                ],
+                "tools": critic.get("tools"),
+                "model_route": critic.get("model_route"),
                 "citations": citations,
                 "retrieval_metrics": retrieval["metrics"],
                 "memory_hits": memories["items"],

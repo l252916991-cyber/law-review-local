@@ -43,6 +43,11 @@ class OfflineModelTest:
 _active: ContextVar[BackendLedger | None] = ContextVar("lexvault_backend_ledger", default=None)
 
 
+def governance_active() -> bool:
+    """True while an authorized host node is executing with an admission ledger."""
+    return _active.get() is not None
+
+
 class BackendLedger:
     def __init__(self, authorize: Callable[[], None], *, max_calls: int = 128,
                  max_input_chars: int = 20_000_000, clock: Callable[[], float] = time.monotonic):
