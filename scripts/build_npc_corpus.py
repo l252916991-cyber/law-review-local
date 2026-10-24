@@ -138,6 +138,70 @@ def _repair_merged_headings(text: str) -> str:
     return "\n".join(repaired)
 
 
+_CN_DIGITS = "〇一二三四五六七八九"
+_HEADING_BREAK_CHARS = "。；！？：\n"
+
+
+def _chinese_number(value: int) -> str:
+    if not 1 <= value <= 999:
+        raise ValueError("article number outside the supported 1..999 range")
+    hundreds, rest = divmod(value, 100)
+    tens, ones = divmod(rest, 10)
+    pieces: list[str] = []
+    if hundreds:
+        pieces.append(f"{_CN_DIGITS[hundreds]}百")
+        if not tens and ones:
+            pieces.append("零")
+    if tens:
+        # 110 is 一百一十, while standalone 12 is 十二: the leading 一 appears
+        # whenever a hundreds digit is present.
+        pieces.append("十" if tens == 1 and not hundreds else f"{_CN_DIGITS[tens]}十")
+    if ones:
+        pieces.append(_CN_DIGITS[ones])
+    return "".join(pieces)
+
+
+def _realign_article_headings(text: str, numbers: range) -> str | None:
+    """Break before article headings that share a line with the previous article.
+
+    Some official publications (for example 公司法) lay the tail of one article and
+    the heading of the next on the same visual line. Only a heading that follows a
+    sentence terminator, a newline or the start of the text is a candidate, so
+    in-sentence references such as ``依照本法第一百四十四条`` are never cut. The
+    alignment must place every published article number in order, otherwise the
+    function returns ``None`` and the caller fails closed.
+    """
+    found: list[tuple[int, str]] = []
+    cursor = 0
+    for number in numbers:
+        token = f"第{_chinese_number(number)}条"
+        index = text.find(token, cursor)
+        while index != -1 and index > 0 and text[index - 1] not in _HEADING_BREAK_CHARS:
+            index = text.find(token, index + 1)
+        if index == -1:
+            return None
+        found.append((index, token))
+        cursor = index + len(token)
+    pieces: list[str] = []
+    previous = 0
+    for index, token in found:
+        if index > 0 and text[index - 1] != "\n":
+            pieces.append(text[previous:index])
+            pieces.append("\n")
+            previous = index
+        else:
+            pieces.append(text[previous:index])
+            previous = index
+        after = index + len(token)
+        pieces.append(text[index:after])
+        following = text[after:after + 1]
+        if following and following not in " \n【〔（(":
+            pieces.append(" ")
+        previous = after
+    pieces.append(text[previous:])
+    return "".join(pieces)
+
+
 def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: str) -> dict[str, Any]:
     detail = bundle["detail"]["data"]
     text = "\n".join(_page_text(page) for page in bundle["pages"])
@@ -184,6 +248,15 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
                 candidate = None
             if candidate is not None:
                 text, articles, layout_repair = repaired, candidate, "merged_heading_separator_v1"
+    if expected_min == 1 and articles is None:
+        realigned = _realign_article_headings(text, range(1, expected_max + 1))
+        if realigned is not None and realigned != text:
+            try:
+                candidate = _split(realigned)
+            except ValueError:
+                candidate = None
+            if candidate is not None:
+                text, articles, layout_repair = realigned, candidate, "article_alignment_v1"
     if articles is None:
         raise ValueError("Incomplete official publication: cannot split into the published articles")
     if expected_min != 1:

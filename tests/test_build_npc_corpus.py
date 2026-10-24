@@ -134,3 +134,61 @@ def test_repair_is_rejected_when_it_would_not_match_the_official_tree():
         assert "Incomplete" in str(error)
     else:  # pragma: no cover - the assertion documents the required failure
         raise AssertionError("incomplete official publication must not be accepted")
+
+
+def test_chinese_article_numbers_round_trip_through_the_shared_parser():
+    from app.legal_corpus import article_number
+    from scripts.build_npc_corpus import _chinese_number
+
+    for value in (1, 10, 12, 20, 100, 105, 110, 218, 999):
+        assert article_number(_chinese_number(value)) == value
+
+
+def test_breaks_article_headings_that_share_a_line_with_the_previous_article():
+    bundle = {
+        "cutoff": "2023-11-13",
+        "detail": {"data": {
+            "bbbs": "inline", "title": "中华人民共和国测试法", "gbrq": "2020-01-01", "sxrq": "2020-02-01",
+            "content": {"title": "测试法", "children": [
+                {"title": "第一条", "children": []}, {"title": "第二条", "children": []},
+            ]},
+        }},
+        "pages": [{"areas": [{"lines": [
+            _line("第一条为了规范测试活动，制定本法。第二条本法适用于测试活动的管理。"),
+        ]}]}],
+    }
+    document = extract_document(bundle, ["测试法"], "today")
+    assert document["layout_repair"] == "article_alignment_v1"
+    assert [article["heading"] for article in document["articles"]] == ["第一条", "第二条"]
+
+
+def test_inline_alignment_is_rejected_when_an_article_is_missing():
+    bundle = {
+        "cutoff": "2023-11-13",
+        "detail": {"data": {
+            "bbbs": "inline-missing", "title": "中华人民共和国测试法", "gbrq": "2020-01-01", "sxrq": "2020-02-01",
+            "content": {"title": "测试法", "children": [
+                {"title": "第一条", "children": []}, {"title": "第二条", "children": []},
+                {"title": "第三条", "children": []},
+            ]},
+        }},
+        "pages": [{"areas": [{"lines": [
+            _line("第一条为了规范测试活动，制定本法。第二条本法适用于测试活动的管理。"),
+        ]}]}],
+    }
+    try:
+        extract_document(bundle, ["测试法"], "today")
+    except ValueError as error:
+        assert "Incomplete" in str(error)
+    else:  # pragma: no cover
+        raise AssertionError("an unreachable published article must fail closed")
+
+
+def test_article_numbers_above_one_hundred_use_the_legal_spelling():
+    from app.legal_corpus import article_number
+    from scripts.build_npc_corpus import _chinese_number
+
+    assert _chinese_number(110) == "一百一十"
+    assert _chinese_number(111) == "一百一十一"
+    assert _chinese_number(210) == "二百一十"
+    assert article_number("一百一十") == 110
