@@ -2,7 +2,9 @@
 
 日期：2026-10-24（北京时间）。编制基线 `1fed2d2284d589376243c6658f3308c71ab9a6b2`，分支 `codex/g2-answerability`，编制前工作区干净。依据：[上一批实施记录](g2-remediation-execution-20261024.md)、[E03 验收参数](e03-acceptance-parameters-20261022.md)及[总执行计划](execution-plan-20261022.md)。
 
-执行状态更新（2026-10-24）：S01～S06 已完成，最终候选为 `candidate-answerability-v9-grammar`，结果和身份见[稳定性实施记录](g2-stability-execution-20261024.md)；S07 未执行，完整 G2/E07 继续不通过。以下保留计划编制时的基线、安排和验收要求，文中的“下一批”“待执行”不作为最新完成状态。
+执行状态更新（2026-10-24）：S01～S06 已完成，最终候选为 `candidate-answerability-v9-grammar`，结果和身份见[稳定性实施记录](g2-stability-execution-20261024.md)；完整 G2/E07 继续不通过。以下保留计划编制时的基线、安排和验收要求，文中的“下一批”“待执行”不作为最新完成状态。
+
+后续状态：S07 已按用户要求获取官方公开真实案例，两批共完成 30 次题目评估、60 条双对照；最终十八题行为通过，开发自审仍有两项内容问题，原资源中断的一条 unknown 保留。另修复历史成功在 deadline 后的复用缺陷，详见 [S07 执行记录](g2-public-development-execution-20261024.md)。完整 G2/E07 继续不通过，原门槛不变。
 
 ## 1. 当前基线与本批目标
 
