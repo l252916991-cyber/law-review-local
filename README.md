@@ -185,6 +185,7 @@ docker compose up -d
 | 界面「配置本地模型」 | 管理员可覆盖端点与对话模型，写入 `LAW_REVIEW_DATA_DIR/model_settings.json`，下次调用即生效，无需重启；「恢复部署默认」删除覆盖 |
 | `LAW_REVIEW_OIDC_*` | 组织登录（保持为空即禁用） |
 | `LAW_REVIEW_JSON_LOGS` / `LAW_REVIEW_LOG_LEVEL` | 结构化日志开关与级别 |
+| `LAW_REVIEW_TOOL_LOOP` | 可选：开启原生 tool calling（默认 `off`）；端点拒绝 `tools` 参数时自动回退单次问答 |
 
 ## 8. 运维
 

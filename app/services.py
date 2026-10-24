@@ -929,6 +929,13 @@ def call_local_llm(
         raise RuntimeError(f"本地模型调用失败（{type(exc).__name__}）") from exc
 
 
+def tool_loop_enabled() -> bool:
+    """Feature flag: native tool calling is opt-in per deployment."""
+    from .tool_loop import tool_loop_enabled as _enabled
+
+    return _enabled()
+
+
 PROMPT_VERSION = "chat-system-v4-multiturn-untrusted-history"
 CHAT_SYSTEM_PROMPT = (
     "你是运行在律所内网的阅卷助手。只能依据本轮卷宗片段回答，不得虚构事实或法条。"
@@ -1163,27 +1170,57 @@ def chat(
             )
             context_meta["memory"] = memory_clues["meta"]
             llm_started = time.perf_counter()
+            tool_loop_used = False
             try:
-                answer = call_local_llm(
-                    question, route, contexts, history=history_text,
-                    memory=memory_clues["text"], object_note=note, on_token=on_token,
-                )
+                # The streaming path is single-shot: tokens arrive before the tool
+                # loop could run, so combining them would publish unretractable text.
+                if on_token is None and tool_loop_enabled():
+                    from .tool_loop import ToolsUnsupportedError, run_tool_loop
+
+                    try:
+                        loop_result = run_tool_loop(
+                            case_id=case_id,
+                            question=question,
+                            route=route,
+                            contexts=contexts,
+                            conversation_id=conversation_id,
+                            use_remote_embeddings=use_remote_embeddings,
+                        )
+                    except ToolsUnsupportedError:
+                        logger.info("Endpoint rejected tools; using single-shot answer")
+                        loop_result = None
+                    if loop_result is not None:
+                        tool_loop_used = True
+                        answer = loop_result["answer"]
+                        context_meta["tools"] = {
+                            "rounds": loop_result["rounds"],
+                            "tool_calls": loop_result["tool_calls"],
+                            "trace": loop_result["tool_trace"],
+                            "model": loop_result["model"],
+                        }
+                if not tool_loop_used:
+                    answer = call_local_llm(
+                        question, route, contexts, history=history_text,
+                        memory=memory_clues["text"], object_note=note, on_token=on_token,
+                    )
                 candidate_validation = validate_review_answer(answer, contexts)
                 if candidate_validation["valid"]:
                     llm_used = True
                     provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
-                    _account_llm_call(
-                        case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
-                    )
+                    if not tool_loop_used:
+                        _account_llm_call(
+                            case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
+                        )
                 else:
                     rejected_validation = candidate_validation
                     diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
                     logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
                     raise RuntimeError("model_output_failed_validation")
             except (RuntimeError, OSError, ValueError, TypeError) as exc:
-                _account_llm_call(
-                    case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
-                )
+                if not tool_loop_used:
+                    _account_llm_call(
+                        case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
+                    )
                 diagnostic = failure_diagnostic(exc, "chat_llm")
                 logger.warning("Chat model failed error_type=%s", type(exc).__name__)
                 raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
