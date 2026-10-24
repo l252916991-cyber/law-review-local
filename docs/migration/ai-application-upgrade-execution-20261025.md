@@ -86,6 +86,7 @@ A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回�
 - 2 项失败是 `test_corpus_audit.py` 与 `test_corpus_canonical.py`，读取被 `.gitignore` 的本地过期 `output/score85/legal_corpus*`；CI 中该目录不存在时会跳过。未修改断言、未删除测试。
 - 1 项跳过是 `test_sft_pool.py`（`mlx_lm` 未安装）。
 - 覆盖率门槛 70% 保持通过。
+- Python 矩阵（自带解释器，独立数据目录）：3.11.15 与 3.14.6 均为 **1254 passed / 2 failed（同一对语料用例）/ 1 skipped**，与 3.12.13 一致。
 
 ### 3.2 页面流程证据
 
