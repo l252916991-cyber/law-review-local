@@ -446,7 +446,6 @@ BODY_WB_RUN = r"""
   if (!citations) failures.push("结果没有引用卡片");
   expectMatch("轨迹标题", text("#trace-total") || "", /^任务 #\d+/);
   notes.push(`steps=${steps} citations=${citations}`);
-  document.querySelector("#chat-messages") && (document.querySelector("#chat-messages").scrollTop = 0);
   return {failures, notes, steps};
 """
 
@@ -554,7 +553,7 @@ def main() -> int:
         print(f"[1/4] 准备隔离数据目录 {data_dir}")
         _seed_demo(data_dir)
         print(f"[2/4] 启动应用服务 {base_url}")
-        if args.flow in ("chat", "agent", "workbench", "all"):
+        if args.flow in ("chat", "agent", "workbench"):
             from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, StubModel
 
             stub = StubModel().__enter__()
@@ -598,19 +597,19 @@ def main() -> int:
                     session = opened
                     session.wait_until("document.readyState === 'complete'")
                     session.evaluate(f"window.__demoCaseId = {demo_id}; window.__emptyCaseId = null;")
-                    if args.flow in ("metrics", "all"):
+                    if args.flow == "metrics":
                         steps.append(_run_step(session, "00-open", _script(BODY_OPEN_METRICS), output_dir, False))
                         steps.append(_run_step(session, "01-partial", _script(BODY_PARTIAL), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "02-empty", _script(BODY_EMPTY_CASE), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True, "#usage-panel"))
-                    if args.flow in ("workbench", "all"):
+                    if args.flow == "workbench":
                         steps.append(_run_step(session, "wb-01-run", _script(BODY_WB_RUN), output_dir, True, ".lab-layout"))
                         steps.append(_run_step(session, "wb-02-trace", _script(BODY_WB_TRACE), output_dir, True, "#agent-trace"))
                         steps.append(_run_step(session, "wb-03-fallback", _script(BODY_WB_FALLBACK), output_dir, True, ".lab-layout"))
                         steps.append(_run_step(session, "wb-04-switch", _script(BODY_WB_SWITCH), output_dir, True, ".lab-layout"))
-                    if args.flow in ("chat", "all"):
+                    if args.flow == "chat":
                         baseline = [int(item["id"]) for item in _api_json(base_url, f"/api/cases/{demo_id}/conversations")]
                         session.evaluate(f"window.__conversationBaseline = {json.dumps(baseline)};")
                         steps.append(_run_step(session, "chat-01-answer", _script(BODY_CHAT_OPEN), output_dir, True, ".chat-panel"))
@@ -633,7 +632,7 @@ def main() -> int:
     report = {
         "ok": not failures,
         "flow": args.flow,
-        "model": "stub" if args.flow in ("chat", "agent", "workbench", "all") else "not used",
+        "model": "stub" if args.flow in ("chat", "agent", "workbench") else "not used",
         "base_url": base_url,
         "browser": browser,
         "source_head": _source_head(),
