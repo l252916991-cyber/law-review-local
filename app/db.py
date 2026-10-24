@@ -405,6 +405,17 @@ BUILTIN_EXPORT_TEMPLATES = [
 ]
 
 
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    """Add a column only when absent.
+
+    A database that already carries a later migration (restored snapshot, or a
+    version bump applied twice) must not fail on ``duplicate column name``.
+    """
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def _execute_script(conn: sqlite3.Connection, script: str) -> None:
     """Execute DDL without executescript's implicit transaction commit."""
     statement = ""
@@ -866,11 +877,9 @@ def _migrate_v21(conn: sqlite3.Connection) -> None:
     rate change cannot silently re-price history. ``turn_key`` groups the calls
     of one logical question (chat request or agent run) for turn-level reports.
     """
-    _execute_script(conn, """
-ALTER TABLE llm_calls ADD COLUMN pricing_json TEXT;
-ALTER TABLE llm_calls ADD COLUMN turn_key TEXT;
-CREATE INDEX IF NOT EXISTS idx_llm_calls_turn ON llm_calls(case_id, turn_key);
-""")
+    _add_column_if_missing(conn, "llm_calls", "pricing_json", "TEXT")
+    _add_column_if_missing(conn, "llm_calls", "turn_key", "TEXT")
+    _execute_script(conn, "CREATE INDEX IF NOT EXISTS idx_llm_calls_turn ON llm_calls(case_id, turn_key);")
 
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
