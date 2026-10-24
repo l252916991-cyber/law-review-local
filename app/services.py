@@ -280,7 +280,7 @@ def extract_pdf_pages(path: Path) -> list[str]:
                     timeout=120,
                     check=True,
                 )
-                text = run_text_command(
+                text = _vision_transcribe(Path(f"{base}.png")) or run_text_command(
                     ["tesseract", f"{base}.png", "stdout", "-l", "chi_sim+eng", "--psm", "6"],
                     timeout=120,
                 ).strip()
@@ -331,8 +331,22 @@ def extract_docx_pages(path: Path) -> list[str]:
     return _cap_total_text(chunks)
 
 
+def _vision_transcribe(path: Path) -> str | None:
+    """Best-effort vision transcription; any failure returns ``None``."""
+    try:
+        from .vlm_ocr import image_to_text
+
+        return image_to_text(path).strip()
+    except Exception as exc:  # disabled, misconfigured, timeout or bad output
+        logger.info("Vision transcription skipped error_type=%s", type(exc).__name__)
+        return None
+
+
 def extract_image_text(path: Path) -> list[str]:
     _check_parse_budget(path)
+    text = _vision_transcribe(path)
+    if text:
+        return [text]
     return [run_text_command(["tesseract", str(path), "stdout", "-l", "chi_sim+eng", "--psm", "6"], timeout=120).strip()]
 
 

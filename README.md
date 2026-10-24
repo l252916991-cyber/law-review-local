@@ -188,6 +188,7 @@ docker compose up -d
 | `LAW_REVIEW_TOOL_LOOP` | 可选：开启原生 tool calling（默认 `off`）；端点拒绝 `tools` 参数时自动回退单次问答 |
 | `LAW_REVIEW_MCP_CASE_ID` | MCP stdio 服务绑定的案件 id，配合 `python -m app.mcp_server`；见 [MCP 接入](docs/runbook/mcp.md) |
 | `LAW_REVIEW_LLM_FALLBACK*` | 可选回退模型：主模型回答未通过引用校验时重试一次，回退答案须通过同一校验 |
+| `LAW_REVIEW_VLM_*` | 可选视觉转录：扫描页优先走视觉模型，失败自动回退 Tesseract，不会产生空白页 |
 
 ## 8. 运维
 
