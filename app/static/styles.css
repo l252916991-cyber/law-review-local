@@ -583,3 +583,7 @@ html[data-theme="dark"] ::backdrop { background: rgba(0, 0, 0, .62); }
   .hero-card h2 { font-size: 34px; }
   .justice-statement { display: none; }
 }
+
+.clarification-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.clarification-options button { border: 1px solid #cfe0da; background: #f6faf8; color: var(--green); border-radius: 99px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
+.clarification-options button:hover { border-color: #9bcab9; }

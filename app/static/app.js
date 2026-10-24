@@ -965,22 +965,32 @@ async function loadConversation(id) {
   try {
     const messages = await api(`/api/conversations/${id}/messages`);
     const container = $("#chat-messages"); container.innerHTML = "";
-    for (const message of messages) appendMessage(message.role, message.content, message.route, message.citations || []);
+    for (const message of messages) {
+      let clarification = null;
+      try { clarification = JSON.parse(message.provenance_json || "{}").clarification || null; } catch { /* Legacy rows have no provenance. */ }
+      appendMessage(message.role, message.content, message.route, message.citations || [], [], false, clarification);
+    }
     container.scrollTop = container.scrollHeight;
   } catch (error) { toast(error.message, "error"); }
 }
 
-function appendMessage(role, content, route = "", citations = [], semantic = [], llmUsed = false) {
+function appendMessage(role, content, route = "", citations = [], semantic = [], llmUsed = false, clarification = null) {
   const node = document.createElement("div");
   node.className = `message ${role}`;
   if (role === "user") node.innerHTML = `<div class="bubble">${escapeHtml(content)}</div>`;
   else {
     const citationHtml = citations.length ? `<div class="citations">${citations.map((item) => `<div class="citation" data-preview="${item.document_id}" data-page="${item.page}"><span class="citation-index">${item.index}</span><div><strong>${escapeHtml(item.document_name)}</strong><small>${escapeHtml(item.quote)}</small></div><span class="citation-page">第 ${item.page} 页 →</span></div>`).join("")}</div>` : "";
     const semanticBadge = semantic?.length ? `<span class="route-badge secondary">语义扩展 ${semantic.length}</span>` : "";
-    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}</div>`;
+    const options = clarification?.options || [];
+    const optionsHtml = options.length ? `<div class="clarification-options">${options.map((item, index) => `<button type="button" data-clarify="${index + 1}">${escapeHtml(item.name)}</button>`).join("")}</div>` : "";
+    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}${optionsHtml}</div>`;
   }
   $("#chat-messages").append(node);
   $$('[data-preview]', node).forEach((button) => button.addEventListener("click", () => openPage(Number(button.dataset.preview), Number(button.dataset.page))));
+  $$('[data-clarify]', node).forEach((button) => button.addEventListener("click", () => {
+    $("#chat-input").value = `第${Number(button.dataset.clarify)}份`;
+    sendChat();
+  }));
 }
 
 function appendTyping() {
@@ -999,7 +1009,7 @@ async function sendChat(event) {
   try {
     const result = await api(`/api/cases/${state.caseId}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, user_name: $("#user-name").value || "本机律师", conversation_id: state.conversationId, use_llm: $("#llm-toggle").checked }) });
     $("#typing-message")?.remove(); state.conversationId = result.conversation_id;
-    appendMessage("assistant", result.answer, result.route, result.citations, result.semantic_expansion, result.llm_used);
+    appendMessage("assistant", result.answer, result.route, result.citations, result.semantic_expansion, result.llm_used, result.clarification);
     $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
     state.conversations = await api(`/api/cases/${state.caseId}/conversations`); renderConversations();
   } catch (error) {

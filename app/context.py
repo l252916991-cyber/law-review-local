@@ -106,6 +106,7 @@ class HistoryTurn:
     route: str
     kind: str
     citations: tuple[dict[str, Any], ...]
+    clarification_options: tuple[dict[str, Any], ...] = ()
 
     @property
     def factual(self) -> bool:
@@ -265,6 +266,27 @@ def _parse_citations(raw: str) -> tuple[dict[str, Any], ...]:
     return tuple(item for item in items if isinstance(item, dict))
 
 
+def _parse_clarification_options(row: Any) -> tuple[dict[str, Any], ...]:
+    try:
+        provenance = json.loads(_row_get(row, "provenance_json", "{}") or "{}")
+    except (TypeError, ValueError):
+        return ()
+    clarification = provenance.get("clarification") if isinstance(provenance, dict) else None
+    options = clarification.get("options") if isinstance(clarification, dict) else None
+    if not isinstance(options, list):
+        return ()
+    parsed: list[dict[str, Any]] = []
+    for item in options:
+        if not isinstance(item, dict):
+            continue
+        try:
+            document_id = int(item.get("document_id"))
+        except (TypeError, ValueError):
+            continue
+        parsed.append({"document_id": document_id, "name": str(item.get("name") or "")})
+    return tuple(parsed)
+
+
 def _turn_kind(row: Any) -> str:
     kind = _row_get(row, "kind", "answer")
     if kind in TURN_KINDS:
@@ -301,7 +323,7 @@ def load_history(
         else:
             cutoff = int(cutoff_message_id)
         rows = conn.execute(
-            """SELECT id, role, content, citations_json, route, kind
+            """SELECT id, role, content, citations_json, route, kind, provenance_json
                FROM messages WHERE conversation_id=? AND id<=? ORDER BY id""",
             (conversation["id"], cutoff),
         ).fetchall()
@@ -329,8 +351,9 @@ def load_history(
                     user_content=user,
                     assistant_content=assistant,
                     route=str(row["route"] or ""),
-                    kind=kind if not cut else kind,
+                    kind=kind,
                     citations=citations,
+                    clarification_options=_parse_clarification_options(row),
                 )
             )
             pending_user = None
@@ -491,3 +514,443 @@ def record_turn(
                 (case_id, action, detail, ts),
             )
     return int(conversation_id)
+
+
+# ---------------------------------------------------------------------------
+# Object resolution and non-factual answer contracts (M03)
+# ---------------------------------------------------------------------------
+
+ANAPHORA_PATTERN = re.compile(
+    r"(?:[它他她](?:们)?"
+    r"|(?:该|此)(?:合|协|文|材|份|笔|案|项|条|款|公|银|集|期|金|数|地|时|单位)"
+    r"|这(?:份|个|件|家|笔|条|些|项|批|款)"
+    r"|那(?:份|个|件|家|笔|条|些|项|批|款)"
+    r"|(?:上述|前述|前面|刚才|上面|此前)"
+    r"|同一(?:份|个|笔|家|项|条)?"
+    r"|其(?![他余中次实间它项]))"
+)
+CORRECTION_PATTERN = re.compile(r"(?:不是|并非|不对|改看|改为|换成|换一份|另一份|别看|更正为|重新看)")
+TYPE_WORDS = (
+    "补充协议", "采购合同", "框架协议", "会议纪要", "起诉意见书", "银行流水", "对账单",
+    "合同", "协议", "备忘录", "确认书", "订单", "发票", "笔录", "电子邮件", "宣传材料",
+    "报告", "说明", "清单", "凭证", "流水", "纪要",
+)
+ENTITY_SUFFIXES = ("有限责任公司", "股份有限公司", "有限公司", "公司", "集团", "银行", "事务所", "中心", "工作室")
+_NAME_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,6}$")
+_NAME_PREFIX = re.compile(r"^\s*(?:[0-9]+|[一二三四五六七八九十]+)\s*[_\-\.．、)]\s*")
+
+
+@dataclass(frozen=True)
+class ResolvedQuestion:
+    original: str
+    retrieval_query: str
+    status: str
+    method: str
+    reason: str
+    object_document_ids: tuple[int, ...] = ()
+    basis_message_ids: tuple[int, ...] = ()
+    options: tuple[dict[str, Any], ...] = ()
+    correction: bool = False
+    policy_version: str = CONTEXT_POLICY_VERSION
+    history_digest: str = ""
+
+    @property
+    def needs_clarification(self) -> bool:
+        return self.status == "needs_clarification"
+
+    def as_dict(self, documents: dict[int, dict[str, Any]] | None = None) -> dict[str, Any]:
+        documents = documents or {}
+        return {
+            "status": self.status,
+            "method": self.method,
+            "reason": self.reason,
+            "original": self.original,
+            "retrieval_query": self.retrieval_query,
+            "object_document_ids": list(self.object_document_ids),
+            "object_document_names": [
+                documents[doc_id]["name"] for doc_id in self.object_document_ids if doc_id in documents
+            ],
+            "basis_message_ids": list(self.basis_message_ids),
+            "options": [dict(option) for option in self.options],
+            "correction": self.correction,
+            "policy_version": self.policy_version,
+            "history_digest": self.history_digest,
+        }
+
+
+def case_documents(case_id: int) -> list[dict[str, Any]]:
+    conn = connect()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, doc_type FROM documents WHERE case_id=? ORDER BY id", (case_id,)
+        ).fetchall()
+    finally:
+        conn.close()
+    return [{"id": int(row["id"]), "name": str(row["name"] or ""), "doc_type": str(row["doc_type"] or "")} for row in rows]
+
+
+def _document_stem(name: str) -> str:
+    stem = _NAME_EXTENSION.sub("", name or "")
+    return _NAME_PREFIX.sub("", stem).strip()
+
+
+def _document_name_keys(name: str) -> list[str]:
+    stem = _NAME_EXTENSION.sub("", name or "")
+    cleaned = _NAME_PREFIX.sub("", stem).strip()
+    keys = {name.strip(), stem.strip(), cleaned}
+    for part in re.split(r"[_\-\s.．、（）()【】\[\]]+", cleaned):
+        if len(part) >= 4:
+            keys.add(part)
+    return sorted((key for key in keys if len(key) >= 4), key=len, reverse=True)
+
+
+def _entity_tokens(documents: list[dict[str, Any]]) -> set[str]:
+    tokens: set[str] = set()
+    for document in documents:
+        stem = _document_stem(document["name"])
+        for suffix in ENTITY_SUFFIXES:
+            start = 0
+            while True:
+                index = stem.find(suffix, start)
+                if index < 0:
+                    break
+                prefix = re.search(r"([\u4e00-\u9fffA-Za-z]{1,6})$", stem[:index])
+                if prefix:
+                    tokens.add(prefix.group(1) + suffix)
+                start = index + len(suffix)
+    return tokens
+
+
+def _type_tokens(question: str) -> list[str]:
+    chosen: list[str] = []
+    for word in sorted(TYPE_WORDS, key=len, reverse=True):
+        if word in question and not any(word in existing for existing in chosen):
+            chosen.append(word)
+    return chosen
+
+
+def _explicit_matches(question: str, documents: list[dict[str, Any]]) -> list[tuple[int, dict[str, Any], str]]:
+    matches: dict[int, tuple[int, dict[str, Any], str]] = {}
+    for document in documents:
+        for key in _document_name_keys(document["name"]):
+            position = question.find(key)
+            if position >= 0:
+                current = matches.get(document["id"])
+                if current is None or position < current[0]:
+                    matches[document["id"]] = (position, document, "explicit_name")
+                break
+    question_entities = [token for token in _entity_tokens(documents) if token in question]
+    types = _type_tokens(question)
+    if question_entities or types:
+        for document in documents:
+            if document["id"] in matches:
+                continue
+            name = document["name"]
+            if question_entities and not any(token in name for token in question_entities):
+                continue
+            if types and not any(token in name for token in types):
+                continue
+            if not question_entities and not types:
+                continue
+            first_position = min(
+                [question.find(token) for token in [*question_entities, *types] if token in question] or [len(question)]
+            )
+            matches[document["id"]] = (first_position, document, "explicit_entity_type")
+    return sorted(matches.values(), key=lambda item: (item[0], item[1]["id"]))
+
+
+def _match_documents(matches: list[tuple[int, dict[str, Any], str]]) -> list[dict[str, Any]]:
+    seen: set[int] = set()
+    documents: list[dict[str, Any]] = []
+    for _, document, _ in matches:
+        if document["id"] not in seen:
+            seen.add(document["id"])
+            documents.append(document)
+    return documents
+
+
+def _option(document: dict[str, Any]) -> dict[str, Any]:
+    return {"document_id": int(document["id"]), "name": str(document["name"])}
+
+
+def _selection(question: str, options: tuple[dict[str, Any], ...] | list[dict[str, Any]]) -> dict[str, Any] | None:
+    for index, option in enumerate(options, 1):
+        name = str(option.get("name") or "")
+        if name and (name in question or _document_stem(name) in question):
+            return option
+    match = re.search(r"第\s*([1-9])\s*(?:份|个|项|条)?", question)
+    if match is None:
+        match = re.fullmatch(r"\s*([1-9])\s*", question)
+    if match is not None:
+        index = int(match.group(1))
+        if 1 <= index <= len(options):
+            return options[index - 1]
+    return None
+
+
+def _history_object_candidates(
+    history: HistorySnapshot, documents: dict[int, dict[str, Any]]
+) -> tuple[list[int], tuple[int, ...], str]:
+    for turn in reversed(history.turns):
+        if not turn.factual:
+            continue
+        cited: list[int] = []
+        for citation in turn.citations:
+            try:
+                document_id = int(citation.get("document_id"))
+            except (TypeError, ValueError):
+                continue
+            if document_id in documents and document_id not in cited:
+                cited.append(document_id)
+        if cited:
+            return cited, turn.message_ids, "history_citation"
+        if turn.citations:
+            # The turn cited material that no longer exists/is accessible. Do
+            # not guess a replacement object from loose words in that turn.
+            return [], (), "history_citation_deleted"
+        mentioned = [document["id"] for _, document, _ in _explicit_matches(turn.user_content, list(documents.values()))]
+        if mentioned:
+            return mentioned, turn.message_ids, "history_mention"
+    return [], (), ""
+
+
+def _fallback_options(question: str, documents: list[dict[str, Any]], limit: int = 5) -> tuple[dict[str, Any], ...]:
+    types = _type_tokens(question)
+    ranked = [document for document in documents if any(token in document["name"] for token in types)]
+    ranked.extend(document for document in documents if document not in ranked)
+    return tuple(_option(document) for document in ranked[:limit])
+
+
+def _last_clarification(history: HistorySnapshot) -> HistoryTurn | None:
+    if history.turns and history.turns[-1].kind == "clarification":
+        return history.turns[-1]
+    return None
+
+
+def resolve_question(
+    case_id: int,
+    question: str,
+    history: HistorySnapshot | None = None,
+    *,
+    documents: list[dict[str, Any]] | None = None,
+    policy: ContextPolicy | None = None,
+) -> ResolvedQuestion:
+    """Resolve what this turn refers to without inventing facts or objects."""
+    policy = policy or context_policy()
+    documents = case_documents(case_id) if documents is None else documents
+    history = history or _empty_snapshot(case_id, None, policy)
+    documents_by_id = {document["id"]: document for document in documents}
+    question = question.strip()
+    anaphora = bool(ANAPHORA_PATTERN.search(question))
+    correction = bool(CORRECTION_PATTERN.search(question))
+
+    def result(**kwargs: Any) -> ResolvedQuestion:
+        base = {
+            "original": question,
+            "retrieval_query": question,
+            "status": "explicit",
+            "method": "none",
+            "reason": "no_ellipsis",
+            "policy_version": policy.version,
+            "history_digest": history.digest,
+            "correction": correction,
+        }
+        base.update(kwargs)
+        return ResolvedQuestion(**base)
+
+    explicit = _explicit_matches(question, documents)
+    if explicit:
+        matched = _match_documents(explicit)
+        ids = tuple(document["id"] for document in matched)
+        if len(ids) > 1 and (anaphora or correction):
+            return result(
+                status="needs_clarification",
+                method="ambiguous_explicit_object",
+                reason="explicit_mention_matches_multiple_documents",
+                options=tuple(_option(document) for document in matched),
+            )
+        return result(
+            status="explicit",
+            method=explicit[0][2],
+            reason="explicit_correction" if correction else "explicit_object",
+            object_document_ids=ids,
+        )
+
+    pending = _last_clarification(history) if policy.history_enabled else None
+    if pending is not None and pending.clarification_options:
+        selected = _selection(question, pending.clarification_options)
+        if selected is not None and int(selected["document_id"]) in documents_by_id:
+            document = documents_by_id[int(selected["document_id"])]
+            return result(
+                status="resolved",
+                method="clarification_selection",
+                reason="user_selected_previous_option",
+                object_document_ids=(document["id"],),
+                basis_message_ids=(pending.user_message_id, pending.assistant_message_id),
+                retrieval_query=_resolved_query(question, [document]),
+            )
+
+    if anaphora or correction:
+        if policy.history_enabled:
+            candidate_ids, basis, method = _history_object_candidates(history, documents_by_id)
+            candidates = [documents_by_id[document_id] for document_id in candidate_ids]
+            if len(candidates) == 1:
+                return result(
+                    status="resolved",
+                    method=method,
+                    reason="single_prior_object",
+                    object_document_ids=(candidates[0]["id"],),
+                    basis_message_ids=basis,
+                    retrieval_query=_resolved_query(question, candidates),
+                )
+            if len(candidates) > 1:
+                return result(
+                    status="needs_clarification",
+                    method="ambiguous_history_object",
+                    reason="multiple_prior_objects",
+                    basis_message_ids=basis,
+                    options=tuple(_option(document) for document in candidates),
+                )
+        if pending is not None and pending.clarification_options:
+            options = tuple(
+                option for option in pending.clarification_options
+                if int(option["document_id"]) in documents_by_id
+            )
+            return result(
+                status="needs_clarification",
+                method="pending_clarification",
+                reason="unselected_previous_clarification",
+                basis_message_ids=(pending.user_message_id, pending.assistant_message_id),
+                options=options or _fallback_options(question, documents),
+            )
+        return result(
+            status="needs_clarification",
+            method="no_prior_object",
+            reason="no_prior_context" if not history.turns else "no_resolvable_object",
+            options=_fallback_options(question, documents),
+        )
+
+    return result()
+
+
+def _resolved_query(question: str, documents: list[dict[str, Any]]) -> str:
+    names = [stem for stem in (_document_stem(document["name"]) for document in documents) if stem and stem not in question]
+    return f"{question} {' '.join(names)}".strip() if names else question
+
+
+def limit_contexts(
+    contexts: list[dict[str, Any]], document_ids: tuple[int, ...] | list[int]
+) -> list[dict[str, Any]]:
+    """Keep retrieval inside the resolved objects; never silently widen it later."""
+    if not document_ids:
+        return contexts
+    allowed = set(int(document_id) for document_id in document_ids)
+    return [item for item in contexts if int(item.get("document_id") or 0) in allowed]
+
+
+def object_note(resolution: ResolvedQuestion, documents: dict[int, dict[str, Any]]) -> str:
+    if not resolution.object_document_ids:
+        return ""
+    names = "、".join(
+        f"《{documents[document_id]['name']}》"
+        for document_id in resolution.object_document_ids
+        if document_id in documents
+    )
+    if not names:
+        return ""
+    if resolution.method == "clarification_selection":
+        basis = "用户在本轮选择了此前澄清的选项"
+    elif resolution.method.startswith("history"):
+        basis = "根据本会话前文引用定位"
+    elif resolution.correction:
+        basis = "用户本轮明确更正了对象"
+    else:
+        basis = "用户本轮明确提及"
+    return (
+        f"本轮指代对象：{names}（{basis}；仅用于定位，事实必须由本轮卷宗片段支持）。"
+        f"\n用于检索的问题：{resolution.retrieval_query}"
+    )
+
+
+def build_clarification(
+    question: str, resolution: ResolvedQuestion, documents: dict[int, dict[str, Any]] | None = None
+) -> tuple[str, dict[str, Any]]:
+    documents = documents or {}
+    options = [
+        {"document_id": int(option["document_id"]), "name": str(option.get("name") or "")}
+        for option in resolution.options
+    ]
+    if resolution.reason == "multiple_prior_objects":
+        lead = "前文提到多份材料，当前问题无法唯一确定所指对象。"
+    elif resolution.reason == "explicit_mention_matches_multiple_documents":
+        lead = "本轮提到的材料名称对应多份材料，暂不能自行选定。"
+    elif resolution.reason == "unselected_previous_clarification":
+        lead = "上一轮澄清尚未选定对象。"
+    else:
+        lead = "当前会话没有可供指代的前文对象。"
+    if options:
+        listing = "；".join(f"{index}.《{option['name']}》" for index, option in enumerate(options, 1))
+        answer = (
+            f"{lead}请确认你指的是哪份材料：{listing}。"
+            "请直接回复序号或材料名称；在对象确认前，系统不会猜测事实。"
+        )
+    else:
+        answer = (
+            f"{lead}当前案件没有可用于定位的材料。请先上传材料并说明所问对象；"
+            "在对象确认前，系统不会猜测事实。"
+        )
+    payload = {
+        "reason": resolution.reason,
+        "question": question,
+        "options": options,
+        "message": answer,
+    }
+    return answer, payload
+
+
+def build_insufficient(
+    question: str, resolution: ResolvedQuestion, documents: dict[int, dict[str, Any]] | None = None
+) -> tuple[str, dict[str, Any]]:
+    documents = documents or {}
+    scope = "、".join(
+        f"《{documents[document_id]['name']}》"
+        for document_id in resolution.object_document_ids
+        if document_id in documents
+    )
+    scope_text = scope or "当前案件材料"
+    answer = (
+        f"在{scope_text}范围内，本轮检索没有找到支持所问事项的原文，资料不足。"
+        "请补充材料、缩小问题范围或确认所指条款；系统不会引用历史回答或猜测事实。"
+    )
+    payload = {
+        "reason": "no_current_supporting_source",
+        "question": question,
+        "scope_document_ids": list(resolution.object_document_ids),
+        "message": answer,
+    }
+    return answer, payload
+
+
+def validate_context_notice(answer: str, kind: str) -> dict[str, Any]:
+    """Validate clarification/insufficient messages without relaxing fact answers."""
+    text = answer or ""
+    checks = {
+        "non_empty": bool(text.strip()),
+        "no_citation_markers": not bool(re.search(r"[\[【［]\s*资料", text)),
+        "not_a_verified_answer": "请律师复核原文与上述结论" not in text,
+        "asks_for_input": "请" in text,
+    }
+    if kind == "clarification":
+        checks["confirmation_requested"] = "确认" in text or "说明" in text
+    else:
+        checks["insufficient_declared"] = "资料不足" in text
+    issues = [name for name, passed in checks.items() if not passed]
+    return {
+        "valid": all(checks.values()),
+        "scope": f"{kind}_message_no_factual_claims",
+        "checks": checks,
+        "issues": issues,
+        "semantic_entailment_checked": False,
+        "amount_calculations_checked": False,
+        "lawyer_review_required": True,
+    }

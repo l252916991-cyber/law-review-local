@@ -53,6 +53,8 @@ token 模式的 `LAW_REVIEW_API_TOKENS_JSON` 是“随机 token → principal �
 
 服务端按受信案件与会话读取有限的完整问答轮次（初始为最近 4 轮、合计 4000 字符）用于理解指代；历史消息只作不可信参考，不是事实来源，也不参与本轮 `[资料N]` 引用编号。`LAW_REVIEW_CONTEXT_HISTORY=off` 可关闭历史读取与注入。
 
+同一会话追问时，系统先用确定性规则解析“它/该合同/第 2 份”等指代，再按解析对象重新检索，并把检索结果限定在解析范围内。对象无法唯一确定时返回 `answer_status=clarification`（HTTP 200，`citations` 为空，附候选材料与 `clarification.reason`），不生成猜测事实；下一轮可直接回复序号或材料名称。解析范围内没有本轮原文支持时返回 `answer_status=insufficient_evidence`，同样不引用历史回答。两类非事实消息的校验范围为 `*_message_no_factual_claims`，事实回答仍执行原引用校验。调用方应依据 `answer_status` 而非“是否有 `answer` 字段”区分三类结果。
+
 ## 后台阅卷
 
 单次任务使用 `POST /api/cases/{id}/agent-jobs`，返回 `202`、`job_id` 和 `poll_url`；轮询结果包含状态、已完成步骤、run_id、最终结果及恢复资格。前端刷新后可继续追踪任务。当前单进程最多 2 个执行线程、4 个已接收任务；队列满返回 429，不是分布式 worker 平台。
