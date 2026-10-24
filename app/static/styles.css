@@ -591,3 +591,12 @@ html[data-theme="dark"] ::backdrop { background: rgba(0, 0, 0, .62); }
 /* A provisional answer that failed the citation contract stays visible but is
    clearly withdrawn; it must never be mistaken for an accepted answer. */
 .message.retracted .bubble { opacity: .55; border: 1px dashed var(--danger, #b42318); }
+
+/* Execution trace detail: inputs and outputs stay collapsed until asked for. */
+.trace-open { margin-top: 10px; }
+.trace-tools { margin-top: 10px; font-size: 12px; color: var(--muted, #667085); }
+.trace-tools ul { margin: 6px 0 0; padding-left: 18px; }
+.trace-detail { margin-top: 12px; border-top: 1px solid var(--border, #e4e7ec); padding-top: 12px; }
+.trace-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.trace-detail-step { border: 1px solid var(--border, #e4e7ec); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.trace-detail-step pre { white-space: pre-wrap; word-break: break-all; margin: 4px 0 8px; font-size: 11px; max-height: 220px; overflow: auto; }

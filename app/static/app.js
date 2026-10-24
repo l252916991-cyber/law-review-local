@@ -373,7 +373,31 @@ function renderAgentResult(result) {
   $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
   $$('[data-preview]', $("#lab-result")).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   $("#trace-total").textContent = `任务 #${result.run_id} · ${result.total_ms}ms`;
-  $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("");
+  $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("")
+    + traceToolSummary(result)
+    + `<button class="secondary-button trace-open" data-run-trace="${result.run_id}">查看步骤输入输出</button>`;
+}
+
+function traceToolSummary(result) {
+  const tools = result.context?.tools;
+  if (!tools || !tools.trace?.length) return "";
+  const items = tools.trace.map((item) => `<li>${escapeHtml(item.tool)} · ${item.ok ? "成功" : "拒绝"} · ${item.latency_ms}ms${item.count == null ? "" : ` · ${item.count} 条`}</li>`).join("");
+  return `<div class="trace-tools"><strong>工具调用 ${tools.tool_calls} 次 / ${tools.rounds} 轮</strong><ul>${items}</ul></div>`;
+}
+
+async function showRunTrace(runId) {
+  const target = $("#trace-detail");
+  target.hidden = false;
+  target.innerHTML = '<div class="empty-state">加载执行轨迹…</div>';
+  try {
+    const trace = await api(`/api/agent-runs/${runId}`);
+    const steps = trace.steps || [];
+    const detail = steps.map((step, index) => `<details class="trace-detail-step"><summary>${String(index + 1).padStart(2, "0")} ${escapeHtml(step.role || step.node_name)} · ${step.latency_ms}ms · ${escapeHtml(step.status)}</summary><div><strong>输入</strong><pre>${escapeHtml(JSON.stringify(step.input ?? {}).slice(0, 1200))}</pre><strong>输出</strong><pre>${escapeHtml(JSON.stringify(step.output ?? {}).slice(0, 1200))}</pre></div></details>`).join("");
+    target.innerHTML = `<div class="trace-detail-head"><span>任务 #${runId} · ${escapeHtml(trace.status || "")} · ${steps.length} 步</span><button class="secondary-button" data-close-trace>关闭</button></div>${detail || '<div class="empty-state">该任务没有步骤记录。</div>'}`;
+    $("[data-close-trace]", target).addEventListener("click", () => { target.hidden = true; });
+  } catch (error) {
+    target.innerHTML = `<div class="empty-state">轨迹加载失败：${escapeHtml(error.message)}</div>`;
+  }
 }
 
 function comparisonCard(label, result) {
@@ -974,7 +998,7 @@ async function loadConversation(id) {
   } catch (error) { toast(error.message, "error"); }
 }
 
-function appendMessage(role, content, route = "", citations = [], semantic = [], llmUsed = false, clarification = null) {
+function appendMessage(role, content, route = "", citations = [], semantic = [], llmUsed = false, clarification = null, tools = null) {
   const node = document.createElement("div");
   node.className = `message ${role}`;
   if (role === "user") node.innerHTML = `<div class="bubble">${escapeHtml(content)}</div>`;
@@ -983,7 +1007,8 @@ function appendMessage(role, content, route = "", citations = [], semantic = [],
     const semanticBadge = semantic?.length ? `<span class="route-badge secondary">语义扩展 ${semantic.length}</span>` : "";
     const options = clarification?.options || [];
     const optionsHtml = options.length ? `<div class="clarification-options">${options.map((item, index) => `<button type="button" data-clarify="${index + 1}">${escapeHtml(item.name)}</button>`).join("")}</div>` : "";
-    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}${optionsHtml}</div>`;
+    const toolsBadge = tools?.trace?.length ? `<span class="route-badge secondary">工具 ${tools.tool_calls} 次</span>` : "";
+    node.innerHTML = `<div class="bubble"><div class="answer-meta"><span class="route-badge">${escapeHtml(route || "阅卷答复")}</span>${semanticBadge}${llmUsed ? '<span class="route-badge secondary">模型生成</span>' : ""}${toolsBadge}</div><div class="answer-text">${markdown(content)}</div>${citationHtml}${optionsHtml}</div>`;
   }
   $("#chat-messages").append(node);
   $$('[data-preview]', node).forEach((button) => button.addEventListener("click", () => openPage(Number(button.dataset.preview), Number(button.dataset.page))));
@@ -1094,7 +1119,7 @@ async function sendChat(event) {
         $("#typing-message")?.remove();
         provisional.remove();
         state.conversationId = data.conversation_id;
-        appendMessage("assistant", data.answer, data.route, data.citations, data.semantic_expansion, data.llm_used, data.clarification);
+        appendMessage("assistant", data.answer, data.route, data.citations, data.semantic_expansion, data.llm_used, data.clarification, data.context?.tools || null);
         $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
       }
     });
@@ -1348,6 +1373,10 @@ function bindEvents() {
   $("#evaluate-btn").addEventListener("click", () => runEvaluation());
   $("#ground-truth-form").addEventListener("submit", submitGroundTruth);
   $("#evaluation-result").addEventListener("click", (event) => { if (event.target.closest("[data-edit-ground-truth]")) openGroundTruthDialog(); });
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest?.("[data-run-trace]");
+    if (trigger) showRunTrace(Number(trigger.dataset.runTrace));
+  });
   $("#new-chat").addEventListener("click", resetChat);
   $("#chat-form").addEventListener("submit", sendChat);
   $("#chat-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat(); } });
