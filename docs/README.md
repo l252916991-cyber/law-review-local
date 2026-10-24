@@ -4,6 +4,8 @@
 
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
 - [威胁模型](security/threat-model.md)：资产、信任边界、提示注入与工具越权的缓解及未覆盖项。
+- [AI 应用升级计划](migration/ai-application-upgrade-plan-20261024.md)：A01–A13 工作包、验收口径与未实施原因。
+- [AI 应用升级实施记录](migration/ai-application-upgrade-execution-20261024.md)：提交清单、验证结果、关键设计与发现的问题。
 - [MCP 接入](runbook/mcp.md)：只读案件工具的 stdio 启动、客户端配置与安全边界。
 - [2026-10-23 领域接入实施记录](migration/domain-integration-execution-20261023.md)：D00–D07 实际进度、用户确认范围、验证与剩余验收条件。
 - [2026-10-23 领域恢复设计](migration/domain-integration-design-20261023.md)：版本化领域图、前驱结果与复合回执、引用、模型用量和正式接入边界。

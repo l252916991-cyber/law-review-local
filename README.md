@@ -244,6 +244,7 @@ for script in app/static/*.js; do node --check "$script"; done
 |---|---|
 | [文档总入口](docs/README.md) | 全部文档导航 |
 | [架构说明](docs/architecture/system.md) | 组件、数据流与运行时边界 |
+| [AI 应用升级计划](docs/migration/ai-application-upgrade-plan-20261024.md) | 流式、工具、MCP、评测、路由与未实施项 |
 | [运维手册](docs/runbook/operations.md) | 配置、鉴权、健康检查、故障排查 |
 | [发布手册](docs/runbook/release.md) | 发布白名单、升级与恢复演练 |
 | [质量门禁](docs/runbook/quality.md) | 依赖锁定、干净安装、测试约定 |
