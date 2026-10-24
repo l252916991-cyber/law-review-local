@@ -215,6 +215,7 @@ for script in app/static/*.js; do node --check "$script"; done
 | 模型 LawBench | 法律任务混合指标，不等于应用准确率 | `unified_benchmark_runner.py` |
 | 项目 RAG | 页级召回和排序，不等于答案事实正确率 | `rag_project_benchmark.py` |
 | 法条检索 | 冻结 gold 上的配对排序评测（hit@5 / MRR@10 / nDCG@10），衡量是否检索到正确法条与条号，不等于法条现行有效性 | `scripts/statutory_hybrid_experiment.py`、`scripts/statutory_gold_report.py` |
+| 答案级 | 必需要点、无据断言与引用页可接受性；确定性评分 + 可选 judge，不等于法律准确率 | `scripts/run_answer_eval.py` |
 | 运行时对比 | 双运行时结构、契约、性能与恢复 | `compare_agent_runtimes.py` |
 
 - **LawBench 全量成绩**（2026-09-14，`Qwythos-9B-v2-8bit-mlx` + task_guided 提示 + canonical 85 部法条库，20 类 × 500 题 = 10,000 题，零技术失败、零截断，`verify_benchmark_run.py` 校验通过）：**混合均分 63.32%**（20 任务等权平均，同配置历史基线 62.75%）。

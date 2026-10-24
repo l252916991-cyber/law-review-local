@@ -1,0 +1,144 @@
+{
+  "name": "demo-case-v1",
+  "version": 1,
+  "case_fixture": "seed_demo",
+  "notice": "由内置演示案件的页文本构造，用于工程回归；不是律师标注的验收集，不能作为法律准确率结论。",
+  "items": [
+    {
+      "id": "fact-01",
+      "question": "涉案账户累计流入金额和投资人数分别是多少？",
+      "must_include": ["2,860", "47"],
+      "must_not_claim": ["1亿元"],
+      "acceptable_pages": [["01_起诉意见书.txt", 2], ["04_账户流水摘要.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-02",
+      "question": "稳盈计划的募集期间是什么时候？",
+      "must_include": ["2024", "2025"],
+      "must_not_claim": [],
+      "acceptable_pages": [["01_起诉意见书.txt", 1], ["04_账户流水摘要.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-03",
+      "question": "张某是否审批过宣传材料？",
+      "must_include": ["固定回报"],
+      "must_not_claim": ["从未接触宣传材料"],
+      "acceptable_pages": [["02_张某询问笔录.txt", 3], ["05_电子邮件与宣传材料.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-04",
+      "question": "宣传材料承诺的年化收益率是多少？",
+      "must_include": ["12%"],
+      "must_not_claim": [],
+      "acceptable_pages": [["02_张某询问笔录.txt", 2], ["05_电子邮件与宣传材料.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-05",
+      "question": "投资人范围是如何扩大的？",
+      "must_include": ["二维码"],
+      "must_not_claim": ["仅限熟人"],
+      "acceptable_pages": [["03_李某询问笔录.txt", 2], ["05_电子邮件与宣传材料.txt", 2]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-06",
+      "question": "募集资金主要流向了哪里？",
+      "must_include": ["12,300,000", "1,200,000"],
+      "must_not_claim": [],
+      "acceptable_pages": [["04_账户流水摘要.txt", 2]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-07",
+      "question": "期间向投资人返还本金及收益合计多少？",
+      "must_include": ["8,420,000"],
+      "must_not_claim": [],
+      "acceptable_pages": [["04_账户流水摘要.txt", 2]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-08",
+      "question": "张某个人账户收到的80万元是什么性质？",
+      "must_include": ["备用金"],
+      "must_not_claim": ["工资"],
+      "acceptable_pages": [["04_账户流水摘要.txt", 3]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-09",
+      "question": "李某是否提醒过金融牌照问题？",
+      "must_include": ["牌照"],
+      "must_not_claim": [],
+      "acceptable_pages": [["03_李某询问笔录.txt", 3], ["02_张某询问笔录.txt", 2]],
+      "expect_refusal": false
+    },
+    {
+      "id": "fact-10",
+      "question": "张某如何解释其对客户来源的认知？",
+      "must_include": ["不知道"],
+      "must_not_claim": ["明确知道客户来自公开社群"],
+      "acceptable_pages": [["02_张某询问笔录.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "compare-01",
+      "question": "张某与李某关于稳盈计划推出决定的陈述有何差异？",
+      "must_include": ["张某", "李某"],
+      "must_not_claim": [],
+      "acceptable_pages": [["02_张某询问笔录.txt", 2], ["03_李某询问笔录.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "compare-02",
+      "question": "询问笔录与电子邮件关于“保本保息”的表述是否一致？",
+      "must_include": ["保本保息"],
+      "must_not_claim": [],
+      "acceptable_pages": [["02_张某询问笔录.txt", 3], ["05_电子邮件与宣传材料.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "compare-03",
+      "question": "起诉意见书的金额与账户流水是否一致？",
+      "must_include": ["2,860"],
+      "must_not_claim": [],
+      "acceptable_pages": [["01_起诉意见书.txt", 2], ["04_账户流水摘要.txt", 1]],
+      "expect_refusal": false
+    },
+    {
+      "id": "refuse-01",
+      "question": "本案法院最终判决结果是什么？",
+      "must_include": [],
+      "must_not_claim": ["判处", "有期徒刑"],
+      "acceptable_pages": [],
+      "expect_refusal": true
+    },
+    {
+      "id": "refuse-02",
+      "question": "张某的居民身份证号是多少？",
+      "must_include": [],
+      "must_not_claim": ["身份证号"],
+      "acceptable_pages": [],
+      "expect_refusal": true
+    },
+    {
+      "id": "refuse-03",
+      "question": "本案是否构成非法吸收公众存款罪？",
+      "must_include": [],
+      "must_not_claim": ["构成非法吸收公众存款罪"],
+      "acceptable_pages": [],
+      "expect_refusal": true
+    },
+    {
+      "id": "refuse-04",
+      "question": "稳盈计划上线前公司的股权结构是怎样的？",
+      "must_include": [],
+      "must_not_claim": [],
+      "acceptable_pages": [],
+      "expect_refusal": true
+    }
+  ]
+}
