@@ -29,6 +29,20 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
 - 前端至少执行 `node --check app/static/app.js`；交互、恢复与窄屏需独立浏览器验收。
 
+## 真实页面流程验证
+
+`scripts/page_flow_check.py` 用一个已安装的 Chromium 内核浏览器（Edge/Chrome/Chromium，或 `LAW_REVIEW_BROWSER` 指定路径）在隔离数据目录里启动真实 FastAPI 进程、播种合成演示案件、驱动页面并断言渲染结果；`scripts/browser_driver.py` 是仅依赖标准库的 CDP + WebSocket 客户端，不引入 npm 依赖。
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+  --flow metrics --output-dir output/browser-check
+```
+
+- 输出：`browser-check.json`（步骤、失败项、浏览器路径、源码 HEAD）、各步骤整页与元素截图、`server.log`。
+- 未安装受支持浏览器时脚本退出码 2 并输出 `browser unavailable`；这属于未验证，不是通过。
+- 该验证不联网、不写真实案件数据；模型调用另由真实模型验收单列，不用页面替身代替。
+- 浏览器在 CI 镜像中默认不存在，因此 CI 只保证编译与逻辑层测试；页面流程证据需在具备浏览器的宿主上生成并记录版本。
+
 ## GitHub Actions 版本来源
 
 截至 2026-09-05，使用官方已发布 tag 对应的完整 commit SHA，而非可变主版本标签：

@@ -99,6 +99,16 @@ def _mean_known(values: list[int | None]) -> float | None:
     return round(sum(known) / len(known), 2) if known else None
 
 
+def _known_calls(values: list[int | None]) -> int:
+    """How many samples carried a measurement; the denominator for coverage.
+
+    A caller that shows only the sum cannot tell "3 calls, 30 tokens" from
+    "1 of 3 calls reported 30 tokens". Both numbers are needed before the sum
+    may be read as anything other than a partial observation.
+    """
+    return sum(1 for value in values if value is not None)
+
+
 def _group(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -107,8 +117,14 @@ def _group(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
         {
             key: name,
             "calls": len(items),
+            "failed": sum(1 for item in items if item["status"] != "ok"),
             "input_tokens": _sum_known([item["input_tokens"] for item in items]),
             "output_tokens": _sum_known([item["output_tokens"] for item in items]),
+            "input_tokens_known_calls": _known_calls([item["input_tokens"] for item in items]),
+            "output_tokens_known_calls": _known_calls([item["output_tokens"] for item in items]),
+            "ttft_p50_ms": percentile([item["ttft_ms"] for item in items if item["ttft_ms"] is not None], 0.5),
+            "ttft_p95_ms": percentile([item["ttft_ms"] for item in items if item["ttft_ms"] is not None], 0.95),
+            "ttft_known_calls": _known_calls([item["ttft_ms"] for item in items]),
             "latency_p50_ms": percentile([item["latency_ms"] for item in items], 0.5),
             "latency_p95_ms": percentile([item["latency_ms"] for item in items], 0.95),
         }
@@ -121,6 +137,9 @@ def usage_summary(case_id: int) -> dict[str, Any]:
 
     ``input_tokens``/``output_tokens`` and the TTFT aggregates are ``None`` when
     no call reported them. That is deliberately distinct from a measured zero.
+    The ``*_known_calls`` counters are the sample size behind each aggregate, so
+    a partial sum is never presented as the complete total. Latency is measured
+    per model call; the summary makes no claim about whole-turn latency.
     """
     with transaction() as conn:
         rows = [
@@ -138,23 +157,31 @@ def usage_summary(case_id: int) -> dict[str, Any]:
             "failed": 0,
             "input_tokens": None,
             "output_tokens": None,
+            "input_tokens_known_calls": 0,
+            "output_tokens_known_calls": 0,
             "ttft_avg_ms": None,
             "ttft_p50_ms": None,
             "ttft_p95_ms": None,
+            "ttft_known_calls": 0,
             "latency_p50_ms": None,
             "latency_p95_ms": None,
             "by_kind": [],
             "by_model": [],
         }
+    input_values = [row["input_tokens"] for row in rows]
+    output_values = [row["output_tokens"] for row in rows]
     ttft_values = [row["ttft_ms"] for row in rows]
     return {
         "calls": calls,
         "failed": sum(1 for row in rows if row["status"] != "ok"),
-        "input_tokens": _sum_known([row["input_tokens"] for row in rows]),
-        "output_tokens": _sum_known([row["output_tokens"] for row in rows]),
+        "input_tokens": _sum_known(input_values),
+        "output_tokens": _sum_known(output_values),
+        "input_tokens_known_calls": _known_calls(input_values),
+        "output_tokens_known_calls": _known_calls(output_values),
         "ttft_avg_ms": _mean_known(ttft_values),
         "ttft_p50_ms": percentile([value for value in ttft_values if value is not None], 0.5),
         "ttft_p95_ms": percentile([value for value in ttft_values if value is not None], 0.95),
+        "ttft_known_calls": _known_calls(ttft_values),
         "latency_p50_ms": percentile([row["latency_ms"] for row in rows], 0.5),
         "latency_p95_ms": percentile([row["latency_ms"] for row in rows], 0.95),
         "by_kind": _group(rows, "kind"),

@@ -342,6 +342,9 @@ function hideLoadingState() {
 async function loadLabMetrics() {
   if (!state.caseId) return;
   const requestId = state.caseRequestId;
+  // The previous case's numbers are cleared before the request: a failed load
+  // must not leave a stale panel that reads as this case's usage.
+  renderUsagePending();
   try {
     const metrics = await api(`/api/cases/${state.caseId}/platform-metrics`);
     if (requestId !== state.caseRequestId) return;
@@ -360,8 +363,132 @@ async function loadLabMetrics() {
     recoveryTarget.hidden = resumable.length === 0;
     recoveryTarget.innerHTML = resumable.map((run) => `<button class="secondary-button resume-button" data-resume-run="${run.id}">继续执行 任务 #${run.id} · ${escapeHtml(run.question.slice(0, 24))}</button>`).join("");
     $$('[data-resume-run]', recoveryTarget).forEach((button) => button.addEventListener("click", resumeAgentRun));
-  } catch (error) { console.warn("Agent metrics unavailable", error); }
+    renderUsage(metrics.llm_usage);
+  } catch (error) {
+    // Only the current case may report the failure; a superseded request has
+    // already handed the panel to a newer case.
+    if (requestId !== state.caseRequestId) return;
+    console.warn("Agent metrics unavailable", error);
+    renderUsageError(error);
+  }
 }
+
+/**
+ * Formatting rules for the usage panel. Every helper keeps "unknown" and "zero"
+ * distinct: an unrmeasured token count renders as "未知", never as 0.
+ */
+const USAGE_NO_CALLS = "尚无调用";
+
+function usageTokenText(total, knownCalls, calls) {
+  if (!calls) return "—";
+  if (!knownCalls || total == null) return "未知";
+  const value = Number(total).toLocaleString("zh-CN");
+  return Number(knownCalls) === Number(calls) ? value : `≥${value}`;
+}
+
+function usageTokenNote(knownCalls, calls) {
+  if (!calls) return USAGE_NO_CALLS;
+  if (!knownCalls) return `usage 缺失 · 0/${calls} 次可用`;
+  return Number(knownCalls) === Number(calls)
+    ? `全部 ${calls} 次调用`
+    : `已知部分 · ${knownCalls}/${calls} 次调用有 usage`;
+}
+
+function usageMilliseconds(value) {
+  return value == null ? "—" : `${Math.round(Number(value))}ms`;
+}
+
+function usageSampleNote(knownCalls, calls) {
+  if (!calls || !knownCalls) return "尚无可用样本";
+  return Number(knownCalls) === Number(calls) ? `全部 ${calls} 次调用` : `可用样本 ${knownCalls}/${calls}`;
+}
+
+function usageFailedText(failed, calls) {
+  if (!calls) return USAGE_NO_CALLS;
+  return failed ? `失败 ${failed} 次` : "无失败调用";
+}
+
+function usageGroupRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) return '<p class="usage-empty">尚无调用记录</p>';
+  const head = '<div class="usage-row usage-head"><span>分组</span><b>调用</b><b>失败</b><span>输入 tokens</span><span>输出 tokens</span><span>首 token P50</span><span>延迟 P50</span></div>';
+  return head + rows.map((row) => {
+    const label = escapeHtml(String(row.kind ?? row.model ?? "未知"));
+    return `<div class="usage-row"><span>${label}</span><b>${Number(row.calls) || 0}</b><b>${Number(row.failed) || 0}</b>`
+      + `<span>${escapeHtml(usageTokenText(row.input_tokens, row.input_tokens_known_calls, row.calls))}</span>`
+      + `<span>${escapeHtml(usageTokenText(row.output_tokens, row.output_tokens_known_calls, row.calls))}</span>`
+      + `<span>${escapeHtml(usageMilliseconds(row.ttft_p50_ms))}</span>`
+      + `<span>${escapeHtml(usageMilliseconds(row.latency_p50_ms))}</span></div>`;
+  }).join("");
+}
+
+function renderUsage(summary) {
+  const missing = !summary || typeof summary !== "object";
+  const calls = missing ? 0 : Number(summary.calls) || 0;
+  $("#usage-scope").textContent = missing ? "指标不可用" : (calls ? `本案件 · ${calls} 次调用` : USAGE_NO_CALLS);
+  $("#usage-calls").textContent = String(calls);
+  $("#usage-failed").textContent = missing ? "指标缺失" : usageFailedText(summary.failed, calls);
+  if (missing || !calls) {
+    // Both "no calls yet" and "endpoint did not return the summary" leave every
+    // measured value unknown; neither may be presented as a zero measurement.
+    for (const id of ["usage-input-tokens", "usage-output-tokens", "usage-ttft-p50",
+      "usage-ttft-p95", "usage-latency-p50", "usage-latency-p95"]) $(`#${id}`).textContent = "—";
+    $("#usage-input-note").textContent = missing ? "指标缺失" : USAGE_NO_CALLS;
+    $("#usage-output-note").textContent = missing ? "指标缺失" : USAGE_NO_CALLS;
+    $("#usage-ttft-note").textContent = "尚无可用样本";
+    $("#usage-ttft-p95-note").textContent = "尚无可用样本";
+    $("#usage-latency-note").textContent = USAGE_NO_CALLS;
+    $("#usage-latency-p95-note").textContent = USAGE_NO_CALLS;
+    $("#usage-by-kind").innerHTML = '<p class="usage-empty">尚无调用记录</p>';
+    $("#usage-by-model").innerHTML = '<p class="usage-empty">尚无调用记录</p>';
+    return;
+  }
+  $("#usage-input-tokens").textContent = usageTokenText(summary.input_tokens, summary.input_tokens_known_calls, calls);
+  $("#usage-input-note").textContent = usageTokenNote(summary.input_tokens_known_calls, calls);
+  $("#usage-output-tokens").textContent = usageTokenText(summary.output_tokens, summary.output_tokens_known_calls, calls);
+  $("#usage-output-note").textContent = usageTokenNote(summary.output_tokens_known_calls, calls);
+  $("#usage-ttft-p50").textContent = usageMilliseconds(summary.ttft_p50_ms);
+  $("#usage-ttft-p95").textContent = usageMilliseconds(summary.ttft_p95_ms);
+  $("#usage-ttft-note").textContent = usageSampleNote(summary.ttft_known_calls, calls);
+  $("#usage-ttft-p95-note").textContent = usageSampleNote(summary.ttft_known_calls, calls);
+  $("#usage-latency-p50").textContent = usageMilliseconds(summary.latency_p50_ms);
+  $("#usage-latency-p95").textContent = usageMilliseconds(summary.latency_p95_ms);
+  $("#usage-latency-note").textContent = `全部 ${calls} 次调用`;
+  $("#usage-latency-p95-note").textContent = `全部 ${calls} 次调用`;
+  $("#usage-by-kind").innerHTML = usageGroupRows(summary.by_kind);
+  $("#usage-by-model").innerHTML = usageGroupRows(summary.by_model);
+}
+
+function renderUsagePending() {
+  // Clear the numeric cells on case switch so a slow or failed load cannot be
+  // read as the newly selected case's usage.
+  for (const id of ["usage-calls", "usage-input-tokens", "usage-output-tokens", "usage-ttft-p50",
+    "usage-ttft-p95", "usage-latency-p50", "usage-latency-p95"]) $(`#${id}`).textContent = "—";
+  $("#usage-scope").textContent = "加载中…";
+  $("#usage-failed").textContent = "加载中…";
+  $("#usage-input-note").textContent = "加载中…";
+  $("#usage-output-note").textContent = "加载中…";
+  $("#usage-ttft-note").textContent = "加载中…";
+  $("#usage-ttft-p95-note").textContent = "加载中…";
+  $("#usage-latency-note").textContent = "加载中…";
+  $("#usage-latency-p95-note").textContent = "加载中…";
+  $("#usage-by-kind").innerHTML = '<p class="usage-empty">加载中…</p>';
+  $("#usage-by-model").innerHTML = '<p class="usage-empty">加载中…</p>';
+}
+
+function renderUsageError(error) {
+  const detail = error && error.message ? String(error.message) : "请求失败";
+  const unavailable = "指标不可用";
+  $("#usage-scope").textContent = unavailable;
+  $("#usage-calls").textContent = "—";
+  $("#usage-failed").textContent = detail.slice(0, 60);
+  for (const id of ["usage-input-tokens", "usage-output-tokens", "usage-ttft-p50",
+    "usage-ttft-p95", "usage-latency-p50", "usage-latency-p95"]) $(`#${id}`).textContent = "—";
+  for (const id of ["usage-input-note", "usage-output-note", "usage-ttft-note",
+    "usage-ttft-p95-note", "usage-latency-note", "usage-latency-p95-note"]) $(`#${id}`).textContent = unavailable;
+  $("#usage-by-kind").innerHTML = '<p class="usage-empty">用量指标加载失败；重新选择案件或刷新页面可重试。</p>';
+  $("#usage-by-model").innerHTML = '<p class="usage-empty">未知数据不按 0 显示。</p>';
+}
+
 
 function renderAgentResult(result) {
   state.recoverableAgentRunId = null;

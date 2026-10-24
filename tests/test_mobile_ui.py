@@ -197,18 +197,23 @@ function finishCase(offset, title) {
   await first;
   assert.equal(run('state.case.title'), 'new');
   const third = run('selectCase(3)');
-  run('pending[10].resolve({agent_runs: {total: 999}})');
+  run('pending[10].resolve({agent_runs: {total: 999}, llm_usage: {calls: 99, failed: 0, by_kind: [], by_model: []}})');
   await second;
   assert.equal(run('$("#lab-run-count").textContent'), undefined);
+  // The superseded case must not leave its usage in the panel either.
+  assert.equal(run('$("#usage-calls").textContent'), '—');
   const fourth = run('selectCase(4)');
   run('pending[11].reject(new Error("old failure"))');
   await third;
   assert.equal(run('errors.length'), 0);
   run('finishCase(16, "latest")');
   await new Promise(resolve => setImmediate(resolve));
-  run('pending[21].resolve({agent_runs: {total: 4}})');
+  run('pending[21].resolve({agent_runs: {total: 4}, llm_usage: {calls: 2, failed: 1, input_tokens: 10, output_tokens: 4, input_tokens_known_calls: 1, output_tokens_known_calls: 1, ttft_p50_ms: 100, ttft_p95_ms: 100, ttft_known_calls: 1, latency_p50_ms: 120, latency_p95_ms: 120, by_kind: [], by_model: []}})');
   await fourth;
   assert.equal(run('state.case.title'), 'latest');
   assert.equal(run('$("#lab-run-count").textContent'), 4);
+  assert.equal(run('$("#usage-calls").textContent'), '2');
+  assert.equal(run('$("#usage-input-tokens").textContent'), '≥10');
+  assert.equal(run('$("#usage-input-note").textContent'), '已知部分 · 1/2 次调用有 usage');
 })().catch(e => {console.error(e); process.exitCode = 1;});
 ''')

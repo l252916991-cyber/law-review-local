@@ -198,12 +198,33 @@ tbody tr:last-child td { border-bottom: 0; } tbody tr:hover { background: #fbfdf
 .resume-button { margin-top: 10px; }
 .lab-result .answer-text h4 { margin: 14px 0 7px; color: #223c35; font-size: 12px; }
 
+/* 模型用量与延迟面板：未知值必须与 0 区分，因此注释行与数值同样重要。 */
+.usage-panel { margin-bottom: 18px; }
+.usage-panel .panel-hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+.usage-stat { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #f8fbfa; padding: 12px 14px; }
+.usage-stat span, .usage-stat strong, .usage-stat small { display: block; }
+.usage-stat span { color: var(--muted); font-size: 12px; }
+.usage-stat strong { margin: 5px 0 3px; color: var(--ink); font-family: Georgia, serif; font-size: 22px; font-weight: 400; line-height: 1.1; overflow-wrap: anywhere; }
+.usage-stat small { color: #8b9793; font-size: 11px; line-height: 1.45; }
+.usage-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.usage-groups h4 { margin: 0 0 8px; color: #3d4f4a; font-size: 13px; }
+.usage-table { display: grid; gap: 2px; font-size: 12px; }
+.usage-row { display: grid; grid-template-columns: minmax(64px, 1.5fr) 40px 40px 78px 78px 74px 66px; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+.usage-row > span, .usage-row > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-row:nth-child(odd) { background: #f7faf9; }
+.usage-head { background: transparent !important; color: var(--muted); font-size: 11px; font-weight: 700; }
+.usage-head > b { font-weight: 700; }
+.usage-empty { margin: 0; padding: 8px; color: var(--muted); font-size: 12px; }
+.usage-footnote { margin: 14px 0 0; color: #8b9793; font-size: 11px; line-height: 1.65; }
+
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 210px 1fr; }.sidebar { padding-left: 12px; padding-right: 12px; }.global-search { width: 210px; }.metric-grid { grid-template-columns: repeat(2,1fr); }.evidence-layout, .lab-layout { grid-template-columns: 1fr; }.relation-panel { position: static; }.evidence-grid { grid-template-columns: 1fr; }.export-copy { padding-right: 30px; }
+  .usage-groups { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) { .comparison-grid { grid-template-columns: 1fr; } }
-@media (max-width: 900px) { .runtime-controls { align-items: flex-end; flex-direction: column; }.lab-run-actions { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .runtime-controls { align-items: flex-end; flex-direction: column; }.lab-run-actions { grid-template-columns: 1fr; }.usage-row { grid-template-columns: minmax(56px,1.4fr) 34px 34px 70px 70px 62px 56px; font-size: 11px; } }
 @media (max-width: 900px) {
   body { overflow: auto; }.app-shell { display: block; }.sidebar { height: auto; position: static; }.main-nav { grid-template-columns: repeat(6,1fr); overflow: auto; }.nav-item { font-size: 0; justify-content: center; }.nav-item span { font-size: 17px; }.case-list, .sidebar-section-title, .new-case-btn, .sidebar-footer { display: none; }.main { height: auto; }.topbar { padding: 0 16px; }.top-actions .global-search, .top-actions .icon-button { display: none; }.content { padding: 18px 16px 40px; }.metric-grid { grid-template-columns: 1fr 1fr; }.toolbar { flex-wrap: wrap; }.table-search { min-width: 100%; }.assistant-view { margin: -18px -16px -40px; height: calc(100vh - 144px); }.assistant-shell { grid-template-columns: 1fr; }.conversation-sidebar { display: none; }.chat-messages { padding: 18px; }.chat-composer { margin: 0 14px 12px; }.export-card { grid-template-columns: 1fr; }.export-copy { padding: 25px; }.export-copy ul { grid-template-columns: 1fr; }.form-grid { grid-template-columns: 1fr; }.lab-actions { flex-direction: column; }.eval-grid { grid-template-columns: 1fr 1fr; }.panel-heading { flex-wrap: wrap; gap: 10px; }.lab-console { overflow: hidden; }
 }

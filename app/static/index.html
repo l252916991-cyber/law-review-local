@@ -7,7 +7,7 @@
   <script src="/assets/entry.js?v=20260911-lab-align"></script>
   <title>LexVault · 本地阅卷系统</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23293034'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white'%3E%E5%BE%8B%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/assets/styles.css?v=20260911-lab-align" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20261025-usage" />
   <!-- 可视化库 -->
   <script src="/assets/vendor/vis-network.min.js"></script>
   <script src="/assets/vendor/echarts.min.js"></script>
@@ -281,6 +281,28 @@
           </div>
 
           <div id="runtime-comparison" class="panel runtime-comparison" hidden></div>
+
+          <article class="panel usage-panel" id="usage-panel">
+            <div class="panel-heading">
+              <div><h3>模型用量与延迟</h3><p class="panel-hint">按服务端逐次模型调用记录统计；未知值不按 0 处理。</p></div>
+              <span id="usage-scope" class="dataset-chip">尚无调用</span>
+            </div>
+            <div class="usage-grid">
+              <div class="usage-stat"><span>模型调用数</span><strong id="usage-calls">0</strong><small id="usage-failed">尚无调用</small></div>
+              <div class="usage-stat"><span>输入 tokens</span><strong id="usage-input-tokens">—</strong><small id="usage-input-note">尚无调用</small></div>
+              <div class="usage-stat"><span>输出 tokens</span><strong id="usage-output-tokens">—</strong><small id="usage-output-note">尚无调用</small></div>
+              <div class="usage-stat"><span>首 token P50</span><strong id="usage-ttft-p50">—</strong><small id="usage-ttft-note">尚无可用样本</small></div>
+              <div class="usage-stat"><span>首 token P95</span><strong id="usage-ttft-p95">—</strong><small id="usage-ttft-p95-note">尚无可用样本</small></div>
+              <div class="usage-stat"><span>单次调用延迟 P50</span><strong id="usage-latency-p50">—</strong><small id="usage-latency-note">尚无调用</small></div>
+              <div class="usage-stat"><span>单次调用延迟 P95</span><strong id="usage-latency-p95">—</strong><small id="usage-latency-p95-note">尚无调用</small></div>
+            </div>
+            <div class="usage-groups">
+              <section><h4>按调用类型</h4><div id="usage-by-kind" class="usage-table"><p class="usage-empty">尚无调用记录</p></div></section>
+              <section><h4>按模型</h4><div id="usage-by-model" class="usage-table"><p class="usage-empty">尚无调用记录</p></div></section>
+            </div>
+            <p class="usage-footnote">口径：首 token 与单次调用延迟都按一次模型调用计，分母是有记录的调用次数；tokens 只在服务端返回 usage 时计入，缺 usage 的调用保持未知且不按 0 计。整次问答延迟与浏览器首字可见时间尚未采集，不与以上数字混用。本面板不含金额。</p>
+          </article>
+
           <article class="panel trace-panel">
             <div class="panel-heading"><div><h3>最近一次执行记录</h3></div><span id="trace-total" class="dataset-chip">等待运行</span></div>
             <div id="agent-trace" class="agent-trace"><div class="empty-state">执行后显示各步骤的状态、耗时和摘要。</div></div>
@@ -470,6 +492,6 @@
   </dialog>
 
   <script src="/assets/shared.js?v=20260911-model-config" defer></script>
-  <script src="/assets/app.js?v=20260911-model-config" defer></script>
+  <script src="/assets/app.js?v=20261025-usage" defer></script>
 </body>
 </html>

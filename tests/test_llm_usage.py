@@ -96,7 +96,47 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(summary["calls"], 0)
         self.assertIsNone(summary["input_tokens"])
         self.assertIsNone(summary["ttft_p95_ms"])
+        # An empty sample has zero known measurements, which is not a measured 0.
+        self.assertEqual(summary["input_tokens_known_calls"], 0)
+        self.assertEqual(summary["output_tokens_known_calls"], 0)
+        self.assertEqual(summary["ttft_known_calls"], 0)
         self.assertEqual(summary["by_model"], [])
+
+    def test_coverage_counters_separate_partial_sums_from_totals(self):
+        record_llm_call(case_id=self.case_id, kind="chat", model="m", usage={"prompt_tokens": 10, "completion_tokens": 4}, latency_ms=100, ttft_ms=40)
+        record_llm_call(case_id=self.case_id, kind="chat", model="m", usage=None, latency_ms=300)
+        record_llm_call(case_id=self.case_id, kind="chat", model="m", usage={"prompt_tokens": 20, "completion_tokens": 6}, latency_ms=200, ttft_ms=60)
+
+        summary = usage_summary(self.case_id)
+        self.assertEqual(summary["calls"], 3)
+        self.assertEqual(summary["input_tokens"], 30)
+        self.assertEqual(summary["input_tokens_known_calls"], 2)
+        self.assertEqual(summary["output_tokens_known_calls"], 2)
+        self.assertEqual(summary["ttft_known_calls"], 2)
+        self.assertNotEqual(summary["input_tokens_known_calls"], summary["calls"])
+        chat = next(row for row in summary["by_kind"] if row["kind"] == "chat")
+        self.assertEqual(chat["calls"], 3)
+        self.assertEqual(chat["failed"], 0)
+        self.assertEqual(chat["input_tokens_known_calls"], 2)
+        self.assertEqual(chat["ttft_known_calls"], 2)
+        self.assertEqual(chat["ttft_p50_ms"], 50.0)
+
+    def test_all_usage_missing_keeps_every_token_number_unknown(self):
+        record_llm_call(case_id=self.case_id, kind="chat", model="m", usage=None, latency_ms=90)
+        record_llm_call(case_id=self.case_id, kind="chat", model="m", usage={}, latency_ms=110, status="failed")
+
+        summary = usage_summary(self.case_id)
+        self.assertIsNone(summary["input_tokens"])
+        self.assertEqual(summary["input_tokens_known_calls"], 0)
+        self.assertEqual(summary["output_tokens_known_calls"], 0)
+        self.assertEqual(summary["ttft_known_calls"], 0)
+        # Latency is measured independently of the token accounting.
+        self.assertEqual(summary["latency_p50_ms"], 100.0)
+        self.assertEqual(summary["failed"], 1)
+        model_row = summary["by_model"][0]
+        self.assertEqual(model_row["failed"], 1)
+        self.assertEqual(model_row["input_tokens_known_calls"], 0)
+        self.assertIsNone(model_row["input_tokens"])
 
 
 if __name__ == "__main__":
