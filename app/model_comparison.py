@@ -22,11 +22,11 @@ from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, Run
 from .services import PROMPT_VERSION
 from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
 
-NATIVE_BASELINE_COMMIT = "d00158efd1f1d637f166f97e6223679c4d2e0d1b"
+NATIVE_BASELINE_COMMIT = "99d28619e538fea6322449ebe3af3cbe4a6b007a"
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "f454ba975a444bb2f42017817978be55fb15444f98946a01b559e1c6682b3313",
+    "agents.py": "0a33d25788055383c25aa5d94f74097d638a1571f25918f07591d17f7a945ec4",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
-    "services.py": "6eae76d6118ec5e4f51a690921dc280ec34a17045e148e1c75721ea086ccf23b",
+    "services.py": "35922ec4a8315e7916c907c4676aa23edb46114b7e0b04eeedb7997ee6e21a74",
     "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
     "statutory_retrieval.py": "49c84f2c3d22d9281ecc9595a3ec57b5081c678c203ff82a0ab873b02593a0bb",
 }

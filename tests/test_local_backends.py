@@ -246,11 +246,20 @@ def test_schema_16_migration_preserves_existing_receipts(local_models):
     before = counts()
     with transaction() as conn:
         conn.execute("DROP TABLE host_backend_calls")
+        # Simulate a genuine v16 database: remove the v18 additions too, so the
+        # version bump upgrades instead of re-adding existing columns.
+        conn.execute("DROP INDEX IF EXISTS idx_messages_source_run")
+        conn.execute("DROP INDEX IF EXISTS idx_messages_conversation_seq")
+        conn.execute("ALTER TABLE messages DROP COLUMN kind")
+        conn.execute("ALTER TABLE messages DROP COLUMN source_run_id")
+        conn.execute("ALTER TABLE agent_runs DROP COLUMN conversation_id")
+        conn.execute("ALTER TABLE agent_runs DROP COLUMN context_json")
         conn.execute("PRAGMA user_version=16")
     init_db(seed=False)
     init_db(seed=False)
     assert counts() == before
     assert control.status("domain-process")["status"] == "queued"
     with closing(connect()) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 17
+        from app import db as app_db
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == app_db.SCHEMA_VERSION
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
