@@ -118,6 +118,26 @@ def _page_text(page: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+_MERGED_HEADING = re.compile(
+    r"^(第[零〇一二三四五六七八九十百千万两0-9]+(?:条(?:之[一二三四五六七八九十0-9]+)?|[编章节]))(?=[^\s【〔（(])")
+
+
+def _repair_merged_headings(text: str) -> str:
+    """Separate article/chapter headings the official layout merged with body text.
+
+    The reader API returns per-character layout, not paragraph lines: a heading and
+    the first clause can share one line (``第一条为了……``), which the shared
+    paragraph-aligned splitter legitimately rejects. The repair only inserts a
+    separator and is accepted solely when the split then matches the official
+    detail tree exactly, so it can never invent article boundaries.
+    """
+    repaired = []
+    for line in text.splitlines():
+        match = _MERGED_HEADING.match(line)
+        repaired.append(f"{match.group(1)} {line[match.end():]}" if match else line)
+    return "\n".join(repaired)
+
+
 def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: str) -> dict[str, Any]:
     detail = bundle["detail"]["data"]
     text = "\n".join(_page_text(page) for page in bundle["pages"])
@@ -147,7 +167,25 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
     if not base_numbers:
         raise ValueError("Official publication contains no article headings")
     expected_min, expected_max = min(base_numbers), max(base_numbers)
-    articles = split_articles(text, expected_max=expected_max if expected_min == 1 else None)
+    def _split(value: str) -> list[dict[str, Any]]:
+        return split_articles(value, expected_max=expected_max if expected_min == 1 else None)
+
+    try:
+        articles: list[dict[str, Any]] | None = _split(text)
+    except ValueError:
+        articles = None
+    layout_repair = None
+    if expected_min == 1 and articles is None:
+        repaired = _repair_merged_headings(text)
+        if repaired != text:
+            try:
+                candidate = _split(repaired)
+            except ValueError:
+                candidate = None
+            if candidate is not None:
+                text, articles, layout_repair = repaired, candidate, "merged_heading_separator_v1"
+    if articles is None:
+        raise ValueError("Incomplete official publication: cannot split into the published articles")
     if expected_min != 1:
         actual = {article["article_number"] for article in articles if article["subarticle_number"] is None}
         if actual != set(range(expected_min, expected_max + 1)):
@@ -167,7 +205,7 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
         "completeness_check": f"official_detail_tree_and_all_base_articles_{expected_min}_through_{expected_max}_present_once",
         "provenance_policy": "complete_official_publication_only; no_benchmark_answers_or_predictions",
         "dataset_cutoff": bundle["cutoff"], "official_record_id": detail["bbbs"],
-        "articles": articles, "appendix_text": "",
+        "layout_repair": layout_repair, "articles": articles, "appendix_text": "",
     }
 
 

@@ -94,3 +94,43 @@ def test_candidate_titles_try_both_prefix_forms():
     # Statutes keep the prefixed form first.
     assert _candidate_titles("中华人民共和国劳动法") == ["中华人民共和国劳动法", "劳动法"]
     assert _candidate_titles("中华人民共和国宪法")[0] == "中华人民共和国宪法（2018年修正文本）"
+
+
+def test_repairs_headings_the_official_layout_merged_with_body_text():
+    bundle = {
+        "cutoff": "2023-11-13",
+        "detail": {"data": {
+            "bbbs": "merged", "title": "中华人民共和国测试法", "gbrq": "2020-01-01", "sxrq": "2020-02-01",
+            "content": {"title": "测试法", "children": [
+                {"title": "第一条", "children": []}, {"title": "第二条", "children": []},
+            ]},
+        }},
+        "pages": [{"areas": [{"lines": [
+            _line("第一条为了规范测试活动，制定本法。"),
+            _line("第二条本法适用于测试活动的管理。"),
+        ]}]}],
+    }
+    document = extract_document(bundle, ["测试法"], "today")
+    assert document["layout_repair"] == "merged_heading_separator_v1"
+    assert [article["heading"] for article in document["articles"]] == ["第一条", "第二条"]
+    assert document["articles"][0]["text"].startswith("第一条 为了规范测试活动")
+
+
+def test_repair_is_rejected_when_it_would_not_match_the_official_tree():
+    bundle = {
+        "cutoff": "2023-11-13",
+        "detail": {"data": {
+            "bbbs": "mismatch", "title": "中华人民共和国测试法", "gbrq": "2020-01-01", "sxrq": "2020-02-01",
+            "content": {"title": "测试法", "children": [{"title": "第一条", "children": []},
+                                                         {"title": "第二条", "children": []}]},
+        }},
+        # Only one merged heading exists; the repair cannot produce the second
+        # article the official tree promises, so the publication must fail closed.
+        "pages": [{"areas": [{"lines": [_line("第一条为了规范测试活动，制定本法。")]}]}],
+    }
+    try:
+        extract_document(bundle, ["测试法"], "today")
+    except ValueError as error:
+        assert "Incomplete" in str(error)
+    else:  # pragma: no cover - the assertion documents the required failure
+        raise AssertionError("incomplete official publication must not be accepted")
