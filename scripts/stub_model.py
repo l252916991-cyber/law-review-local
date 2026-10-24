@@ -33,6 +33,7 @@ VALID_ANSWER = "根据卷宗第1页的记录，张某批准了年化12%的固定
 INVALID_ANSWER = "张某已经批准了该宣传，材料可以支持这个结论。"
 EMBEDDING_MODEL = "stub-embedding"
 CHAT_MODEL = "stub-chat"
+FALLBACK_MODEL = "fallback-model"
 
 
 def _vector(text: str) -> list[float]:
@@ -50,6 +51,9 @@ class StubModel:
         self.retract_marker = retract_marker
         self.prompts: list[str] = []
         self.mode = "stub"
+        # The fallback scenario needs one rejected answer before the next call
+        # succeeds, so the host's one-shot fallback really runs.
+        self.invalid_served = 0
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -76,6 +80,7 @@ class StubModel:
                     self._json({"object": "list", "data": [
                         {"id": CHAT_MODEL, "object": "model", "owned_by": "lexvault-stub"},
                         {"id": EMBEDDING_MODEL, "object": "model", "owned_by": "lexvault-stub"},
+                        {"id": FALLBACK_MODEL, "object": "model", "owned_by": "lexvault-stub"},
                     ]})
                     return
                 self._json({"error": "not found"}, status=404)
@@ -140,7 +145,7 @@ class StubModel:
         if payload.get("stream") is False:
             self._json_answer(handler, prompt, messages, payload)
             return
-        answer = INVALID_ANSWER if self.retract_marker in prompt else VALID_ANSWER
+        answer = self._pick_answer(prompt)
         chunks = [answer[index:index + 8] for index in range(0, len(answer), 8)] or [answer]
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream")
@@ -163,8 +168,14 @@ class StubModel:
         handler.wfile.flush()
         handler.close_connection = True
 
-    @staticmethod
-    def _json_answer(handler: BaseHTTPRequestHandler, prompt: str, messages: list[Any],
+    def _pick_answer(self, prompt: str) -> str:
+        """Choose the scripted answer; the fallback scenario rejects once."""
+        if "回退验证" in prompt and self.invalid_served < 1:
+            self.invalid_served += 1
+            return INVALID_ANSWER
+        return INVALID_ANSWER if self.retract_marker in prompt else VALID_ANSWER
+
+    def _json_answer(self, handler: BaseHTTPRequestHandler, prompt: str, messages: list[Any],
                      payload: dict[str, Any]) -> None:
         """Non-streaming answer: one tool call first, then the grounded answer."""
         has_tool_result = any(
@@ -182,10 +193,8 @@ class StubModel:
                                  "arguments": json.dumps({"document_id": 1, "page_no": 1})},
                 }],
             }
-        elif "拒答校验" in prompt:
-            message["content"] = INVALID_ANSWER
         else:
-            message["content"] = VALID_ANSWER
+            message["content"] = self._pick_answer(prompt)
         body = json.dumps({
             "id": "stub-json-1", "object": "chat.completion", "model": CHAT_MODEL,
             "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],

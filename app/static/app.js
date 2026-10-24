@@ -288,6 +288,13 @@ async function selectCase(caseId) {
   state.conversationId = null;
   // 评测结果属于上一个案件的 ground truth，切案后必须清空，避免被误读为本案结果。
   $("#evaluation-result").innerHTML = "";
+  // 上一次运行结果与轨迹同样属于上一个案件，切案后立即清空。
+  $("#lab-result").innerHTML = '<div class="empty-state">运行后将在这里显示最终答复与来源。</div>';
+  $("#agent-trace").innerHTML = '<div class="empty-state">执行后显示各步骤的状态、耗时和摘要。</div>';
+  $("#trace-total").textContent = "等待运行";
+  $("#trace-detail").hidden = true;
+  $("#trace-detail").innerHTML = "";
+  $("#runtime-comparison").hidden = true;
 
   // 显示加载状态
   showLoadingState();
@@ -580,16 +587,38 @@ function renderAgentResult(result) {
   $("#lab-result").innerHTML = `<div class="lab-result-meta"><span class="route-badge">${escapeHtml(result.agent_type)}</span><span class="route-badge secondary">${escapeHtml(result.route)}</span>${modelBadge}${modelFallbackBadge}${fallbackBadge}${checkpointBadge}<span class="route-badge secondary">${result.total_ms}ms</span></div><div class="answer-text">${markdown(result.answer)}</div>${citationHtml}`;
   $$('[data-preview]', $("#lab-result")).forEach((node) => node.addEventListener("click", () => openPage(Number(node.dataset.preview), Number(node.dataset.page))));
   $("#trace-total").textContent = `任务 #${result.run_id} · ${result.total_ms}ms`;
-  $("#agent-trace").innerHTML = result.steps.map((step, index) => `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`).join("")
+  const routeNote = result.model_route?.fallback
+    ? ` · 回退模型 ${escapeHtml(result.model_route.model || "")}`
+    : "";
+  $("#agent-trace").innerHTML = result.steps.map((step, index) => {
+    const model = step.node === "critic" && result.llm_model ? ` · ${escapeHtml(result.llm_model)}` : "";
+    return `<div class="trace-step"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(step.role)}</strong><small>${escapeHtml(step.summary || step.node)}${model}${step.node === "critic" ? routeNote : ""}</small></div><b>${step.latency_ms}ms</b><i>${escapeHtml(step.status)}</i></div>`;
+  }).join("")
     + traceToolSummary(result)
     + `<button class="secondary-button trace-open" data-run-trace="${result.run_id}">查看步骤输入输出</button>`;
 }
 
 function traceToolSummary(result) {
-  const tools = result.context?.tools;
-  if (!tools || !tools.trace?.length) return "";
-  const items = tools.trace.map((item) => `<li>${escapeHtml(item.tool)} · ${item.ok ? "成功" : "拒绝"} · ${item.latency_ms}ms${item.count == null ? "" : ` · ${item.count} 条`}</li>`).join("");
+  const tools = result.tools || result.context?.tools;
+  if (!tools || !tools.enabled || !tools.trace?.length) return "";
+  const items = tools.trace.map((item) => `<li>${escapeHtml(item.tool)} · ${item.ok ? "成功" : "拒绝/失败"} · ${item.latency_ms}ms${item.count == null ? "" : ` · ${item.count} 条`}</li>`).join("");
   return `<div class="trace-tools"><strong>工具调用 ${tools.tool_calls} 次 / ${tools.rounds} 轮</strong><ul>${items}</ul></div>`;
+}
+
+function traceUsageChip(run) {
+  if (!run) return "";
+  const usage = run.usage || {};
+  const known = usage.input_tokens_known_calls == null ? 0 : Number(usage.input_tokens_known_calls);
+  const calls = Number(usage.calls) || 0;
+  if (!calls) return "无模型调用";
+  const tokens = usage.input_tokens == null && usage.output_tokens == null
+    ? "tokens 未知"
+    : `已知 tokens ${Number(usage.input_tokens || 0).toLocaleString("zh-CN")}/${Number(usage.output_tokens || 0).toLocaleString("zh-CN")}${known === calls ? "" : `（${known}/${calls} 次有用量）`}`;
+  const cost = usage.cost && usage.cost.total
+    ? ` · 估算 ${usage.cost.total}`
+    : usage.cost && usage.cost.partial_total ? ` · 估算 ≥${usage.cost.partial_total}`
+    : "";
+  return `任务 #${run.run_id} · ${calls} 次模型调用 · ${tokens}${cost}`;
 }
 
 async function showRunTrace(runId) {
@@ -600,7 +629,8 @@ async function showRunTrace(runId) {
     const trace = await api(`/api/agent-runs/${runId}`);
     const steps = trace.steps || [];
     const detail = steps.map((step, index) => `<details class="trace-detail-step"><summary>${String(index + 1).padStart(2, "0")} ${escapeHtml(step.role || step.node_name)} · ${step.latency_ms}ms · ${escapeHtml(step.status)}</summary><div><strong>输入</strong><pre>${escapeHtml(JSON.stringify(step.input ?? {}).slice(0, 1200))}</pre><strong>输出</strong><pre>${escapeHtml(JSON.stringify(step.output ?? {}).slice(0, 1200))}</pre></div></details>`).join("");
-    target.innerHTML = `<div class="trace-detail-head"><span>任务 #${runId} · ${escapeHtml(trace.status || "")} · ${steps.length} 步</span><button class="secondary-button" data-close-trace>关闭</button></div>${detail || '<div class="empty-state">该任务没有步骤记录。</div>'}`;
+    const usageChip = traceUsageChip({...trace, run_id: runId});
+    target.innerHTML = `<div class="trace-detail-head"><span>任务 #${runId} · ${escapeHtml(trace.status || "")} · ${steps.length} 步 · ${escapeHtml(usageChip)}</span><button class="secondary-button" data-close-trace>关闭</button></div>${detail || '<div class="empty-state">该任务没有步骤记录。</div>'}`;
     $("[data-close-trace]", target).addEventListener("click", () => { target.hidden = true; });
   } catch (error) {
     target.innerHTML = `<div class="empty-state">轨迹加载失败：${escapeHtml(error.message)}</div>`;

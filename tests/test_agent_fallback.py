@@ -189,6 +189,16 @@ class AgentFallbackTests(IsolatedDatabaseTestCase):
         self.assertFalse(output["llm_used"])
         self.assertEqual(output["model_route"]["reason"], "run_attribution_unavailable")
 
+    def test_fallback_probe_uses_the_fallback_endpoint(self):
+        """The model check must hit the endpoint that will actually serve it."""
+        with patch.object(services, "local_llm_available", return_value=(False, "fallback-model")) as probe:
+            with self.assertRaises(RuntimeError):
+                services.call_local_llm(
+                    "问题", "事实检索", CONTEXTS,
+                    model_override="fallback-model", base_url_override="http://127.0.0.1:9/v1",
+                )
+        self.assertEqual(probe.call_args.kwargs.get("base_url"), "http://127.0.0.1:9/v1")
+
     def test_fallback_configuration_error_is_a_value_error(self):
         """The router's error type stays a ValueError so callers can map it."""
         self.assertTrue(issubclass(FallbackConfigError, ValueError))

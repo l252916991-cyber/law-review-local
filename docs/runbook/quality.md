@@ -35,13 +35,18 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
-  --flow metrics --output-dir output/browser-check          # 用量面板：正常/空案件/部分缺失/失败/快速切案
+  --flow metrics --output-dir output/browser-check          # 用量与费用面板：正常/空案件/部分缺失/失败/快速切案
 UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
-  --flow chat --output-dir output/browser-check-chat       # 流式问答：引用、撤回、同键重试、消息落库
+  --flow chat --output-dir output/browser-check-chat       # 流式问答：引用回原文、撤回、同键回放、消息落库
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+  --flow workbench --output-dir output/browser-check-wb    # Agent 工作台：工具轨迹、回退徽标、切案清理
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+  --flow agent --output-dir output/browser-check-agent     # API 级：工具循环、运行轨迹、用量记账
 ```
 
 - 输出：`browser-check.json`（步骤、失败项、浏览器路径、源码 HEAD）、各步骤整页与元素截图、`server.log`。
-- `--flow chat` 会启动 `scripts/stub_model.py`：一个 OpenAI 兼容的**模型测试替身**，答案是固定字符串、embedding 是哈希向量、rerank 按位置给分。它只用于验证协议、引用契约与页面行为；报告里 `model` 字段标为 `stub`，不能当作真实模型效果。
+- `--flow chat` / `workbench` / `agent` 会启动 `scripts/stub_model.py`：一个 OpenAI 兼容的**模型测试替身**，答案是固定字符串、embedding 是哈希向量、rerank 按位置给分，并可按问题标记返回一次不合格答案以触发回退。它只用于验证协议、引用契约与页面行为；报告里 `model` 字段标为 `stub`，不能当作真实模型效果。
+- 报告步骤名与任务包对应：`wb-01-run`/`wb-02-trace`/`wb-03-fallback`/`wb-04-switch` 对应 A06.1 的 Agent 轨迹、回退与切案清理验收；`chat-*` 对应 A01.1；`0x-*` 对应 A02.1/A02.2。
 - 未安装受支持浏览器时脚本退出码 2 并输出 `browser unavailable`；这属于未验证，不是通过。
 - 该验证不联网、不写真实案件数据；模型调用另由真实模型验收单列，不用页面替身代替。
 - 浏览器在 CI 镜像中默认不存在，因此 CI 只保证编译与逻辑层测试；页面流程证据需在具备浏览器的宿主上生成并记录版本。

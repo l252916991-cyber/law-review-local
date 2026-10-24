@@ -165,7 +165,7 @@ def _money(amount: Decimal | None, currency: str | None) -> str | None:
     return format_money(amount, currency)
 
 
-def _cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def cost_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Call-level cost with an explicit unknown bucket.
 
     ``total`` is only present when every call could be priced; otherwise the
@@ -263,27 +263,11 @@ def _turn_rows(rows: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[st
     return turns[:limit], len(turns)
 
 
-def usage_summary(case_id: int) -> dict[str, Any]:
-    """Case-scoped cost and latency summary.
-
-    ``input_tokens``/``output_tokens`` and the TTFT aggregates are ``None`` when
-    no call reported them. That is deliberately distinct from a measured zero.
-    The ``*_known_calls`` counters are the sample size behind each aggregate, so
-    a partial sum is never presented as the complete total. Latency is measured
-    per model call; the summary makes no claim about whole-turn latency.
-    """
-    with transaction() as conn:
-        rows = [
-            dict(row)
-            for row in conn.execute(
-                """SELECT kind, model, input_tokens, output_tokens, ttft_ms, latency_ms, status,
-                          pricing_json, turn_key
-                   FROM llm_calls WHERE case_id=? ORDER BY id""",
-                (case_id,),
-            ).fetchall()
-        ]
+def _summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate call rows; shared by the case, run and turn scopes."""
     calls = len(rows)
     if not calls:
+        snapshot, error = load_pricing()
         return {
             "calls": 0,
             "failed": 0,
@@ -300,8 +284,8 @@ def usage_summary(case_id: int) -> dict[str, Any]:
             "by_kind": [],
             "by_model": [],
             "cost": {
-                "configured": load_pricing()[0] is not None,
-                "config_error": load_pricing()[1],
+                "configured": snapshot is not None,
+                "config_error": error,
                 "currency": None, "mixed_currency": False, "unit_tokens": None,
                 "version": None, "versions": [], "source": None,
                 "calls": 0, "known_calls": 0, "no_price_calls": 0,
@@ -329,7 +313,44 @@ def usage_summary(case_id: int) -> dict[str, Any]:
         "latency_p95_ms": percentile([row["latency_ms"] for row in rows], 0.95),
         "by_kind": _group(rows, "kind"),
         "by_model": _group(rows, "model"),
-        "cost": _cost_summary(rows),
+        "cost": cost_summary(rows),
         "turn_count": turn_count,
         "turns": turns,
     }
+
+
+_CALL_COLUMNS = """kind, model, input_tokens, output_tokens, ttft_ms, latency_ms, status,
+                   pricing_json, turn_key"""
+
+
+def usage_summary(case_id: int) -> dict[str, Any]:
+    """Case-scoped cost and latency summary.
+
+    ``input_tokens``/``output_tokens`` and the TTFT aggregates are ``None`` when
+    no call reported them. That is deliberately distinct from a measured zero.
+    The ``*_known_calls`` counters are the sample size behind each aggregate, so
+    a partial sum is never presented as the complete total. Latency is measured
+    per model call; the summary makes no claim about whole-turn latency.
+    """
+    with transaction() as conn:
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                f"SELECT {_CALL_COLUMNS} FROM llm_calls WHERE case_id=? ORDER BY id",
+                (case_id,),
+            ).fetchall()
+        ]
+    return _summarize(rows)
+
+
+def usage_for_run(run_id: int) -> dict[str, Any]:
+    """Usage of one agent run, including its tool rounds and fallback call."""
+    with transaction() as conn:
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                f"SELECT {_CALL_COLUMNS} FROM llm_calls WHERE run_id=? ORDER BY id",
+                (run_id,),
+            ).fetchall()
+        ]
+    return _summarize(rows)

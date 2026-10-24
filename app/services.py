@@ -655,16 +655,22 @@ def statistics_answer(case_id: int, question: str) -> tuple[str, list[dict[str, 
     return answer, citations
 
 
-def local_llm_available(model_name: str | None = None) -> tuple[bool, str]:
+def local_llm_available(model_name: str | None = None, base_url: str | None = None) -> tuple[bool, str]:
+    """Probe the endpoint that will be called.
+
+    A fallback target has its own URL; checking the primary endpoint for the
+    fallback model name would reject a correctly configured deployment.
+    """
     llm = LLMConfig.load()
+    endpoint = (base_url or llm.base_url).rstrip("/")
     desired_model = model_name or llm.model
     try:
-        assert_model_endpoint_allowed(llm.base_url)
+        assert_model_endpoint_allowed(endpoint)
     except ValueError:
         # Do not even probe an unapproved destination.
         return False, desired_model
     try:
-        req = urllib.request.Request(f"{llm.base_url}/models")
+        req = urllib.request.Request(f"{endpoint}/models")
         opener = egress_opener()
         with opener.open(req, timeout=2) as response:
             payload = json.load(response)
@@ -832,7 +838,7 @@ def call_local_llm(
     except ValueError as exc:
         logger.error("Model egress rejected: %s", exc)
         raise RuntimeError(str(exc)) from exc
-    available, model = local_llm_available(model_override)
+    available, model = local_llm_available(model_override, base_url=base_url)
     if not available:
         raise RuntimeError(f"本地模型不可用：{model}")
     context_text = "\n\n".join(

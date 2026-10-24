@@ -426,7 +426,85 @@ def _agent_flow(base_url: str, case_id: int, model_calls: list[str]) -> list[dic
     return steps
 
 
-FLOWS = ("metrics", "chat", "agent")
+BODY_WB_RUN = r"""
+  await waitFor("案件列表加载", () => document.querySelector(".case-item"));
+  document.querySelector(".case-item").click();
+  await waitFor("案件标题", () => (text("#case-title") || "").includes("合成演示"));
+  document.querySelector('.nav-item[data-view="lab"]').click();
+  await sleep(200);
+  document.querySelector("#lab-llm-toggle").checked = true;
+  document.querySelector("#lab-question").value = "张某是否批准了年化12%的固定回报宣传？";
+  document.querySelector("#run-agent-btn").click();
+  await waitFor("分析完成", () => document.querySelector("#lab-result .answer-text"), 90000);
+  await waitFor("轨迹出现", () => document.querySelectorAll("#agent-trace .trace-step").length >= 3, 20000);
+  const steps = document.querySelectorAll("#agent-trace .trace-step").length;
+  if (steps < 3) failures.push(`轨迹步骤只有 ${steps} 个`);
+  expectMatch("轨迹含工具调用", text("#agent-trace") || "", /工具调用 1 次/);
+  const meta = text("#lab-result .lab-result-meta") || "";
+  expectMatch("结果含调用模型", meta, /stub-chat/);
+  const citations = document.querySelectorAll("#lab-result .citation").length;
+  if (!citations) failures.push("结果没有引用卡片");
+  expectMatch("轨迹标题", text("#trace-total") || "", /^任务 #\d+/);
+  notes.push(`steps=${steps} citations=${citations}`);
+  document.querySelector("#chat-messages") && (document.querySelector("#chat-messages").scrollTop = 0);
+  return {failures, notes, steps};
+"""
+
+BODY_WB_TRACE = r"""
+  const trigger = document.querySelector("[data-run-trace]");
+  if (!trigger) { failures.push("没有轨迹展开按钮： " + (html("#agent-trace") || "").slice(-300)); return {failures, notes}; }
+  trigger.click();
+  const opened = await waitFor("轨迹详情", () => {
+    const node = document.querySelector("#trace-detail");
+    const body = node ? String(node.textContent || "") : "";
+    return !node.hidden && body && !body.includes("加载执行轨迹");
+  }, 20000);
+  if (!opened) {
+    const node = document.querySelector("#trace-detail");
+    failures.push("轨迹详情未展开： " + (node ? String(node.innerHTML).slice(0, 300) : "无节点"));
+    return {failures, notes};
+  }
+  const detail = text("#trace-detail") || "";
+  expectMatch("轨迹详情含任务用量", detail, /已知 tokens|tokens 未知/);
+  expectMatch("轨迹详情含步骤数", detail, /步/);
+  expectMatch("轨迹详情含工具步骤", detail, /get_page|工具/);
+  const inputs = document.querySelectorAll("#trace-detail .trace-detail-step").length;
+  if (!inputs) failures.push("没有可展开的步骤输入输出");
+  notes.push(`detail_steps=${inputs}`);
+  document.querySelector("[data-close-trace]")?.click();
+  return {failures, notes, inputs};
+"""
+
+BODY_WB_FALLBACK = r"""
+  document.querySelector("#lab-question").value = "回退验证：谁批准了固定回报宣传？";
+  document.querySelector("#run-agent-btn").click();
+  await waitFor("回退运行完成", () => (text("#lab-result .lab-result-meta") || "").includes("回退模型"), 90000);
+  const meta = text("#lab-result .lab-result-meta") || "";
+  expectMatch("回退模型标注", meta, /回退模型 fallback-model/);
+  expectMatch("轨迹包含回退说明", text("#agent-trace") || "", /回退模型 fallback-model/);
+  notes.push(meta);
+  return {failures, notes};
+"""
+
+BODY_WB_SWITCH = r"""
+  const created = await (await fetch("/api/cases", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({title: "运行面板清理验证"}),
+  })).json();
+  await selectCase(created.id);
+  await waitFor("切案后结果清空", () => (text("#lab-result") || "").includes("运行后将在这里显示"), 15000);
+  expectMatch("轨迹清空", text("#agent-trace") || "", /执行后显示各步骤/);
+  expect("轨迹标题复位", text("#trace-total"), "等待运行");
+  expect("轨迹详情隐藏", document.querySelector("#trace-detail").hidden, true);
+  // Switching back must not resurrect the previous run either.
+  await selectCase(window.__demoCaseId);
+  await waitFor("切回案件", () => (text("#case-title") || "").includes("合成演示"), 15000);
+  expectMatch("切回后仍为空态", text("#lab-result") || "", /运行后将在这里显示/);
+  expectMatch("切回后轨迹仍为空态", text("#agent-trace") || "", /执行后显示各步骤/);
+  return {failures, notes, empty_case_id: created.id};
+"""
+
+FLOWS = ("metrics", "chat", "agent", "workbench")
 
 
 def main() -> int:
@@ -476,7 +554,7 @@ def main() -> int:
         print(f"[1/4] 准备隔离数据目录 {data_dir}")
         _seed_demo(data_dir)
         print(f"[2/4] 启动应用服务 {base_url}")
-        if args.flow in ("chat", "agent", "all"):
+        if args.flow in ("chat", "agent", "workbench", "all"):
             from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, StubModel
 
             stub = StubModel().__enter__()
@@ -486,8 +564,14 @@ def main() -> int:
                 "LAW_REVIEW_EMBEDDING_URL": stub.base_url,
                 "LAW_REVIEW_EMBEDDING_MODEL": EMBEDDING_MODEL,
             })
-            if args.flow == "agent":
+            if args.flow in ("agent", "workbench"):
                 environment["LAW_REVIEW_TOOL_LOOP"] = "on"
+            if args.flow == "workbench":
+                environment.update({
+                    "LAW_REVIEW_LLM_FALLBACK": "on",
+                    "LAW_REVIEW_LLM_FALLBACK_URL": stub.base_url,
+                    "LAW_REVIEW_LLM_FALLBACK_MODEL": "fallback-model",
+                })
             print(f"      模型测试替身：{stub.base_url}（固定答案，不是真实模型）")
         else:
             _seed_usage(data_dir, 1)
@@ -521,6 +605,11 @@ def main() -> int:
                         steps.append(_run_step(session, "03-rapid-switch", _script(BODY_RAPID_SWITCH), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "04-failure", _script(BODY_FAILURE), output_dir, True, "#usage-panel"))
                         steps.append(_run_step(session, "05-recovery", _script(BODY_RECOVERY), output_dir, True, "#usage-panel"))
+                    if args.flow in ("workbench", "all"):
+                        steps.append(_run_step(session, "wb-01-run", _script(BODY_WB_RUN), output_dir, True, ".lab-layout"))
+                        steps.append(_run_step(session, "wb-02-trace", _script(BODY_WB_TRACE), output_dir, True, "#agent-trace"))
+                        steps.append(_run_step(session, "wb-03-fallback", _script(BODY_WB_FALLBACK), output_dir, True, ".lab-layout"))
+                        steps.append(_run_step(session, "wb-04-switch", _script(BODY_WB_SWITCH), output_dir, True, ".lab-layout"))
                     if args.flow in ("chat", "all"):
                         baseline = [int(item["id"]) for item in _api_json(base_url, f"/api/cases/{demo_id}/conversations")]
                         session.evaluate(f"window.__conversationBaseline = {json.dumps(baseline)};")
@@ -544,7 +633,7 @@ def main() -> int:
     report = {
         "ok": not failures,
         "flow": args.flow,
-        "model": "stub" if args.flow in ("chat", "agent", "all") else "not used",
+        "model": "stub" if args.flow in ("chat", "agent", "workbench", "all") else "not used",
         "base_url": base_url,
         "browser": browser,
         "source_head": _source_head(),

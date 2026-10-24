@@ -1202,6 +1202,9 @@ def get_run_trace(run_id: int) -> dict[str, Any]:
                 result.get("checkpoint_thread_id", "")
             )
         result["citations"] = json.loads(result.pop("citations_json") or "[]")
+        from .llm_usage import usage_for_run
+
+        result["usage"] = usage_for_run(run_id)
         result["steps"] = []
         for row in conn.execute("SELECT * FROM agent_steps WHERE run_id = ? ORDER BY id", (run_id,)):
             item = rowdict(row)
