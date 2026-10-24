@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "document_role": "manual G2 review record template; not an executable model registry",
+  "status": "pending",
+  "candidate_commit": null,
+  "source_manifest_sha256": null,
+  "material_kind": null,
+  "material_scope": null,
+  "authorization_reference": null,
+  "dataset_snapshot_sha256": null,
+  "frozen_questions_sha256": null,
+  "run_order_and_repetitions_frozen": false,
+  "model_and_service_identity_reference": null,
+  "native_baseline_reference": null,
+  "comparison_modes": [
+    "shared_retrieval_and_memory_snapshot",
+    "independent_retrieval_and_memory"
+  ],
+  "thresholds": {
+    "per_question_token_ratio_max": 1.10,
+    "aggregate_token_ratio_max": 1.10,
+    "p95_wall_ratio_max": 1.20,
+    "zero_tolerance_failures_max": 0
+  },
+  "question_reviews": [],
+  "measurement_valid": null,
+  "source_unchanged": null,
+  "unknown_usage": null,
+  "system_failures": null,
+  "engineering_result": "not_evaluated",
+  "usage_result": "not_evaluated",
+  "latency_result": "not_evaluated",
+  "developer_reviewer": null,
+  "independent_reviewer": null,
+  "professional_reviewer": null,
+  "semantic_entailment_checked": false,
+  "review_notes": null,
+  "blockers": [],
+  "g2_accepted": false,
+  "e17_qualified": false,
+  "production_qualified": false
+}
