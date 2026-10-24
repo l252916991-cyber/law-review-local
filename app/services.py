@@ -43,6 +43,7 @@ from .context import (
     record_turn,
     render_history,
     resolve_question,
+    unsupported_clause_topic,
     validate_context_notice,
     validate_conversation,
 )
@@ -928,9 +929,13 @@ def chat(
             case_id, prefer_remote_embeddings=use_remote_embeddings
         ).retrieve(resolution.retrieval_query, 6)
         contexts = limit_contexts(contexts, resolution.object_document_ids)
-        if not contexts:
+        missing_topic = unsupported_clause_topic(case_id, question, contexts) if contexts else ""
+        if not contexts or missing_topic:
             context_meta["memory"] = memory_meta(policy, reason="insufficient_source")
-            answer, insufficient = build_insufficient(question, resolution, documents_by_id)
+            answer, insufficient = build_insufficient(
+                question, resolution, documents_by_id,
+                reason="asked_topic_not_in_current_sources" if missing_topic else "no_current_supporting_source",
+            )
             validation = validate_context_notice(answer, "insufficient_evidence")
             provenance = {
                 "mode": "insufficient-evidence",

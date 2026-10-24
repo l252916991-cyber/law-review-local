@@ -537,6 +537,12 @@ TYPE_WORDS = (
     "合同", "协议", "备忘录", "确认书", "订单", "发票", "笔录", "电子邮件", "宣传材料",
     "报告", "说明", "清单", "凭证", "流水", "纪要",
 )
+# Closed set of specific clause words used only for a conservative "asked but
+# absent" gate. Generic words (付款/期限/交付) are deliberately not included.
+CLAUSE_TOPIC_TERMS = (
+    "保密", "违约金", "竞业", "保修", "质保", "不可抗力", "仲裁", "管辖",
+    "解除", "终止", "送达", "发票", "税费",
+)
 ENTITY_SUFFIXES = ("有限责任公司", "股份有限公司", "有限公司", "公司", "集团", "银行", "事务所", "中心", "工作室")
 _NAME_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,6}$")
 _NAME_PREFIX = re.compile(r"^\s*(?:[0-9]+|[一二三四五六七八九十]+)\s*[_\-\.．、)]\s*")
@@ -657,7 +663,8 @@ def _explicit_matches(question: str, documents: list[dict[str, Any]]) -> list[tu
             first_position = min(
                 [question.find(token) for token in [*question_entities, *types] if token in question] or [len(question)]
             )
-            matches[document["id"]] = (first_position, document, "explicit_entity_type")
+            method = "explicit_entity_type" if question_entities else "explicit_document_type"
+            matches[document["id"]] = (first_position, document, method)
     return sorted(matches.values(), key=lambda item: (item[0], item[1]["id"]))
 
 
@@ -764,19 +771,27 @@ def resolve_question(
     if explicit:
         matched = _match_documents(explicit)
         ids = tuple(document["id"] for document in matched)
-        if len(ids) > 1 and (anaphora or correction):
+        # A bare generic type word ("哪份合同") matching several documents is a
+        # weak hint, not a specific indication. When the question is elliptical,
+        # let the verifiable prior object win instead of asking a needless
+        # clarification; an explicit correction still always clarifies.
+        weak_multi = len(ids) > 1 and all(method == "explicit_document_type" for _, _, method in explicit)
+        if weak_multi and anaphora and not correction:
+            pass
+        elif len(ids) > 1 and (anaphora or correction):
             return result(
                 status="needs_clarification",
                 method="ambiguous_explicit_object",
                 reason="explicit_mention_matches_multiple_documents",
                 options=tuple(_option(document) for document in matched),
             )
-        return result(
-            status="explicit",
-            method=explicit[0][2],
-            reason="explicit_correction" if correction else "explicit_object",
-            object_document_ids=ids,
-        )
+        else:
+            return result(
+                status="explicit",
+                method=explicit[0][2],
+                reason="explicit_correction" if correction else "explicit_object",
+                object_document_ids=ids,
+            )
 
     pending = _last_clarification(history) if policy.history_enabled else None
     if pending is not None and pending.clarification_options:
@@ -910,8 +925,45 @@ def build_clarification(
     return answer, payload
 
 
+def unsupported_clause_topic(case_id: int, question: str, contexts: list[dict[str, Any]]) -> str:
+    """Detect a rare asked-for clause whose term is absent from the actual pages.
+
+    This is a narrow, fail-closed gate for a closed set of specific clause words
+    (for example 保密/违约金). It does not attempt semantic entailment; when the
+    term is absent from every page used this round, the honest result is
+    "insufficient evidence", not a generic summary of unrelated pages.
+    """
+    for term in CLAUSE_TOPIC_TERMS:
+        if term not in question:
+            continue
+        conn = connect()
+        try:
+            supported = False
+            for item in contexts:
+                document_id = item.get("document_id")
+                page_no = item.get("page_no")
+                if document_id is None or page_no is None:
+                    continue
+                row = conn.execute(
+                    "SELECT text FROM pages WHERE document_id=? AND page_no=?",
+                    (int(document_id), int(page_no)),
+                ).fetchone()
+                if row is not None and term in str(row["text"] or ""):
+                    supported = True
+                    break
+        finally:
+            conn.close()
+        if not supported:
+            return term
+    return ""
+
+
 def build_insufficient(
-    question: str, resolution: ResolvedQuestion, documents: dict[int, dict[str, Any]] | None = None
+    question: str,
+    resolution: ResolvedQuestion,
+    documents: dict[int, dict[str, Any]] | None = None,
+    *,
+    reason: str = "no_current_supporting_source",
 ) -> tuple[str, dict[str, Any]]:
     documents = documents or {}
     scope = "、".join(
@@ -925,7 +977,7 @@ def build_insufficient(
         "请补充材料、缩小问题范围或确认所指条款；系统不会引用历史回答或猜测事实。"
     )
     payload = {
-        "reason": "no_current_supporting_source",
+        "reason": reason,
         "question": question,
         "scope_document_ids": list(resolution.object_document_ids),
         "message": answer,

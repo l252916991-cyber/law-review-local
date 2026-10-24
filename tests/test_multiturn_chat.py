@@ -163,6 +163,20 @@ class ResolutionTest(IsolatedDatabaseTestCase):
         self.assertEqual(resolution.status, "needs_clarification")
         self.assertEqual(resolution.reason, "no_resolvable_object")
 
+    def test_generic_type_word_does_not_override_unique_history_object(self):
+        from app.context import load_history, resolve_question
+
+        case_id, ids = create_case_with_documents(SCENARIOS["pair_with_supplement"], title="补充协议案件")
+        conversation_id = make_conversation(case_id)
+        append_turn(
+            conversation_id, "不是这份，是补充协议。它的付款期限呢？", "变更后为90日[资料1]。",
+            citations=[citation(ids["supplement"], "补充协议.txt", 1)],
+        )
+        resolution = resolve_question(case_id, "它是对哪份合同的补充？", load_history(case_id, conversation_id))
+        self.assertEqual(resolution.status, "resolved")
+        self.assertEqual(resolution.object_document_ids, (ids["supplement"],))
+        self.assertIn("补充协议", resolution.retrieval_query)
+
     def test_previous_clarification_option_can_be_selected(self):
         append_turn(
             self.conversation_id, "它的付款期限呢？", "请确认你指的是哪份材料：1.《甲公司采购合同.txt》；2.《乙公司采购合同.txt》。",
@@ -280,6 +294,13 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
         self.assertEqual(result["citations"], [])
         self.assertNotIn("[资料", result["answer"])
         self.assertTrue(result["validation"]["valid"])
+        self.assertEqual(result["clarification"]["reason"], "no_current_supporting_source")
+
+    def test_asked_but_absent_specific_clause_returns_insufficient_evidence(self):
+        result = self.ask("甲公司采购合同的保密期限是多少？")
+        self.assertEqual(result["answer_status"], "insufficient_evidence")
+        self.assertEqual(result["clarification"]["reason"], "asked_topic_not_in_current_sources")
+        self.assertEqual(result["citations"], [])
 
     def test_insufficient_scope_is_limited_to_resolved_document(self):
         first = self.ask("甲公司采购合同的签署方有哪些？")
