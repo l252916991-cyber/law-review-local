@@ -1,0 +1,16 @@
+# 答案级回归集
+
+`v1/demo-case.json` 保留原有 17 题。`v2/dataset.json` 冻结 60 题及内置合成演示案件的 14 页完整来源：正常 30、材料对照/矛盾 10、资料不足 8、无关问题 4、法条缺失 4、注入 4。注入题为问题中携带的攻击文本；卷宗/工具/历史/文件名注入仍由独立红队测试覆盖。
+
+来源为仓库 `app.db.seed_demo`，全部为虚构材料。题目和规则由编码助手构造，**未经律师或独立人工标注**，不能称为人工 gold 或法律准确率。对照题要求并列呈现来源差异，不能把任一人的陈述当成已认定事实。
+
+每题包含案情、问题、必需要点、可接受页、拒答预期和场景类别。v2 可回答题必须有可接受引用；关键词规则仍可能因同义表述或否定句产生误判。来源摘要证明冻结内容一致，不能证明事实或法律判断真实。
+
+```sh
+uv run --locked python scripts/build_answer_eval.py
+uv run --locked python scripts/run_answer_eval.py --dataset benchmarks/answer_eval/v2/dataset.json --answers /path/to/answers.json --output output/answer-v2/report.json
+```
+
+构建/核对使用临时合成数据库，不接触运行数据，不调用模型。缺少冻结输出时显式 `--write`；已有产物不同则拒绝覆盖，应建立新版本及其生成规则。`manifest.json` 记录题目、来源、最终数据集摘要和分组数量。
+
+答案级报告与页级检索评测分开。Judge 输出、人工评分和确定性规则各列报告，人工数据缺失时不计算“人工一致性已通过”。

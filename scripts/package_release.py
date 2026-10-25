@@ -24,6 +24,10 @@ EXACT_FIXTURES = (
     "frontend/playwright.config.ts", "frontend/.prettierignore",
     "benchmarks/fewshot/2-2_sft_pool.jsonl",
     "benchmarks/answer_eval/v1/demo-case.json",
+    "benchmarks/answer_eval/README.md",
+    "benchmarks/answer_eval/v2/questions.json",
+    "benchmarks/answer_eval/v2/dataset.json",
+    "benchmarks/answer_eval/v2/manifest.json",
     # Frozen experiment configuration (non-sensitive test fixture input);
     # tests/test_statutory_experiment.py fails closed without it. Restored
     # 2026-10-21 from the public origin repository, see docs/migration/ledger.md.

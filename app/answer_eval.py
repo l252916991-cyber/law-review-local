@@ -14,6 +14,7 @@ is a regression fixture, not lawyer-annotated ground truth.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from pathlib import Path
 from typing import Any, Iterable
@@ -43,21 +44,66 @@ def validate_dataset(payload: dict[str, Any]) -> None:
         raise ValueError("数据集必须包含非空 items")
     seen: set[str] = set()
     for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"].strip():
+            raise ValueError("题目必须包含非空字符串 id")
+        if not isinstance(item.get("question"), str) or not item["question"].strip():
+            raise ValueError(f"question 必须是非空字符串: {item['id']}")
         for field in ("id", "question", "must_include", "acceptable_pages", "expect_refusal"):
             if field not in item:
                 raise ValueError(f"题目缺少字段 {field}: {item.get('id')}")
         if item["id"] in seen:
             raise ValueError(f"题目 id 重复: {item['id']}")
         seen.add(item["id"])
-        if not isinstance(item["must_include"], list):
+        if not isinstance(item["must_include"], list) or any(not isinstance(v, str) or not v for v in item["must_include"]):
             raise ValueError(f"must_include 必须是列表: {item['id']}")
         if not isinstance(item["expect_refusal"], bool):
             raise ValueError(f"expect_refusal 必须是布尔值: {item['id']}")
+        if not isinstance(item["acceptable_pages"], list):
+            raise ValueError(f"acceptable_pages 必须是列表: {item['id']}")
         for page in item["acceptable_pages"]:
-            if not (isinstance(page, list) and len(page) == 2 and isinstance(page[0], str) and isinstance(page[1], int)):
+            if not (isinstance(page, list) and len(page) == 2 and isinstance(page[0], str)
+                    and type(page[1]) is int and page[1] > 0):
                 raise ValueError(f"acceptable_pages 必须是 [文件名, 页号] 列表: {item['id']}")
         if item["expect_refusal"] and item["acceptable_pages"]:
             raise ValueError(f"拒答题不应声明可接受页: {item['id']}")
+    if payload.get("version") == 2:
+        validate_frozen_sources(payload)
+
+
+def validate_frozen_sources(payload: dict[str, Any]) -> None:
+    """Validate v2's independently frozen synthetic evidence, never answer quotes."""
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ValueError("v2 必须冻结非空 sources")
+    digest = hashlib.sha256(json.dumps(sources, ensure_ascii=False, sort_keys=True,
+                                     separators=(",", ":")).encode()).hexdigest()
+    if payload.get("source_sha256") != digest:
+        raise ValueError("sources 摘要不匹配")
+    pages = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            raise ValueError("sources 必须为页对象列表")
+        name, page, text = source.get("document_name"), source.get("page"), source.get("text")
+        if not isinstance(name, str) or type(page) is not int or page < 1 or not isinstance(text, str):
+            raise ValueError("sources 页格式无效")
+        key = (name, page)
+        if key in pages or source.get("sha256") != hashlib.sha256(text.encode()).hexdigest():
+            raise ValueError("来源重复或页摘要不匹配")
+        pages[key] = text
+    categories = {"normal", "contradiction", "insufficient", "irrelevant", "statute_missing", "injection"}
+    for item in payload["items"]:
+        if item.get("category") not in categories or not item.get("case_description"):
+            raise ValueError(f"题目缺少类别或案情: {item['id']}")
+        if not item["expect_refusal"] and not item["must_include"]:
+            raise ValueError(f"可回答题必须包含必需要点: {item['id']}")
+        if not item["expect_refusal"] and (not item["acceptable_pages"] or item.get("requires_citation") is not True):
+            raise ValueError(f"可回答题必须要求来源引用: {item['id']}")
+        pairs = [tuple(pair) for pair in item["acceptable_pages"]]
+        if any(pair not in pages for pair in pairs):
+            raise ValueError(f"可接受页不存在: {item['id']}")
+        corpus = normalise("\n".join(pages[pair] for pair in pairs))
+        if any(normalise(value) not in corpus for value in item["must_include"]):
+            raise ValueError(f"必需要点没有来源支持: {item['id']}")
 
 
 def _page_pairs(citations: Iterable[dict[str, Any]]) -> set[tuple[str, int]]:
@@ -65,7 +111,7 @@ def _page_pairs(citations: Iterable[dict[str, Any]]) -> set[tuple[str, int]]:
     for citation in citations or []:
         name = citation.get("document_name") or citation.get("name")
         page = citation.get("page") or citation.get("page_no")
-        if isinstance(name, str) and isinstance(page, int):
+        if isinstance(name, str) and type(page) is int and page > 0:
             pairs.add((name, page))
     return pairs
 
@@ -99,6 +145,8 @@ def score_answer(item: dict[str, Any], answer: str, *, citations: list[dict[str,
         passed = refusal_ok and not violations
     else:
         passed = coverage == 1.0 and not violations and (citation_precision is None or citation_precision == 1.0)
+        if item.get("requires_citation") and not cited:
+            passed = False
 
     return {
         "id": item["id"],

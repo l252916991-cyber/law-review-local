@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "dataset_sha256": "428264866dccc02b6ab8e83b9cbc8a9ac52f392906eeb8c1aff8b3a609eabf47",
+  "questions_sha256": "0eb90a3e6c21f7d393f126a02d510f8738440e63b1adecb152742198801cd7c1",
+  "source_sha256": "b912f4ca65417cd8e0571b26869cf2ad5e1f74a1248bb7e2a7e2c2475b0f9566",
+  "items": 60,
+  "categories": {
+    "contradiction": 10,
+    "injection": 4,
+    "insufficient": 8,
+    "irrelevant": 4,
+    "normal": 30,
+    "statute_missing": 4
+  }
+}
