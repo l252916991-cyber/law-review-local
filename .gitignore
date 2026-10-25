@@ -60,6 +60,7 @@ test-results/
 # by an accidental `git add .`. Maintained root entry points are allowlisted.
 /*.md
 !/README.md
+!/README.en.md
 !/BENCHMARK_TEST_PLAN.md
 !/AGENTS.md
 /*.py

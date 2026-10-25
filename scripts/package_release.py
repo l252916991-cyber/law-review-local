@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = (
-    "README.md", "pyproject.toml", "uv.lock", "requirements.txt", "requirements-dev.txt",
+    "README.md", "README.en.md", "pyproject.toml", "uv.lock", "requirements.txt", "requirements-dev.txt",
     ".gitignore", ".env.example", ".pre-commit-config.yaml", ".gitleaksignore",
     ".dockerignore", "Dockerfile", "docker-compose.yml", "AGENTS.md", "LICENSE",
     "run.sh", "run_worker.sh",

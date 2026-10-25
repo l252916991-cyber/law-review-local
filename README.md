@@ -2,7 +2,9 @@
 
 ![CI](https://github.com/l252916991-cyber/law-review-local/actions/workflows/test.yml/badge.svg) ![Supply-chain scans](https://github.com/l252916991-cyber/law-review-local/actions/workflows/security.yml/badge.svg)
 
-FastAPI + SQLite 的私有化法律阅卷工作台：多格式卷宗导入、页级混合检索、证据管理与审批、可审计的双运行时 Agent 分析。核心设计是**证据优先**——法律检索结果必须能追溯到受控法条语料与案件原文页，法条引用在无法精确核验时拒绝作答，而不是用相近条文替代。**AI 输出仅辅助审阅，不能代替律师判断；系统不自动出具法律结论。**
+[English documentation](README.en.md)
+
+FastAPI + SQLite 的私有化法律阅卷工作台：多格式卷宗导入、页级混合检索、证据管理与审批、可审计的双运行时 Agent 分析。核心设计是**证据优先**——法律检索结果必须能追溯到受控法条语料与案件原文页；法条核验节点无法精确核验时，不提供可核验法条引用。普通聊天的引用检查主要验证格式与来源存在性，不能据此声称语义支持或法律有效性已验证。**AI 输出仅辅助审阅，不能代替律师判断；系统不自动出具法律结论。**
 
 ## 1. 项目定位
 

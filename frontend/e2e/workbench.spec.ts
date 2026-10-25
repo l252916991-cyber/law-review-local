@@ -96,3 +96,15 @@ test('evidence editing, approval attribution, safe annotations, graph and export
   await page.getByRole('button', { name: '模型设置', exact: true }).click();
   await expect(page.getByLabel('模型名称')).toHaveValue('stub-chat');
 });
+
+test('missing statute corpus remains explicit in the specialist trace', async ({ page }) => {
+  await login(page); await demoCase(page);
+  await page.getByRole('button', { name: '阅卷任务', exact: true }).click();
+  await page.getByLabel('使用模型', { exact: true }).uncheck();
+  await page.getByLabel('审校问题').fill('请核验刑法第999999条的法律规定，缺少依据时不要作法律结论。');
+  await page.getByRole('button', { name: '运行审校 →' }).click();
+  const trace = page.getByRole('region', { name: '执行轨迹' });
+  await expect(trace.locator('header .badge').first()).toHaveText('completed', { timeout: 30_000 });
+  await trace.locator('details').filter({ hasText: '法条核验 Agent' }).locator('summary').click();
+  await expect(trace).toContainText('未配置法条语料，无法核验法律依据');
+});

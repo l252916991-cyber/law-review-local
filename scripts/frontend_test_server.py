@@ -97,6 +97,7 @@ def main() -> int:
             "LAW_REVIEW_LLM_FALLBACK_MODEL": FALLBACK_MODEL,
             "LAW_REVIEW_PRICING_JSON": "",
             "LAW_REVIEW_PRICING_FILE": "",
+            "LAW_REVIEW_LEGAL_CORPUS_DIR": "",
             "REDIS_URL": "redis://127.0.0.1:1/0",
             "LEXVAULT_API_ORIGIN": "http://127.0.0.1:18765",
             "NEXT_TELEMETRY_DISABLED": "1",
