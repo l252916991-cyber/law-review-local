@@ -171,10 +171,10 @@ class JudgeTests(unittest.TestCase):
         result = judge_answer(
             self.ITEM, "2,860万元。",
             [{"document_name": "流水.txt", "page": 1, "quote": "2,860万元"}],
-            call_model=lambda prompt: '{"coverage_ok": true, "unsupported_claims": [], "citation_ok": true, "rationale": "ok"}',
+            call_model=lambda prompt: '{"coverage_ok": true, "unsupported_claims": [], "citation_ok": true, "refusal_ok": true, "rationale": "ok"}',
         )
         self.assertTrue(result["available"])
-        self.assertEqual(result["judge_version"], "answer-judge-v1")
+        self.assertEqual(result["judge_version"], "answer-judge-v2-frozen-sources")
         self.assertTrue(result["parsed"]["coverage_ok"])
 
     def test_garbage_output_is_marked_unavailable_instead_of_passing(self):

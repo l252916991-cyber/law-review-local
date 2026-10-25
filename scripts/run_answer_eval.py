@@ -63,11 +63,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.human_labels:
         labels = json.loads(args.human_labels.read_text(encoding="utf-8"))
+        if not isinstance(labels, dict) or any(type(value) is not bool for value in labels.values()):
+            raise ValueError("人工标签必须是 {id: bool}，不能转换字符串或空值")
         ids = [row["id"] for row in report["per_item"] if row["id"] in labels]
+        if not ids:
+            raise ValueError("人工标签与数据集没有共同题目")
         if ids:
             auto = [row["passed"] for row in report["per_item"] if row["id"] in labels]
             human = [bool(labels[item_id]) for item_id in ids]
             report["human_agreement"] = {
+                "compared_labels": "deterministic_rules_not_judge",
                 "items": len(ids),
                 "kappa": cohen_kappa(auto, human),
                 "disagreements": [item_id for item_id, a, h in zip(ids, auto, human) if a != h],
