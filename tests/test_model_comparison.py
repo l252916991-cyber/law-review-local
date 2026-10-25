@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 from contextlib import closing
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -16,6 +18,19 @@ from tests.test_host_writes import isolated  # noqa: F401
 from tests.test_local_backends import local_models  # noqa: F401
 
 actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="installed framework Python3.12 required")
+
+
+def test_native_baseline_still_refuses_any_unreviewed_source_change():
+    from app.model_comparison import native_baseline_identity
+
+    original = Path.read_bytes
+
+    def changed(path):
+        value = original(path)
+        return value + b"# unreviewed change" if path.name == "services.py" else value
+
+    with patch.object(Path, "read_bytes", new=changed), pytest.raises(ContractValidationError, match="pinned baseline"):
+        native_baseline_identity()
 
 
 @actual
