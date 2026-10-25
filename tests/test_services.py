@@ -206,6 +206,34 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertIn("请律师复核原文与上述结论。", payload["messages"][0]["content"])
         self.assertIn("付款金额是多少？", payload["messages"][1]["content"])
 
+    def test_fallback_request_uses_the_endpoint_that_was_checked(self):
+        from app.services import call_local_llm
+
+        fallback = "http://127.0.0.1:19002/v1"
+        with patch.dict(os.environ, {"LAW_REVIEW_LLM_URL": "http://127.0.0.1:19001/v1"}), \
+                patch("app.services.local_llm_available", return_value=(True, "fallback-model")) as available, \
+                patch("app.services.egress_opener") as opener, \
+                patch("app.services.read_json_with_deadline", return_value={
+                    "choices": [{"message": {"content": "合成回答"}}],
+                }):
+            self.assertEqual(call_local_llm("问题", "事实检索", [],
+                             model_override="fallback-model", base_url_override=fallback), "合成回答")
+        available.assert_called_once_with("fallback-model", base_url=fallback)
+        request = opener.return_value.open.call_args.args[0]
+        self.assertEqual(request.full_url, fallback + "/chat/completions")
+        self.assertEqual(json.loads(request.data)["model"], "fallback-model")
+
+    def test_fallback_endpoint_is_rejected_before_model_probe_or_request(self):
+        from app.services import call_local_llm
+
+        with patch.dict(os.environ, {"LAW_REVIEW_ALLOW_REMOTE_MODELS": "off"}), \
+                patch("app.services.local_llm_available") as available, \
+                patch("app.services.egress_opener") as opener:
+            with self.assertRaises(RuntimeError):
+                call_local_llm("问题", "事实检索", [], base_url_override="https://example.invalid/v1")
+        available.assert_not_called()
+        opener.assert_not_called()
+
     def test_gap_preview_does_not_write_and_explicit_save_deduplicates(self):
         from app.db import connect
         from app.services import preview_gap_analysis, save_gap_analysis

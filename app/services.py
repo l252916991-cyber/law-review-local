@@ -872,7 +872,7 @@ def call_local_llm(
         ensure_ascii=False,
     ).encode("utf-8")
     req = urllib.request.Request(
-        f"{llm.base_url}/chat/completions",
+        f"{base_url}/chat/completions",
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
