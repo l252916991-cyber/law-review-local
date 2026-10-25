@@ -144,9 +144,21 @@ class ToolLoopTests(unittest.TestCase):
             self._run(opener, max_rounds=2, max_tool_calls=5)
 
     def test_endpoint_rejecting_tools_is_reported_explicitly(self):
-        opener = _ScriptedOpener(urllib.error.HTTPError("http://x", 400, "bad request", None, None))
+        opener = _ScriptedOpener(urllib.error.HTTPError("http://x", 400, "bad request", None,
+                                  io.BytesIO(b'{"error":{"message":"tools are not supported"}}')))
         with self.assertRaises(ToolsUnsupportedError):
             self._run(opener)
+
+    def test_memory_guard_400_is_a_failed_call_not_unsupported_tools(self):
+        raw = b'{"error":{"code":"prefill_memory_exceeded","message":"memory guard rejected prompt"}}'
+        opener = _ScriptedOpener(urllib.error.HTTPError("http://x", 400, "bad request", None, io.BytesIO(raw)))
+        with self.assertRaises(RuntimeError) as caught:
+            self._run(opener)
+        self.assertNotIsInstance(caught.exception, ToolsUnsupportedError)
+        self.assertEqual(caught.exception.__cause__.read(), raw)
+        with transaction() as conn:
+            row = conn.execute("SELECT kind,status,input_tokens FROM llm_calls ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertEqual((row["kind"], row["status"], row["input_tokens"]), ("tool_loop", "failed", None))
 
     def test_limits_are_validated(self):
         for kwargs in ({"max_rounds": 0}, {"max_rounds": MAX_ROUNDS_LIMIT + 1}, {"max_tool_calls": 0}):

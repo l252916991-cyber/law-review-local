@@ -17,6 +17,7 @@ The loop is deliberately small and closed:
 from __future__ import annotations
 
 import json
+import io
 import logging
 import os
 import time
@@ -133,11 +134,17 @@ def _post(
         with opener.open(request, timeout=timeout) as response:
             return read_json_with_deadline(response, timeout, deadline=deadline)
     except urllib.error.HTTPError as exc:
-        # A 400/422 on the very first request is how most servers reject an
-        # unsupported ``tools`` parameter; anything else is a normal failure.
-        if exc.code in {400, 404, 422} and include_tools:
+        # Memory/admission errors can also use HTTP 400. Only an explicit
+        # unsupported-tool message permits the single-shot compatibility path.
+        raw = exc.read(8192) if exc.fp is not None else b""
+        detail = raw.decode("utf-8", "replace").lower()
+        mentions_tools = any(word in detail for word in ("tools", "tool_choice", "function calling"))
+        unsupported = any(word in detail for word in (
+            "unsupported", "not supported", "does not support", "unknown parameter", "unrecognized parameter",
+        ))
+        if exc.code in {400, 404, 422} and include_tools and mentions_tools and unsupported:
             raise ToolsUnsupportedError(f"endpoint rejected tools ({exc.code})") from exc
-        raise
+        raise urllib.error.HTTPError(exc.url, exc.code, exc.reason, exc.headers, io.BytesIO(raw)) from exc
 
 
 def _safe_arguments(raw: Any) -> dict[str, Any] | None:
