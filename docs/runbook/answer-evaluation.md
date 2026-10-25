@@ -9,12 +9,17 @@ uv run --locked python scripts/build_answer_eval.py
 uv run --locked python scripts/run_answer_judge.py --collect-rules \
   --answers-output output/answer-review/rule-answers.json \
   --review-directory output/answer-review/blind \
+  --review-archive output/answer-review/blind.zip \
   --output output/answer-review/rule-report.json
 ```
 
 采集使用临时合成库，明确关闭模型和远端检索。也可用 `--answers` 载入已有答案；答案文件需显式记录 collection_mode，未知来源记为 user_supplied_unverified。输出拒绝覆盖，保留失败与历史版本。
 
 `blind/sample-manifest.json` 冻结 20 题：每类先取两题，再按摘要顺序补足；样本绑定完整数据集与答案摘要，在模型或人工打分前生成。`blind-review.json` 含来源、题目、候选答案和评分标准，不含 judge/自动得分。审核人核对：要点是否完整、是否有来源不支持的断言、引用是否准确、需要拒答时是否正确拒答；整体四项均满足才标 passed=true。
+
+转交时优先使用 ZIP：审核人先打开包内 `README.md`，再按 `REVIEW.md` 的冻结顺序阅读 20 题及独立来源全文，最后填写 `human-labels.template.json` 的副本。题本把问题/候选/来源作为纯文本展示，不执行其中的 HTML、Markdown 或指令。
+
+`--review-archive` 需同时指定 `--review-directory`。ZIP 只收录上述说明/题本、三份 JSON 和 `PACK_MANIFEST.json` 的逐文件摘要；不收录目录内额外文件、自动评分报告或候选的额外生成元数据。模板已有通过/不通过标签、材料与样本不一致、符号链接和覆盖旧 ZIP 均拒绝打包。缺少人工时保持全部 passed=null，准备包本身不算完成 A08.1。
 
 样本内摘要使用排序键、无额外空格的 UTF-8 JSON 计算；数据集 manifest 的文件摘要使用实际文件字节，两者编码口径不同，均可按脚本复算。
 
