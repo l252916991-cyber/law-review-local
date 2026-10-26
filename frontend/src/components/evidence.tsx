@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, jsonBody } from "@/lib/api";
+import { ApiError, api, jsonBody } from "@/lib/api";
 import { id, message, object, text, type Row } from "@/lib/data";
 import { Empty, ErrorBox, Modal, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
@@ -318,6 +318,7 @@ export function Evidence({
               body.source_document_id = body.source_document_id
                 ? Number(body.source_document_id)
                 : null;
+              if (edit.id) body.expected_version = Number(edit.version);
               try {
                 await api(
                   edit.id
@@ -328,6 +329,11 @@ export function Evidence({
                 setEdit(null);
                 data.reload();
               } catch (e) {
+                if (e instanceof ApiError && e.status === 409) {
+                  // 同事已先保存：关闭编辑并刷新，不基于旧版本继续提交。
+                  setEdit(null);
+                  data.reload();
+                }
                 setError(message(e));
               }
             }}

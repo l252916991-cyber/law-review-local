@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, jsonBody } from "@/lib/api";
+import { ApiError, api, jsonBody } from "@/lib/api";
 import { id, object, text, message, type Row } from "@/lib/data";
 import { ErrorBox, Fields, Modal, Empty, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
@@ -132,14 +132,28 @@ export function Documents({
             onSubmit={async (e) => {
               e.preventDefault();
               try {
+                const changes = values(e.currentTarget);
                 await api(
                   `/api/documents/${id(edit.id)}/directory`,
-                  jsonBody(values(e.currentTarget), "PATCH"),
+                  jsonBody(
+                    {
+                      ...changes,
+                      ...(edit.version
+                        ? { expected_version: Number(edit.version) }
+                        : {}),
+                    },
+                    "PATCH",
+                  ),
                 );
                 setEdit(null);
                 reload();
-              } catch (e) {
-                setFailure(message(e));
+              } catch (err) {
+                setFailure(message(err));
+                if (err instanceof ApiError && err.status === 409) {
+                  // 同事已先保存：关闭表单并刷新到最新目录。
+                  setEdit(null);
+                  reload();
+                }
               }
             }}
           >

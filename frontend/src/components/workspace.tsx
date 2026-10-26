@@ -230,6 +230,7 @@ function CaseWorkspace({
         : "overview";
     }),
     [page, setPage] = useState<PageTarget | null>(null),
+    [editing, setEditing] = useState(false),
     [error, setError] = useState("");
   const [dark, setDark] = useState(false);
   useEffect(() => {
@@ -265,8 +266,7 @@ function CaseWorkspace({
     return () => window.removeEventListener("keydown", keyboard);
   }, []);
   const record = detail.data ? object(detail.data) : caseRow,
-    metrics = record.metrics ? object(record.metrics) : {};
-  const views: Record<string, string> = {
+    metrics = record.metrics ? object(record.metrics) : {};  const views: Record<string, string> = {
     overview: "案件总览",
     documents: "卷宗目录",
     evidence: "证据关系",
@@ -288,6 +288,7 @@ function CaseWorkspace({
         </div>
         <div>
           <span className="badge">{text(record.status) || "阅卷中"}</span>
+          <button onClick={() => setEditing(true)}>修改案件信息</button>
           <button
             aria-label="切换主题"
             onClick={() =>
@@ -363,7 +364,7 @@ function CaseWorkspace({
                   <div className="row" key={index}>
                     <span>
                       {text(row.action)}
-                      <small>{text(row.detail)}</small>
+                      <small>{auditText(row.detail)}</small>
                     </span>
                     <time>{text(row.created_at)}</time>
                   </div>
@@ -417,6 +418,78 @@ function CaseWorkspace({
           select={setPage}
         />
       )}
+      {editing && (
+        <Modal title="修改案件信息" close={() => setEditing(false)}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await api(
+                  `/api/cases/${caseId}`,
+                  jsonBody(
+                    {
+                      ...values(e.currentTarget),
+                      expected_version: Number(record.version),
+                    },
+                    "PATCH",
+                  ),
+                );
+                setEditing(false);
+                setError("");
+                detail.reload();
+                refresh();
+              } catch (err) {
+                setError(message(err));
+              }
+            }}
+          >
+            <label>
+              案件名称
+              <input
+                name="title"
+                required
+                minLength={2}
+                maxLength={120}
+                defaultValue={text(record.title)}
+              />
+            </label>
+            <Fields
+              names={{
+                case_no: "案号",
+                case_type: "案件类型",
+                client_name: "委托人",
+                status: "案件状态",
+                description: "案件说明",
+              }}
+              values={record}
+            />
+            <ErrorBox error={error} />
+            <button className="primary">保存修改</button>
+          </form>
+        </Modal>
+      )}
     </div>
   );
+}
+
+// 结构化审计详情（字段前后值）在活动列表里只展示可读摘要。
+function auditText(detail: unknown) {
+  const raw = text(detail);
+  if (!raw.startsWith("{")) return raw;
+  try {
+    const parsed = object(JSON.parse(raw));
+    const fields = parsed.fields ? object(parsed.fields) : {};
+    const names = Object.keys(fields);
+    return (
+      [
+        text(parsed.actor),
+        text(parsed.target),
+        names.length ? `改动：${names.join("、")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") || raw
+    );
+  } catch {
+    return raw;
+  }
 }

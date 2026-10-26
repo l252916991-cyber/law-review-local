@@ -856,3 +856,24 @@ dialog form .primary {
     align-items: start;
   }
 }
+.preview-edit {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.preview-edit textarea {
+  min-height: 240px;
+  font:
+    14px/1.8 system-ui,
+    sans-serif;
+  white-space: pre-wrap;
+}
+.preview-edit p,
+.audit-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
