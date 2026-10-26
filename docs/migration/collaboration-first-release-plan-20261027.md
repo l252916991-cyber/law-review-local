@@ -201,14 +201,34 @@
 - 全量离线 `pytest -q`：**1240 passed, 4 failed, 85 skipped**；4 项失败在基线提交 `580c5b7` 上同样失败（见 12.3），非本批引入。
 - 前端：`contract:check`、`typecheck`、`lint`、`test`、`build:static` 通过；Playwright e2e 16 项（desktop + mobile）全部通过，构建产物已由 FastAPI 静态入口验证。
 
-### 12.2 尚未开始
+### 12.2 2026-10-27：W1 成员分工 + W2 人工任务
+
+| 提交 | 内容 |
+|---|---|
+| `684475e` | W1 后端：schema v23（`members`/`member_tokens`/`case_members`）、目录成员令牌、按案件角色收窄权限、停用与轮换即撤权 |
+| `04de37f` | W1 前端：“成员与权限”页、案件分工面板、一次性令牌弹窗 |
+| `9461ad3` | W2 后端：schema v24（`review_tasks`/`review_task_events`）、任务状态机与流转审计、`/api/tasks/mine` |
+| `0b7df0a` | W2 前端：“任务”页、状态计数、开始/提交/退回/完成/取消 |
+
+已完成行为：
+
+- **W1 成员与分工**：管理员创建成员后只显示一次令牌（数据库仅存 SHA-256 摘要）；成员在案件上按承办/复核/助理/只读四类角色获得权限，角色只能收窄不能放大；停用或轮换令牌会删除该成员的会话，下一次请求即 401。环境变量令牌保留为部署引导，并与目录成员同时可用；环境配置损坏仍失败关闭。D5（停用即撤权）随 W1 一并完成。
+- **W2 人工任务**：任务可指派到目录成员、设期限、关联证据；状态机为待处理 → 进行中 → 待复核 → 已完成，退回必须填写原因并回到待处理，未完结任务可取消；每次流转写 `review_task_events` 与 `audit_log`；`/api/tasks/mine` 提供待办数据，“只看我的”在案件内过滤并标记逾期。
+
+验证：
+
+- `tests/test_members.py` 15 项、`tests/test_review_task_workflow.py` 7 项通过；相关安全回归（`test_access_control`、`test_02_api_security`、`test_enterprise_login`）共 151 项通过。
+- 全量离线 `pytest -q`：**1262 passed, 4 failed, 85 skipped**（同 12.3 的基线失败）。
+- 前端：`contract:check`、`typecheck`、`lint`、`test`、`build:static` 通过；Playwright 20 项（desktop + mobile）通过，包含“创建成员并分配复核角色”与“创建任务并取消”两条新用例。
+
+### 12.2.1 尚未开始
 
 | 工作包 | 状态 | 说明 |
 |---|---|---|
-| W1 成员与案件分工（含 D5 会话撤权） | 未开始 | 依赖 `members`/`member_tokens`/`case_members` 设计与迁移 |
-| W2 人工任务闭环 | 未开始 | `review_tasks`/`review_task_events` 与待办视图 |
 | W4 报告复核与签发 | 未开始 | 依赖 W1 的复核人身份与 W3 的版本快照 |
 | W5 部署与运行保障 | 未开始 | 可执行验收脚本与恢复演练 |
+
+下一步顺序：W4 先落 schema（`case_reports` 与依据快照），再做导出侧强制校验与前端签发面板；最后用 W5 的验收脚本在目标设备上串一遍“建案 → 分工 → 任务 → 复核 → 签发 → 导出 → 备份恢复”。
 
 ### 12.3 环境与既有失败
 
@@ -217,4 +237,5 @@
 3. `test_corpus_audit`（`boundary_difference` 0≠1）与 `test_corpus_canonical`（`publication_count` 66<71）依赖受控语料资产，基线即失败。
 4. `test_model_comparison` 的两项失败为 native 基线快照校验，基线即失败。
 5. M2/框架与 `mlx_lm` 相关测试因缺少 `LAW_REVIEW_FORGE_PYTHON`、`mlx_lm` 跳过，未计入通过数。
-6. 遗留 `app/static/*.js` 移动端界面仍可校准目录（不带 `expected_version`，服务端保持兼容），但不含案件信息编辑与原文纠错入口；正式界面以 Next 静态构建为准。
+6. 遗留 `app/static/*.js` 移动端界面仍可校准目录（不带 `expected_version`，服务端保持兼容），但不含案件信息编辑、原文纠错、成员管理与任务入口；正式界面以 Next 静态构建为准。
+7. 目录成员的令牌需要管理员手工转交，没有邮件/短信等外部投递；用户名重复、环境配置同名冲突均在接口层拒绝。
