@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import hashlib
 import json
 import logging
 import os
@@ -83,6 +84,7 @@ from .services import (
 )
 from .security import actor_name, allowed_case_ids, require_case_access, require_permission
 from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
+from .audit_trail import record_field_changes
 from .statutory_retrieval import corpus_status
 from .agent_tools import execute_readonly_tool
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
@@ -280,6 +282,16 @@ class CaseCreate(BaseModel):
     description: str = ""
 
 
+class CaseUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=120)
+    case_no: str | None = Field(default=None, max_length=60)
+    case_type: str | None = Field(default=None, max_length=40)
+    client_name: str | None = Field(default=None, max_length=120)
+    status: str | None = Field(default=None, max_length=40)
+    description: str | None = Field(default=None, max_length=5000)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
 class ModelConfigTest(BaseModel):
     base_url: str = Field(min_length=8, max_length=500)
 
@@ -290,11 +302,18 @@ class ModelConfigUpdate(BaseModel):
 
 
 class DirectoryUpdate(BaseModel):
-    doc_type: str | None = None
-    people: str | None = None
-    date_range: str | None = None
-    summary: str | None = None
-    status: str | None = None
+    doc_type: str | None = Field(default=None, max_length=40)
+    people: str | None = Field(default=None, max_length=200)
+    date_range: str | None = Field(default=None, max_length=200)
+    summary: str | None = Field(default=None, max_length=5000)
+    status: str | None = Field(default=None, max_length=40)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+class PageTextUpdate(BaseModel):
+    text: str = Field(max_length=200_000)
+    expected_version: int | None = Field(default=None, ge=1)
+    reason: str = Field(default="", max_length=300)
 
 
 class EvidenceCreate(BaseModel):
@@ -344,6 +363,9 @@ class EvidenceUpdate(BaseModel):
     source_page_start: int | None = Field(default=None, ge=1)
     source_page_end: int | None = Field(default=None, ge=1)
     quote: str | None = None
+    # Version this edit was based on. Omit for legacy clients; present it and a
+    # concurrent save fails with 409 instead of overwriting someone else.
+    expected_version: int | None = Field(default=None, ge=1)
 
     @field_validator('category')
     @classmethod
@@ -589,6 +611,43 @@ def create_case(payload: CaseCreate):
     return require_case(case_id)
 
 
+@app.patch("/api/cases/{case_id}")
+def update_case(case_id: int, payload: CaseUpdate):
+    """修改案件基本信息（带版本校验与字段级审计）。
+
+    建案后案号、当事人、类型和说明都可能需要更正；这里保留同一案件 ID，
+    不通过重建案件来"修正"信息。带上 ``expected_version`` 可避免覆盖同事
+    刚保存的修改。
+    """
+    require_permission("edit")
+    current = require_case(case_id)
+    if payload.expected_version is not None and payload.expected_version != current["version"]:
+        raise HTTPException(409, f"案件已被他人修改（当前版本 {current['version']}），请刷新后重试")
+    values = {
+        key: value
+        for key, value in payload.model_dump(exclude_none=True).items()
+        if key != "expected_version"
+    }
+    if not values:
+        raise HTTPException(400, "至少需要更新一个字段")
+    if "title" in values and not values["title"].strip():
+        raise HTTPException(400, "案件名称不能为空")
+    with transaction() as conn:
+        assignments = ", ".join(f"{key} = ?" for key in values)
+        cursor = conn.execute(
+            f"UPDATE cases SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ? AND version = ?",
+            (*values.values(), now(), case_id, current["version"]),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(409, "案件已被他人修改，请刷新后重试")
+        record_field_changes(
+            conn, case_id=case_id, action="修改案件信息", target=f"案件#{case_id}《{current['title']}》",
+            actor=actor_name(), before={key: current[key] for key in values}, after=values,
+            versions=(current["version"], current["version"] + 1),
+        )
+    return require_case(case_id)
+
+
 @app.post("/api/cases/{case_id}/archive")
 def archive_case(case_id: int):
     require_permission("edit")
@@ -826,26 +885,107 @@ def get_batch_import_status(batch_id: int):
 
 @app.patch("/api/documents/{document_id}/directory")
 def update_directory(document_id: int, payload: DirectoryUpdate):
+    """人工校准材料目录，并记录改动前后值。"""
+    require_permission("edit")
     document = get_document(document_id)
     if not document:
         raise HTTPException(404, "文件不存在")
-    values = payload.model_dump(exclude_none=True)
+    require_case_access(document["case_id"])
+    allowed = {"doc_type", "people", "date_range", "summary", "status"}
+    values = {key: value for key, value in payload.model_dump(exclude_none=True).items() if key in allowed}
     if not values:
         return document
-    allowed = {"doc_type", "people", "date_range", "summary", "status"}
-    values = {k: v for k, v in values.items() if k in allowed}
-    assignments = ", ".join(f"{key} = ?" for key in values)
+    if payload.expected_version is not None and payload.expected_version != document["version"]:
+        raise HTTPException(409, f"材料目录已被他人修改（当前版本 {document['version']}），请刷新后重试")
     with transaction() as conn:
-        conn.execute(
-            f"UPDATE documents SET {assignments}, updated_at = ? WHERE id = ?",
-            (*values.values(), now(), document_id),
+        assignments = ", ".join(f"{key} = ?" for key in values)
+        cursor = conn.execute(
+            f"UPDATE documents SET {assignments}, updated_at = ?, version = version + 1 WHERE id = ? AND version = ?",
+            (*values.values(), now(), document_id, document["version"]),
         )
-        conn.execute(
-            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '人工校准目录', ?, ?)",
-            (document["case_id"], document["name"], now()),
+        if cursor.rowcount == 0:
+            raise HTTPException(409, "材料目录已被他人修改，请刷新后重试")
+        record_field_changes(
+            conn, case_id=document["case_id"], action="校准目录", target=f"材料#{document_id}《{document['name']}》",
+            actor=actor_name(), before={key: document[key] for key in values}, after=values,
+            versions=(document["version"], document["version"] + 1),
         )
     sync_fts_index()
     return get_document(document_id)
+
+
+def _text_fingerprint(value: str) -> str:
+    """Audit a long page without copying it: length, hash prefix and opening."""
+    preview = " ".join(value.strip().split())[:80]
+    return f"{len(value)}字 sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()[:16]} 开头:{preview}"
+
+
+@app.patch("/api/documents/{document_id}/pages/{page_no}")
+def correct_page_text(document_id: int, page_no: int, payload: PageTextUpdate):
+    """纠正单页原文，并让依赖该页的已确认证据退回待复核。
+
+    OCR 错字会直接污染检索与证据引用，因此允许人工纠错。纠错与审批失效在
+    同一事务内完成：引用仍能在新原文中找到的证据保留确认，找不到的（含没有
+    引用可核对的）退回待复核并清除确认人。
+    """
+    require_permission("edit")
+    document = get_document(document_id)
+    if not document:
+        raise HTTPException(404, "文件不存在")
+    require_case_access(document["case_id"])
+    if payload.expected_version is not None and payload.expected_version != document["version"]:
+        raise HTTPException(409, f"材料已被他人修改（当前版本 {document['version']}），请刷新后重试")
+
+    ts = now()
+    invalidated: list[dict[str, Any]] = []
+    changed = False
+    new_version = document["version"]
+    with transaction() as conn:
+        page = conn.execute(
+            "SELECT id, text FROM pages WHERE document_id = ? AND page_no = ?", (document_id, page_no)
+        ).fetchone()
+        if page is None:
+            raise HTTPException(404, "页面不存在")
+        if page["text"] != payload.text:
+            changed = True
+            new_version = document["version"] + 1
+            conn.execute("UPDATE pages SET text = ? WHERE id = ?", (payload.text, page["id"]))
+            conn.execute("UPDATE documents SET version = version + 1, updated_at = ? WHERE id = ?", (ts, document_id))
+            record_field_changes(
+                conn, case_id=document["case_id"], action="纠错原文",
+                target=f"材料#{document_id}《{document['name']}》第{page_no}页", actor=actor_name(),
+                before={"原文": _text_fingerprint(page["text"]), "说明": ""},
+                after={"原文": _text_fingerprint(payload.text), "说明": payload.reason},
+                versions=(document["version"], new_version),
+            )
+            affected = conn.execute(
+                "SELECT id, title, quote FROM evidence WHERE source_document_id = ? AND status = '已确认' "
+                "AND source_page_start <= ? AND source_page_end >= ?",
+                (document_id, page_no, page_no),
+            ).fetchall()
+            for item in affected:
+                quote = (item["quote"] or "").strip()
+                if quote and quote in payload.text:
+                    continue
+                conn.execute(
+                    "UPDATE evidence SET status = '待复核', approved_by = NULL, approved_at = NULL, "
+                    "version = version + 1, updated_at = ? WHERE id = ?",
+                    (ts, item["id"]),
+                )
+                conn.execute(
+                    "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, ?, ?, ?)",
+                    (document["case_id"], "审批失效",
+                     f"证据#{item['id']}《{item['title']}》因《{document['name']}》第{page_no}页原文纠错后引用不再匹配，"
+                     "状态 已确认→待复核，确认人已清除", ts),
+                )
+                invalidated.append({"id": item["id"], "title": item["title"]})
+    return {
+        "page": document_page(document_id, page_no),
+        "changed": changed,
+        "invalidated": invalidated,
+        "version": new_version,
+        "message": "原文已纠正" if changed else "原文未变化",
+    }
 
 
 @app.get("/api/documents/{document_id}/file")
@@ -886,7 +1026,8 @@ def document_page(document_id: int, page_no: int):
     try:
         row = conn.execute(
             """
-            SELECT p.*, d.name, d.doc_type FROM pages p JOIN documents d ON d.id = p.document_id
+            SELECT p.*, d.name, d.doc_type, d.version AS document_version
+            FROM pages p JOIN documents d ON d.id = p.document_id
             WHERE p.document_id = ? AND p.page_no = ?
             """,
             (document_id, page_no),
@@ -957,8 +1098,8 @@ def create_evidence(case_id: int, body: EvidenceCreate):
             INSERT INTO evidence (
                 case_id, title, category, fact, credibility, status,
                 source_document_id, source_page_start, source_page_end,
-                quote, approved_by, approved_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                quote, approved_by, approved_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
         """, (
             case_id, body.title, body.category, body.fact, body.credibility,
             body.status, body.source_document_id, body.source_page_start,
@@ -985,17 +1126,22 @@ def create_evidence(case_id: int, body: EvidenceCreate):
 
 @app.patch("/api/evidence/{evidence_id}")
 def update_evidence(evidence_id: int, body: EvidenceUpdate):
-    """更新证据事项"""
+    """更新证据事项
+
+    协作约定：客户端带上读取时的 ``expected_version``；版本不一致返回 409，
+    不会覆盖同事刚保存的内容。未携带时保留旧客户端行为。
+    """
     conn = connect()
     try:
         # 验证证据存在
-        evidence = conn.execute(
-            "SELECT case_id, status, source_page_start, source_page_end FROM evidence WHERE id = ?", (evidence_id,)
-        ).fetchone()
+        evidence = conn.execute("SELECT * FROM evidence WHERE id = ?", (evidence_id,)).fetchone()
         if not evidence:
             raise HTTPException(404, "证据不存在")
 
         case_id = evidence["case_id"]
+        current_version = evidence["version"]
+        if body.expected_version is not None and body.expected_version != current_version:
+            raise HTTPException(409, f"证据已被他人修改（当前版本 {current_version}），请刷新后重试")
 
         # 验证来源文档（如果要更新）
         if body.source_document_id is not None:
@@ -1006,57 +1152,70 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
             if not doc:
                 raise HTTPException(404, "来源文档不存在或不属于该案件")
 
-        # 构建动态 UPDATE 语句
-        updates = []
-        params = []
-
+        values: dict[str, Any] = {}
         for field in ['title', 'category', 'fact', 'credibility', 'status',
                       'source_document_id', 'source_page_start',
                       'source_page_end', 'quote']:
             value = getattr(body, field)
             if value is not None:
-                updates.append(f"{field} = ?")
-                params.append(value)
+                values[field] = value
+
+        content_fields = ('title', 'category', 'fact', 'credibility',
+                          'source_document_id', 'source_page_start', 'source_page_end', 'quote')
+        changed_content = any(evidence[field] != values[field] for field in content_fields if field in values)
 
         # Approval is attributed to the authenticated principal; moving an
         # item out of 已确认 clears the attribution. Model code has no write
         # path to this endpoint, so a confirmed status always has a human name.
-        if body.status is not None:
-            if body.status == "已确认":
+        approval: tuple[str | None, str | None] | None = None
+        if "status" in values:
+            if values["status"] == "已确认":
                 require_permission("approve")
-                updates.append("approved_by = ?")
-                params.append(actor_name())
-                updates.append("approved_at = ?")
-                params.append(now())
+                approval = (actor_name(), now())
             else:
-                updates.append("approved_by = NULL")
-                updates.append("approved_at = NULL")
+                approval = (None, None)
+        elif evidence["status"] == "已确认" and changed_content:
+            # An approval binds the exact content that was confirmed. Editing
+            # the content of a confirmed item without explicitly re-confirming
+            # voids the old approval and returns the item to review.
+            values["status"] = "待复核"
+            approval = (None, None)
 
-        # An approval binds the exact content that was confirmed. Editing the
-        # content of a confirmed item without explicitly re-confirming voids
-        # the old approval and returns the item to review.
-        content_fields = ('title', 'category', 'fact', 'credibility',
-                          'source_document_id', 'source_page_start', 'source_page_end', 'quote')
-        if evidence["status"] == "已确认" and body.status != "已确认" and any(
-            getattr(body, field) is not None for field in content_fields
-        ):
-            updates.append("status = '待复核'")
-            updates.append("approved_by = NULL")
-            updates.append("approved_at = NULL")
-
-        if not updates:
+        if not values:
             raise HTTPException(400, "至少需要更新一个字段")
 
         # 单独更新起始页或结束页时，也必须和数据库中的另一端联合校验。
-        next_page_start = body.source_page_start if body.source_page_start is not None else evidence["source_page_start"]
-        next_page_end = body.source_page_end if body.source_page_end is not None else evidence["source_page_end"]
+        next_page_start = values.get("source_page_start", evidence["source_page_start"])
+        next_page_end = values.get("source_page_end", evidence["source_page_end"])
         if next_page_end < next_page_start:
             raise HTTPException(400, "结束页码不能小于起始页码")
 
-        params.append(evidence_id)
-        sql = f"UPDATE evidence SET {', '.join(updates)} WHERE id = ?"
+        updates = [f"{field} = ?" for field in values]
+        params: list[Any] = list(values.values())
+        if approval is not None:
+            updates.extend(["approved_by = ?", "approved_at = ?"])
+            params.extend(approval)
+        # The conditional UPDATE is the actual guard: a read followed by another
+        # writer's commit must fail here rather than silently replace it.
+        params.extend([now(), evidence_id, current_version])
+        cursor = conn.execute(
+            f"UPDATE evidence SET {', '.join(updates)}, updated_at = ?, version = version + 1 "
+            "WHERE id = ? AND version = ?",
+            params,
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            raise HTTPException(409, "证据已被他人修改，请刷新后重试")
 
-        conn.execute(sql, params)
+        after: dict[str, Any] = dict(values)
+        if approval is not None:
+            after["approved_by"], after["approved_at"] = approval
+        record_field_changes(
+            conn, case_id=case_id, action="修改证据",
+            target=f"证据#{evidence_id}《{evidence['title']}》", actor=actor_name(),
+            before={field: evidence[field] for field in after}, after=after,
+            versions=(current_version, current_version + 1),
+        )
         conn.commit()
 
         # 返回更新后的证据

@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -881,6 +881,21 @@ def _migrate_v21(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "llm_calls", "turn_key", "TEXT")
     _execute_script(conn, "CREATE INDEX IF NOT EXISTS idx_llm_calls_turn ON llm_calls(case_id, turn_key);")
 
+
+def _migrate_v22(conn: sqlite3.Connection) -> None:
+    """Optimistic concurrency for records that several people edit.
+
+    A writer must present the version it read; the conditional UPDATE then
+    fails instead of silently replacing a colleague's newer edit. Existing rows
+    keep version 1, so no backfill is required.
+    """
+    _add_column_if_missing(conn, "evidence", "version", "INTEGER NOT NULL DEFAULT 1")
+    _add_column_if_missing(conn, "evidence", "updated_at", "TEXT")
+    _add_column_if_missing(conn, "documents", "version", "INTEGER NOT NULL DEFAULT 1")
+    _add_column_if_missing(conn, "cases", "version", "INTEGER NOT NULL DEFAULT 1")
+    conn.execute("UPDATE evidence SET updated_at = created_at WHERE updated_at IS NULL")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -903,7 +918,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

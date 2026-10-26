@@ -245,6 +245,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case Detail */
+        get: operations["case_detail_api_cases__case_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Case
+         * @description 修改案件基本信息（带版本校验与字段级审计）。
+         *
+         *     建案后案号、当事人、类型和说明都可能需要更正；这里保留同一案件 ID，
+         *     不通过重建案件来"修正"信息。带上 ``expected_version`` 可避免覆盖同事
+         *     刚保存的修改。
+         */
+        patch: operations["update_case_api_cases__case_id__patch"];
+        trace?: never;
+    };
     "/api/cases/{case_id}/archive": {
         parameters: {
             query?: never;
@@ -305,23 +330,6 @@ export interface paths {
         };
         /** Lifecycle Cases */
         get: operations["lifecycle_cases_api_cases_lifecycle__lifecycle_status__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/cases/{case_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Case Detail */
-        get: operations["case_detail_api_cases__case_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -401,25 +409,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Directory */
+        /**
+         * Update Directory
+         * @description 人工校准材料目录，并记录改动前后值。
+         */
         patch: operations["update_directory_api_documents__document_id__directory_patch"];
-        trace?: never;
-    };
-    "/api/documents/{document_id}/file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Document File */
-        get: operations["document_file_api_documents__document_id__file_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/documents/{document_id}/pages/{page_no}": {
@@ -431,6 +425,31 @@ export interface paths {
         };
         /** Document Page */
         get: operations["document_page_api_documents__document_id__pages__page_no__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Correct Page Text
+         * @description 纠正单页原文，并让依赖该页的已确认证据退回待复核。
+         *
+         *     OCR 错字会直接污染检索与证据引用，因此允许人工纠错。纠错与审批失效在
+         *     同一事务内完成：引用仍能在新原文中找到的证据保留确认，找不到的（含没有
+         *     引用可核对的）退回待复核并清除确认人。
+         */
+        patch: operations["correct_page_text_api_documents__document_id__pages__page_no__patch"];
+        trace?: never;
+    };
+    "/api/documents/{document_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document File */
+        get: operations["document_file_api_documents__document_id__file_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -497,6 +516,9 @@ export interface paths {
         /**
          * Update Evidence
          * @description 更新证据事项
+         *
+         *     协作约定：客户端带上读取时的 ``expected_version``；版本不一致返回 409，
+         *     不会覆盖同事刚保存的内容。未携带时保留旧客户端行为。
          */
         patch: operations["update_evidence_api_evidence__evidence_id__patch"];
         trace?: never;
@@ -1151,6 +1173,23 @@ export interface components {
              */
             description: string;
         };
+        /** CaseUpdate */
+        CaseUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Case No */
+            case_no?: string | null;
+            /** Case Type */
+            case_type?: string | null;
+            /** Client Name */
+            client_name?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Expected Version */
+            expected_version?: number | null;
+        };
         /** ChatRequest */
         ChatRequest: {
             /** Question */
@@ -1187,6 +1226,8 @@ export interface components {
             summary?: string | null;
             /** Status */
             status?: string | null;
+            /** Expected Version */
+            expected_version?: number | null;
         };
         /** EvidenceCreate */
         EvidenceCreate: {
@@ -1261,6 +1302,8 @@ export interface components {
             source_page_end?: number | null;
             /** Quote */
             quote?: string | null;
+            /** Expected Version */
+            expected_version?: number | null;
         };
         /** ExportTemplateBlockIn */
         ExportTemplateBlockIn: {
@@ -1319,6 +1362,18 @@ export interface components {
             base_url: string;
             /** Model */
             model: string;
+        };
+        /** PageTextUpdate */
+        PageTextUpdate: {
+            /** Text */
+            text: string;
+            /** Expected Version */
+            expected_version?: number | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /** ReadonlyToolCall */
         ReadonlyToolCall: {
@@ -1823,6 +1878,72 @@ export interface operations {
             };
         };
     };
+    case_detail_api_cases__case_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_case_api_cases__case_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     archive_case_api_cases__case_id__archive_post: {
         parameters: {
             query?: never;
@@ -1922,37 +2043,6 @@ export interface operations {
             header?: never;
             path: {
                 lifecycle_status: "archived" | "trash";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    case_detail_api_cases__case_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                case_id: number;
             };
             cookie?: never;
         };
@@ -2145,12 +2235,13 @@ export interface operations {
             };
         };
     };
-    document_file_api_documents__document_id__file_get: {
+    document_page_api_documents__document_id__pages__page_no__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 document_id: number;
+                page_no: number;
             };
             cookie?: never;
         };
@@ -2176,13 +2267,48 @@ export interface operations {
             };
         };
     };
-    document_page_api_documents__document_id__pages__page_no__get: {
+    correct_page_text_api_documents__document_id__pages__page_no__patch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 document_id: number;
                 page_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageTextUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_file_api_documents__document_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
             };
             cookie?: never;
         };
