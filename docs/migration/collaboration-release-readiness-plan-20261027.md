@@ -3,7 +3,7 @@
 - 日期：2026-10-27（Asia/Shanghai）。
 - 实施基线：`326b71f`，分支 `codex/collaboration-first-release`，编写时工作区干净。
 - 承接：[多人协作首版改进计划书](collaboration-first-release-plan-20261027.md)及其第 12 节实施记录。
-- 状态：**计划已编制，实施与验收尚未开始**。本次仅新增计划和文档入口，不修改业务代码、不迁移数据、不调用模型、不推送或发布。
+- 状态：**R1–R3 已实施并本地提交，G1 本地等价检查已执行**；M1/U1 未执行（前提未登记）。证据见[执行证据](collaboration-release-readiness-evidence-20261027.md)。未推送、未合并、未升级正式库、未发布。
 - 目标：将已有协同阅卷首版收尾为一家律所内部可验收、可维护的交付版本。继续沿用单组织、单实例、SQLite、FastAPI 与 Next.js 静态界面。
 
 ## 1. 当前判断与范围
@@ -243,15 +243,15 @@ A01–A12 应有与风险相匹配的自动回归及实际页面/进程验证；
 
 各修复按仓库规则完成验证后本地提交；建议主题为 `fix(auth)`、`fix(reports)`、`fix(ops)` 及对应的 `test`/`docs`，每个提交保持可独立验证。推送、合并、正式库升级与发布按后续明确授权执行，本计划本身不执行这些操作。
 
-## 10. 执行记录模板
+## 10. 执行记录
 
 | 工作包 | 状态 | 实际提交 | 验证命令/证据位置 | 失败/跳过/剩余条件 |
 |---|---|---|---|---|
-| R1 权限交集 | 未开始 | — | — | — |
-| R2 冻结签发与一致性 | 未开始 | — | — | — |
-| R3 验收工具与手册 | 未开始 | — | — | — |
-| G1 完整工程与发布候选 | 未开始 | — | — | 原四项失败须复现裁决；独立 M2 待补 |
-| M1 迁移与恢复 | 未开始 | — | — | 源路径、checkpoint、停写窗口待登记 |
-| U1 律所人工验收 | 未开始 | — | — | 目标设备、身份、样本、模型、容量阈值与责任人待登记 |
+| R1 权限交集 | 已完成 | `592b6c2` | `pytest tests/test_permission_intersection.py`(9) + 协作相关 105 项；`tsc`/`eslint`；手册第 5 节权限矩阵 | 无；环境令牌无案件角色不能复核已登记为规则 |
+| R2 冻结签发与一致性 | 已完成 | `f2d4bfd` | `pytest tests/test_report_frozen_delivery.py`(12)、`scripts/test_data_snapshot.py`(10)、`tests/test_case_reports.py`(7)；schema 26；`GET /api/reports/{id}/frozen` | 历史批准无冻结正文不能导出（按设计）；工件不做自动清理 |
+| R3 验收工具与手册 | 已完成 | `f2e862a` | `pytest tests/test_collaboration_acceptance.py`(13)；`--multi-user`/`--model-id`/`--checkpoint-db`；手册参数与值守表 | 内置告警仍未实现，已写外部巡检责任与频率 |
+| G1 完整工程与发布候选 | 已完成（本地等价） | `de68877`、`19bdb68` | 1411 passed / 2 failed / 1 skipped，覆盖率 86.13%；ruff/mypy/compileall/依赖导出/doctor 通过；前端 11 单测 + 22 e2e + 构建；候选包 446 成员、解包 0 差异、隔离实例 `release_smoke` 通过 | 两项法条语料失败为本地资产过期（断言未放宽）；Docker 守护进程不可用，容器交付 CI 与 gitleaks 未执行；原生对照基线按评审重登记为 `specialist-review-v2` |
+| M1 迁移与恢复 | 未开始 | — | 仅合成演练（`data_snapshot` 单测 + 巡检备份演练） | 源路径、`user_version`、checkpoint、停写窗口待登记；不得直接打开业务库 |
+| U1 律所人工验收 | 未开始 | — | — | 目标设备、五身份、样本、模型、容量阈值与责任人待登记；本机无 OCR 工具与授权模型 |
 
 完成记录必须对应最终代码、构建及实际运行进程；后续修改影响已验内容时重跑相应检查，再更新本表。
