@@ -90,7 +90,7 @@ test('evidence editing, approval attribution, safe annotations, graph and export
   await page.screenshot({ path: test.info().outputPath('evidence.png'), fullPage: true });
   await page.getByRole('button', { name: '成果导出', exact: true }).click();
   const [download] = await Promise.all([
-    page.waitForEvent('download'), page.getByRole('link', { name: '下载案件交付包' }).click(),
+    page.waitForEvent('download'), page.getByRole('link', { name: '下载预览包' }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/\.zip$/);
   await page.getByRole('button', { name: '模型设置', exact: true }).click();

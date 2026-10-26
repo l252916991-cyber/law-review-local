@@ -25,13 +25,23 @@ from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_i
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "c63abf953bf10f6f025c2ff22e5819247590e58a"
-NATIVE_BASELINE_REVISION = "specialist-review-v1"
+NATIVE_BASELINE_REVISION = "specialist-review-v2"
+# Reviewed change since specialist-review-v1, recorded so a future drift is
+# explained instead of re-pinned silently. The file digest covers the whole
+# module, so a non-algorithmic edit still moves it; the review below confirms
+# that no prompt, retrieval, answerability or model-call path changed.
+NATIVE_BASELINE_REVIEW = (
+    "services.py: 0bbb8ef 增加流水全量迭代（列表分页不变，汇总/图谱/导出覆盖全部行）；"
+    "188a342 报告批准绑定材料快照；f2d4bfd 交付包改为读取冻结正文并移出渲染代码。"
+    "PROMPT_VERSION、LOCAL_PROMPT_VERSION、POLICY_VERSION 与消息/检索路径均未改动，"
+    "因此对照算法未漂移，仅整文件摘要需要按本次评审重新登记。"
+)
 NATIVE_ALGORITHM_HASHES = {
     "agents.py": "6ae41ec65c7bc174c7ee9bfb7ab98c63e739f1a6fa0862b1ed016b6e7d6ae55a",
     "review_collaboration.py": "512c03d6719bddfd98d422c7cb65e46c26331b8aab7ab56b40e651a4a07d632a",
     "agent_tools.py": "2af80bdaa3e1277de96a4127e2fd9bbabbb906b1213a94e6beb43a54d28dfb34",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
-    "services.py": "02c352ecea0ef9dfbc4663b8a45a19c231bca758416d99b79598f6911bf47813",
+    "services.py": "4c2047b9ca49ec85619351e8b877bdadb672b5c5ae8fca30509fdd6d8eab9468",
     "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
     "statutory_retrieval.py": "d9d2f60c01ac03f405ca4e1da593ff049a32cd6e072d3fa4bcb98f8be4b9fbe8",
 }
@@ -44,6 +54,7 @@ def native_baseline_identity():
         raise ContractValidationError("native comparison algorithms differ from the pinned baseline")
     return {"schema_version": 2, "source_commit": NATIVE_BASELINE_SOURCE_COMMIT,
             "revision": NATIVE_BASELINE_REVISION, "algorithm_files": actual,
+            "review_note": NATIVE_BASELINE_REVIEW,
             "scope": "reviewed source snapshot derived from source_commit; exact identity is revision plus algorithm_files"}
 
 
