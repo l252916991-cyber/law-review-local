@@ -164,6 +164,11 @@ ROLE_PERMISSIONS = {
 }
 ROLE_LABELS = {"owner": "承办律师", "reviewer": "复核律师", "assistant": "助理", "viewer": "只读"}
 MEMBER_PERMISSIONS = frozenset({"view", "edit", "approve", "export"})
+# Review actions (approve, return, void, complete) need the member permission
+# *and* a review-capable case role; management actions need the same for the
+# owning role. A role never restores a permission that was withdrawn.
+REVIEW_ROLES = frozenset({"owner", "reviewer"})
+MANAGER_ROLES = frozenset({"owner"})
 
 
 @dataclass(frozen=True)
@@ -296,6 +301,28 @@ def require_permission(permission: str, case_id: int | None = None) -> None:
     principal = current_principal()
     if not principal.has_for_case(permission, case_id):
         raise HTTPException(403, f"需要{PERMISSION_LABELS[permission]}权限")
+
+
+def has_case_role(permission: str, case_id: int | None, roles: frozenset[str]) -> bool:
+    """Effective permission = member permission ∩ case role ∩ case scope.
+
+    ``case_ids`` already gates access in the middleware; this adds the action
+    relation so a retained role cannot carry out a withdrawn permission. An
+    environment-configured principal carries no case roles, so only an
+    administrator reaches a role-gated action there — a deployment token must
+    not silently inherit approval rights it was never assigned.
+    """
+    principal = current_principal()
+    if principal.admin:
+        return True
+    if case_id is None or principal.role_for(case_id) not in roles:
+        return False
+    return principal.has_for_case(permission, case_id)
+
+
+def require_case_role(permission: str, case_id: int, roles: frozenset[str], label: str) -> None:
+    if not has_case_role(permission, case_id, roles):
+        raise HTTPException(403, label)
 
 
 def _required_case_permission(method: str, path: str) -> str:

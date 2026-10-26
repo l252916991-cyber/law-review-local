@@ -17,7 +17,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .db import connect, now, record_security_event, transaction
-from .security import current_principal, require_case_access
+from .security import (
+    MANAGER_ROLES,
+    REVIEW_ROLES,
+    current_principal,
+    has_case_role,
+    require_case_access,
+)
 
 router = APIRouter(prefix="/api", tags=["tasks"])
 
@@ -42,18 +48,22 @@ def _parse_due(value: str | None) -> str | None:
     return parsed.isoformat()
 
 
-def _role(case_id: int) -> str | None:
-    return current_principal().role_for(case_id)
-
-
 def _is_manager(case_id: int) -> bool:
-    principal = current_principal()
-    return principal.admin or principal.role_for(case_id) == "owner"
+    """Managing people, dates and cancellation needs edit rights *and* 承办."""
+    return has_case_role("edit", case_id, MANAGER_ROLES)
 
 
 def _is_reviewer(case_id: int) -> bool:
+    """Returning or completing a task is a review action, not just a role."""
+    return has_case_role("approve", case_id, REVIEW_ROLES)
+
+
+def _can_work(case_id: int, task: Any) -> bool:
+    """Starting or submitting needs edit rights on top of the assignment."""
     principal = current_principal()
-    return principal.admin or principal.role_for(case_id) in {"owner", "reviewer"}
+    if not principal.has_for_case("edit", case_id):
+        return False
+    return _is_assignee(task) or _is_manager(case_id)
 
 
 def _is_assignee(task: Any) -> bool:
@@ -75,6 +85,7 @@ def _member_name(conn, member_id: int | None) -> str:
 
 
 def _task_payload(conn, row, *, today: str) -> dict[str, Any]:
+    case_id = row["case_id"]
     events = conn.execute(
         "SELECT action, actor, note, from_status, to_status, created_at FROM review_task_events "
         "WHERE task_id = ? ORDER BY id", (row["id"],)
@@ -97,6 +108,11 @@ def _task_payload(conn, row, *, today: str) -> dict[str, Any]:
         "updated_at": row["updated_at"],
         "closed_at": row["closed_at"],
         "version": row["version"],
+        # The interface mirrors these server-side decisions; a hidden button is
+        # never the authorization, only the explanation of a refused action.
+        "can_manage": _is_manager(case_id),
+        "can_review": _is_reviewer(case_id),
+        "can_work": _can_work(case_id, row),
         "events": [
             {"action": item["action"], "actor": item["actor"], "note": item["note"],
              "from": item["from_status"], "to": item["to_status"], "created_at": item["created_at"]}
@@ -184,7 +200,7 @@ def list_case_tasks(case_id: int, status: str | None = None, mine: bool = False)
 @router.post("/cases/{case_id}/tasks", status_code=201)
 def create_task(case_id: int, payload: TaskCreate):
     if not _is_manager(case_id):
-        raise HTTPException(403, "需要案件负责人或管理员权限")
+        raise HTTPException(403, "需要编辑权限及案件负责人角色")
     if payload.kind not in TASK_KINDS:
         raise HTTPException(400, "任务类型必须来自：" + "、".join(TASK_KINDS))
     due = _parse_due(payload.due_at)
@@ -249,11 +265,11 @@ def act_on_task(task_id: int, payload: TaskAction):
         action = payload.action
 
         if action in {"assign", "due", "cancel"} and not _is_manager(case_id):
-            raise HTTPException(403, "需要案件负责人或管理员权限")
+            raise HTTPException(403, "需要编辑权限及案件负责人角色")
         if action in {"return", "complete"} and not _is_reviewer(case_id):
-            raise HTTPException(403, "需要复核律师或案件负责人权限")
-        if action in {"start", "submit"} and not (_is_assignee(row) or _is_manager(case_id)):
-            raise HTTPException(403, "只有任务负责人可以提交")
+            raise HTTPException(403, "需要审批确认权限及复核律师或案件负责人角色")
+        if action in {"start", "submit"} and not _can_work(case_id, row):
+            raise HTTPException(403, "需要编辑权限且为任务负责人或案件负责人")
 
         if row["status"] in {"已完成", "已取消"}:
             raise HTTPException(409, "任务已结束，不能再操作")

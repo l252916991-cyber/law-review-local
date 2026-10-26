@@ -19,7 +19,10 @@ export function ExportCase({ caseId, identity }: { caseId: number; identity: Row
   const role = text((identity.roles ? object(identity.roles) : {})[String(caseId)]),
     permissions = Array.isArray(identity.permissions) ? identity.permissions.map(String) : [],
     canEdit = Boolean(identity.admin) || (permissions.includes("edit") && !["reviewer", "viewer"].includes(role)),
-    canReview = Boolean(identity.admin) || (permissions.includes("approve") && ["owner", "reviewer", ""].includes(role)),
+    // A case role only narrows a member's permissions: owner/reviewer never
+    // restore a withdrawn approve right, and an environment identity without a
+    // case role cannot review.
+    canReview = Boolean(identity.admin) || (permissions.includes("approve") && ["owner", "reviewer"].includes(role)),
     reportData = reports.data ? object(reports.data) : {},
     items = list(reportData.reports),
     basis = reportData.current_basis ? object(reportData.current_basis) : {},
@@ -90,6 +93,7 @@ export function ExportCase({ caseId, identity }: { caseId: number; identity: Row
         )}
         {items.map((report) => {
           const status = text(report.status);
+          const canReviewReport = typeof report.can_review === "boolean" ? report.can_review : canReview;
           return (
             <article className="row" key={id(report.id)}>
               <span>
@@ -110,7 +114,7 @@ export function ExportCase({ caseId, identity }: { caseId: number; identity: Row
                     提交复核
                   </button>
                 )}
-                {canReview && status === "待复核" && (
+                {canReviewReport && status === "待复核" && (
                   <>
                     <button disabled={busy} onClick={() => void transition(report, "approve")}>
                       批准
@@ -120,7 +124,7 @@ export function ExportCase({ caseId, identity }: { caseId: number; identity: Row
                     </button>
                   </>
                 )}
-                {canReview && status !== "已作废" && (
+                {canReviewReport && status !== "已作废" && (
                   <button
                     disabled={busy}
                     onClick={() => {

@@ -1,10 +1,14 @@
 "use client";
 import { useState } from "react";
 import { api, jsonBody } from "@/lib/api";
-import { id, message, object, text, type Row } from "@/lib/data";
+import { id, message, object, strings, text, type Row } from "@/lib/data";
 import { Empty, ErrorBox, list, useData } from "./ui";
 
 const KINDS = ["阅卷", "核证", "补证", "复核", "归档", "其他"];
+
+function flag(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
 
 function lastEventText(task: Row) {
   const events = list(task.events);
@@ -21,8 +25,10 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
   const tasks = useData(`/api/cases/${caseId}/tasks${mine ? "?mine=true" : ""}`),
     roles = identity.roles ? object(identity.roles) : {},
     role = text(roles[String(caseId)]),
-    manager = Boolean(identity.admin) || role === "owner",
-    reviewer = manager || role === "reviewer",
+    permissions = strings(identity.permissions),
+    manager = Boolean(identity.admin) || (permissions.includes("edit") && role === "owner"),
+    reviewer = Boolean(identity.admin) || (permissions.includes("approve") && ["owner", "reviewer"].includes(role)),
+    canWork = Boolean(identity.admin) || permissions.includes("edit"),
     members = useData(manager ? `/api/cases/${caseId}/members` : null);
   const body = tasks.data ? object(tasks.data) : {},
     items = list(body.tasks),
@@ -153,6 +159,9 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
         {items.map((task) => {
           const assignedToMe = memberId !== null && Number(task.assignee_member_id) === memberId;
           const open = ["待处理", "进行中", "待复核"].includes(text(task.status));
+          const canManage = flag(task.can_manage, manager);
+          const canReviewTask = flag(task.can_review, reviewer);
+          const canWorkTask = flag(task.can_work, canWork && (assignedToMe || manager));
           return (
             <article className="row" key={id(task.id)}>
               <span>
@@ -171,27 +180,27 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
               <span>
                 {task.overdue ? <span className="badge">逾期</span> : null}
                 <span className="badge">{text(task.status_label)}</span>
-                {open && (assignedToMe || manager) && text(task.status) === "待处理" && (
+                {open && canWorkTask && text(task.status) === "待处理" && (
                   <button disabled={busy} onClick={() => void act(task, "start")}>
                     开始
                   </button>
                 )}
-                {open && (assignedToMe || manager) && text(task.status) === "进行中" && (
+                {open && canWorkTask && text(task.status) === "进行中" && (
                   <button disabled={busy} onClick={() => void act(task, "submit")}>
                     提交复核
                   </button>
                 )}
-                {open && reviewer && text(task.status) === "待复核" && (
+                {open && canReviewTask && text(task.status) === "待复核" && (
                   <button disabled={busy} onClick={() => void act(task, "complete")}>
                     确认完成
                   </button>
                 )}
-                {open && reviewer && ["进行中", "待复核"].includes(text(task.status)) && (
+                {open && canReviewTask && ["进行中", "待复核"].includes(text(task.status)) && (
                   <button disabled={busy} onClick={() => returnTask(task)}>
                     退回
                   </button>
                 )}
-                {open && manager && (
+                {open && canManage && (
                   <button
                     disabled={busy}
                     onClick={() => {

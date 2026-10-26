@@ -17,17 +17,25 @@ from pydantic import BaseModel, Field
 
 from .db import connect, now, record_security_event, transaction
 from .report_basis import basis_hash, basis_snapshot
-from .security import current_principal, require_case_access, require_permission
+from .security import (
+    REVIEW_ROLES,
+    current_principal,
+    has_case_role,
+    require_case_access,
+    require_case_role,
+    require_permission,
+)
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
 REPORT_STATUSES = ("草稿", "待复核", "已退回", "已批准", "已作废")
 OPEN_STATUSES = ("草稿", "待复核", "已退回")
+REVIEW_ACTIONS = {"return", "approve", "void"}
 
 
 def _is_reviewer(case_id: int) -> bool:
-    principal = current_principal()
-    return principal.admin or principal.role_for(case_id) in {"owner", "reviewer"}
+    """A review action needs the approve permission *and* a review case role."""
+    return has_case_role("approve", case_id, REVIEW_ROLES)
 
 
 def _load(conn, report_id: int):
@@ -46,7 +54,6 @@ def _payload(conn, row, current_hash: str) -> dict[str, Any]:
         "SELECT action, actor, note, from_status, to_status, created_at FROM case_report_events "
         "WHERE report_id = ? ORDER BY id", (row["id"],)
     ).fetchall()
-    day = now()[:10]
     return {
         "id": row["id"],
         "case_id": row["case_id"],
@@ -73,7 +80,9 @@ def _payload(conn, row, current_hash: str) -> dict[str, Any]:
              "from": item["from_status"], "to": item["to_status"], "created_at": item["created_at"]}
             for item in events
         ],
-        "can_review": _is_reviewer(row["case_id"]) and day is not None,
+        "can_edit": current_principal().has_for_case("edit", row["case_id"]),
+        "can_review": _is_reviewer(row["case_id"]),
+        "can_export": current_principal().has_for_case("export", row["case_id"]),
     }
 
 
@@ -166,6 +175,11 @@ def act_on_report(report_id: int, payload: ReportAction):
         require_case_access(case_id)
         action = payload.action
 
+        # Return/approve/void are review actions: the approve permission alone is
+        # not enough, and a retained owner/reviewer role never restores it.
+        if action in REVIEW_ACTIONS:
+            require_case_role("approve", case_id, REVIEW_ROLES, "需要审批确认权限及复核律师或案件负责人角色")
+
         if action == "submit":
             require_permission("edit", case_id)
             if row["status"] not in {"草稿", "已退回"}:
@@ -178,8 +192,6 @@ def act_on_report(report_id: int, payload: ReportAction):
             )
             _event(conn, report_id, action="submit", actor=actor, from_status=row["status"], to_status="待复核")
         elif action == "return":
-            if not _is_reviewer(case_id):
-                raise HTTPException(403, "需要复核律师或案件负责人权限")
             reason = payload.note.strip()
             if not reason:
                 raise HTTPException(400, "退回报告必须填写原因")
@@ -192,8 +204,6 @@ def act_on_report(report_id: int, payload: ReportAction):
             )
             _event(conn, report_id, action="return", actor=actor, from_status="待复核", to_status="已退回", note=reason)
         elif action == "approve":
-            if not _is_reviewer(case_id):
-                raise HTTPException(403, "需要复核律师或案件负责人权限")
             if row["status"] != "待复核":
                 raise HTTPException(409, "只有待复核的报告可以批准")
             snapshot = basis_snapshot(conn, case_id)
@@ -212,8 +222,6 @@ def act_on_report(report_id: int, payload: ReportAction):
             _event(conn, report_id, action="approve", actor=actor, from_status="待复核", to_status="已批准",
                    note=payload.note)
         else:  # void
-            if not _is_reviewer(case_id):
-                raise HTTPException(403, "需要复核律师或案件负责人权限")
             if row["status"] == "已作废":
                 raise HTTPException(409, "报告已作废")
             conn.execute(
