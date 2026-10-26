@@ -22,7 +22,7 @@ from collections import defaultdict
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from docx import Document as DocxDocument
 
@@ -196,15 +196,38 @@ def persist_parsed_bank_rows(case_id: int, document_id: int, source_hash: str, r
     return _persist_parsed_bank_rows(case_id, document_id, source_hash, rows)
 
 
-def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, account: str | None = None, direction: str | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None) -> dict[str, Any]:
-    limit = max(1, min(limit, 500)); offset = max(0, offset)
+def _bank_transaction_clause(case_id: int, *, account: str | None = None, direction: str | None = None, counterparty: str | None = None, date_from: str | None = None, date_to: str | None = None) -> tuple[str, list[Any]]:
     clauses = ["case_id=?"]; params: list[Any] = [case_id]
     for field, value in (("account", account), ("counterparty", counterparty)):
         if value: clauses.append(f"{field} LIKE ?"); params.append(f"%{value}%")
     if direction: clauses.append("direction=?"); params.append(direction)
     if date_from: clauses.append("transaction_time>=?"); params.append(date_from)
     if date_to: clauses.append("transaction_time<=?"); params.append(date_to)
-    where = " AND ".join(clauses); conn = connect()
+    return " AND ".join(clauses), params
+
+
+def iter_bank_transactions(case_id: int, **filters: Any) -> Iterator[dict[str, Any]]:
+    """Stream every matching row for aggregation and export.
+
+    The interactive list endpoint stays paginated and capped at 500 rows, but
+    summary, graph and the export package must not report one page as the whole
+    case.
+    """
+    where, params = _bank_transaction_clause(case_id, **filters)
+    conn = connect()
+    try:
+        for row in conn.execute(
+            f"SELECT * FROM bank_transactions WHERE {where} ORDER BY transaction_time, id", params
+        ):
+            yield rowdict(row)
+    finally:
+        conn.close()
+
+
+def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, **filters: Any) -> dict[str, Any]:
+    limit = max(1, min(limit, 500)); offset = max(0, offset)
+    where, params = _bank_transaction_clause(case_id, **filters)
+    conn = connect()
     try:
         total = conn.execute(f"SELECT COUNT(*) FROM bank_transactions WHERE {where}", params).fetchone()[0]
         rows = [rowdict(row) for row in conn.execute(f"SELECT * FROM bank_transactions WHERE {where} ORDER BY transaction_time, id LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()]
@@ -213,25 +236,38 @@ def list_bank_transactions(case_id: int, *, limit: int = 100, offset: int = 0, a
 
 
 def summarize_bank_transactions(case_id: int, **filters: Any) -> dict[str, Any]:
-    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]
-    inflow = [r for r in rows if r["direction"] == "inflow" and r["amount_minor"] is not None]; outflow = [r for r in rows if r["direction"] == "outflow" and r["amount_minor"] is not None]
-    def group(key: str) -> dict[str, int]:
-        result: dict[str, int] = {}
-        for row in rows:
-            if row["amount_minor"] is not None: result[row[key] or "(空)"] = result.get(row[key] or "(空)", 0) + row["amount_minor"]
-        return result
+    count = inflow_count = outflow_count = 0
+    inflow_minor = outflow_minor = 0
+    by_account: dict[str, int] = {}
+    by_counterparty: dict[str, int] = {}
     by_period: dict[str, int] = {}
-    for row in rows:
-        if row["amount_minor"] is not None and row["transaction_time"]: by_period[row["transaction_time"][:7]] = by_period.get(row["transaction_time"][:7], 0) + row["amount_minor"]
-    return {"transaction_count": len(rows), "inflow_count": len(inflow), "outflow_count": len(outflow), "inflow_minor": sum(r["amount_minor"] for r in inflow), "outflow_minor": sum(r["amount_minor"] for r in outflow), "net_minor": sum(r["amount_minor"] for r in inflow) - sum(r["amount_minor"] for r in outflow), "currency": rows[0]["currency"] if rows else "CNY", "by_account": group("account"), "by_counterparty": group("counterparty"), "by_period": by_period, "filters": filters}
+    currency = "CNY"
+    for row in iter_bank_transactions(case_id, **filters):
+        amount = row["amount_minor"]
+        if count == 0:
+            currency = row["currency"] or "CNY"
+        count += 1
+        if amount is None:
+            continue
+        if row["direction"] == "inflow":
+            inflow_count += 1; inflow_minor += amount
+        elif row["direction"] == "outflow":
+            outflow_count += 1; outflow_minor += amount
+        by_account[row["account"] or "(空)"] = by_account.get(row["account"] or "(空)", 0) + amount
+        by_counterparty[row["counterparty"] or "(空)"] = by_counterparty.get(row["counterparty"] or "(空)", 0) + amount
+        if row["transaction_time"]:
+            period = row["transaction_time"][:7]
+            by_period[period] = by_period.get(period, 0) + amount
+    return {"transaction_count": count, "inflow_count": inflow_count, "outflow_count": outflow_count, "inflow_minor": inflow_minor, "outflow_minor": outflow_minor, "net_minor": inflow_minor - outflow_minor, "currency": currency, "by_account": by_account, "by_counterparty": by_counterparty, "by_period": by_period, "filters": filters}
 
 
 def bank_transaction_graph(case_id: int, **filters: Any) -> dict[str, Any]:
-    rows = list_bank_transactions(case_id, limit=500, offset=0, **filters)["transactions"]; nodes: dict[str, dict[str, Any]] = {}; edges: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for row in rows:
+    nodes: dict[str, dict[str, Any]] = {}; edges: dict[tuple[str, str, str], dict[str, Any]] = {}; count = 0
+    for row in iter_bank_transactions(case_id, **filters):
+        count += 1
         account = f"account:{row['account'] or '(空)'}"; party = f"party:{row['counterparty'] or '(空)'}"; nodes.setdefault(account, {"id": account, "label": row["account"] or "(空)", "kind": "account"}); nodes.setdefault(party, {"id": party, "label": row["counterparty"] or "(空)", "kind": "party"})
         source, target = (party, account) if row["direction"] == "inflow" else (account, party); key = (source, target, row["currency"]); edge = edges.setdefault(key, {"from": source, "to": target, "relation_type": "资金链路", "currency": row["currency"], "count": 0, "amount_minor": 0, "transaction_ids": [], "unknown_direction": row["direction"] == "unknown"}); edge["count"] += 1; edge["transaction_ids"].append(row["id"]); edge["amount_minor"] += row["amount_minor"] or 0
-    return {"nodes": list(nodes.values()), "edges": list(edges.values()), "transaction_count": len(rows)}
+    return {"nodes": list(nodes.values()), "edges": list(edges.values()), "transaction_count": count}
 
 
 def _file_sha256(path: Path) -> str:
@@ -1683,14 +1719,7 @@ def build_export_package(
     if not messages:
         chats.append("\n[待补充：暂无问答记录]")
 
-    transactions = list_bank_transactions(case_id, limit=500, offset=0)["transactions"]
-    transaction_csv = io.StringIO()
-    transaction_writer = csv.writer(transaction_csv)
-    transaction_writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
-    for row in transactions:
-        transaction_writer.writerow([csv_safe_cell(row[key]) for key in ("transaction_time", "account", "direction", "amount_minor", "currency", "counterparty", "memo", "source_row_number", "parse_status")])
-    transaction_bytes = ("\ufeff" + transaction_csv.getvalue()).encode("utf-8")
-    transaction_sha = hashlib.sha256(transaction_bytes).hexdigest()
+    transactions = iter_bank_transactions(case_id)
     block_renderers = {
         "case_summary": lambda block: summary,
         "catalog_csv": lambda block: "\ufeff" + directory_csv.getvalue(),
@@ -1719,11 +1748,46 @@ def build_export_package(
             for item in evidence
         ],
         "files": [],
-        "artifacts": [{"archive_name": "资金流水.csv", "sha256": transaction_sha, "transaction_count": len(transactions)}],
+        "artifacts": [],
     }
 
+    # The transaction sheet is streamed so that a case with more rows than one
+    # interactive page still exports completely, without holding the whole CSV
+    # in memory. The manifest hash is computed over the exact bytes written.
+    transaction_sha = hashlib.sha256()
+    transaction_count = 0
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("资金流水.csv", transaction_bytes)
+        transaction_csv = io.StringIO()
+        transaction_writer = csv.writer(transaction_csv)
+        transaction_writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
+        buffered = 1
+        with archive.open("资金流水.csv", "w") as sink:
+            def emit(pending: io.StringIO) -> None:
+                data = pending.getvalue().encode("utf-8")
+                transaction_sha.update(data)
+                sink.write(data)
+                pending.seek(0)
+                pending.truncate(0)
+
+            emit_bom = "\ufeff".encode()
+            transaction_sha.update(emit_bom)
+            sink.write(emit_bom)
+            try:
+                for row in transactions:
+                    transaction_writer.writerow([csv_safe_cell(row[key]) for key in ("transaction_time", "account", "direction", "amount_minor", "currency", "counterparty", "memo", "source_row_number", "parse_status")])
+                    transaction_count += 1
+                    buffered += 1
+                    if buffered >= 500:
+                        emit(transaction_csv)
+                        buffered = 1
+                emit(transaction_csv)
+            finally:
+                transactions.close()
+        manifest["artifacts"] = [{
+            "archive_name": "资金流水.csv",
+            "sha256": transaction_sha.hexdigest(),
+            "transaction_count": transaction_count,
+        }]
         for block in blocks:
             kind = block["type"]
             if kind == "attachments":

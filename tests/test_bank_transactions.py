@@ -1,4 +1,6 @@
+import hashlib
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -142,3 +144,80 @@ class BankTransactionServiceTest(IsolatedDatabaseTestCase):
         with connect() as conn:
             stored = conn.execute("SELECT source_sheet, amount_minor, direction FROM bank_transactions WHERE source_document_id=?", (document["id"],)).fetchone()
         self.assertEqual(tuple(stored), ("主表", 2000, "outflow"))
+
+
+class BankTransactionVolumeTest(IsolatedDatabaseTestCase):
+    """统计、图谱与导出必须覆盖全部流水，而不是交互列表的第一页。"""
+
+    @classmethod
+    def setUpClass(cls):
+        from app.db import init_db
+        init_db(seed=False)
+
+    def test_summary_graph_and_export_cover_every_row(self):
+        import zipfile
+
+        from app.db import connect, now, transaction
+        from app.services import bank_transaction_graph, build_export_package, list_bank_transactions, summarize_bank_transactions
+
+        total = 620
+        rows = [
+            (
+                index,
+                "账户甲" if index % 2 else "账户乙",
+                "inflow" if index % 3 else "outflow",
+                index,
+                "2024-01-02",
+                "对方丙",
+            )
+            for index in range(1, total + 1)
+        ]
+        with transaction() as conn:
+            case_id = conn.execute(
+                "INSERT INTO cases(title,case_no,created_at,updated_at) VALUES ('大额流水案','(2026)测1号',?,?)",
+                (now(), now()),
+            ).lastrowid
+            conn.executemany(
+                "INSERT INTO bank_transactions(case_id,source_row_number,account,direction,amount_minor,currency,transaction_time,counterparty,memo,parser_version,row_fingerprint,created_at) "
+                "VALUES (?,?,?,?,?,'CNY',?,?,'备注','test',?,?)",
+                [(case_id, row[0], row[1], row[2], row[3], row[4], row[5], f"fp-{row[0]}", now()) for row in rows],
+            )
+
+        with connect() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM bank_transactions WHERE case_id=?", (case_id,)).fetchone()[0], total)
+
+        page = list_bank_transactions(case_id)
+        self.assertEqual(page["pagination"]["total"], total)
+        self.assertEqual(len(page["transactions"]), 100)
+
+        inflow = [row for row in rows if row[2] == "inflow"]
+        outflow = [row for row in rows if row[2] == "outflow"]
+        summary = summarize_bank_transactions(case_id)
+        self.assertEqual(summary["transaction_count"], total)
+        self.assertEqual(summary["inflow_count"], len(inflow))
+        self.assertEqual(summary["outflow_count"], len(outflow))
+        self.assertEqual(summary["inflow_minor"], sum(row[3] for row in inflow))
+        self.assertEqual(summary["outflow_minor"], sum(row[3] for row in outflow))
+        self.assertEqual(summary["net_minor"], sum(row[3] for row in inflow) - sum(row[3] for row in outflow))
+        self.assertEqual(summary["by_period"], {"2024-01": sum(row[3] for row in rows)})
+        self.assertEqual(summary["by_counterparty"], {"对方丙": sum(row[3] for row in rows)})
+
+        graph = bank_transaction_graph(case_id)
+        self.assertEqual(graph["transaction_count"], total)
+        self.assertEqual(sum(edge["count"] for edge in graph["edges"]), total)
+        self.assertEqual(sum(edge["amount_minor"] for edge in graph["edges"]), sum(row[3] for row in rows))
+
+        path, package_sha = build_export_package(case_id)
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            self.assertIn("资金流水.csv", names)
+            content = archive.read("资金流水.csv")
+            self.assertTrue(content.startswith("\ufeff".encode()))
+            lines = content.decode("utf-8-sig").splitlines()
+            self.assertEqual(len(lines), total + 1)
+            self.assertTrue(lines[1].startswith("2024-01-02,账户甲,inflow,"))
+            manifest = json.loads(archive.read("清单.json"))
+            artifact = manifest["artifacts"][0]
+            self.assertEqual(artifact["transaction_count"], total)
+            self.assertEqual(artifact["sha256"], hashlib.sha256(content).hexdigest())
+        self.assertEqual(len(package_sha), 64)
