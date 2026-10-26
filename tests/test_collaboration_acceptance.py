@@ -129,6 +129,114 @@ class AcceptanceChecksTest(unittest.TestCase):
         self.assertEqual(report["summary"]["fail"], 0)
         self.assertEqual(checks["multi_user"]["status"], "warn")
 
+    def test_multi_user_profile_rejects_local_mode(self):
+        with patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "local"}):
+            report = run_checks(self.data, multi_user=True)
+        checks = self.checks_by_name(report)
+        self.assertEqual(checks["multi_user"]["status"], "fail")
+        self.assertIn("不能作为多人交付验收结论", checks["multi_user"]["detail"])
+        self.assertGreaterEqual(report["summary"]["fail"], 1)
+
+    def test_inspection_never_creates_a_database(self):
+        missing = Path(self.directory.name) / "wrong-path"
+        missing.mkdir()
+        report = run_checks(missing)
+        checks = self.checks_by_name(report)
+        self.assertEqual(checks["database"]["status"], "fail")
+        self.assertFalse((missing / "law_review.db").exists())
+
+    def test_model_probe_requires_a_listed_target_model(self):
+        class Response:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self, _limit=None):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        empty = run_checks(self.data, model_url="http://127.0.0.1:9000/v1")
+        self.assertEqual(self.checks_by_name(empty)["model_endpoint"]["status"], "fail")
+        with patch("scripts.collaboration_acceptance.urllib.request.urlopen",
+                   return_value=Response({"data": []})):
+            no_models = self.checks_by_name(run_checks(self.data, model_url="http://127.0.0.1:9000/v1"))
+        self.assertEqual(no_models["model_endpoint"]["status"], "pass")
+        self.assertEqual(no_models["model_list"]["status"], "fail")
+        with patch("scripts.collaboration_acceptance.urllib.request.urlopen",
+                   return_value=Response({"data": [{"id": "qwen3-32b"}]})):
+            missing_target = self.checks_by_name(
+                run_checks(self.data, model_url="http://127.0.0.1:9000/v1", model_id="other-model")
+            )
+            found = self.checks_by_name(
+                run_checks(self.data, model_url="http://127.0.0.1:9000/v1", model_id="qwen3-32b")
+            )
+        self.assertEqual(missing_target["model_target"]["status"], "fail")
+        self.assertEqual(found["model_target"]["status"], "pass")
+        self.assertEqual(found["model_inference"]["status"], "skip")
+
+    def _approved_frozen_report(self):
+        from app.db import now, transaction
+        from app.report_delivery import freeze_for_submission
+
+        with transaction() as conn:
+            case_id = conn.execute(
+                "INSERT INTO cases(title,created_at,updated_at) VALUES ('冻结验收案',?,?)", (now(), now())
+            ).lastrowid
+            report_id = conn.execute(
+                "INSERT INTO case_reports(case_id,version,title,status,prepared_by,created_at,updated_at,row_version) "
+                "VALUES (?,1,'结案报告','草稿','管理员',?,?,1)",
+                (case_id, now(), now()),
+            ).lastrowid
+            row = conn.execute("SELECT * FROM case_reports WHERE id = ?", (report_id,)).fetchone()
+            frozen = freeze_for_submission(conn, row, actor="管理员")
+            conn.execute(
+                "UPDATE case_reports SET status='已批准', approved_by='管理员', approved_version_id=?, "
+                "content_hash=?, source_hash=? WHERE id=?",
+                (frozen["id"], frozen["content_hash"], frozen["source_hash"], report_id),
+            )
+        return case_id, report_id, frozen
+
+    def test_backup_drill_verifies_frozen_report_artifacts(self):
+        case_id, report_id, frozen = self._approved_frozen_report()
+        report = run_checks(
+            self.data, backup_target=Path(self.directory.name) / "drill-frozen", quiescent=True
+        )
+        checks = self.checks_by_name(report)
+        self.assertEqual(checks["backup_drill"]["status"], "pass", report)
+        self.assertEqual(checks["restore_integrity"]["status"], "pass", report)
+        self.assertEqual(checks["restore_artifacts"]["status"], "pass", report)
+        self.assertEqual(checks["restore_counts"]["status"], "pass", report)
+        self.assertIn("耗时", checks["backup_drill"]["detail"])
+
+        artifact_dir = self.data / frozen["artifact_dir"]
+        victim = sorted(path for path in artifact_dir.iterdir() if path.name.startswith("001-"))[0]
+        victim.unlink()
+        broken = run_checks(
+            self.data, backup_target=Path(self.directory.name) / "drill-broken", quiescent=True
+        )
+        broken_checks = self.checks_by_name(broken)
+        self.assertEqual(broken_checks["restore_artifacts"]["status"], "fail", broken)
+        self.assertIn("缺少冻结文件", broken_checks["restore_artifacts"]["detail"])
+
+    def test_old_schema_tables_are_classified_not_crashed(self):
+        with closing(sqlite3.connect(self.data / "law_review.db")) as conn:
+            for table in ("case_report_versions", "case_report_events", "bank_transactions"):
+                conn.execute(f"DROP TABLE {table}")
+            conn.execute("PRAGMA user_version = 24")
+            conn.commit()
+        report = run_checks(
+            self.data, backup_target=Path(self.directory.name) / "drill-old", quiescent=True
+        )
+        checks = self.checks_by_name(report)
+        self.assertEqual(checks["backup_drill"]["status"], "pass", report)
+        self.assertEqual(checks["restore_schema"]["status"], "warn")
+        self.assertIn("case_report_versions", checks["restore_schema"]["detail"])
+        self.assertEqual(checks["restore_artifacts"]["status"], "pass", report)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,9 +8,10 @@ stopped for the backup drill:
         --data-dir ~/lexvault-data --backup-drill /tmp/lexvault-drill --quiescent
 
 Checks cover identity configuration, member directory, schema/integrity,
-storage headroom, optional OCR tools and an optional offline model probe. The
-script never prints tokens, never sends case data and never mutates the source
-data directory.
+storage headroom, optional OCR tools, an optional offline model probe and an
+optional backup/restore drill. The script never prints tokens, never sends case
+data and never mutates the source data directory: every database is opened
+read-only, so a wrong path fails instead of creating an empty database.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ import os
 import shutil
 import sqlite3
 import sys
+import time
 import urllib.request
 from contextlib import closing
 from dataclasses import asdict, dataclass
@@ -34,6 +36,10 @@ if str(ROOT) not in sys.path:
 MIN_TOKEN_LENGTH = 32
 WARN_FREE_BYTES = 2 * 1024 * 1024 * 1024
 MIN_FREE_BYTES = 512 * 1024 * 1024
+# Rows compared after a drill; new system tables are reported, not required to
+# match, so an older schema is classified instead of failing the backup.
+BUSINESS_TABLES = ("cases", "documents", "evidence", "members", "review_tasks", "case_reports",
+                   "case_report_versions", "case_report_events", "review_task_events", "bank_transactions")
 
 
 @dataclass
@@ -49,6 +55,13 @@ def _check(name: str, status: str, detail: str) -> Check:
 
 def _db_path(data_dir: Path) -> Path:
     return data_dir / "law_review.db"
+
+
+def open_readonly(db_path: Path) -> sqlite3.Connection:
+    """Open an existing database for inspection; never create one."""
+    if not db_path.is_file():
+        raise FileNotFoundError(f"数据库不存在：{db_path}")
+    return sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=5)
 
 
 def _count(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -93,7 +106,7 @@ def _tesseract_languages(binary: str) -> list[str]:
     return [line.strip() for line in result.stdout.splitlines()[1:] if line.strip()]
 
 
-def check_identity(conn: sqlite3.Connection) -> list[Check]:
+def check_identity(conn: sqlite3.Connection, *, multi_user: bool = False) -> list[Check]:
     mode = os.getenv("LAW_REVIEW_AUTH_MODE", "local")
     checks: list[Check] = [_check("auth_mode", "pass" if mode in {"local", "token"} else "fail", f"模式：{mode}")]
     active_members = _count(conn, "SELECT COUNT(*) FROM members WHERE active = 1")
@@ -101,7 +114,12 @@ def check_identity(conn: sqlite3.Connection) -> list[Check]:
     checks.append(_check("member_directory", "pass" if active_members else "skip",
                          f"启用成员 {active_members} 人，其中管理员 {active_admins} 人"))
     if mode == "local":
-        checks.append(_check("multi_user", "warn", "本机模式是单用户；多人协作需要 LAW_REVIEW_AUTH_MODE=token"))
+        checks.append(_check(
+            "multi_user",
+            "fail" if multi_user else "warn",
+            "本机模式是单用户，不能作为多人交付验收结论"
+            if multi_user else "本机模式是单用户；多人协作需要 LAW_REVIEW_AUTH_MODE=token",
+        ))
         return checks
     raw = os.getenv("LAW_REVIEW_API_TOKENS_JSON", "").strip()
     env_tokens: dict[str, Any] = {}
@@ -144,7 +162,7 @@ def check_database(db_path: Path) -> list[Check]:
         return [_check("database", "fail", f"找不到 {db_path}")]
     from app.db import SCHEMA_VERSION
 
-    with closing(sqlite3.connect(db_path)) as conn:
+    with closing(open_readonly(db_path)) as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         checks = [
             _check("database", "pass", f"{db_path}（{db_path.stat().st_size // 1024} KiB）"),
@@ -173,7 +191,7 @@ def check_database(db_path: Path) -> list[Check]:
 def check_collaboration(db_path: Path) -> list[Check]:
     from app.report_basis import basis_hash, basis_snapshot
 
-    with closing(sqlite3.connect(db_path)) as conn:
+    with closing(open_readonly(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         checks: list[Check] = []
         unassigned = _count(
@@ -197,6 +215,20 @@ def check_collaboration(db_path: Path) -> list[Check]:
             snapshot = basis_snapshot(conn, report["case_id"])
             if basis_hash(snapshot) != report["basis_hash"]:
                 stale += 1
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(case_reports)")}
+        if "approved_version_id" not in columns:
+            checks.append(_check("signing_freeze", "warn",
+                                 "该库还没有冻结正文列：启动一次当前版本完成迁移后重新验收"))
+        else:
+            legacy = _count(
+                conn,
+                "SELECT COUNT(*) FROM case_reports WHERE status = '已批准' AND approved_version_id IS NULL",
+            )
+            checks.append(_check(
+                "signing_freeze", "warn" if legacy else "pass",
+                f"{legacy} 份已批准报告没有冻结正文，需重新准备并审批" if legacy
+                else "已批准报告均绑定冻结正文",
+            ))
         checks.append(_check("report_basis", "warn" if stale else "pass",
                              f"{stale} 份已批准报告的材料依据已变化" if stale else
                              f"已批准报告 {len(reports)} 份，依据均未变化"))
@@ -219,7 +251,45 @@ def check_storage(data_dir: Path) -> list[Check]:
                    f"剩余 {usage.free / (1024 ** 3):.1f} GiB，数据目录 {data_dir}")]
 
 
-def backup_drill(data_dir: Path, target: Path, *, quiescent: bool) -> list[Check]:
+def _restored_artifact_problem(restored: sqlite3.Connection, root: Path) -> str:
+    """Verify every approved frozen body resolves inside the restored copy."""
+    if not _table_exists(restored, "case_report_versions"):
+        return ""
+    rows = restored.execute(
+        """SELECT v.id, v.artifact_dir, v.content_json, v.content_hash
+           FROM case_reports r JOIN case_report_versions v ON v.id = r.approved_version_id
+           WHERE r.status = '已批准' AND r.approved_version_id IS NOT NULL"""
+    ).fetchall()
+    for version_id, artifact_dir, content_json, content_hash in rows:
+        directory = (root / artifact_dir).resolve()
+        if not directory.is_dir() or root.resolve() not in directory.parents:
+            return f"批准版本 #{version_id} 的冻结工件目录缺失：{artifact_dir}"
+        try:
+            body = json.loads(content_json or "{}")
+        except ValueError:
+            return f"批准版本 #{version_id} 的正文记录损坏"
+        import hashlib
+
+        digest = hashlib.sha256(
+            json.dumps({"blocks": body.get("blocks"), "transactions": body.get("transactions"),
+                        "attachments": body.get("attachments")},
+                       ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        if digest != content_hash:
+            return f"批准版本 #{version_id} 的正文摘要不一致"
+        entries = [*(body.get("blocks") or []), body.get("transactions") or {}]
+        for entry in entries:
+            path = directory / entry.get("file", "")
+            if not path.is_file():
+                return f"批准版本 #{version_id} 缺少冻结文件：{entry.get('archive_name')}"
+            if path.stat().st_size != entry.get("size"):
+                return f"批准版本 #{version_id} 的冻结文件大小不符：{entry.get('archive_name')}"
+    return ""
+
+
+def backup_drill(
+    data_dir: Path, target: Path, *, quiescent: bool, checkpoint: Path | None = None
+) -> list[Check]:
     if not quiescent:
         return [_check("backup_drill", "fail", "需要先停止 API/worker 并显式传入 --quiescent")]
     from scripts import data_snapshot
@@ -228,32 +298,48 @@ def backup_drill(data_dir: Path, target: Path, *, quiescent: bool) -> list[Check
         return [_check("backup_drill", "fail", f"演练目录已存在：{target}")]
     backup_dir = target / "backup"
     restore_dir = target / "restored"
+    started = time.monotonic()
     try:
         target.mkdir(parents=True, exist_ok=True)
-        manifest = data_snapshot.backup(data_dir, backup_dir, quiescent=True)
+        manifest = data_snapshot.backup(data_dir, backup_dir, checkpoint=checkpoint, quiescent=True)
         data_snapshot.verify(backup_dir)
         data_snapshot.restore(backup_dir, restore_dir)
     except Exception as exc:  # the drill reports the real error instead of guessing
         return [_check("backup_drill", "fail", f"{type(exc).__name__}: {exc}")]
-    checks = [_check("backup_drill", "pass", f"备份 {len(manifest['files'])} 个文件并通过校验")]
-    original = sqlite3.connect(_db_path(data_dir))
-    restored = sqlite3.connect(_db_path(restore_dir))
-    try:
-        for table in ("cases", "documents", "evidence", "members", "review_tasks", "case_reports"):
-            before = original.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            after = restored.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    elapsed = time.monotonic() - started
+    checks = [_check("backup_drill", "pass",
+                     f"备份 {len(manifest['files'])} 个文件并通过校验，恢复到新目录耗时 {elapsed:.1f}s")]
+    if "langgraph_checkpoints.sqlite" in {Path(item["path"]).name for item in manifest["files"]}:
+        checks.append(_check("restore_checkpoint", "pass",
+                             f"已恢复 checkpoint：{Path(manifest['checkpoint_original'] or '')}"))
+    with closing(open_readonly(_db_path(data_dir))) as original, \
+            closing(open_readonly(_db_path(restore_dir))) as restored:
+        integrity = restored.execute("PRAGMA integrity_check").fetchone()[0]
+        foreign = restored.execute("PRAGMA foreign_key_check").fetchall()
+        checks.append(_check("restore_integrity", "pass" if integrity == "ok" and not foreign else "fail",
+                             f"完整性 {integrity}，外键问题 {len(foreign)} 条"))
+        missing = [table for table in BUSINESS_TABLES if not _table_exists(restored, table)]
+        if missing:
+            checks.append(_check("restore_schema", "warn",
+                                 "恢复库缺少表（旧 schema 或未迁移）：" + "、".join(missing)))
+        compared = [table for table in BUSINESS_TABLES
+                    if _table_exists(original, table) and _table_exists(restored, table)]
+        differences = []
+        for table in compared:
+            before = _count(original, f"SELECT COUNT(*) FROM {table}")
+            after = _count(restored, f"SELECT COUNT(*) FROM {table}")
             if before != after:
-                checks.append(_check("restore_counts", "fail", f"{table}: {before} → {after}"))
-                break
-        else:
-            checks.append(_check("restore_counts", "pass", "恢复后核心表行数一致"))
-    finally:
-        original.close()
-        restored.close()
+                differences.append(f"{table}: {before} → {after}")
+        checks.append(_check("restore_counts", "fail" if differences else "pass",
+                             "；".join(differences) if differences else
+                             f"{len(compared)} 张业务表行数一致"))
+        problem = _restored_artifact_problem(restored, restore_dir)
+        checks.append(_check("restore_artifacts", "fail" if problem else "pass",
+                             problem or "已批准报告的冻结正文与工件可读"))
     return checks
 
 
-def probe_model(url: str) -> list[Check]:
+def probe_model(url: str, model_id: str | None = None) -> list[Check]:
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         return [_check("model_probe", "fail", "模型地址无效")]
@@ -262,10 +348,23 @@ def probe_model(url: str) -> list[Check]:
     try:
         with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - explicit operator URL
             body = json.loads(response.read(1_000_000).decode("utf-8", "replace"))
-        models = [item.get("id") for item in body.get("data", []) if isinstance(item, dict)]
-        return [_check("model_probe", "pass", f"{endpoint} 返回 {len(models)} 个模型")]
     except Exception as exc:
-        return [_check("model_probe", "fail", f"{endpoint} 不可用：{type(exc).__name__}")]
+        detail = f"{endpoint} 不可用：{type(exc).__name__}"
+        return [_check("model_probe", "fail", detail),
+                _check("model_endpoint", "fail", detail),
+                _check("model_target", "fail" if model_id else "skip", "接口不可达，无法确认目标模型")]
+    items = body.get("data") if isinstance(body, dict) else None
+    models = [item.get("id") for item in items or [] if isinstance(item, dict)]
+    checks = [_check("model_endpoint", "pass", f"{endpoint} 可访问，列出 {len(models)} 个模型"),
+              _check("model_list", "pass" if models else "fail",
+                     "模型列表非空" if models else "模型列表为空，不能视为模型就绪")]
+    if model_id:
+        present = model_id in models
+        checks.append(_check("model_target", "pass" if present else "fail",
+                             f"目标模型 {model_id} {'存在' if present else '未在 /models 中列出'}"))
+    checks.append(_check("model_inference", "skip",
+                         "推理质量与引用效果属于业务验收，需授权后由复核人执行"))
+    return checks
 
 
 def run_checks(
@@ -275,6 +374,9 @@ def run_checks(
     backup_target: Path | None = None,
     quiescent: bool = False,
     model_url: str | None = None,
+    model_id: str | None = None,
+    multi_user: bool = False,
+    checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     data_dir = data_dir.expanduser().resolve()
     os.environ["LAW_REVIEW_DATA_DIR"] = str(data_dir)
@@ -284,8 +386,8 @@ def run_checks(
     checks.extend(check_database(db_path))
     if db_path.is_file():
         try:
-            with closing(sqlite3.connect(db_path)) as conn:
-                checks.extend(check_identity(conn))
+            with closing(open_readonly(db_path)) as conn:
+                checks.extend(check_identity(conn, multi_user=multi_user))
         except sqlite3.OperationalError as exc:
             checks.append(_check("member_directory", "fail", f"缺少成员表：{exc}"))
         try:
@@ -293,9 +395,12 @@ def run_checks(
         except sqlite3.OperationalError as exc:
             checks.append(_check("collaboration_tables", "fail", f"缺少协作表：{exc}"))
     if backup_target is not None:
-        checks.extend(backup_drill(data_dir, backup_target.expanduser().resolve(), quiescent=quiescent))
+        checks.extend(backup_drill(
+            data_dir, backup_target.expanduser().resolve(), quiescent=quiescent,
+            checkpoint=checkpoint.expanduser().resolve() if checkpoint else None,
+        ))
     if model_url:
-        checks.extend(probe_model(model_url))
+        checks.extend(probe_model(model_url, model_id))
     summary = {
         "pass": sum(check.status == "pass" for check in checks),
         "warn": sum(check.status == "warn" for check in checks),
@@ -312,6 +417,11 @@ def main() -> int:
     parser.add_argument("--backup-drill", type=Path, default=None, help="备份恢复演练目录（必须不存在）")
     parser.add_argument("--quiescent", action="store_true", help="确认 API/worker 已停止，允许执行备份演练")
     parser.add_argument("--probe-model", default=None, help="显式探测模型服务地址（不发送案件数据）")
+    parser.add_argument("--model-id", default=None, help="要求 /models 列出的目标模型 ID")
+    parser.add_argument("--multi-user", action="store_true",
+                        help="按多人交付验收：本机单用户模式判为失败")
+    parser.add_argument("--checkpoint-db", type=Path, default=None,
+                        help="实际的 LangGraph checkpoint 数据库路径（透传给备份工具）")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     args = parser.parse_args()
     report = run_checks(
@@ -320,6 +430,9 @@ def main() -> int:
         backup_target=args.backup_drill,
         quiescent=args.quiescent,
         model_url=args.probe_model,
+        model_id=args.model_id,
+        multi_user=args.multi_user,
+        checkpoint=args.checkpoint_db,
     )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

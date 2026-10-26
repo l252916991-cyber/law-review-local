@@ -22,10 +22,15 @@ uv run --locked python -m scripts.collaboration_acceptance --data-dir /path/to/d
 | 参数 | 作用 |
 |---|---|
 | `--require-ocr` | 缺少 PDF/OCR 工具或 `chi_sim`/`eng` 语言包时判为失败（默认仅警告） |
-| `--backup-drill DIR` | 在 `DIR` 下执行备份 → 校验 → 恢复 → 行数比对；`DIR` 必须不存在 |
+| `--multi-user` | 按多人交付验收：`local` 单用户模式改为失败，不再只警告 |
+| `--backup-drill DIR` | 在 `DIR` 下执行备份 → 校验 → 恢复 → 完整性/外键/表计数/冻结工件核对；`DIR` 必须不存在 |
 | `--quiescent` | 确认 API/worker 已停止，允许备份演练 |
+| `--checkpoint-db PATH` | 实际的 LangGraph checkpoint 路径，透传给备份工具；有自定义路径时必须显式传入 |
 | `--probe-model URL` | 显式探测模型服务 `/models`，不发送案件数据；不传则不访问网络 |
+| `--model-id ID` | 要求 `/models` 列出该模型，缺失即失败 |
 | `--json` | 机器可读输出，便于值班记录归档 |
+
+只读保证：所有数据库都以 `mode=ro` 打开，路径写错直接判失败，不会新建空库。
 
 判定：`PASS` 通过；`WARN` 需要知悉但不阻断；`FAIL` 阻断验收。存在任一 `FAIL` 时脚本退出码为 1。
 
@@ -47,7 +52,15 @@ uv run --locked python -m scripts.collaboration_acceptance --data-dir /path/to/d
 | `case_assignment` | 有启用成员未分配案件 | 仅警告，适合按需分配 |
 | `overdue_tasks` | 存在逾期未结任务 | 仅警告 |
 | `report_basis` | 已批准报告的基线与当前材料不一致 | 仅警告；导出会拒绝 |
-| `backup_drill` / `restore_counts` | 备份失败、校验失败或恢复后行数不一致 | 阻断 |
+| `signing_freeze` | 已批准报告没有冻结正文（历史批准或未迁移） | 仅警告；这些报告不能正式导出 |
+| `multi_user` | `--multi-user` 下仍为 `local` 模式 | 阻断，多人交付不能用单用户模式验收 |
+| `model_endpoint` / `model_list` / `model_target` | 接口不可达、模型列表为空或缺少 `--model-id` | 阻断；`/models` 可访问不等于模型就绪 |
+| `model_inference` | 恒为 `skip` | 推理与引用效果属于授权后的业务验收 |
+| `backup_drill` / `restore_checkpoint` | 备份或恢复失败、checkpoint 未随包恢复 | 阻断 |
+| `restore_integrity` | 恢复库 `integrity_check` 或 `foreign_key_check` 失败 | 阻断 |
+| `restore_schema` | 恢复库缺表（旧 schema 或未迁移） | 警告并列出缺表，不因缺表中断演练 |
+| `restore_counts` | 双方都存在的业务表行数不一致 | 阻断；新增系统表不要求机械等量 |
+| `restore_artifacts` | 已批准报告的冻结正文目录、文件或摘要缺失 | 阻断；恢复后必须能预览与下载 |
 
 ## 3. 备份与恢复演练
 
@@ -57,7 +70,9 @@ uv run --locked python -m scripts.collaboration_acceptance \
   --data-dir /path/to/data --backup-drill /tmp/lexvault-drill --quiescent
 ```
 
-脚本会：备份到 `DIR/backup` → 校验清单与哈希 → 恢复到 `DIR/restored` → 比对 `cases/documents/evidence/members/review_tasks/case_reports` 行数。任一失败即阻断验收。演练产物可保留为证据，但不得含真实案件材料对外流转。
+脚本会：备份到 `DIR/backup` → 校验清单与哈希 → 恢复到 `DIR/restored` → 运行完整性/外键检查 → 比对双方都存在的业务表行数 → 核对已批准报告的冻结工件。缺失的表单列为 `restore_schema` 警告（旧 schema 未迁移），不会中断演练。恢复耗时写入 `backup_drill` 明细，作为恢复时间的实测基线。演练产物可保留为证据，但不得含真实案件材料对外流转。
+
+恢复实例的真实启动与业务验证（登录、权限、任务、报告、下载）属于人工验收，脚本只覆盖数据与工件层；`scripts/data_snapshot.py restore` 产出的 `RESTORE_REPORT.json` 用于配置恢复进程的 `LAW_REVIEW_DATA_DIR` 与 checkpoint 路径。
 
 恢复真实环境仍使用 `scripts/data_snapshot.py restore`，并在恢复后执行一次只读检查确认 `schema_version`、`integrity` 与行数。
 
@@ -116,19 +131,26 @@ uv run --locked python -m scripts.collaboration_acceptance \
 | 令牌泄露 | 轮换令牌 | 旧令牌立即失效 |
 | 复核人变更 | 新复核人批准新报告版本 | 旧批准版本置为已作废 |
 
-## 8. 运行提醒建议
+## 8. 运行提醒与值班责任
 
-当前版本提供 `/api/health`、`/api/ready`、结构化日志与 `security_events`，没有内置告警通道。建议至少监控：
+当前版本提供 `/api/health`、`/api/ready`、结构化日志与 `security_events`，**没有内置告警通道**。下列值守项由律所指定运维负责人执行外部巡检（系统定时任务或人工），本版不声称这些监控已接入：
 
-- `/api/ready` 连续失败或 `legal_verification=unavailable`（法条语料缺失只降级核验）；
-- 数据目录剩余空间低于 2 GiB；
-- 备份任务超过计划周期未成功；
-- 登录失败与 `security_events` 中 `denied` 的异常增长；
-- 已批准报告变为“依据已变化”后长期未重新签发。
+| 值守项 | 建议频率 | 失败处理 |
+|---|---|---|
+| `/api/ready`、`legal_verification=unavailable` | 每 5 分钟 | 法条语料缺失只降级核验；接口连续失败通知交付接收人并暂停签发 |
+| 数据目录剩余空间 < 2 GiB | 每小时 | 停止批量导入、清理旧导出包、扩容后复核 |
+| `python -m scripts.collaboration_acceptance --data-dir ... --multi-user` | 每日（只读，可随时执行） | 出现 `FAIL` 时按检查名定位；`multi_user` 失败说明身份模式退回单用户 |
+| 备份任务与恢复演练 | 每日备份、每月演练一次 | 备份失败当日重试；演练失败保留目录并记录责任人 |
+| 登录失败与 `security_events` 中 `denied` 增长 | 每日 | 核对来源与成员状态，必要时停用成员并轮换令牌 |
+| 已批准报告“依据已变化”后长期未重新签发 | 每周 | 通知承办律师重新准备、冻结并复核 |
+
+值班人、备份周期与保留位置在 U1 前登记到第 9 节放行参数；未登记时不能以本文默认值视为律所已接受。
 
 ## 9. 未覆盖项
 
 - 没有在线热备、异地复制、自动故障转移与多实例部署承诺。
 - 没有邮件/短信令牌投递，令牌由管理员手工转交。
 - 没有外部身份平台停用事件的实时同步；离职需在本系统停用成员。
-- 模型服务连通性检查仅在显式传入 `--probe-model` 时执行。
+- 模型服务连通性检查仅在显式传入 `--probe-model` 时执行；`/models` 通过不代表推理效果通过。
+- 恢复演练只覆盖数据与工件层，恢复实例的真实启动与业务链路属于 U1 人工验收。
+- 未登记的目标硬件、人数、并发与容量阈值不能由开发机结果推定满足。
