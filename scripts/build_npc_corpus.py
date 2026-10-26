@@ -22,7 +22,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.legal_corpus import LegalCorpus, SCHEMA_VERSION, article_number, split_articles  # noqa: E402
+from app.legal_corpus import ARTICLE_RE, LegalCorpus, SCHEMA_VERSION, article_number, split_articles  # noqa: E402
 from scripts.benchmark_campaign import read_rows  # noqa: E402
 
 SEARCH_URL = "https://flk.npc.gov.cn/law-search/search/list"
@@ -215,8 +215,20 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
         # contiguous numbered clauses (for example 32..52, then 123..127).
         # Only that first contiguous sequence is the amendment structure; keep
         # later standalone headings inside the final clause as quoted text.
-        encountered = [article_number(match.group(1)) for line in text.splitlines()
-                       if (match := ARTICLE_TITLE.fullmatch(line))]
+        def _clause_numbers(value: str) -> list[int]:
+            return [article_number(match.group(1)) for line in value.splitlines()
+                    if (match := ARTICLE_RE.match(line.strip()))]
+
+        amendment_repair = None
+        encountered = _clause_numbers(text)
+        if not encountered:
+            # The official publication merges each clause heading with its own
+            # body (``第十八条宪法序言……``); the repair only adds a separator so the
+            # paragraph-aligned parser can see the heading again.
+            repaired = _repair_merged_headings(text)
+            if repaired != text and _clause_numbers(repaired):
+                text, encountered = repaired, _clause_numbers(repaired)
+                amendment_repair = "merged_heading_separator_v1"
         base_numbers = encountered[:1]
         for number in encountered[1:]:
             if number != base_numbers[-1] + 1:
@@ -278,7 +290,8 @@ def extract_document(bundle: dict[str, Any], aliases: list[str], downloaded_at: 
         "completeness_check": f"official_detail_tree_and_all_base_articles_{expected_min}_through_{expected_max}_present_once",
         "provenance_policy": "complete_official_publication_only; no_benchmark_answers_or_predictions",
         "dataset_cutoff": bundle["cutoff"], "official_record_id": detail["bbbs"],
-        "layout_repair": layout_repair, "articles": articles, "appendix_text": "",
+        "layout_repair": layout_repair if isinstance(content_tree, dict) else amendment_repair,
+        "articles": articles, "appendix_text": "",
     }
 
 

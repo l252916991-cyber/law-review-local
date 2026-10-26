@@ -192,3 +192,21 @@ def test_article_numbers_above_one_hundred_use_the_legal_spelling():
     assert _chinese_number(111) == "一百一十一"
     assert _chinese_number(210) == "二百一十"
     assert article_number("一百一十") == 110
+
+
+def test_extracts_amendment_whose_clause_headings_are_merged_with_the_body():
+    bundle = {
+        "cutoff": "2023-11-13",
+        "detail": {"data": {
+            "bbbs": "amendment-merged", "title": "中华人民共和国宪法修正案（1988年）", "gbrq": "1988-04-12",
+            "sxrq": "1988-04-12", "content": None,
+        }},
+        "pages": [{"areas": [{"lines": [
+            _line("第一条宪法第十一条增加规定:“国家允许私营经济在法律规定的范围内存在和发展。"),
+            _line("第二条宪法第十条第四款修改为:“任何组织或者个人不得侵占、买卖或者以其他形式非法转让土地。"),
+        ]}]}],
+    }
+    document = extract_document(bundle, ["宪法修正案（1988年）"], "today")
+    assert [article["heading"] for article in document["articles"]] == ["第一条", "第二条"]
+    assert document["articles"][0]["text"].startswith("第一条 宪法第十一条增加规定")
+    assert document["layout_repair"] == "merged_heading_separator_v1"
