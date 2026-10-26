@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -896,6 +896,46 @@ def _migrate_v22(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE evidence SET updated_at = created_at WHERE updated_at IS NULL")
 
 
+def _migrate_v23(conn: sqlite3.Connection) -> None:
+    """Local member directory, hashed tokens and per-case roles.
+
+    Tokens are stored only as SHA-256 digests: the plaintext is shown once at
+    creation and never persisted. Members are deactivated rather than deleted
+    so case assignments, audit rows and later task history keep one identity.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    is_admin INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0,1)),
+    permissions_json TEXT NOT NULL DEFAULT '[]',
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS member_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_member_tokens_member ON member_tokens(member_id, revoked_at);
+CREATE TABLE IF NOT EXISTS case_members (
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('owner','reviewer','assistant','viewer')),
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (case_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_case_members_member ON case_members(member_id);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -918,7 +958,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

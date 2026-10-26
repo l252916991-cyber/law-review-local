@@ -28,7 +28,7 @@ def bounded_value(value: Any) -> Any:
 def record_field_changes(
     conn: sqlite3.Connection,
     *,
-    case_id: int,
+    case_id: int | None,
     action: str,
     target: str,
     actor: str,

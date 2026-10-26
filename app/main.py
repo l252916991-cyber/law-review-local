@@ -88,6 +88,7 @@ from .audit_trail import record_field_changes
 from .statutory_retrieval import corpus_status
 from .agent_tools import execute_readonly_tool
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
+from .members import router as member_router
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
 
 
@@ -154,6 +155,7 @@ app = FastAPI(
 app.add_middleware(AccessMiddleware)
 app.include_router(access_router)
 app.include_router(review_job_router)
+app.include_router(member_router)
 
 
 class RequestCorrelationMiddleware:
@@ -1077,7 +1079,7 @@ def create_evidence(case_id: int, body: EvidenceCreate):
     """手动创建证据事项"""
     require_case(case_id)
     if body.status == "已确认":
-        require_permission("approve")
+        require_permission("approve", case_id)
 
     conn = connect()
     try:
@@ -1163,6 +1165,9 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
         content_fields = ('title', 'category', 'fact', 'credibility',
                           'source_document_id', 'source_page_start', 'source_page_end', 'quote')
         changed_content = any(evidence[field] != values[field] for field in content_fields if field in values)
+        if changed_content:
+            # Approvers cannot rewrite the content they are confirming.
+            require_permission("edit", case_id)
 
         # Approval is attributed to the authenticated principal; moving an
         # item out of 已确认 clears the attribution. Model code has no write
@@ -1170,7 +1175,7 @@ def update_evidence(evidence_id: int, body: EvidenceUpdate):
         approval: tuple[str | None, str | None] | None = None
         if "status" in values:
             if values["status"] == "已确认":
-                require_permission("approve")
+                require_permission("approve", case_id)
                 approval = (actor_name(), now())
             else:
                 approval = (None, None)

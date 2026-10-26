@@ -56,8 +56,8 @@ class AccountingTests(unittest.TestCase):
             columns = {row[1] for row in conn.execute("PRAGMA table_info(llm_calls)")}
         # The latest migration number is asserted on purpose: a schema bump must
         # update this test rather than silently passing on an old database.
-        # v22 adds optimistic-concurrency versions for evidence/documents/cases.
-        self.assertEqual(version, 22)
+        # v22 adds optimistic-concurrency versions; v23 the member directory.
+        self.assertEqual(version, 23)
         self.assertTrue({"case_id", "run_id", "input_tokens", "ttft_ms", "kind"} <= columns)
 
     def test_unknown_usage_keeps_average_unknown(self):

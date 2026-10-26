@@ -71,12 +71,68 @@ def session_principal(value: str) -> Principal | None:
     if row is None:
         return None
     if row["kind"] == "token":
-        for token, principal in configured_tokens().items():
-            if hmac.compare_digest(_session_hash(token), row["credential_fingerprint"]):
-                return principal
-        return None
+        try:
+            for token, principal in configured_tokens().items():
+                if hmac.compare_digest(_session_hash(token), row["credential_fingerprint"]):
+                    return principal
+        except AccessConfigurationError:
+            # A directory-only deployment has no environment tokens; the member
+            # store below is then the sole authoritative source.
+            pass
+        return member_principal_for_fingerprint(row["credential_fingerprint"])
     settings = oidc_settings()
     return settings["principals"].get(row["oidc_subject"]) if settings else None
+
+
+def environment_token_principal(token: str) -> Principal | None:
+    """Environment token lookup that tolerates a directory-only deployment."""
+    try:
+        return token_principal(token)
+    except AccessConfigurationError:
+        return None
+
+
+def member_principal_for_token(token: str) -> Principal | None:
+    """Resolve a directory member from a plaintext token, failing closed."""
+    if not token:
+        return None
+    try:
+        from .members import principal_for_token
+        return principal_for_token(token)
+    except Exception as exc:
+        logger.error("Member token lookup failed (%s)", type(exc).__name__)
+        return None
+
+
+def member_principal_for_fingerprint(fingerprint: str) -> Principal | None:
+    """Resolve a directory member from a stored session fingerprint."""
+    if not fingerprint:
+        return None
+    try:
+        from .members import principal_for_fingerprint
+        return principal_for_fingerprint(fingerprint)
+    except Exception as exc:
+        logger.error("Member session lookup failed (%s)", type(exc).__name__)
+        return None
+
+
+def identity_providers_configured() -> bool:
+    """Token mode needs at least one usable identity source.
+
+    Environment tokens stay the deployment-level bootstrap; directory members
+    are the day-to-day source. A malformed environment configuration still fails
+    closed instead of being silently ignored in favour of the database.
+    """
+    raw = os.getenv("LAW_REVIEW_API_TOKENS_JSON", "").strip()
+    if raw and raw != "{}":
+        configured_tokens()
+        return True
+    try:
+        from .members import active_member_count
+        return active_member_count() > 0
+    except Exception as exc:
+        logger.error("Member directory unavailable (%s)", type(exc).__name__)
+        return False
 
 
 def oidc_session_principal(request_value: str) -> Principal | None:
@@ -98,6 +154,17 @@ ALL_PERMISSIONS = frozenset({"view", "edit", "approve", "export", "manage"})
 # permissions explicitly instead of relying on this compatibility default.
 LEGACY_MEMBER_PERMISSIONS = frozenset({"view", "edit", "approve", "export"})
 
+# A case role narrows what a member may do on that case; it never grants more
+# than the member's own permission set.
+ROLE_PERMISSIONS = {
+    "owner": frozenset({"view", "edit", "approve", "export"}),
+    "reviewer": frozenset({"view", "approve", "export"}),
+    "assistant": frozenset({"view", "edit"}),
+    "viewer": frozenset({"view"}),
+}
+ROLE_LABELS = {"owner": "承办律师", "reviewer": "复核律师", "assistant": "助理", "viewer": "只读"}
+MEMBER_PERMISSIONS = frozenset({"view", "edit", "approve", "export"})
+
 
 @dataclass(frozen=True)
 class Principal:
@@ -106,9 +173,26 @@ class Principal:
     case_ids: tuple[int, ...] = ()
     local: bool = False
     permissions: frozenset[str] = LEGACY_MEMBER_PERMISSIONS
+    # Directory-backed members carry their identity and per-case roles so that
+    # an assigned role can be enforced on the case the request targets.
+    member_id: int | None = None
+    roles: tuple[tuple[int, str], ...] = ()
 
     def has(self, permission: str) -> bool:
         return self.admin or permission in self.permissions
+
+    def role_for(self, case_id: int | None) -> str | None:
+        if case_id is None or not self.roles:
+            return None
+        return dict(self.roles).get(case_id)
+
+    def has_for_case(self, permission: str, case_id: int | None) -> bool:
+        if self.admin:
+            return True
+        role = self.role_for(case_id)
+        if role is None:
+            return self.has(permission)
+        return self.has(permission) and permission in ROLE_PERMISSIONS.get(role, frozenset())
 
 
 _principal: ContextVar[Principal | None] = ContextVar("lexvault_principal", default=None)
@@ -202,10 +286,15 @@ def require_case_access(case_id: int) -> None:
 PERMISSION_LABELS = {"view": "查看", "edit": "编辑", "approve": "审批确认", "export": "导出", "manage": "管理"}
 
 
-def require_permission(permission: str) -> None:
-    """Endpoint-level check for body-dependent permissions such as approve."""
+def require_permission(permission: str, case_id: int | None = None) -> None:
+    """Endpoint-level check for body-dependent permissions such as approve.
+
+    Pass ``case_id`` when the action targets one case: a directory member's role
+    on that case then narrows the permission (a reviewer may approve but not
+    edit content).
+    """
     principal = current_principal()
-    if not principal.has(permission):
+    if not principal.has_for_case(permission, case_id):
         raise HTTPException(403, f"需要{PERMISSION_LABELS[permission]}权限")
 
 
@@ -213,6 +302,11 @@ def _required_case_permission(method: str, path: str) -> str:
     if path.endswith("/export"):
         return "export"
     if method == "POST" and re.fullmatch(r"/api/cases/\d+/agent-tools/call", path):
+        return "view"
+    if method == "PATCH" and re.fullmatch(r"/api/evidence/\d+", path):
+        # Content edits and approvals share this endpoint. The handler requires
+        # "edit" only when content changes and "approve" only when confirming,
+        # so a reviewer can approve without gaining edit rights.
         return "view"
     if method in {"POST", "PATCH", "PUT", "DELETE"}:
         return "edit"
@@ -298,10 +392,13 @@ class AccessMiddleware(BaseHTTPMiddleware):
                     raise HTTPException(403, "本机模式不接受远程访问，请配置 token 模式")
                 principal = Principal("本机律师", True, local=True, permissions=ALL_PERMISSIONS)
             else:
-                configured_tokens()  # Fail closed even on auth endpoints.
+                if not identity_providers_configured():
+                    # Fail closed even on auth endpoints: no token source means
+                    # nobody can authenticate, not that everybody can.
+                    raise AccessConfigurationError("token 模式需要至少一个可用身份来源")
                 authorization = request.headers.get("authorization", "")
                 if authorization.startswith("Bearer "):
-                    principal = token_principal(authorization[7:])
+                    principal = environment_token_principal(authorization[7:]) or member_principal_for_token(authorization[7:])
                 else:
                     principal = session_principal(request.cookies.get("lexvault_session", ""))
                 public = not request.url.path.startswith("/api/") or request.url.path in {"/api/auth/session", "/api/auth/me", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/health", "/api/ready"}
@@ -313,7 +410,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                 if case_id is not None:
                     require_case_access(case_id)
                     needed = _required_case_permission(request.method, request.url.path)
-                    if not principal.has(needed):
+                    if not principal.has_for_case(needed, case_id):
                         raise HTTPException(403, f"需要{PERMISSION_LABELS[needed]}权限")
                 if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
@@ -456,6 +553,8 @@ def identity():
     value = _principal.get()
     return {"mode": auth_mode(), "authenticated": value is not None, "name": value.name if value else None, "admin": value.admin if value else False,
             "permissions": sorted(value.permissions) if value else [],
+            "member_id": value.member_id if value else None,
+            "roles": {str(case_id): role for case_id, role in value.roles} if value else {},
             "organization_name": os.getenv("LAW_REVIEW_ORGANIZATION_NAME", "").strip(),
             "support_contact": os.getenv("LAW_REVIEW_SUPPORT_CONTACT", "").strip(),
             "oidc_enabled": auth_mode() == "token" and oidc_settings() is not None}
@@ -576,7 +675,7 @@ def _limited_token_principal(token: str, request: Request) -> Principal | None:
             conn.execute("BEGIN IMMEDIATE")
             bucket = _login_bucket(request, "token")
             _check_login_limit(conn, bucket)
-            principal = token_principal(token)
+            principal = environment_token_principal(token) or member_principal_for_token(token)
             if principal is None:
                 _count_login_attempt(conn, bucket)
             return principal
