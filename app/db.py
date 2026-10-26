@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -977,6 +977,47 @@ CREATE INDEX IF NOT EXISTS idx_review_task_events_task ON review_task_events(tas
 """)
 
 
+def _migrate_v25(conn: sqlite3.Connection) -> None:
+    """Case reports bound to the material snapshot they were reviewed against."""
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS case_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    template_id INTEGER REFERENCES export_templates(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT '草稿'
+        CHECK (status IN ('草稿','待复核','已退回','已批准','已作废')),
+    basis_json TEXT NOT NULL DEFAULT '{}',
+    basis_hash TEXT NOT NULL DEFAULT '',
+    prepared_by TEXT NOT NULL DEFAULT '',
+    reviewed_by TEXT,
+    approved_by TEXT,
+    return_reason TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    submitted_at TEXT,
+    approved_at TEXT,
+    voided_at TEXT,
+    superseded_by INTEGER REFERENCES case_reports(id) ON DELETE SET NULL,
+    row_version INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (case_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_case_reports_case ON case_reports(case_id, status);
+CREATE TABLE IF NOT EXISTS case_report_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER NOT NULL REFERENCES case_reports(id) ON DELETE CASCADE,
+    from_status TEXT NOT NULL DEFAULT '',
+    to_status TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_case_report_events_report ON case_report_events(report_id, id);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -999,7 +1040,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24, _migrate_v25,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

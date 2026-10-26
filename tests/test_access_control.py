@@ -628,6 +628,18 @@ class AccessControlTests(unittest.TestCase):
                 "INSERT INTO evidence(case_id,title,category,fact,credibility,status,source_document_id,source_page_start,source_page_end,quote,approved_by,approved_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (self.cases[0], "已确认结案事实", "书证", "材料支持该事实", "高", "已确认", document_id, 1, 1, "结案原始材料", "管理员", now(), now()),
             )
+        # A formal delivery must be bound to an approved report of this material.
+        unbound = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
+        self.assertEqual(unbound.status_code, 400)
+        self.assertIn("先批准一份报告", unbound.text)
+        report = self.client.post(f"/api/cases/{self.cases[0]}/reports", headers=admin, json={"title": "结案报告"})
+        self.assertEqual(report.status_code, 201, report.text)
+        report_id = report.json()["report"]["id"]
+        submitted = self.client.patch(f"/api/reports/{report_id}", headers=admin, json={"action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.text)
+        approved = self.client.patch(f"/api/reports/{report_id}", headers=admin, json={"action": "approve"})
+        self.assertEqual(approved.status_code, 200, approved.text)
+
         final = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
         self.assertEqual(final.status_code, 200, final.text)
         self.assertTrue(final.headers.get("x-package-sha256"))

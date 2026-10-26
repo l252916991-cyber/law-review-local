@@ -312,6 +312,10 @@ def _required_case_permission(method: str, path: str) -> str:
         # Task actions are permission-checked per action: a reviewer completes
         # and returns, the assignee starts and submits, a manager reassigns.
         return "view"
+    if method == "PATCH" and re.fullmatch(r"/api/reports/\d+", path):
+        # Report transitions are checked per action: authors submit, reviewers
+        # return/approve/void.
+        return "view"
     if method in {"POST", "PATCH", "PUT", "DELETE"}:
         return "edit"
     return "view"
@@ -321,7 +325,7 @@ def _owned_case(path: str) -> int | None:
     direct = re.match(r"^/api/cases/(\d+)(?:/|$)", path)
     if direct:
         return int(direct[1])
-    match = re.match(r"^/api/(documents|evidence|conversations|agent-runs|batch-imports|agent-jobs|annotations|evidence-annotations|tasks)/([^/]+)", path)
+    match = re.match(r"^/api/(documents|evidence|conversations|agent-runs|batch-imports|agent-jobs|annotations|evidence-annotations|tasks|reports)/([^/]+)", path)
     if not match:
         return None
     group, identifier = match.groups()
@@ -337,6 +341,7 @@ def _owned_case(path: str) -> int | None:
         "annotations": "SELECT e.case_id FROM evidence_annotations a JOIN evidence e ON e.id=a.evidence_id WHERE a.id=?",
         "evidence-annotations": "SELECT e.case_id FROM evidence_annotations a JOIN evidence e ON e.id=a.evidence_id WHERE a.id=?",
         "tasks": "SELECT case_id FROM review_tasks WHERE id=?",
+        "reports": "SELECT case_id FROM case_reports WHERE id=?",
     }[group]
     with closing(connect()) as conn:
         row = conn.execute(sql, (identifier,)).fetchone()

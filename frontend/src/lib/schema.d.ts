@@ -243,6 +243,41 @@ export interface paths {
         patch: operations["act_on_task_api_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/cases/{case_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reports */
+        get: operations["list_reports_api_cases__case_id__reports_get"];
+        put?: never;
+        /** Create Report */
+        post: operations["create_report_api_cases__case_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Act On Report */
+        patch: operations["act_on_report_api_reports__report_id__patch"];
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1568,6 +1603,29 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ReportAction */
+        ReportAction: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "submit" | "return" | "approve" | "void";
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** ReportCreate */
+        ReportCreate: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Template Id */
+            template_id?: number | null;
+        };
         /** ReviewJobRequest */
         ReviewJobRequest: {
             /** Question */
@@ -2200,6 +2258,107 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_cases__case_id__reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_api_cases__case_id__reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    act_on_report_api_reports__report_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportAction"];
             };
         };
         responses: {

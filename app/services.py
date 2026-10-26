@@ -28,6 +28,7 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
+from .report_basis import basis_hash, basis_snapshot
 from .context import (
     ArchivedConversationError,
     ConversationNotFoundError,
@@ -1676,6 +1677,31 @@ def build_export_package(
                 (case_id,),
             )
         ]
+        # A formal delivery must point at one approved report whose material
+        # snapshot still matches; an approval never survives later edits. The
+        # template completeness check runs first so authors see it before this.
+        report_info = None
+        report_error = ""
+        if final:
+            report = conn.execute(
+                "SELECT * FROM case_reports WHERE case_id = ? AND status = '已批准' ORDER BY version DESC LIMIT 1",
+                (case_id,),
+            ).fetchone()
+            if report is None:
+                report_error = "正式交付需要先批准一份报告：请在“成果导出”中提交复核并批准"
+            elif basis_hash(basis_snapshot(conn, case_id)) != report["basis_hash"]:
+                report_error = "报告依据的材料或证据已变化，请重新复核并批准后再导出"
+            else:
+                try:
+                    counts = json.loads(report["basis_json"] or "{}").get("counts", {})
+                except ValueError:
+                    counts = {}
+                report_info = {
+                    "id": report["id"], "version": report["version"], "title": report["title"],
+                    "status": report["status"], "basis_hash": report["basis_hash"], "counts": counts,
+                    "prepared_by": report["prepared_by"], "reviewed_by": report["reviewed_by"],
+                    "approved_by": report["approved_by"], "approved_at": report["approved_at"],
+                }
     finally:
         conn.close()
 
@@ -1693,6 +1719,8 @@ def build_export_package(
         missing = [block.get("title") or block["type"] for block in blocks if block.get("required") and not _block_has_data(block, context)]
         if missing:
             raise ValueError("结案包缺少必选内容：" + "、".join(missing))
+        if report_info is None:
+            raise ValueError(report_error or "正式交付需要先批准一份报告：请在“成果导出”中提交复核并批准")
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     export_dir = get_db_path().parent / "exports"
@@ -1749,6 +1777,7 @@ def build_export_package(
         ],
         "files": [],
         "artifacts": [],
+        "report": report_info,
     }
 
     # The transaction sheet is streamed so that a case with more rows than one
@@ -1815,7 +1844,9 @@ def build_export_package(
         if final:
             conn.execute(
                 "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '模板结案打包', ?, ?)",
-                (case_id, f"模板[{template_info['name']}] 操作人[{actor or '未知'}] 包哈希 {_file_sha256(path)[:16]}", now()),
+                (case_id, f"模板[{template_info['name']}] 报告 v{report_info['version']}#{report_info['id']} "
+                          f"批准人[{report_info['approved_by']}] 操作人[{actor or '未知'}] "
+                          f"包哈希 {_file_sha256(path)[:16]}", now()),
             )
     return path, _file_sha256(path)
 
