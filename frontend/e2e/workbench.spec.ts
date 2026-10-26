@@ -151,3 +151,17 @@ test('owner creates a review task and cancels it', async ({ page }) => {
   await expect(row).toContainText('已取消');
   await page.screenshot({ path: test.info().outputPath('tasks.png'), fullPage: true });
 });
+
+test('report approval unlocks formal delivery', async ({ page }) => {
+  await login(page); await demoCase(page);
+  await page.getByRole('button', { name: '成果导出', exact: true }).click();
+  await page.getByRole('button', { name: '新建报告草稿' }).click();
+  const row = page.locator('article.row').filter({ hasText: /^v\d+ / }).first();
+  await expect(row).toContainText('草稿');
+  await row.getByRole('button', { name: '提交复核' }).click();
+  await expect(row).toContainText('待复核');
+  await row.getByRole('button', { name: '批准' }).click();
+  await expect(row).toContainText('已批准');
+  await expect(page.getByText('可正式交付')).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('reports.png'), fullPage: true });
+});

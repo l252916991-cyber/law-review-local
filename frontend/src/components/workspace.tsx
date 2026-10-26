@@ -419,7 +419,7 @@ function CaseWorkspace({
         {view === "tasks" && <ReviewTasks caseId={caseId} identity={identity} />}
         {view === "agent" && <Agent caseId={caseId} preview={setPage} />}
         {view === "metrics" && <Metrics caseId={caseId} />}
-        {view === "export" && <ExportCase caseId={caseId} />}
+        {view === "export" && <ExportCase caseId={caseId} identity={identity} />}
         {view === "settings" && <Settings />}
         {view === "members" && Boolean(identity.admin) && <Members />}
         {view === "search" && <Search caseId={caseId} preview={setPage} />}
