@@ -19,6 +19,23 @@
 
 离线演示证明的是发布包、镜像、权限访问、解析、检索、引用定位和导出链路能在隔离环境工作；不证明生成模型质量、法条现行有效性或真实律师审阅收益。
 
+### 源码包（含前端构建）的签发链路验收
+
+`package_release.py --with-frontend` 生成的私有候选包解压到新目录后，可先核对 `RELEASE_MANIFEST.json` 的每个成员摘要，再在隔离数据目录上启动实例：
+
+```bash
+LAW_REVIEW_DATA_DIR=/absolute/isolated-data \
+LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB=/absolute/isolated-data/checkpoints.sqlite \
+LAW_REVIEW_AUTH_MODE=token LAW_REVIEW_ALLOWED_HOSTS=127.0.0.1,localhost \
+LAW_REVIEW_API_TOKENS_JSON='{"<32 字符以上令牌>": {"name": "管理员", "admin": true}}' \
+  uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 18766
+
+uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:18766 \
+  --admin-token '<同一令牌>' --output /tmp/release-smoke
+```
+
+脚本会实际验证：静态首页与 CSP、管理员登录、成员与案件角色、材料上传、证据、模板、报告提交（冻结正文）、冻结预览、复核律师“可批准不可编制”、正式下载绑定冻结版本，以及包内清单与文件摘要。只使用合成材料，可重复执行。容器路径仍需按上一节的 `delivery_smoke.py` 验收，两者不可互相替代。
+
 ## 接入本地模型
 
 应用使用 OpenAI-compatible 的本地接口，模型服务须明确提供：对话 `/v1/chat/completions`、embedding `/v1/embeddings`、重排 `/v1/rerank`（或分别配置三台服务）。设置 `LAW_REVIEW_LLM_URL`、`LAW_REVIEW_EMBEDDING_URL`、`LAW_REVIEW_RERANK_URL` 和对应 `*_MODEL` 为服务**实际列出的 ID**；不要默认下载或换用另一个模型。嵌入权重变化时修改 `LAW_REVIEW_EMBEDDING_REVISION`，避免混用旧向量空间。先用服务自身的 `/v1/models` 与健康检查核对型号、URL、网络可达性，再启动模型模式的合成验收：
