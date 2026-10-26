@@ -308,6 +308,10 @@ def _required_case_permission(method: str, path: str) -> str:
         # "edit" only when content changes and "approve" only when confirming,
         # so a reviewer can approve without gaining edit rights.
         return "view"
+    if method in {"PATCH", "DELETE"} and re.fullmatch(r"/api/tasks/\d+", path):
+        # Task actions are permission-checked per action: a reviewer completes
+        # and returns, the assignee starts and submits, a manager reassigns.
+        return "view"
     if method in {"POST", "PATCH", "PUT", "DELETE"}:
         return "edit"
     return "view"
@@ -317,10 +321,12 @@ def _owned_case(path: str) -> int | None:
     direct = re.match(r"^/api/cases/(\d+)(?:/|$)", path)
     if direct:
         return int(direct[1])
-    match = re.match(r"^/api/(documents|evidence|conversations|agent-runs|batch-imports|agent-jobs|annotations|evidence-annotations)/([^/]+)", path)
+    match = re.match(r"^/api/(documents|evidence|conversations|agent-runs|batch-imports|agent-jobs|annotations|evidence-annotations|tasks)/([^/]+)", path)
     if not match:
         return None
     group, identifier = match.groups()
+    if group == "tasks" and identifier == "mine":
+        return None
     sql = {
         "documents": "SELECT case_id FROM documents WHERE id=?",
         "evidence": "SELECT case_id FROM evidence WHERE id=?",
@@ -330,6 +336,7 @@ def _owned_case(path: str) -> int | None:
         "agent-jobs": "SELECT case_id FROM review_jobs WHERE id=?",
         "annotations": "SELECT e.case_id FROM evidence_annotations a JOIN evidence e ON e.id=a.evidence_id WHERE a.id=?",
         "evidence-annotations": "SELECT e.case_id FROM evidence_annotations a JOIN evidence e ON e.id=a.evidence_id WHERE a.id=?",
+        "tasks": "SELECT case_id FROM review_tasks WHERE id=?",
     }[group]
     with closing(connect()) as conn:
         row = conn.execute(sql, (identifier,)).fetchone()
@@ -415,7 +422,7 @@ class AccessMiddleware(BaseHTTPMiddleware):
                 if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
                         raise HTTPException(403, "仅管理员可以创建案件")
-                    if case_id is None and request.url.path not in {"/api/cases/lifecycle/archived", "/api/cases/lifecycle/trash", "/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/ready", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates"}:
+                    if case_id is None and request.url.path not in {"/api/cases/lifecycle/archived", "/api/cases/lifecycle/trash", "/api/cases", "/api/health", "/api/benchmarks/lawbench", "/api/ready", "/api/auth/me", "/api/auth/session", "/api/auth/oidc/login", "/api/auth/oidc/callback", "/api/export-templates", "/api/tasks/mine"}:
                         raise HTTPException(403, "需要管理员权限")
             response = await call_next(request)
             if principal and not principal.local and response.status_code < 400 and (

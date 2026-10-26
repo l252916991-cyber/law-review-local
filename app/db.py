@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -936,6 +936,47 @@ CREATE INDEX IF NOT EXISTS idx_case_members_member ON case_members(member_id);
 """)
 
 
+def _migrate_v24(conn: sqlite3.Connection) -> None:
+    """Human review tasks with an append-only transition log.
+
+    These are people's work items, not the AI review queue: a returned task
+    keeps its reason and actor in ``review_task_events``.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS review_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT '阅卷',
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    assignee_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+    assignee_name TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT '待处理'
+        CHECK (status IN ('待处理','进行中','待复核','已完成','已取消')),
+    due_at TEXT,
+    evidence_id INTEGER REFERENCES evidence(id) ON DELETE SET NULL,
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    closed_at TEXT,
+    version INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_review_tasks_case ON review_tasks(case_id, status);
+CREATE INDEX IF NOT EXISTS idx_review_tasks_assignee ON review_tasks(assignee_member_id, status);
+CREATE TABLE IF NOT EXISTS review_task_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES review_tasks(id) ON DELETE CASCADE,
+    from_status TEXT NOT NULL DEFAULT '',
+    to_status TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL DEFAULT '',
+    actor TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_review_task_events_task ON review_task_events(task_id, id);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -958,7 +999,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

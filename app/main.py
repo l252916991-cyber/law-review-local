@@ -89,6 +89,7 @@ from .statutory_retrieval import corpus_status
 from .agent_tools import execute_readonly_tool
 from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
 from .members import router as member_router
+from .human_tasks import router as human_task_router
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
 
 
@@ -156,6 +157,7 @@ app.add_middleware(AccessMiddleware)
 app.include_router(access_router)
 app.include_router(review_job_router)
 app.include_router(member_router)
+app.include_router(human_task_router)
 
 
 class RequestCorrelationMiddleware:
