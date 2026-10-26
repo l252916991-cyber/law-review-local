@@ -178,4 +178,43 @@
 
 > 本节随实施更新，记录提交哈希、验证命令与未完成项。
 
-（待填）
+### 12.1 2026-10-27：计划 + P0 正确性
+
+| 提交 | 内容 |
+|---|---|
+| `93bc8f4` | 本计划书与文档索引 |
+| `0bbb8ef` | D2：流水汇总、资金链路图与导出覆盖全部记录（620 条回归，含清单哈希复算） |
+| `469873e` | D1/D3/D4：schema v22 版本列、`app/audit_trail.py` 字段级审计、`PATCH /api/cases/{id}`、单页原文纠错与审批失效 |
+| `76eb1c4` | 前端接入：证据与目录冲突提示、案件信息编辑、原文纠错、审计摘要 |
+
+已完成行为（与第 4 节逐项对应）：
+
+- **D1 并发覆盖**：`evidence`/`documents`/`cases` 增加 `version`；更新使用 `WHERE version=?`，冲突返回 409 与当前版本。前端带 `expected_version` 并只提示刷新，不自动重试。两名 token 律师的覆盖与审批归属有专门测试。
+- **D2 流水截断**：新增 `iter_bank_transactions` 流式游标，汇总与图谱按全量累计；导出按 500 行缓冲写入 zip 并边写边算 sha256，`清单.json` 的 `transaction_count` 与哈希覆盖全部记录。
+- **D3 案件信息**：新增 `PATCH /api/cases/{id}`（编辑权限 + 版本校验 + 字段级审计），前端顶栏“修改案件信息”。
+- **D4 材料纠错**：材料目录纠错改为字段级审计（含版本号）；新增 `PATCH /api/documents/{id}/pages/{no}`，同一事务内让来源该页、引用不再匹配的“已确认”证据退回待复核并清除确认人；页码详情返回 `document_version`。
+
+验证：
+
+- 协作专项 `tests/test_collaboration_concurrency.py`：12 项通过（含两名律师并发与审批归属）。
+- 受影响 Python 套件：186 passed；`ruff check app tests scripts` 通过。
+- 全量离线 `pytest -q`：**1240 passed, 4 failed, 85 skipped**；4 项失败在基线提交 `580c5b7` 上同样失败（见 12.3），非本批引入。
+- 前端：`contract:check`、`typecheck`、`lint`、`test`、`build:static` 通过；Playwright e2e 16 项（desktop + mobile）全部通过，构建产物已由 FastAPI 静态入口验证。
+
+### 12.2 尚未开始
+
+| 工作包 | 状态 | 说明 |
+|---|---|---|
+| W1 成员与案件分工（含 D5 会话撤权） | 未开始 | 依赖 `members`/`member_tokens`/`case_members` 设计与迁移 |
+| W2 人工任务闭环 | 未开始 | `review_tasks`/`review_task_events` 与待办视图 |
+| W4 报告复核与签发 | 未开始 | 依赖 W1 的复核人身份与 W3 的版本快照 |
+| W5 部署与运行保障 | 未开始 | 可执行验收脚本与恢复演练 |
+
+### 12.3 环境与既有失败
+
+1. 默认 PATH 中没有 `node`，`test_pricing`、`test_usage_panel`、`test_chat_client`、`test_mobile_ui` 会失败；补上 Node 后全部通过。
+2. 本机仅有 Node 24.21.0，且 DSH 运行时的签名策略拒绝加载 Vercel 签名的 `@next/swc-darwin-arm64`。本次按 `frontend/.node-version` 下载 24.22.1 到临时目录并仅在该副本上重签名，用于构建与 e2e；仓库固定的工具版本未修改。**部署机需安装 24.22.1，否则 `build:static` 会按设计拒绝执行。**
+3. `test_corpus_audit`（`boundary_difference` 0≠1）与 `test_corpus_canonical`（`publication_count` 66<71）依赖受控语料资产，基线即失败。
+4. `test_model_comparison` 的两项失败为 native 基线快照校验，基线即失败。
+5. M2/框架与 `mlx_lm` 相关测试因缺少 `LAW_REVIEW_FORGE_PYTHON`、`mlx_lm` 跳过，未计入通过数。
+6. 遗留 `app/static/*.js` 移动端界面仍可校准目录（不带 `expected_version`，服务端保持兼容），但不含案件信息编辑与原文纠错入口；正式界面以 Next 静态构建为准。
