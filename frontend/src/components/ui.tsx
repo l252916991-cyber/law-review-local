@@ -36,7 +36,7 @@ export function useData(path: string | null) {
   };
 }
 export function list(value: unknown) {
-  return value === undefined ? [] : rows(value);
+  return value == null ? [] : rows(value);
 }
 export function ErrorBox({ error }: { error?: string }) {
   return error ? (

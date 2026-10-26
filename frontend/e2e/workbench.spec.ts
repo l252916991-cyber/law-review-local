@@ -134,3 +134,20 @@ test('administrator creates a member and assigns a case role', async ({ page }) 
   await expect(panel).toContainText('复核律师');
   await page.screenshot({ path: test.info().outputPath('members.png'), fullPage: true });
 });
+
+test('owner creates a review task and cancels it', async ({ page }) => {
+  await login(page); await demoCase(page);
+  await page.getByRole('button', { name: '任务', exact: true }).click();
+  const title = `合成任务 ${Date.now()}`;
+  await page.locator('input[name="title"]').fill(title);
+  await page.locator('select[name="kind"]').selectOption('核证');
+  await page.locator('input[name="due_at"]').fill('2026-12-31');
+  await page.getByRole('button', { name: '创建任务' }).click();
+  const row = page.locator('article.row').filter({ hasText: title });
+  await expect(row).toContainText('待处理');
+  await expect(row).toContainText('2026-12-31');
+  page.once('dialog', (dialog) => dialog.accept());
+  await row.getByRole('button', { name: '取消' }).click();
+  await expect(row).toContainText('已取消');
+  await page.screenshot({ path: test.info().outputPath('tasks.png'), fullPage: true });
+});

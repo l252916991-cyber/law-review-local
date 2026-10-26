@@ -13,6 +13,7 @@ import { Settings } from "./settings";
 import { ExportCase } from "./export";
 import { Search } from "./search";
 import { CaseAssignment, Members } from "./members";
+import { ReviewTasks } from "./tasks";
 import { Empty, ErrorBox, Fields, Modal, list, useData, values } from "./ui";
 
 export default function Workspace() {
@@ -223,6 +224,7 @@ function CaseWorkspace({
         "overview",
         "documents",
         "evidence",
+        "tasks",
         "chat",
         "agent",
         "metrics",
@@ -277,6 +279,7 @@ function CaseWorkspace({
     overview: "案件总览",
     documents: "卷宗目录",
     evidence: "证据关系",
+    tasks: "任务",
     chat: "AI 阅卷",
     agent: "阅卷任务",
     metrics: "用量与费用",
@@ -413,6 +416,7 @@ function CaseWorkspace({
         )}
         {view === "chat" && <Chat caseId={caseId} preview={setPage} />}
         {view === "evidence" && <Evidence caseId={caseId} preview={setPage} />}
+        {view === "tasks" && <ReviewTasks caseId={caseId} identity={identity} />}
         {view === "agent" && <Agent caseId={caseId} preview={setPage} />}
         {view === "metrics" && <Metrics caseId={caseId} />}
         {view === "export" && <ExportCase caseId={caseId} />}
