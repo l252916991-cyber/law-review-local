@@ -108,3 +108,29 @@ test('missing statute corpus remains explicit in the specialist trace', async ({
   await trace.locator('details').filter({ hasText: '法条核验 Agent' }).locator('summary').click();
   await expect(trace).toContainText('未配置法条语料，无法核验法律依据');
 });
+
+test('administrator creates a member and assigns a case role', async ({ page }) => {
+  await login(page);
+  await page.getByRole('button', { name: '成员与权限', exact: true }).click();
+  await page.getByRole('button', { name: '添加成员' }).click();
+  const dialog = page.getByRole('dialog', { name: '添加成员' });
+  const name = `合成成员 ${Date.now()}`;
+  await dialog.getByLabel('姓名 / 登录标识').fill(name);
+  await dialog.getByRole('button', { name: '创建成员并生成令牌' }).click();
+  const tokenDialog = page.getByRole('dialog', { name: '访问令牌（只显示一次）' });
+  await expect(tokenDialog).toBeVisible();
+  await expect(tokenDialog.locator('.token')).not.toHaveText('');
+  await tokenDialog.getByRole('button', { name: '我已保存' }).click();
+  await expect(page.getByText(name, { exact: false }).first()).toBeVisible();
+
+  await page.getByRole('button', { name: '案件总览', exact: true }).click();
+  const panel = page.locator('section.card').filter({
+    has: page.getByRole('heading', { name: '案件分工', exact: true }),
+  });
+  await panel.locator('select[name="member_id"]').selectOption({ label: name });
+  await panel.locator('select[name="role"]').selectOption('reviewer');
+  await panel.getByRole('button', { name: '分配' }).click();
+  await expect(panel).toContainText(name);
+  await expect(panel).toContainText('复核律师');
+  await page.screenshot({ path: test.info().outputPath('members.png'), fullPage: true });
+});

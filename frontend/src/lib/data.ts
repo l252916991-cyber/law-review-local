@@ -8,6 +8,9 @@ export function rows(value: unknown): Row[] {
   if (!Array.isArray(value)) throw new Error("接口列表格式无效");
   return value.map(object);
 }
+export function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(text) : [];
+}
 export function text(value: unknown): string {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }

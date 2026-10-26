@@ -12,6 +12,7 @@ import { Evidence } from "./evidence";
 import { Settings } from "./settings";
 import { ExportCase } from "./export";
 import { Search } from "./search";
+import { CaseAssignment, Members } from "./members";
 import { Empty, ErrorBox, Fields, Modal, list, useData, values } from "./ui";
 
 export default function Workspace() {
@@ -104,6 +105,7 @@ function Shell({
           <CaseWorkspace
             key={id(current.id)}
             caseRow={current}
+            identity={identity}
             refresh={cases.reload}
           />
         ) : (
@@ -202,9 +204,11 @@ function Storage({
 }
 function CaseWorkspace({
   caseRow,
+  identity,
   refresh,
 }: {
   caseRow: Row;
+  identity: Row;
   refresh: () => void;
 }) {
   const caseId = id(caseRow.id),
@@ -225,6 +229,7 @@ function CaseWorkspace({
         "search",
         "export",
         "settings",
+        "members",
       ].includes(value || "")
         ? value!
         : "overview";
@@ -266,7 +271,9 @@ function CaseWorkspace({
     return () => window.removeEventListener("keydown", keyboard);
   }, []);
   const record = detail.data ? object(detail.data) : caseRow,
-    metrics = record.metrics ? object(record.metrics) : {};  const views: Record<string, string> = {
+    metrics = record.metrics ? object(record.metrics) : {};  const roles = identity.roles ? object(identity.roles) : {};
+  const canManageMembers = Boolean(identity.admin) || text(roles[String(caseId)]) === "owner";
+  const views: Record<string, string> = {
     overview: "案件总览",
     documents: "卷宗目录",
     evidence: "证据关系",
@@ -276,6 +283,7 @@ function CaseWorkspace({
     search: "全文检索",
     export: "成果导出",
     settings: "模型设置",
+    ...(identity.admin ? { members: "成员与权限" } : {}),
   };
   return (
     <div className={dark ? "case-space dark" : "case-space"}>
@@ -370,6 +378,7 @@ function CaseWorkspace({
                   </div>
                 ))}
             </section>
+            {canManageMembers && <CaseAssignment caseId={caseId} />}
             <section className="card">
               <h2>案卷管理</h2>
               <p>归档保留材料；移入回收站后按现有保留策略处理。</p>
@@ -408,6 +417,7 @@ function CaseWorkspace({
         {view === "metrics" && <Metrics caseId={caseId} />}
         {view === "export" && <ExportCase caseId={caseId} />}
         {view === "settings" && <Settings />}
+        {view === "members" && Boolean(identity.admin) && <Members />}
         {view === "search" && <Search caseId={caseId} preview={setPage} />}
       </main>
       {page && (

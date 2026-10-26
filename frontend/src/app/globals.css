@@ -877,3 +877,11 @@ dialog form .primary {
   font-size: 12px;
   line-height: 1.6;
 }
+.token {
+  word-break: break-all;
+  white-space: pre-wrap;
+  background: #f8f9f5;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
