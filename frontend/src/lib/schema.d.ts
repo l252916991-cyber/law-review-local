@@ -261,6 +261,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/{report_id}/frozen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Frozen
+         * @description The exact body the reviewer is asked to approve.
+         *
+         *     Read-only: it never renders from live tables, so a reviewer can compare the
+         *     preview with what a formal export will contain. Only block text is exposed;
+         *     artifact paths stay server-side.
+         */
+        get: operations["preview_frozen_api_reports__report_id__frozen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/{report_id}": {
         parameters: {
             query?: never;
@@ -2347,6 +2371,37 @@ export interface operations {
             };
         };
     };
+    preview_frozen_api_reports__report_id__frozen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     act_on_report_api_reports__report_id__patch: {
         parameters: {
             query?: never;
@@ -4120,6 +4175,7 @@ export interface operations {
             query?: {
                 template_id?: number | null;
                 final?: boolean;
+                report_id?: number | null;
             };
             header?: never;
             path: {

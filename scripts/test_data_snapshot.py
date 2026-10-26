@@ -26,6 +26,11 @@ class SnapshotTests(unittest.TestCase):
         self.document.write_text("synthetic evidence fixture", encoding="utf-8")
         (self.source / "exports").mkdir()
         (self.source / "exports/fixture.zip").write_bytes(b"synthetic export")
+        # Approved report bodies live outside uploads/exports; a restore must
+        # carry them or a delivered version would lose its frozen text.
+        self.artifact = self.source / "report_versions/case-1/report-1-1-deadbeef/001-案件摘要.md"
+        self.artifact.parent.mkdir(parents=True)
+        self.artifact.write_text("synthetic frozen body", encoding="utf-8")
         with closing(sqlite3.connect(self.source / "law_review.db")) as database, database:
             database.executescript("""
                 CREATE TABLE documents(id INTEGER PRIMARY KEY, stored_path TEXT);
@@ -54,6 +59,10 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(result["relocated_paths"], 2)
         self.assertEqual((target / "uploads/1/fixture.txt").read_text(), "synthetic evidence fixture")
         self.assertTrue((target / "exports/fixture.zip").is_file())
+        self.assertEqual(
+            (target / "report_versions/case-1/report-1-1-deadbeef/001-案件摘要.md").read_text(),
+            "synthetic frozen body",
+        )
         with closing(sqlite3.connect(target / "law_review.db")) as database:
             self.assertEqual(database.execute("SELECT stored_path FROM documents").fetchone()[0], str(target / "uploads/1/fixture.txt"))
             self.assertEqual(database.execute("SELECT stored_path FROM batch_import_files").fetchone()[0], str(target / "uploads/batch_temp/1/deleted.txt"))

@@ -17,6 +17,9 @@ FORMAT = "lexvault-offline-snapshot-v1"
 DB_NAME = "law_review.db"
 CHECKPOINT_NAME = "langgraph_checkpoints.sqlite"
 PATH_TABLES = ("documents", "batch_import_files")
+# Every mutable directory a restore must carry. A new artifact kind belongs here,
+# otherwise a restored instance would silently lose approved report bodies.
+ARTIFACT_DIRS = ("uploads", "exports", "report_versions")
 
 
 def digest(path: Path) -> str:
@@ -156,7 +159,7 @@ def backup(source: Path, destination: Path, *, checkpoint: Path | None = None, q
         (destination / "INCOMPLETE").write_text("Do not restore until manifest.json exists and verifies.\n", encoding="utf-8")
         for name, connection in connections.items():
             snapshot_database(connection, destination / name)
-        for directory in ("uploads", "exports"):
+        for directory in ARTIFACT_DIRS:
             if (source / directory).exists():
                 shutil.copytree(source / directory, destination / directory, symlinks=True)
         if inventory(source, ignore_sqlite_locks=True) != before or any(

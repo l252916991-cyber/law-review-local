@@ -17,6 +17,17 @@ from pydantic import BaseModel, Field
 
 from .db import connect, now, record_security_event, transaction
 from .report_basis import basis_hash, basis_snapshot
+from .report_delivery import (
+    current_source,
+    freeze_for_submission,
+    load_body,
+    missing_required_blocks,
+    resolve_artifact_dir,
+    sheet_stale,
+    source_digest,
+    transaction_sheet,
+    verify_body,
+)
 from .security import (
     REVIEW_ROLES,
     current_principal,
@@ -45,7 +56,44 @@ def _load(conn, report_id: int):
     return row
 
 
-def _payload(conn, row, current_hash: str) -> dict[str, Any]:
+def _inspect(conn, row, current_hash: str, sheet_sha: str | None = None) -> dict[str, Any]:
+    """Staleness and template completeness for one report row.
+
+    ``stale`` means the frozen source no longer matches the live inputs;
+    ``missing_blocks`` lists required template blocks that have no content, so
+    the page can warn before a formal export is refused.
+    """
+    result: dict[str, Any] = {"stale": False, "missing_blocks": []}
+    try:
+        source = current_source(conn, row["case_id"], row["template_id"])
+    except ValueError:
+        result["stale"] = row["status"] in {"待复核", "已批准"}
+        return result
+    result["missing_blocks"] = missing_required_blocks(source)
+    if row["status"] not in {"待复核", "已批准"}:
+        return result
+    if row["basis_hash"] and row["basis_hash"] != current_hash:
+        result["stale"] = True
+    if not result["stale"] and row["source_hash"] and source_digest(source) != row["source_hash"]:
+        result["stale"] = True
+    if not result["stale"] and sheet_sha is not None and row["frozen_version_id"]:
+        frozen = conn.execute(
+            "SELECT content_json FROM case_report_versions WHERE id = ?", (row["frozen_version_id"],)
+        ).fetchone()
+        if frozen is None:
+            result["stale"] = True
+        else:
+            try:
+                body = json.loads(frozen["content_json"] or "{}")
+            except ValueError:
+                result["stale"] = True
+            else:
+                result["stale"] = (body.get("transactions") or {}).get("sha256") != sheet_sha
+    return result
+
+
+def _payload(conn, row, current_hash: str, *, sheet_sha: str | None = None) -> dict[str, Any]:
+    inspected = _inspect(conn, row, current_hash, sheet_sha)
     try:
         basis = json.loads(row["basis_json"] or "{}")
     except ValueError:
@@ -61,7 +109,12 @@ def _payload(conn, row, current_hash: str) -> dict[str, Any]:
         "title": row["title"],
         "template_id": row["template_id"],
         "status": row["status"],
-        "stale": bool(row["status"] == "已批准" and row["basis_hash"] and row["basis_hash"] != current_hash),
+        "stale": inspected["stale"],
+        "missing_blocks": inspected["missing_blocks"],
+        "frozen_version_id": row["frozen_version_id"],
+        "approved_version_id": row["approved_version_id"],
+        "content_hash": row["content_hash"],
+        "source_hash": row["source_hash"],
         "basis": {
             "hash": row["basis_hash"],
             "counts": basis.get("counts", {}),
@@ -125,7 +178,8 @@ def list_reports(case_id: int):
         rows = conn.execute(
             "SELECT * FROM case_reports WHERE case_id = ? ORDER BY version DESC", (case_id,)
         ).fetchall()
-        reports = [_payload(conn, row, current) for row in rows]
+        sheet_sha = transaction_sheet(case_id)["sha256"]
+        reports = [_payload(conn, row, current, sheet_sha=sheet_sha) for row in rows]
     approved = next((item for item in reports if item["status"] == "已批准" and not item["stale"]), None)
     return {
         "reports": reports,
@@ -133,6 +187,63 @@ def list_reports(case_id: int):
         "deliverable": approved is not None,
         "deliverable_report_id": approved["id"] if approved else None,
     }
+
+
+PREVIEW_CHARS = 200_000
+
+
+@router.get("/reports/{report_id}/frozen")
+def preview_frozen(report_id: int):
+    """The exact body the reviewer is asked to approve.
+
+    Read-only: it never renders from live tables, so a reviewer can compare the
+    preview with what a formal export will contain. Only block text is exposed;
+    artifact paths stay server-side.
+    """
+    with closing(connect()) as conn:
+        row = _load(conn, report_id)
+        require_case_access(row["case_id"])
+        version = conn.execute(
+            "SELECT * FROM case_report_versions WHERE id = ?", (row["frozen_version_id"],)
+        ).fetchone() if row["frozen_version_id"] else None
+        if version is None:
+            raise HTTPException(404, "该报告还没有冻结的交付正文，请先提交复核")
+        try:
+            body = load_body(version)
+            directory = resolve_artifact_dir(version["artifact_dir"])
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        blocks = []
+        for item in body["blocks"]:
+            path = directory / item["file"]
+            if not path.is_file():
+                raise HTTPException(409, f"冻结正文文件缺失：{item['archive_name']}")
+            text = path.read_text(encoding="utf-8", errors="replace")
+            blocks.append({
+                "type": item["type"], "title": item["title"], "archive_name": item["archive_name"],
+                "sha256": item["sha256"], "size": item["size"],
+                "text": text[:PREVIEW_CHARS], "truncated": len(text) > PREVIEW_CHARS,
+            })
+        return {
+            "report": {
+                "id": row["id"], "version": row["version"], "title": row["title"],
+                "status": row["status"], "template_id": row["template_id"],
+                "frozen_version_id": version["id"], "frozen_seq": version["seq"],
+                "content_hash": version["content_hash"], "source_hash": version["source_hash"],
+                "frozen_at": version["frozen_at"], "frozen_by": version["frozen_by"],
+            },
+            "blocks": blocks,
+            "transactions": {
+                "archive_name": body["transactions"]["archive_name"],
+                "count": body["transactions"]["count"],
+                "currencies": body["transactions"]["currencies"],
+                "sha256": body["transactions"]["sha256"],
+            },
+            "attachments": [
+                {"archive_name": item["archive_name"], "size": item["size"], "sha256": item["sha256"]}
+                for item in body["attachments"]
+            ],
+        }
 
 
 @router.post("/cases/{case_id}/reports", status_code=201)
@@ -170,6 +281,9 @@ def act_on_report(report_id: int, payload: ReportAction):
     principal = current_principal()
     actor = principal.name
     with transaction() as conn:
+        # Serialize writers so two concurrent approve/return attempts resolve to
+        # one success and one conflict, never a half-applied transition.
+        conn.execute("BEGIN IMMEDIATE")
         row = _load(conn, report_id)
         case_id = row["case_id"]
         require_case_access(case_id)
@@ -184,12 +298,24 @@ def act_on_report(report_id: int, payload: ReportAction):
             require_permission("edit", case_id)
             if row["status"] not in {"草稿", "已退回"}:
                 raise HTTPException(409, "只有草稿或已退回的报告可以提交复核")
+            # The body is frozen before the status changes: an incomplete freeze
+            # leaves the report a draft instead of sending reviewable-looking
+            # content that cannot be delivered.
+            try:
+                frozen = freeze_for_submission(conn, row, actor=actor)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from exc
             snapshot = basis_snapshot(conn, case_id)
-            conn.execute(
+            changed = conn.execute(
                 "UPDATE case_reports SET status = '待复核', basis_json = ?, basis_hash = ?, prepared_by = ?, "
-                "submitted_at = ?, updated_at = ?, return_reason = '', row_version = row_version + 1 WHERE id = ?",
-                (json.dumps(snapshot, ensure_ascii=False), basis_hash(snapshot), actor, now(), now(), report_id),
+                "submitted_at = ?, updated_at = ?, return_reason = '', frozen_version_id = ?, content_hash = ?, "
+                "source_hash = ?, row_version = row_version + 1 WHERE id = ? AND status = ? AND row_version = ?",
+                (json.dumps(snapshot, ensure_ascii=False), basis_hash(snapshot), actor, now(), now(),
+                 frozen["id"], frozen["content_hash"], frozen["source_hash"], report_id, row["status"],
+                 row["row_version"]),
             )
+            if changed.rowcount != 1:
+                raise HTTPException(409, "报告已被其他人修改，请刷新后重试")
             _event(conn, report_id, action="submit", actor=actor, from_status=row["status"], to_status="待复核")
         elif action == "return":
             reason = payload.note.strip()
@@ -206,19 +332,40 @@ def act_on_report(report_id: int, payload: ReportAction):
         elif action == "approve":
             if row["status"] != "待复核":
                 raise HTTPException(409, "只有待复核的报告可以批准")
-            snapshot = basis_snapshot(conn, case_id)
-            if basis_hash(snapshot) != row["basis_hash"]:
-                raise HTTPException(409, "提交复核后材料或证据已变化，请退回并要求重新提交")
+            version = conn.execute(
+                "SELECT * FROM case_report_versions WHERE id = ?", (row["frozen_version_id"],)
+            ).fetchone() if row["frozen_version_id"] else None
+            if version is None:
+                raise HTTPException(409, "该报告没有冻结的交付正文，请重新提交复核后再批准")
+            # The approval covers exactly the frozen bytes: verify them and the
+            # source inputs again, so an approval cannot be granted to content
+            # that moved after submission.
+            try:
+                verify_body(version)
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
+            try:
+                current_digest = source_digest(current_source(conn, case_id, row["template_id"]))
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
+            if current_digest != version["source_hash"]:
+                raise HTTPException(409, "提交复核后材料、证据、问答或模板已变化，请退回并要求重新提交")
+            if sheet_stale(case_id, load_body(version)):
+                raise HTTPException(409, "提交复核后资金流水已变化，请退回并要求重新提交")
             conn.execute(
                 "UPDATE case_reports SET status = '已作废', superseded_by = ?, updated_at = ?, "
                 "row_version = row_version + 1 WHERE case_id = ? AND status = '已批准' AND id <> ?",
                 (report_id, now(), case_id, report_id),
             )
-            conn.execute(
+            changed = conn.execute(
                 "UPDATE case_reports SET status = '已批准', reviewed_by = ?, approved_by = ?, approved_at = ?, "
-                "updated_at = ?, row_version = row_version + 1 WHERE id = ?",
-                (actor, actor, now(), now(), report_id),
+                "approved_version_id = ?, content_hash = ?, source_hash = ?, updated_at = ?, "
+                "row_version = row_version + 1 WHERE id = ? AND status = '待复核' AND row_version = ?",
+                (actor, actor, now(), version["id"], version["content_hash"], version["source_hash"],
+                 now(), report_id, row["row_version"]),
             )
+            if changed.rowcount != 1:
+                raise HTTPException(409, "报告已被其他人处理，请刷新后重试")
             _event(conn, report_id, action="approve", actor=actor, from_status="待复核", to_status="已批准",
                    note=payload.note)
         else:  # void

@@ -72,7 +72,7 @@ class ReportFlowTest(IsolatedDatabaseTestCase):
         self.assertEqual(blocked.status_code, 400)
         self.assertIn("先批准一份报告", blocked.text)
 
-        report = self.create_report(case["id"], title="结案报告")
+        report = self.create_report(case["id"], title="结案报告", template_id=self.template())
         self.assertEqual(report["status"], "草稿")
         self.assertEqual(report["version"], 1)
         self.assertEqual(self.act(report["id"], "submit").status_code, 200)
@@ -99,7 +99,7 @@ class ReportFlowTest(IsolatedDatabaseTestCase):
         self.assertFalse(listed["deliverable"])
         self.assertTrue(listed["reports"][0]["stale"])
 
-        second = self.create_report(case["id"], title="结案报告（修订）")
+        second = self.create_report(case["id"], title="结案报告（修订）", template_id=self.template())
         self.assertEqual(second["version"], 2)
         self.act(second["id"], "submit")
         self.act(second["id"], "approve")
@@ -145,7 +145,7 @@ class ReportFlowTest(IsolatedDatabaseTestCase):
 
     def test_voided_report_blocks_formal_export(self):
         case = self.create_case()
-        report = self.create_report(case["id"])
+        report = self.create_report(case["id"], template_id=self.template())
         self.act(report["id"], "submit")
         self.act(report["id"], "approve")
         self.assertEqual(self.client.get(f"/api/cases/{case['id']}/export?template_id={self.template()}&final=true").status_code, 200)

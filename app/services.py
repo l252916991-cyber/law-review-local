@@ -16,7 +16,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-import zipfile
 from contextvars import ContextVar
 from collections import defaultdict
 from contextlib import closing
@@ -28,7 +27,6 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
-from .report_basis import basis_hash, basis_snapshot
 from .context import (
     ArchivedConversationError,
     ConversationNotFoundError,
@@ -1614,24 +1612,6 @@ def _block_filename(block: dict[str, Any]) -> str:
     return safe_filename(block.get("title") or block["type"]) + _TEXT_BLOCK_EXT.get(block["type"], "")
 
 
-def _block_has_data(block: dict[str, Any], context: dict[str, Any]) -> bool:
-    kind = block["type"]
-    if kind == "case_summary" or kind == "static_markdown":
-        return True
-    if kind == "catalog_csv":
-        return bool(context["documents"])
-    if kind == "evidence_table":
-        return bool(_export_evidence_rows(context["evidence"], block.get("evidence_status")))
-    if kind == "qa_log":
-        return bool(context["messages"])
-    if kind == "attachments":
-        return any(
-            (Path(doc["stored_path"]) if doc["stored_path"] else None) and Path(doc["stored_path"]).is_file()
-            for doc in context["documents"]
-        )
-    return False
-
-
 def get_export_template(template_id: int) -> dict[str, Any] | None:
     conn = connect()
     try:
@@ -1647,208 +1627,52 @@ def get_export_template(template_id: int) -> dict[str, Any] | None:
 
 
 def build_export_package(
-    case_id: int, template_id: int | None = None, *, final: bool = False, actor: str = ""
+    case_id: int, template_id: int | None = None, *, final: bool = False, actor: str = "",
+    report_id: int | None = None,
 ) -> tuple[Path, str]:
+    """Preview or formal delivery of one case.
+
+    A preview is rendered now and is explicitly ``finalized=false``. A formal
+    delivery reads the frozen body of one approved report version and refuses
+    to substitute another template or re-render from live tables.
+    """
+    from . import report_delivery
+
+    if not final:
+        if report_id is not None:
+            raise ValueError("只有正式交付可以指定报告版本")
+        return report_delivery.build_preview_package(case_id, template_id, actor=actor)
     conn = connect()
     try:
-        case = rowdict(conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
-        if not case:
+        if not conn.execute("SELECT 1 FROM cases WHERE id = ?", (case_id,)).fetchone():
             raise ValueError("案件不存在")
-        documents = [rowdict(x) for x in conn.execute("SELECT * FROM documents WHERE case_id = ? ORDER BY id", (case_id,))]
-        evidence = [
-            rowdict(x)
-            for x in conn.execute(
-                """
-                SELECT e.*, d.name AS source_name FROM evidence e
-                LEFT JOIN documents d ON d.id = e.source_document_id
-                WHERE e.case_id = ? ORDER BY e.id
-                """,
-                (case_id,),
-            )
-        ]
-        messages = [
-            rowdict(x)
-            for x in conn.execute(
-                """
-                SELECT m.*, c.title AS conversation_title, c.user_name FROM messages m
-                JOIN conversations c ON c.id = m.conversation_id
-                WHERE c.case_id = ? ORDER BY m.id
-                """,
-                (case_id,),
-            )
-        ]
-        # A formal delivery must point at one approved report whose material
-        # snapshot still matches; an approval never survives later edits. The
-        # template completeness check runs first so authors see it before this.
-        report_info = None
-        report_error = ""
-        if final:
+        if report_id is None:
             report = conn.execute(
                 "SELECT * FROM case_reports WHERE case_id = ? AND status = '已批准' ORDER BY version DESC LIMIT 1",
                 (case_id,),
             ).fetchone()
-            if report is None:
-                report_error = "正式交付需要先批准一份报告：请在“成果导出”中提交复核并批准"
-            elif basis_hash(basis_snapshot(conn, case_id)) != report["basis_hash"]:
-                report_error = "报告依据的材料或证据已变化，请重新复核并批准后再导出"
-            else:
-                try:
-                    counts = json.loads(report["basis_json"] or "{}").get("counts", {})
-                except ValueError:
-                    counts = {}
-                report_info = {
-                    "id": report["id"], "version": report["version"], "title": report["title"],
-                    "status": report["status"], "basis_hash": report["basis_hash"], "counts": counts,
-                    "prepared_by": report["prepared_by"], "reviewed_by": report["reviewed_by"],
-                    "approved_by": report["approved_by"], "approved_at": report["approved_at"],
-                }
+        else:
+            report = conn.execute(
+                "SELECT * FROM case_reports WHERE id = ? AND case_id = ?", (report_id, case_id)
+            ).fetchone()
     finally:
         conn.close()
-
-    if template_id is None:
-        blocks, template_info = DEFAULT_EXPORT_BLOCKS, {"id": None, "name": "默认结案包", "builtin": True, "version": None}
-    else:
-        template = get_export_template(template_id)
-        if template is None:
-            raise ValueError("结案模板不存在")
-        blocks = template["blocks"]
-        template_info = {"id": template["id"], "name": template["name"], "builtin": template["builtin"], "version": template["updated_at"]}
-    context = {"case": case, "documents": documents, "evidence": evidence, "messages": messages}
-
-    if final:
-        missing = [block.get("title") or block["type"] for block in blocks if block.get("required") and not _block_has_data(block, context)]
+    if report is None:
+        if report_id is not None:
+            raise ValueError("指定的报告不存在或不属于本案")
+        # Template completeness is reported before the approval gate: authors
+        # need to see what the selected template still lacks.
+        missing = report_delivery.required_missing(case_id, template_id)
         if missing:
             raise ValueError("结案包缺少必选内容：" + "、".join(missing))
-        if report_info is None:
-            raise ValueError(report_error or "正式交付需要先批准一份报告：请在“成果导出”中提交复核并批准")
-
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    export_dir = get_db_path().parent / "exports"
-    export_dir.mkdir(parents=True, exist_ok=True)
-    path = export_dir / f"{safe_filename(case['title'])}_{stamp}_{uuid.uuid4().hex[:8]}.zip"
-
-    summary = (
-        f"# {case['title']}\n\n"
-        f"- 案号：{case['case_no']}\n- 类型：{case['case_type']}\n- 当事人：{case['client_name']}\n"
-        f"- 状态：{case['status']}\n- 卷宗：{len(documents)}份\n- 证据事项：{len(evidence)}条\n\n"
-        f"## 案件说明\n\n{case['description']}\n\n"
-        "> 本文件由本地复刻系统生成，所有AI结果均需执业律师复核。\n"
-    )
-    directory_csv_rows = []
-    for doc in documents:
-        directory_csv_rows.append([csv_safe_cell(doc[key]) for key in ("name", "doc_type", "pages", "people", "date_range", "summary", "status")])
-    directory_csv = io.StringIO()
-    writer = csv.writer(directory_csv)
-    writer.writerow(["文件名", "文书类型", "页数", "涉及人员", "时间范围", "摘要", "状态"])
-    writer.writerows(directory_csv_rows)
-    chats = ["# 阅卷问答记录\n"]
-    for message in messages:
-        chats.append(f"## {message['conversation_title']} · {message['user_name']}\n\n**{message['role']}**\n\n{message['content']}\n")
-    if not messages:
-        chats.append("\n[待补充：暂无问答记录]")
-
-    transactions = iter_bank_transactions(case_id)
-    block_renderers = {
-        "case_summary": lambda block: summary,
-        "catalog_csv": lambda block: "\ufeff" + directory_csv.getvalue(),
-        "evidence_table": lambda block: "\ufeff" + _evidence_table_csv(_export_evidence_rows(evidence, block.get("evidence_status"))),
-        "qa_log": lambda block: "\n".join(chats),
-        "static_markdown": lambda block: block.get("content") or "[待补充：模板未填写内容]",
-    }
-
-    manifest = {
-        "generated_at": now(),
-        "schema_version": SCHEMA_VERSION,
-        "renderer_version": EXPORT_RENDERER_VERSION,
-        "finalized": bool(final),
-        "case": {"id": case["id"], "title": case["title"], "case_no": case["case_no"], "status": case["status"]},
-        "template": {**template_info, "blocks": blocks},
-        "documents": [
-            {"id": doc["id"], "name": doc["name"], "content_hash": doc.get("content_hash"),
-             "pages": doc["pages"], "doc_type": doc["doc_type"], "status": doc["status"]}
-            for doc in documents
-        ],
-        "evidence": [
-            {"id": item["id"], "title": item["title"], "status": item["status"],
-             "approved_by": item.get("approved_by"), "approved_at": item.get("approved_at"),
-             "source_document_id": item.get("source_document_id"),
-             "source_pages": [item["source_page_start"], item["source_page_end"]]}
-            for item in evidence
-        ],
-        "files": [],
-        "artifacts": [],
-        "report": report_info,
-    }
-
-    # The transaction sheet is streamed so that a case with more rows than one
-    # interactive page still exports completely, without holding the whole CSV
-    # in memory. The manifest hash is computed over the exact bytes written.
-    transaction_sha = hashlib.sha256()
-    transaction_count = 0
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        transaction_csv = io.StringIO()
-        transaction_writer = csv.writer(transaction_csv)
-        transaction_writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
-        buffered = 1
-        with archive.open("资金流水.csv", "w") as sink:
-            def emit(pending: io.StringIO) -> None:
-                data = pending.getvalue().encode("utf-8")
-                transaction_sha.update(data)
-                sink.write(data)
-                pending.seek(0)
-                pending.truncate(0)
-
-            emit_bom = "\ufeff".encode()
-            transaction_sha.update(emit_bom)
-            sink.write(emit_bom)
-            try:
-                for row in transactions:
-                    transaction_writer.writerow([csv_safe_cell(row[key]) for key in ("transaction_time", "account", "direction", "amount_minor", "currency", "counterparty", "memo", "source_row_number", "parse_status")])
-                    transaction_count += 1
-                    buffered += 1
-                    if buffered >= 500:
-                        emit(transaction_csv)
-                        buffered = 1
-                emit(transaction_csv)
-            finally:
-                transactions.close()
-        manifest["artifacts"] = [{
-            "archive_name": "资金流水.csv",
-            "sha256": transaction_sha.hexdigest(),
-            "transaction_count": transaction_count,
-        }]
-        for block in blocks:
-            kind = block["type"]
-            if kind == "attachments":
-                folder = safe_filename(block.get("filename") or block.get("title") or "原始卷宗")
-                for doc in documents:
-                    stored = Path(doc["stored_path"]) if doc["stored_path"] else None
-                    if stored and stored.exists() and stored.is_file():
-                        # Export must not package files outside the managed data
-                        # directory, even if database metadata was tampered with.
-                        stored = contained_path(stored, get_db_path().parent)
-                        archive_name = f"{folder}/{safe_filename(doc['name'])}"
-                        archive.write(stored, archive_name)
-                        manifest["files"].append({
-                            "archive_name": archive_name, "document_id": doc["id"],
-                            "sha256": _file_sha256(stored), "size": stored.stat().st_size,
-                        })
-                continue
-            archive.writestr(_block_filename(block), block_renderers[kind](block))
-        archive.writestr("清单.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-    with transaction() as conn:
-        conn.execute(
-            "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '导出结案包', ?, ?)",
-            (case_id, path.name, now()),
-        )
-        if final:
-            conn.execute(
-                "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '模板结案打包', ?, ?)",
-                (case_id, f"模板[{template_info['name']}] 报告 v{report_info['version']}#{report_info['id']} "
-                          f"批准人[{report_info['approved_by']}] 操作人[{actor or '未知'}] "
-                          f"包哈希 {_file_sha256(path)[:16]}", now()),
-            )
-    return path, _file_sha256(path)
+        raise ValueError("正式交付需要先批准一份报告：请在“成果导出”中提交复核并批准")
+    if report["status"] != "已批准":
+        raise ValueError("只有已批准的报告可以正式交付")
+    if not report["approved_version_id"]:
+        raise ValueError("该报告批准时没有冻结交付正文，请重新准备并提交复核后批准")
+    if template_id is not None and template_id != report["template_id"]:
+        raise ValueError("正式交付只能使用报告冻结的模板，不能替换正文")
+    return report_delivery.build_frozen_package(case_id, report, actor=actor)
 
 
 def build_export(case_id: int) -> Path:

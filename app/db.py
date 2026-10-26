@@ -45,6 +45,7 @@ def ensure_dirs() -> None:
     base = get_db_path().parent
     (base / "uploads").mkdir(parents=True, exist_ok=True)
     (base / "exports").mkdir(parents=True, exist_ok=True)
+    (base / "report_versions").mkdir(parents=True, exist_ok=True)
 
 
 def connect() -> sqlite3.Connection:
@@ -376,7 +377,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -1018,6 +1019,41 @@ CREATE INDEX IF NOT EXISTS idx_case_report_events_report ON case_report_events(r
 """)
 
 
+def _migrate_v26(conn: sqlite3.Connection) -> None:
+    """Frozen delivery body: one immutable version per report submission.
+
+    A reviewer approves rendered bytes, not live tables, so each submission
+    stores the body manifest, the source inputs it was rendered from and the
+    artifact directory holding those bytes. Historical reports keep their
+    approval record but carry no frozen version: they cannot be delivered until
+    a new version is prepared and approved.
+    """
+    _add_column_if_missing(conn, "case_reports", "frozen_version_id", "INTEGER")
+    _add_column_if_missing(conn, "case_reports", "approved_version_id", "INTEGER")
+    _add_column_if_missing(conn, "case_reports", "content_hash", "TEXT NOT NULL DEFAULT ''")
+    _add_column_if_missing(conn, "case_reports", "source_hash", "TEXT NOT NULL DEFAULT ''")
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS case_report_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER NOT NULL REFERENCES case_reports(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    report_version INTEGER NOT NULL,
+    template_id INTEGER,
+    renderer_version TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    content_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    artifact_dir TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'frozen' CHECK (status IN ('frozen','failed')),
+    frozen_by TEXT NOT NULL DEFAULT '',
+    frozen_at TEXT NOT NULL,
+    UNIQUE (report_id, seq)
+);
+CREATE INDEX IF NOT EXISTS idx_case_report_versions_report ON case_report_versions(report_id, seq);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -1040,7 +1076,7 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
             _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5, _migrate_v6,
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
-            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24, _migrate_v25,
+            _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24, _migrate_v25, _migrate_v26,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)

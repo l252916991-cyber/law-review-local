@@ -2089,10 +2089,13 @@ def get_bank_transaction_graph(case_id: int):
 
 
 @app.get("/api/cases/{case_id}/export")
-def export_case(case_id: int, request: Request, template_id: int | None = None, final: bool = False):
+def export_case(case_id: int, request: Request, template_id: int | None = None, final: bool = False,
+                report_id: int | None = None):
     require_case(case_id)
     try:
-        path, package_sha = build_export_package(case_id, template_id=template_id, final=final, actor=actor_name())
+        path, package_sha = build_export_package(
+            case_id, template_id=template_id, final=final, actor=actor_name(), report_id=report_id,
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     record_security_event("case_export", "success", actor=actor_name(), case_id=case_id,

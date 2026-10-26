@@ -632,7 +632,11 @@ class AccessControlTests(unittest.TestCase):
         unbound = self.client.get(f"/api/cases/{self.cases[0]}/export?template_id={template_id}&final=true", headers=admin)
         self.assertEqual(unbound.status_code, 400)
         self.assertIn("先批准一份报告", unbound.text)
-        report = self.client.post(f"/api/cases/{self.cases[0]}/reports", headers=admin, json={"title": "结案报告"})
+        # The report binds the delivery template; a formal export may not swap it.
+        report = self.client.post(
+            f"/api/cases/{self.cases[0]}/reports", headers=admin,
+            json={"title": "结案报告", "template_id": template_id},
+        )
         self.assertEqual(report.status_code, 201, report.text)
         report_id = report.json()["report"]["id"]
         submitted = self.client.patch(f"/api/reports/{report_id}", headers=admin, json={"action": "submit"})
