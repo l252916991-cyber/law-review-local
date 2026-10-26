@@ -28,6 +28,14 @@ from .context import (
 )
 from .db import connect, now, transaction
 from .rag import HybridRetriever, recall_memories, remember
+from .review_collaboration import (
+    GROUNDING_VERSION,
+    build_collaboration,
+    review_appendix,
+    review_prompt,
+    source_reference,
+    validate_grounding,
+)
 from .services import _account_llm_call, call_local_llm, concise, detect_route, rowdict
 from .statutory_retrieval import retrieve_statutory
 
@@ -140,18 +148,47 @@ def validate_specialist_output(
             source_index = item.get("source_index", item.get("index"))
             if source_index is not None and (type(source_index) is not int or not 1 <= source_index <= max_index):
                 raise ValueError(f"specialist source index out of bounds: {source_index}")
+    validate_grounding(normalized, contexts)
     return normalized
 
 
 def specialist_specs(coordinator: Any) -> dict[str, SubAgentSpec]:
     return {
-        "facts": SubAgentSpec("facts", "事实 Agent", "all_case_pages", "facts-v1", ("retrieve",), coordinator.fact_agent.run),
-        "evidence": SubAgentSpec("evidence", "证据 Agent", "case_pages_and_evidence_catalog", "evidence-v1", ("retrieve",), coordinator.evidence_agent.run),
-        "contradiction": SubAgentSpec("contradiction", "矛盾 Agent", "case_pages_and_evidence_catalog", "contradiction-v1", ("retrieve",), coordinator.contradiction_agent.run),
-        "gap_detection": SubAgentSpec("gap_detection", "疏漏 Agent", "case_pages_and_evidence_catalog", "gap-v1", ("retrieve", "facts", "evidence"), coordinator.gap_detection_agent.run),
+        "facts": SubAgentSpec("facts", "事实 Agent", "retrieved_case_pages", "facts-v1", ("retrieve",), coordinator.fact_agent.run),
+        "evidence": SubAgentSpec("evidence", "证据 Agent", "retrieved_case_pages", "evidence-v1", ("retrieve",), coordinator.evidence_agent.run),
+        "contradiction": SubAgentSpec("contradiction", "矛盾 Agent", "retrieved_case_pages", "contradiction-v1", ("retrieve",), coordinator.contradiction_agent.run),
+        "gap_detection": SubAgentSpec("gap_detection", "疏漏 Agent", "retrieved_pages_and_specialist_findings", "gap-v1", ("retrieve", "facts", "evidence"), coordinator.gap_detection_agent.run),
         "statutory_conflict": SubAgentSpec("statutory_conflict", "法条核验 Agent", "legal_corpus", "statutory-v1", ("retrieve",),
                                           (getattr(coordinator, "statutory_conflict_agent", None) or StatutoryConflictAgent()).run),
     }
+
+
+def run_specialist(
+    spec: SubAgentSpec, question: str, contexts: list[dict[str, Any]],
+    upstream: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """One shared handoff path for native, LangGraph and framework adapters."""
+    output = spec.runner(question, deepcopy(contexts))
+    output = validate_specialist_output(output, contexts, schema=spec.output_schema)
+    if spec.name == "gap_detection":
+        inputs = {name: (upstream or {})[name] for name in ("facts", "evidence") if name in (upstream or {})}
+        review = build_collaboration(contexts, inputs)
+        output["upstream_review"] = {
+            "schema_version": review["schema_version"], "status": review["status"],
+            "source_checks": review["source_checks"], "issues": review["issues"],
+        }
+        if review["issues"]:
+            output.setdefault("gaps", []).append({
+                "type": "专家来源核对待补", "severity": "高",
+                "description": "事实或证据专家结果缺失、未绑定来源或尚待复核，无法完成逐项来源对照。",
+                "suggestion": "补齐相关专家结果并回看原文，不能将当前分析视为完整证据链。",
+                "affected_evidence_ids": [],
+            })
+            distribution = output.get("severity_distribution")
+            if distribution is not None:
+                distribution["high"] = distribution.get("high", 0) + 1
+            output["summary"] = f"识别 {len(output['gaps'])} 处证据疏漏或待补证事项"
+    return output
 
 
 class PlannerAgent:
@@ -159,8 +196,8 @@ class PlannerAgent:
         route = detect_route(question)
         nodes = [
             PlanNode("retrieve", "检索 Agent", (), "执行 BM25/向量双路召回与 RRF 融合"),
-            PlanNode("facts", "事实 Agent", ("retrieve",), "提炼受来源约束的事实时间线"),
-            PlanNode("evidence", "证据 Agent", ("retrieve",), "评估证据类型、独立来源与证明力"),
+            PlanNode("facts", "事实 Agent", ("retrieve",), "整理绑定原文出处的事实摘录", "retrieved_case_pages", "facts-v1"),
+            PlanNode("evidence", "证据 Agent", ("retrieve",), "整理证据来源与材料类型，供逐项交叉核对", "retrieved_case_pages", "evidence-v1"),
         ]
         if route == "多文档对比" or any(term in question for term in ("口供", "陈述", "审批")):
             nodes.append(PlanNode("contradiction", "矛盾 Agent", ("retrieve",), "跨文件比对否认、确认与客观记录"))
@@ -178,7 +215,7 @@ class PlannerAgent:
                     "critic",
                     "审校 Agent",
                     tuple(node.name for node in nodes if node.name != "retrieve"),
-                    "合并专家结果、消解冲突并检查引用覆盖",
+                    "交叉核对完整专家结果，保留分歧与待补事项并检查引用覆盖",
                 ),
                 PlanNode("memory", "记忆 Agent", ("critic",), "沉淀可语义召回的案件长期记忆"),
             ]
@@ -238,9 +275,13 @@ class FactAgent:
                     "source": f"资料{index}",
                     "document": item["name"],
                     "page": item["page_no"],
+                    "finding_id": f"fact-{index}", "kind": "source_excerpt",
+                    "review_status": "needs_lawyer_review",
+                    "citation": source_reference(contexts, index),
                 }
             )
-        return {"summary": f"提炼 {len(facts)} 条可溯源事实", "facts": facts}
+        return {"summary": f"整理 {len(facts)} 条待律师复核的事实摘录", "facts": facts,
+                "grounding_version": GROUNDING_VERSION}
 
 
 class EvidenceAgent:
@@ -256,12 +297,14 @@ class EvidenceAgent:
                     "type": item.get("doc_type", "其他材料"),
                     "independence": "客观记录" if item.get("doc_type") in {"银行流水", "电子数据", "审计报告"} else "言词/书面材料",
                     "initial_weight": type_weights.get(item.get("doc_type", ""), 0.62),
+                    "citation": source_reference(contexts, index),
                 }
             )
         objective = sum(1 for item in sources if item["independence"] == "客观记录")
         return {
             "summary": f"{len(sources)} 个来源中包含 {objective} 个客观记录来源",
             "sources": sources,
+            "grounding_version": GROUNDING_VERSION,
             "warning": "权重仅用于检索排序解释，不替代律师对证据能力与证明力的判断。",
         }
 
@@ -290,6 +333,9 @@ class ContradictionAgent:
                         "denial": f"资料{left_index}：{concise(left['quote'], 130)}",
                         "counter": f"资料{right_index}：{concise(right['quote'], 130)}",
                         "verification": "核对形成时间、陈述主体、原始载体及上下文。",
+                        "finding_id": f"conflict-{len(conflicts) + 1}", "kind": "candidate_conflict",
+                        "review_status": "needs_lawyer_review",
+                        "citations": [source_reference(contexts, left_index), source_reference(contexts, right_index)],
                     }
                 )
                 if len(conflicts) >= 3:
@@ -299,6 +345,7 @@ class ContradictionAgent:
         return {
             "summary": f"识别 {len(conflicts)} 组候选矛盾，需由律师回看原页确认",
             "conflicts": conflicts,
+            "grounding_version": GROUNDING_VERSION,
         }
 
 
@@ -743,14 +790,32 @@ class CriticAgent:
         memory: str = "",
         object_note: str = "",
     ) -> dict[str, Any]:
+        collaboration = build_collaboration(contexts, specialist_outputs)
+
+        def finish(result: dict[str, Any]) -> dict[str, Any]:
+            # Validate the model's own answer before adding any source markers
+            # from the deterministic appendix. An appendix cannot rescue a bad
+            # model answer or make it eligible for draft memory.
+            raw_valid = result["validation"]["valid"]
+            result["answer"] += review_appendix(collaboration)
+            if raw_valid:
+                result["validation"] = validate_review_answer(result["answer"], contexts)
+                result["citation_check"] = "passed" if result["validation"]["valid"] else "failed"
+            result["collaboration"] = collaboration
+            result["memory_eligible"] = bool(
+                result["memory_eligible"] and result["validation"]["valid"]
+                and collaboration["status"] == "ready_for_lawyer_review"
+            )
+            return result
+
         failed_validation = None
         diagnostic = None
         tools_attempted: dict[str, Any] = {
             "enabled": False, "reason": "not_started", "tool_calls": 0, "trace": [],
         }
         if use_llm:
-            expert_summary = "；".join(specialist_outputs[name].get("summary", "") for name in sorted(specialist_outputs))
-            grounded_question = f"{question}\n专家节点摘要：{expert_summary}。请只输出给律师的最终结论。"
+            grounded_question = question
+            object_note = "\n\n".join(part for part in (object_note, review_prompt(collaboration)) if part)
             started = time.perf_counter()
             try:
                 answer, tools_attempted = self._grounded_answer(
@@ -765,13 +830,13 @@ class CriticAgent:
                         _account_llm_call(
                             self.case_id, "critic", started, "ok", run_id=self.run_id,
                         )
-                    return {
+                    return finish({
                         "answer": answer, "llm_used": True, "llm_model": self.model,
                         "fallback_reason": None, "citation_check": "passed",
                         "validation": validation, "memory_eligible": True,
                         "llm_attempted": True, "failure_diagnostic": None,
                         "tools": tools_attempted, "model_route": self.model_route,
-                    }
+                    })
                 failed_validation = validation
                 if self.case_id is not None and not tools_attempted["enabled"]:
                     _account_llm_call(
@@ -790,14 +855,14 @@ class CriticAgent:
                 if fallback is not None:
                     fallback_text, target, fallback_validation = fallback
                     if fallback_validation["valid"]:
-                        return {
+                        return finish({
                             "answer": fallback_text, "llm_used": True, "llm_model": target.model,
                             "fallback_reason": None, "citation_check": "passed",
                             "validation": fallback_validation, "memory_eligible": True,
                             "llm_attempted": True, "failure_diagnostic": None,
                             "rejected_llm_validation": failed_validation,
                             "tools": tools_attempted, "model_route": self.model_route,
-                        }
+                        })
                     failure = (
                         f"主模型与回退模型 {target.model} 的输出均未通过格式/来源校验："
                         + ", ".join(fallback_validation["issues"])
@@ -842,7 +907,7 @@ class CriticAgent:
             answer += "\n\n## 证据疏漏检测\n" + "\n".join(gap_lines)
         answer += f"\n\n> 审校说明：{failure}；结论必须由律师点击资料卡回看原页。仅检查引用格式和来源存在性，未验证语义支持或金额计算。"
         validation = validate_review_answer(answer, contexts)
-        return {
+        return finish({
             "answer": answer,
             "llm_used": False,
             "llm_model": self.model,
@@ -855,7 +920,7 @@ class CriticAgent:
             "memory_eligible": validation["valid"] and not use_llm,
             "tools": tools_attempted,
             "model_route": self.model_route,
-        }
+        })
 
 
 class LawReviewCoordinator:
@@ -1033,7 +1098,8 @@ class LawReviewCoordinator:
                     futures = {}
                     for name in ready:
                         spec = specialists[name]
-                        function = lambda spec=spec: spec.runner(retrieval_question, contexts)
+                        upstream = deepcopy(specialist_outputs)
+                        function = lambda spec=spec, upstream=upstream: run_specialist(spec, retrieval_question, contexts, upstream)
                         futures[pool.submit(copy_context().run, self._timed, function)] = (name, spec, now(), time.perf_counter())
                     failures = []
                     for future in as_completed(futures):
@@ -1157,6 +1223,7 @@ class LawReviewCoordinator:
                 "llm_model": critic["llm_model"],
                 "fallback_reason": critic["fallback_reason"],
                 "validation": critic.get("validation"),
+                "collaboration": critic.get("collaboration"),
                 "citation_check": critic["citation_check"],
                 "failure_diagnostic": critic.get("failure_diagnostic"),
                 "memory_persisted": stored["persisted"],

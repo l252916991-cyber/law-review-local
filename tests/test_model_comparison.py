@@ -20,17 +20,29 @@ from tests.test_local_backends import local_models  # noqa: F401
 actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="installed framework Python3.12 required")
 
 
-def test_native_baseline_still_refuses_any_unreviewed_source_change():
+@pytest.mark.parametrize("filename", ["services.py", "agents.py", "review_collaboration.py", "agent_tools.py"])
+def test_native_baseline_still_refuses_any_unreviewed_source_change(filename):
     from app.model_comparison import native_baseline_identity
 
     original = Path.read_bytes
 
     def changed(path):
         value = original(path)
-        return value + b"# unreviewed change" if path.name == "services.py" else value
+        return value + b"# unreviewed change" if path.name == filename else value
 
     with patch.object(Path, "read_bytes", new=changed), pytest.raises(ContractValidationError, match="pinned baseline"):
         native_baseline_identity()
+
+
+def test_native_baseline_identifies_reviewed_snapshot_without_claiming_an_old_commit_matches():
+    from app.model_comparison import native_baseline_identity
+
+    identity = native_baseline_identity()
+    assert identity["schema_version"] == 2
+    assert identity["revision"] == "specialist-review-v1"
+    assert identity["source_commit"] == "c63abf953bf10f6f025c2ff22e5819247590e58a"
+    assert "commit" not in identity
+    assert "review_collaboration.py" in identity["algorithm_files"]
 
 
 @actual

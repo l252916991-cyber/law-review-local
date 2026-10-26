@@ -182,11 +182,19 @@ class CriticAndMemoryTest(IsolatedQualityTest):
         self.assertFalse(result["validation"]["amount_calculations_checked"])
 
     def test_source_quote_and_page_must_exist(self):
+        from app.agents import validate_review_answer
+
         for change in ({"quote": ""}, {"page_no": 0}, {"document_id": -1}):
             with self.subTest(change=change):
-                result = self.critic("依据[资料1]，需律师复核。", [{**self.context, **change}])
-                self.assertFalse(result["memory_eligible"])
-                self.assertIn("sources_valid", result["validation"]["issues"])
+                contexts = [{**self.context, **change}]
+                validation = validate_review_answer("依据[资料1]，需律师复核。", contexts)
+                self.assertFalse(validation["valid"])
+                self.assertIn("sources_valid", validation["issues"])
+                # Source-bound specialists now reject unusable source identity
+                # before spending tokens, rather than returning an unbound draft.
+                with patch("app.agents.call_local_llm") as model, self.assertRaises(ValueError):
+                    self.critic("依据[资料1]，需律师复核。", contexts)
+                model.assert_not_called()
 
     def test_failure_details_do_not_leak_into_fallback_trace_or_memory(self):
         with patch("app.agents.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN sensitive case")):

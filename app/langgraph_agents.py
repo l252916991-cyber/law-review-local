@@ -6,11 +6,13 @@ topology, checkpointing, parallel fan-out/fan-in, and failure resumption.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import sqlite3
 import time
+from contextlib import closing
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
@@ -37,9 +39,11 @@ from .agents import (
     RetrievalAgent,
     ContradictionAgent,
     StatutoryConflictAgent,
+    SubAgentSpec,
     _citation,
     answer_contract,
     failure_diagnostic,
+    run_specialist,
     validate_specialist_output,
 )
 from .db import connect, db_scope, get_db_path, now, transaction
@@ -312,7 +316,7 @@ class LangGraphCoordinator:
             state,
             "facts",
             "事实 Agent",
-            {"context_count": len(state.get("contexts", [])), "input_scope": "all_case_pages", "output_schema": "facts-v1"},
+            {"context_count": len(state.get("contexts", [])), "input_scope": "retrieved_case_pages", "output_schema": "facts-v1"},
             lambda: validate_specialist_output(FactAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="facts-v1"),
         )
         return {"specialist_outputs": {"facts": output}}
@@ -322,7 +326,7 @@ class LangGraphCoordinator:
             state,
             "evidence",
             "证据 Agent",
-            {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "evidence-v1"},
+            {"context_count": len(state.get("contexts", [])), "input_scope": "retrieved_case_pages", "output_schema": "evidence-v1"},
             lambda: validate_specialist_output(EvidenceAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="evidence-v1"),
         )
         return {"specialist_outputs": {"evidence": output}}
@@ -334,7 +338,7 @@ class LangGraphCoordinator:
             state,
             "contradiction",
             "矛盾 Agent",
-            {"context_count": len(state.get("contexts", [])), "input_scope": "case_pages_and_evidence_catalog", "output_schema": "contradiction-v1"},
+            {"context_count": len(state.get("contexts", [])), "input_scope": "retrieved_case_pages", "output_schema": "contradiction-v1"},
             lambda: validate_specialist_output(ContradictionAgent().run(_retrieval_question(state), state.get("contexts", [])), state.get("contexts", []), schema="contradiction-v1"),
         )
         return {"specialist_outputs": {"contradiction": output}}
@@ -350,9 +354,11 @@ class LangGraphCoordinator:
                 "context_count": len(state.get("contexts", [])),
                 "dependencies": sorted(state.get("specialist_outputs", {})),
             },
-            lambda: validate_specialist_output(GapDetectionAgent(state["case_id"]).run(
-                _retrieval_question(state), state.get("contexts", [])
-            ), state.get("contexts", []), schema="gap-v1"),
+            lambda: run_specialist(
+                SubAgentSpec("gap_detection", "疏漏 Agent", "retrieved_pages_and_specialist_findings",
+                             "gap-v1", ("retrieve", "facts", "evidence"), GapDetectionAgent(state["case_id"]).run),
+                _retrieval_question(state), state.get("contexts", []), state.get("specialist_outputs", {}),
+            ),
         )
         return {"specialist_outputs": {"gap_detection": output}}
 
@@ -587,6 +593,7 @@ class LangGraphCoordinator:
             "llm_model": critic["llm_model"],
             "fallback_reason": critic["fallback_reason"],
             "validation": critic.get("validation"),
+            "collaboration": critic.get("collaboration"),
             "citation_check": critic["citation_check"],
             "failure_diagnostic": critic.get("failure_diagnostic"),
             "memory_persisted": state.get("memory_result", {}).get("persisted", False),
@@ -702,6 +709,22 @@ class LangGraphCoordinator:
                 raise ValueError("Checkpoint 上下文与运行记录不一致，拒绝恢复")
             if not source_pages_exist(self.case_id, list(saved.get("contexts") or [])):
                 raise ValueError("运行依据的资料页已被删除或不可访问，拒绝恢复")
+            # A source that still exists may have been edited. New retrieval
+            # contexts carry the exact page text; check it before consuming a
+            # retry or reusing an already reviewed specialist result. Hashes
+            # bind the full page before the tool's display truncation; legacy
+            # contexts without this hash retain the existence-only contract.
+            with closing(connect()) as source_db:
+                for item in saved.get("contexts") or []:
+                    if "page_text_sha256" not in item:
+                        continue
+                    current = source_db.execute(
+                        """SELECT p.text FROM pages p JOIN documents d ON d.id=p.document_id
+                           WHERE p.document_id=? AND p.page_no=? AND d.case_id=?""",
+                        (item["document_id"], item["page_no"], self.case_id),
+                    ).fetchone()
+                    if current is None or hashlib.sha256(str(current["text"]).encode("utf-8")).hexdigest() != item["page_text_sha256"]:
+                        raise ValueError("运行依据的资料页内容已变化，拒绝恢复旧分析")
         finally:
             validation_conn.close()
 

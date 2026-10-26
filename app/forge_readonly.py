@@ -292,8 +292,7 @@ class ReadonlyCaseSession:
             if not set(plan[node]["depends_on"]) <= self.outputs.keys():
                 raise ValueError("specialist dependencies have not completed")
             spec = self.specs[node]
-            return agents.validate_specialist_output(spec.runner(question, deepcopy(contexts)),
-                                                     contexts, schema=spec.output_schema)
+            return agents.run_specialist(spec, question, contexts, self.outputs)
         if node == "critic":
             if not set(plan["critic"]["depends_on"]) <= self.outputs.keys():
                 raise ValueError("critic dependencies have not completed")

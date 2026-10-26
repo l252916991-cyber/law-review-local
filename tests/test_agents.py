@@ -92,7 +92,7 @@ class MultiAgentRuntimeTest(IsolatedDatabaseTestCase):
         from app.agents import specialist_specs, validate_specialist_output
         coordinator = create_coordinator(1, False)
         specs = specialist_specs(coordinator)
-        self.assertEqual(specs["facts"].input_scope, "all_case_pages")
+        self.assertEqual(specs["facts"].input_scope, "retrieved_case_pages")
         self.assertEqual(specs["evidence"].output_schema, "evidence-v1")
         contexts = [{"document_id": 1, "page_no": 1, "name": "证据.txt", "quote": "事实"}]
         normalized = validate_specialist_output({"facts": [{"index": 1}], "summary": "ok"}, contexts, schema="facts-v1")
@@ -107,7 +107,7 @@ class MultiAgentRuntimeTest(IsolatedDatabaseTestCase):
         from app.agents import LawReviewCoordinator, specialist_specs, validate_specialist_output
         coordinator = LawReviewCoordinator(1, prefer_remote_embeddings=False)
         specs = specialist_specs(coordinator)
-        self.assertEqual(specs["facts"].input_scope, "all_case_pages")
+        self.assertEqual(specs["facts"].input_scope, "retrieved_case_pages")
         self.assertEqual(specs["evidence"].output_schema, "evidence-v1")
         self.assertEqual(specs["statutory_conflict"].input_scope, "legal_corpus")
         self.assertEqual(validate_specialist_output({"facts": [], "summary": "ok"}, [{"page_no": 1}], schema="facts-v1")["schema_version"], "facts-v1")

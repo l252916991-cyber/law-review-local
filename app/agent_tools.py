@@ -6,6 +6,7 @@ approval capability.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any
@@ -96,6 +97,9 @@ def _search(
     }
     items = [{key: value for key, value in item.items() if key in allowed_fields} for item in contexts]
     for item in items:
+        # Bind the complete source before whitespace normalization/truncation.
+        # A resume must also detect edits beyond the returned display window.
+        item["page_text_sha256"] = hashlib.sha256(str(item.get("text", "")).encode("utf-8")).hexdigest()
         item["quote"] = concise(str(item.get("quote", "")), 800)
         item["text"] = concise(str(item.get("text", "")), 4000)
         item["summary"] = concise(str(item.get("summary", "")), 400)

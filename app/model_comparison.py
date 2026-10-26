@@ -22,9 +22,14 @@ from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, Run
 from .services import PROMPT_VERSION
 from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
 
-NATIVE_BASELINE_COMMIT = "542a5e23eb0919b3cf12a962ca64a63f7d4acc45"
+# The source commit predates the reviewed changes below. The exact new
+# snapshot is identified by a version and literal hashes, not a future commit.
+NATIVE_BASELINE_SOURCE_COMMIT = "c63abf953bf10f6f025c2ff22e5819247590e58a"
+NATIVE_BASELINE_REVISION = "specialist-review-v1"
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "48f3038e295df60942f16403bcca91e984ed49dcd7e1c3eb730c57a0b074397c",
+    "agents.py": "6ae41ec65c7bc174c7ee9bfb7ab98c63e739f1a6fa0862b1ed016b6e7d6ae55a",
+    "review_collaboration.py": "512c03d6719bddfd98d422c7cb65e46c26331b8aab7ab56b40e651a4a07d632a",
+    "agent_tools.py": "2af80bdaa3e1277de96a4127e2fd9bbabbb906b1213a94e6beb43a54d28dfb34",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
     "services.py": "02c352ecea0ef9dfbc4663b8a45a19c231bca758416d99b79598f6911bf47813",
     "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
@@ -37,8 +42,9 @@ def native_baseline_identity():
               for name in NATIVE_ALGORITHM_HASHES}
     if actual != NATIVE_ALGORITHM_HASHES:
         raise ContractValidationError("native comparison algorithms differ from the pinned baseline")
-    return {"commit": NATIVE_BASELINE_COMMIT, "algorithm_files": actual,
-            "scope": "pinned native algorithms and prompt; host governance is current candidate"}
+    return {"schema_version": 2, "source_commit": NATIVE_BASELINE_SOURCE_COMMIT,
+            "revision": NATIVE_BASELINE_REVISION, "algorithm_files": actual,
+            "scope": "reviewed source snapshot derived from source_commit; exact identity is revision plus algorithm_files"}
 
 
 def private_report(path, value):
@@ -210,7 +216,7 @@ def compare_local_models(*, case_id, question, models, framework_python, output,
             with db_scope(deployment.database):
                 control.cancel(mode)  # measurement handle was never sent to the framework
         source.assert_current()
-        report = {"schema_version": 2, "source_identity": source_identity, "question": question,
+        report = {"schema_version": 3, "source_identity": source_identity, "question": question,
             "expected": expected, "models": deepcopy(models.binding), "prompt_version": PROMPT_VERSION,
             "local_prompt_version": LOCAL_PROMPT_VERSION, "measurement_valid": models.transport is None,
             "candidate": candidate, "candidate_elapsed_seconds": elapsed,
