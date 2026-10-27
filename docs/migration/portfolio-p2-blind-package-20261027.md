@@ -39,10 +39,12 @@ uv run --locked python scripts/build_ablation_blind_package.py \
 | 采集方式 | `stub`（`README.md` 与 `review.json` 均带替身标记） |
 | 样本 | 20 题，覆盖 6 个案例；可选池 24 题 |
 | 抽样规则 | `two-per-category-case-coverage-then-sha256-order-v1` |
-| 样本摘要 | `b0135b3cbcbd08eb10213e4e839381cd73b170d218dba9a1b2974409299e6178` |
-| `review.json` | `22b201a20974ad8cddcba4d236882f81d661837094688028a0fc554a429c8449` |
-| `key.json` | `265ab6ba98c1420dc963bd5ede6aa34b73a846e90c2e36ddbc892a44dc7ac9da` |
-| `PACK_MANIFEST.json` | `91900bea4a25069610212ddcf109d08b3dd946265c76212a070cdc54c8306d02` |
+| 样本摘要（题号序列，`review`/`key` 一致） | `5e2b61cd1d08149ae1946b44e28c8e160bc49fd4d442dde276fed53e13c606cb` |
+| `manifest.review_sha256`（整份评审文件） | `b0135b3cbcbd08eb10213e4e839381cd73b170d218dba9a1b2974409299e6178` |
+| `review.json` 字节摘要 | `22b201a20974ad8cddcba4d236882f81d661837094688028a0fc554a429c8449` |
+| `key.json` 字节摘要 | `265ab6ba98c1420dc963bd5ede6aa34b73a846e90c2e36ddbc892a44dc7ac9da` |
+| `README.md` 字节摘要 | `ac7df2e9a432defa6315e71324c903f8e10326ba2a0c707c46b55cad540e3640` |
+| `PACK_MANIFEST.json` 字节摘要 | `91900bea4a25069610212ddcf109d08b3dd946265c76212a070cdc54c8306d02` |
 
 演练证明的是“流程可跑、组别确实被隐藏、映射与摘要可复算”，**不代表**任何回答质量或 Judge/人工一致性。
 
