@@ -139,7 +139,7 @@
 
 模型预检失败时先定位资源/协议问题，停止无效批量调用；主实验遇到契约、安全或数据完整性问题时停止相关批次并保存证据。修复后使用新批次身份，重跑受影响项目。任何失败都不通过删题、放宽断言、隐藏未知用量或覆盖旧报告消除。
 
-阶段状态：P0 已完成；P1 已完成；P2 已完成（单模型 27B、单案开发集 + 六案例保留集，Judge 与人工复核未做）；P3 部分完成（异常路径完成，主演示待录制）；P4 已完成；P5 已完成。计划编制不改变 G1、M1、U1 或 ForgeHarness 正式入口的既有状态。
+阶段状态：P0 已完成；P1 已完成；P2 已完成（单模型 27B、单案开发集 + 六案例保留集；Judge 作观察辅助已跑，独立人工复核未做）；P3 部分完成（异常路径完成，主演示待录制）；P4 已完成；P5 已完成。计划编制不改变 G1、M1、U1 或 ForgeHarness 正式入口的既有状态。
 
 ## 8. 执行记录
 
@@ -157,6 +157,7 @@
 | P2 模型切换与预检 | [portfolio-p2-model-switch-20261027.md](portfolio-p2-model-switch-20261027.md) | 完成 |
 | P2 开发集结果 | [portfolio-p2-dev-results-20261027.md](portfolio-p2-dev-results-20261027.md) | 完成 |
 | P2 保留集结果 | [portfolio-p2-holdout-results-20261028.md](portfolio-p2-holdout-results-20261028.md) | 完成 |
+| P2 Judge 结果 | [portfolio-p2-judge-results-20261028.md](portfolio-p2-judge-results-20261028.md) | 完成（观察辅助） |
 | P3 演示状态与异常片段 | [portfolio-p3-demo-status-20261027.md](portfolio-p3-demo-status-20261027.md) | 部分完成 |
 | P4 可复现交付 | [portfolio-p4-reproducible-delivery-20261027.md](portfolio-p4-reproducible-delivery-20261027.md) | 完成 |
 | P5 投递材料 | [portfolio-p5-materials-20261027.md](portfolio-p5-materials-20261027.md) | 完成 |

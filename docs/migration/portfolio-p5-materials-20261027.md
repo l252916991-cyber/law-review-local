@@ -21,12 +21,14 @@
 | 恢复片段 steps 9→9、`resume_count=1`、拒绝恢复 | `output/portfolio-demo/anomaly-20261027/*.json` | 重跑 `scripts/demo_recovery_check.py` 三个阶段 |
 | 1476 passed / 86.38%（提交 `e31593e`） | 全量离线检查日志 `output/portfolio-ci/pytest8.log` | 按 P4 第 5 节命令重跑（含前端门禁见 5.1） |
 | 460 成员、zip `03c65406…`、包内 133 passed | `output/portfolio-repro/lexvault-source-20261027d.zip` | 重新打包并核对清单 |
+| 开发集 A/B/C 86.67/76.67/86.67%、保留集 90.28/88.89/87.50% | `output/portfolio-ablation/{dev,holdout}-qwen38-27b-20261027/run/` | 用 `analyse_collaboration_ablation.py` 复算 |
+| Judge 57/57/57（60 题）、与 v2 一致 51/43/49 | `output/portfolio-judge/dev-{A,B,C}-judge*.json` | 用 `export_ablation_answers.py` + `run_answer_judge.py` 复算 |
 
 ## 3. 明确不写的表述
 
 - “多个自主 LLM 专家协作”——专家是确定性规则节点。
 - “来源一致率 = 法律准确率”——来源匹配不等于语义蕴含或律师确认。
-- 任何质量提升数字——P2 未执行。
+- “提升 X%”——实测为持平或退步，只写“未观察到收益、成本更高”。
 - “线上 SLA / 已上线律所”——本机/受控内网单实例，未上线。
 - “跨案件泛化”——开发集单案 60 题；保留集已冻结但未运行。
 
