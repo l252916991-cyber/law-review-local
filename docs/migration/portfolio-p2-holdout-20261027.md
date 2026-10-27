@@ -48,6 +48,8 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
 
 提示长度（24 题冻结值）：A 355–713 字符、B 355–4,950、C 355–6,751；仍低于 48,000 字符硬上限。
 
+允许清单包（`lexvault-source-20261027c.zip`）已包含 `holdout-v1` 三个冻结文件，解压后可直接运行 `scripts/build_holdout_eval.py` 复算并在包内 `--mode prepare` 冻结 24 题批次，见 [P4 记录](portfolio-p4-reproducible-delivery-20261027.md) 第 4 节。
+
 ## 3.1 冻结前的可复现性修正
 
 首次 `prepare` 两次结果不一致（`contradiction-10` 提示摘要变化），根因是疏漏专家的集合迭代顺序；已修复并把 native 基线重登记为 `specialist-review-v3`，详见[对照批次可复现性修正](portfolio-determinism-20261027.md)。修复后，开发集与保留集各自两次独立进程 `prepare` 的提示摘要全部一致。
