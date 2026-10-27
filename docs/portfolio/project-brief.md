@@ -101,7 +101,7 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 ## 6. 明确未覆盖
 
 - 真实模型的质量、token 与延迟对照：**未测**（本机无模型端点，见 P2 记录）。
-- 跨案件泛化：60 题同属一个虚构案件；保留集 6 案例 24 题尚未编制。
+- 跨案件泛化：60 题同属一个虚构案件；保留集 6 案例 24 题已冻结在 `benchmarks/answer_eval/holdout-v1/`，尚未运行。
 - 独立人工评分与 κ：**未做**，因此不声称“独立质量验收完成”。
 - Docker 路径、前端构建与浏览器流程、Redis 队列导入：本轮未验证。
 - 项目级许可证与对外公开权利：未确定，材料默认私下审阅。

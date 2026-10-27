@@ -8,6 +8,8 @@
 - [求职展示版阶段记录](migration/portfolio-p0-scope-evidence-20261027.md)：P0 身份与证据冻结、[P1](migration/portfolio-p1-ablation-driver-20261027.md) A/B/C 隔离驱动与回归、[P2](migration/portfolio-p2-precheck-blocked-20261027.md) 模型预检阻塞、[P3](migration/portfolio-p3-demo-status-20261027.md) 恢复片段、[P4](migration/portfolio-p4-reproducible-delivery-20261027.md) 新目录重建；每份含命令、实测值与未覆盖项。
 - [项目说明](portfolio/project-brief.md)、[面试材料](portfolio/interview-notes.md)、[简历条目](portfolio/resume-bullets.md)：一页架构、运行步骤、证据索引、8 个问答与待测占位。
 - [求职展示版 P5 交付记录](migration/portfolio-p5-materials-20261027.md)：材料清单、数字可追溯性核对、不写的表述、按依赖排序的待办。
+- [求职展示版 P2 前置：六案例保留集](migration/portfolio-p2-holdout-20261027.md)：24 题冻结身份、案例隔离方式、已验/未验清单与复算命令。
+- [对照批次可复现性修正](migration/portfolio-determinism-20261027.md)：专家发现顺序的集合迭代缺陷、`specialist-review-v3` 重登记与跨进程复验。
 - [2026-10-27 多人协作首版改进计划书](migration/collaboration-first-release-plan-20261027.md)：成员分工、人工任务、并发保护、报告签发与部署验收的工作包、阶段与验收用例。
 - [2026-10-27 多人协作首版交付前收尾计划书](migration/collaboration-release-readiness-plan-20261027.md)：权限交集、冻结签发内容及 R1–R3 实施记录，保留完整检查和验收用例。
 - [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：正式交付执行入口；关闭语料资产、Python 矩阵、gitleaks、容器路径门禁，再执行 M1 副本迁移及 U1 律所验收。
