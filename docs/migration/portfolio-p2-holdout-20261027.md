@@ -1,6 +1,6 @@
 # 求职展示版 P2 前置：六案例保留集冻结（holdout-v1）
 
-- 日期：2026-10-27（Asia/Shanghai）。
+- 日期：2026-10-27（Asia/Shanghai）。 协议见[冻结版 v1](portfolio-protocol-20261027.md)。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 4.2 节“保留集：6 个独立案例、每案 4 题，共 24 题”；前置：[P0](portfolio-p0-scope-evidence-20261027.md)、[P1](portfolio-p1-ablation-driver-20261027.md)、[P2 预检记录](portfolio-p2-precheck-blocked-20261027.md)。
 - 结论：**保留集已编制并冻结，尚未运行**。真实模型对照仍受模型端点阻塞；本文件只补“保留集缺失”这一项，不产生任何质量数值。
 

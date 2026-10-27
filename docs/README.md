@@ -5,6 +5,7 @@
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
 - [威胁模型](security/threat-model.md)：资产、信任边界、提示注入与工具越权的缓解及未覆盖项。
 - [2026-10-27 求职展示版计划书](migration/agent-portfolio-plan-20261027.md)：面向 AI 应用 / Agent 工程求职，推进多专家真实模型对照、可复现演示和简历证据；与正式交付验收分别记录。
+- [三组对照实验协议（冻结 v1）](migration/portfolio-protocol-20261027.md)：组别定义、不变项、数据与代码身份、预算与停止规则、采样轮换、评分与失败分类、分析与盲审规则、变更控制。
 - [求职展示版阶段记录](migration/portfolio-p0-scope-evidence-20261027.md)：P0 身份与证据冻结、[P1](migration/portfolio-p1-ablation-driver-20261027.md) A/B/C 隔离驱动与回归、[P2](migration/portfolio-p2-precheck-blocked-20261027.md) 模型预检阻塞、[P3](migration/portfolio-p3-demo-status-20261027.md) 恢复片段、[P4](migration/portfolio-p4-reproducible-delivery-20261027.md) 新目录重建；每份含命令、实测值与未覆盖项。
 - [项目说明](portfolio/project-brief.md)、[面试材料](portfolio/interview-notes.md)、[简历条目](portfolio/resume-bullets.md)：一页架构、运行步骤、证据索引、8 个问答与待测占位。
 - [求职展示版 P5 交付记录](migration/portfolio-p5-materials-20261027.md)：材料清单、数字可追溯性核对、不写的表述、按依赖排序的待办。
