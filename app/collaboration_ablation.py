@@ -510,6 +510,15 @@ def summarise_attempts(rows: list[dict[str, Any]], dataset: dict[str, Any]) -> d
     return results
 
 
+def _citation_reachable(item: dict[str, Any], contexts: list[dict[str, Any]]) -> bool:
+    """Can the model see every page the scorer accepts? Recorded, never enforced by trimming."""
+    acceptable = {tuple(pair) for pair in item.get("acceptable_pages", [])}
+    if not acceptable:
+        return True
+    seen = {(context["name"], context["page_no"]) for context in contexts}
+    return acceptable <= seen
+
+
 def _private_write(path: Path, value: Any) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
@@ -532,6 +541,7 @@ def prepare_batch(
     if not items:
         raise ValueError("选中的题目为空")
     prepared = []
+    dataset_items = {item["id"]: item for item in items}
     with isolated_case(dataset, output / "case" / "law_review.db") as case:
         for item in items:
             item_case = int(item.get("case_id", 1))
@@ -563,7 +573,9 @@ def prepare_batch(
                  "specialists_sha256": row["specialists_sha256"],
                  "crosscheck_sha256": row["crosscheck_sha256"],
                  "prompt_sha256": {g: row["prompts"][g]["sha256"] for g in GROUPS},
-                 "prompt_chars": {g: row["prompts"][g]["chars"] for g in GROUPS}}
+                 "prompt_chars": {g: row["prompts"][g]["chars"] for g in GROUPS},
+                 "citation_reachable": _citation_reachable(dataset_items[row["id"]], row["contexts"]),
+                 "acceptable_pages": len(dataset_items[row["id"]].get("acceptable_pages", []))}
                 for row in prepared
             ],
             "protocol": {

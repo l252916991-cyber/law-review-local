@@ -36,6 +36,7 @@
 | 提示与策略 | `chat-system-v4-multiturn-untrusted-history`、`candidate-answerability-v11-detail`、`answer-judge-v2-frozen-sources` |
 | 标注来源 | 二者均为编码助手依合成材料编制，**未经律师或独立人工标注** |
 | 隔离库 | 开发集用演示种子；保留集由 `dataset.json` 的 `cases` 直接播种（`seed=False`），逐页比对冻结正文 |
+| 引用可达 | 冻结上下文必须覆盖题目的全部可接受页；`prepare` 逐题记录 `citation_reachable`，为假时该题的通过率不作为质量证据 |
 
 ## 5. 预算与停止规则
 

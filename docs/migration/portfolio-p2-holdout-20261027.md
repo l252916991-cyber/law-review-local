@@ -50,6 +50,18 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
 
 允许清单包（`lexvault-source-20261027c.zip`）已包含 `holdout-v1` 三个冻结文件，解压后可直接运行 `scripts/build_holdout_eval.py` 复算并在包内 `--mode prepare` 冻结 24 题批次，见 [P4 记录](portfolio-p4-reproducible-delivery-20261027.md) 第 4 节。
 
+## 3.0 冻结集的可用性审计
+
+| 检查 | 开发集 v2 | 保留集 holdout-v1 |
+|---|---|---|
+| 可回答题的可接受页是否全部出现在冻结检索上下文 | 40/40 | 18/18 |
+| 一条合规参考回答能否通过确定性评分 | 60/60 通过 | 24/24 通过 |
+| 缺少必需要点的回答是否被判不通过 | 40/40 不通过 | 18/18 不通过 |
+| 拒答题：拒答文本通过、自信断言不通过 | 20/20 | 6/6 |
+
+- `prepare` 现按题记录 `citation_reachable` 与 `acceptable_pages`：模型看得到的页面覆盖计分接受的页面才为真。两个数据集全部为真，说明“看得到却引不到”的情形没有被计分口径制造出来。
+- 参考回答由必需要点 + 可接受页引用 + 复核提醒拼成；它只用于验证题面自洽，不是模型输出。对应回归：`tests/test_benchmark_satisfiability.py`（8 项）。
+
 ## 3.1 冻结前的可复现性修正
 
 首次 `prepare` 两次结果不一致（`contradiction-10` 提示摘要变化），根因是疏漏专家的集合迭代顺序；已修复并把 native 基线重登记为 `specialist-review-v3`，详见[对照批次可复现性修正](portfolio-determinism-20261027.md)。修复后，开发集与保留集各自两次独立进程 `prepare` 的提示摘要全部一致。
