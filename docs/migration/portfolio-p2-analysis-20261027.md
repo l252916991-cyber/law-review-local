@@ -16,6 +16,8 @@
 | 案例级区间 | 先按案例求均值，再对该均值做有种子重采样，报告 2.5%–97.5%；结论注明不能当总体估计或 SLA |
 | 轮次波动 | `repeat_variation`：每个分组有多少题在不同轮次间通过/不通过翻转 |
 | 成本 | 输入/输出 token 与耗时的配对中位差；端点未报用量时计入 `unknown_pairs`，不写 0 |
+| 失败分类 | `outcomes`：每个分组的尝试数、各 outcome 计数、`not_attempted`、`unknown_usage`；`failure_by_category`：非 ok 结果按题目类别拆分 |
+| 规则降级口径 | 受控对照里的规则降级表现为 `model_unavailable` / `timeout` / `transport_error`，一律记为未通过；产品路径的规则兜底不进入对照 |
 
 不做的三件事：不重新评分（只读账本里的 `passed` 与 `score`）、不给缺失分组补造记录、不把附录文本算进模型通过率（通过判定来自驱动写入的原始回答评分）。
 
@@ -55,7 +57,7 @@ uv run --locked python scripts/analyse_collaboration_ablation.py \
 
 ## 4. 验证
 
-`uv run --locked python -m pytest tests/test_ablation_analysis.py -q` → **10 passed**：配对与未配对、失败计入分母、McNemar 精确值、分类/分案例聚合、轮次翻转、案例重采样可复现且有界、缺少 `case_id` 时拒绝重采样、成本区分已知与未知用量、账本校验、CLI 一次性写入与参数拒绝。
+`uv run --locked python -m pytest tests/test_ablation_analysis.py -q` → **13 passed**：配对与未配对、失败计入分母、McNemar 精确值、分类/分案例聚合、轮次翻转、案例重采样可复现且有界、缺少 `case_id` 时拒绝重采样、成本区分已知与未知用量、账本校验、CLI 一次性写入与参数拒绝，以及未尝试/未知用量/超时与契约失败的分类统计。
 
 ## 5. 与真实批次的关系
 

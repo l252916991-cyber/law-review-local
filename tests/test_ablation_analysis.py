@@ -151,3 +151,41 @@ def test_cli_writes_once_and_refuses_overwrite(tmp_path):
         main(["--run", str(run), "--baseline", "A", "--compare", "A", "--iterations", "200",
               "--output", str(tmp_path / "other.json")])
     assert not (tmp_path / "other.json").exists()
+
+
+def test_outcome_counts_keep_unattempted_and_unknown_usage_visible():
+    rows = ledger(
+        row("i1", "A", True),
+        row("i1", "C", True, usage_known=False, input_tokens=None, output_tokens=None),
+        row("i2", "A", False, outcome="not_attempted", executed=False, rule_refused=True),
+        row("i2", "C", False, outcome="timeout", executed=True),
+        row("i3", "C", False, outcome="contract_failed", executed=True),
+    )
+    report = analyse(rows, "A", "C", iterations=200)
+    assert report["outcomes"]["A"] == {"attempts": 2, "outcomes": {"not_attempted": 1, "ok": 1},
+                                       "not_attempted": 1, "unknown_usage": 0}
+    assert report["outcomes"]["C"]["unknown_usage"] == 1
+    assert report["outcomes"]["C"]["not_attempted"] == 0
+    assert report["outcomes"]["C"]["outcomes"]["timeout"] == 1
+
+
+def test_failure_by_category_separates_failure_kinds():
+    rows = ledger(
+        row("i1", "A", True, category="normal"),
+        row("i1", "C", False, category="normal", outcome="transport_error"),
+        row("i2", "A", False, category="contradiction", outcome="timeout"),
+        row("i2", "C", True, category="contradiction"),
+        row("i3", "C", False, category="contradiction", outcome="contract_failed"),
+    )
+    report = analyse(rows, "A", "C", iterations=200)
+    assert report["failure_by_category"]["A"] == {"contradiction": {"timeout": 1}}
+    assert report["failure_by_category"]["C"] == {
+        "contradiction": {"contract_failed": 1}, "normal": {"transport_error": 1}}
+
+
+def test_rule_degradation_note_and_mapping_are_explicit():
+    rows = ledger(row("i1", "A", True), row("i1", "C", False, outcome="model_unavailable"))
+    report = analyse(rows, "A", "C", iterations=200)
+    assert any("规则降级" in note for note in report["notes"])
+    assert report["outcomes"]["C"]["outcomes"] == {"model_unavailable": 1}
+    assert report["summary"]["pass_rate_compare"] == 0.0

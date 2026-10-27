@@ -202,6 +202,32 @@ def _cost(pairs: list[dict[str, Any]], baseline: str, compare: str) -> dict[str,
                                        or not pair["baseline"].get("usage_known"))}
 
 
+def outcome_counts(rows: Iterable[dict[str, Any]], group: str) -> dict[str, Any]:
+    """Count every attempt outcome for one group, including the ones that never ran."""
+    outcomes: dict[str, int] = {}
+    unknown_usage = 0
+    for row in rows:
+        if row["group"] != group:
+            continue
+        outcomes[str(row["outcome"])] = outcomes.get(str(row["outcome"]), 0) + 1
+        if row["outcome"] == "ok" and not row.get("usage_known"):
+            unknown_usage += 1
+    return {"attempts": sum(outcomes.values()), "outcomes": dict(sorted(outcomes.items())),
+            "not_attempted": outcomes.get("not_attempted", 0),
+            "unknown_usage": unknown_usage}
+
+
+def failure_by_category(rows: Iterable[dict[str, Any]], group: str) -> dict[str, Any]:
+    """Where a group failed, split by item category, so attribution is not one aggregate."""
+    buckets: dict[str, dict[str, int]] = {}
+    for row in rows:
+        if row["group"] != group or row["outcome"] == "ok":
+            continue
+        bucket = buckets.setdefault(str(row.get("category") or ""), {})
+        bucket[str(row["outcome"])] = bucket.get(str(row["outcome"]), 0) + 1
+    return dict(sorted(buckets.items()))
+
+
 def analyse(
     rows: list[dict[str, Any]], baseline: str = "A", compare: str = "C", *,
     iterations: int = DEFAULT_ITERATIONS, seed: int = DEFAULT_SEED,
@@ -216,12 +242,15 @@ def analyse(
         "by_category": _by_category(pairs, baseline, compare),
         "by_case": _by_case(pairs, baseline, compare),
         "repeat_variation": {group: repeat_variation(rows, group) for group in (baseline, compare)},
+        "outcomes": {group: outcome_counts(rows, group) for group in (baseline, compare)},
+        "failure_by_category": {group: failure_by_category(rows, group) for group in (baseline, compare)},
         "case_bootstrap": case_bootstrap(pairs, iterations=iterations, seed=seed),
         "cost": _cost(pairs, baseline, compare),
         "notes": [
             "配对只比较同一题同一轮；未尝试、失败与规则拒答按未通过计入分母",
             "确定性评分与附录分开：通过判定取模型原始回答，附录只影响最终文本",
             "案例级区间描述本批波动，不构成总体估计、SLA 或法律准确率",
+            "规则降级在受控对照中表现为 model_unavailable/timeout/transport_error，记为未通过，不进入通过率分子",
         ],
     }
 
