@@ -14,3 +14,19 @@ uv run --locked python scripts/run_answer_eval.py --dataset benchmarks/answer_ev
 构建/核对使用临时合成数据库，不接触运行数据，不调用模型。缺少冻结输出时显式 `--write`；已有产物不同则拒绝覆盖，应建立新版本及其生成规则。`manifest.json` 记录题目、来源、最终数据集摘要和分组数量。
 
 答案级报告与页级检索评测分开。Judge 输出、人工评分和确定性规则各列报告，人工数据缺失时不计算“人工一致性已通过”。
+
+## 六案例保留集 `holdout-v1`
+
+`holdout-v1/cases.json` 是作者编写的 6 个独立虚构案例（建设工程、劳动争议、买卖质量异议、民间借贷、交通事故、股权转让），每案 2 份文书共 24 页、4 题，合计 24 题：正常 12、候选矛盾 6、资料不足 3、无关 2、法条缺失 1。案例与开发集在当事人、金额、文书名和问题上都不同，不共享任何页面。
+
+`holdout-v1/dataset.json` 由 fixture 派生并冻结：来源逐页摘要、`source_sha256`、每题的 `case_id` 与 `case_description`。`scripts/build_holdout_eval.py` 额外校验“题目只能引用本案例页面”，并拒绝跨案例引用。
+
+```sh
+uv run --locked python scripts/build_holdout_eval.py            # 核对冻结产物
+uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
+  --dataset benchmarks/answer_eval/holdout-v1/dataset.json --output output/portfolio-ablation/holdout-v1
+```
+
+隔离库由 `dataset.json` 的 `cases` 直接播种（`init_db(seed=False)`），因此检索上下文与计分来源是同一份冻结文本；不使用开发集的演示案件。构建与核对不调用模型；已有产物不同则拒绝覆盖。
+
+保留集只用于“候选冻结后”的复验。一旦用它的结果调整方法，它就转为开发数据，需要另建未见过的保留集。

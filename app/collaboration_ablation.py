@@ -102,16 +102,64 @@ def load_batch_dataset(path: str | Path) -> dict[str, Any]:
     return dataset
 
 
-def verify_frozen_pages(dataset: dict[str, Any], case_id: int = 1) -> dict[str, Any]:
-    """Bind the isolated synthetic database to the frozen dataset pages."""
-    pages: dict[tuple[str, int], str] = {}
+def dataset_case_ids(dataset: dict[str, Any]) -> list[int]:
+    """Cases referenced by the frozen items; the development set is a single case."""
+    ids = sorted({int(item.get("case_id", 1)) for item in dataset["items"]})
+    if not ids:
+        raise ValueError("数据集没有题目")
+    return ids
+
+
+def seed_dataset_cases(dataset: dict[str, Any]) -> dict[int, int]:
+    """Create the authored holdout cases from the frozen dataset itself.
+
+    The page text written here is the frozen text, so the retrieval context of a
+    holdout run cannot drift from the dataset that will score it.
+    """
+    from .db import now, transaction
+
+    cases = dataset.get("cases")
+    if not cases:
+        raise ValueError("数据集没有 cases 定义")
+    ts = now()
+    mapping: dict[int, int] = {}
+    with transaction() as conn:
+        for case in cases:
+            case_id = int(conn.execute(
+                "INSERT INTO cases(title, case_no, case_type, client_name, status, description, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (case["title"], case.get("case_no", ""), case.get("case_type", "经济纠纷"),
+                 case.get("client_name", ""), "阅卷中", case["description"], ts, ts),
+            ).lastrowid)
+            if case_id != case["case_id"]:
+                raise ValueError(f"隔离库案例 id 与冻结值不同：{case_id} != {case['case_id']}")
+            mapping[case_id] = case_id
+            for document in case["documents"]:
+                document_id = int(conn.execute(
+                    "INSERT INTO documents(case_id, name, mime_type, pages, status, doc_type, people, date_range, "
+                    "summary, created_at, updated_at) VALUES (?, ?, 'text/plain', ?, '已索引', ?, ?, ?, ?, ?, ?)",
+                    (case_id, document["name"], len(document["pages"]), document.get("doc_type", "其他材料"),
+                     document.get("people", ""), document.get("date_range", ""), document.get("summary", ""), ts, ts),
+                ).lastrowid)
+                for page_no, text in enumerate(document["pages"], 1):
+                    conn.execute("INSERT INTO pages(document_id, page_no, text, summary) VALUES (?, ?, ?, ?)",
+                                 (document_id, page_no, text, text[:120]))
+    return mapping
+
+
+def verify_frozen_pages(dataset: dict[str, Any]) -> dict[str, Any]:
+    """Bind the isolated synthetic database to the frozen dataset pages, case by case."""
+    cases = sorted({int(source.get("case_id", 1)) for source in dataset["sources"]})
+    pages: dict[tuple[int, str, int], str] = {}
     with connect() as conn:
-        for row in conn.execute(
-            "SELECT d.name AS name, p.page_no AS page_no, p.text AS text FROM pages p "
-            "JOIN documents d ON d.id = p.document_id WHERE d.case_id = ?", (case_id,),
-        ):
-            pages[(row["name"], row["page_no"])] = row["text"]
-    expected = {(item["document_name"], item["page"]): item["text"] for item in dataset["sources"]}
+        for case_id in cases:
+            for row in conn.execute(
+                "SELECT d.name AS name, p.page_no AS page_no, p.text AS text FROM pages p "
+                "JOIN documents d ON d.id = p.document_id WHERE d.case_id = ?", (case_id,),
+            ):
+                pages[(case_id, row["name"], row["page_no"])] = row["text"]
+    expected = {(int(item.get("case_id", 1)), item["document_name"], item["page"]): item["text"]
+                for item in dataset["sources"]}
     if set(expected) != set(pages):
         missing = sorted(set(expected) - set(pages))[:3]
         extra = sorted(set(pages) - set(expected))[:3]
@@ -119,18 +167,26 @@ def verify_frozen_pages(dataset: dict[str, Any], case_id: int = 1) -> dict[str, 
     for key, text in expected.items():
         if pages[key] != text:
             raise ValueError(f"冻结来源正文与隔离库不同：{key}")
-    return {"case_id": case_id, "pages": len(pages), "source_sha256": dataset["source_sha256"]}
+    return {"cases": cases, "pages": len(pages), "source_sha256": dataset["source_sha256"]}
 
 
 @contextmanager
-def isolated_case(dataset: dict[str, Any], database: Path, case_id: int = 1) -> Iterator[dict[str, Any]]:
-    """Create a throwaway synthetic case database; never touch the runtime data dir."""
+def isolated_case(dataset: dict[str, Any], database: Path) -> Iterator[dict[str, Any]]:
+    """Create a throwaway synthetic case database; never touch the runtime data dir.
+
+    The development set seeds the repository demo case; a holdout set carries its
+    own authored cases and is seeded from the frozen dataset instead.
+    """
     database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if database.exists():
         raise FileExistsError("隔离库已存在，拒绝覆盖")
     with db_scope(database):
-        init_db(seed=True)
-        yield verify_frozen_pages(dataset, case_id)
+        if dataset.get("cases"):
+            init_db(seed=False)
+            seed_dataset_cases(dataset)
+        else:
+            init_db(seed=True)
+        yield verify_frozen_pages(dataset)
 
 
 def freeze_context(case_id: int, question: str, limit: int = 6) -> tuple[list[dict[str, Any]], str]:
@@ -275,8 +331,8 @@ def prepare_item(item: dict[str, Any], case_id: int, *, limit: int = 6) -> dict[
             "chars": len(prompt["system"]) + len(prompt["user"]),
         }
     return {
-        "id": item["id"], "category": item.get("category"), "question": question, "route": route,
-        "retrieval_status": retrieval_status,
+        "id": item["id"], "case_id": case_id, "category": item.get("category"),
+        "question": question, "route": route, "retrieval_status": retrieval_status,
         "contexts": contexts, "specialists": specialists, "collaboration": collaboration,
         "notes": notes,
         "specialists_chars": len(specialists_text), "crosscheck_chars": len(crosscheck_text),
@@ -477,8 +533,11 @@ def prepare_batch(
     prepared = []
     with isolated_case(dataset, output / "case" / "law_review.db") as case:
         for item in items:
+            item_case = int(item.get("case_id", 1))
+            if item_case not in case["cases"]:
+                raise ValueError(f"{item['id']}: 案例 {item_case} 不在隔离库中")
             try:
-                record = prepare_item(item, case["case_id"], limit=limit)
+                record = prepare_item(item, item_case, limit=limit)
             except ValueError as exc:
                 raise ValueError(f"{item['id']}: {exc}") from exc
             _private_write(output / "items" / f"{item['id']}.json", record)
@@ -495,8 +554,8 @@ def prepare_batch(
             "max_prompt_chars": MAX_PROMPT_CHARS, "retrieval_limit": limit,
             "retrieval": "keyword-only HybridRetriever, prefer_remote_embeddings=False",
             "items": [
-                {"id": row["id"], "category": row["category"], "route": row["route"],
-                 "retrieval_status": row["retrieval_status"],
+                {"id": row["id"], "case_id": row["case_id"], "category": row["category"],
+                 "route": row["route"], "retrieval_status": row["retrieval_status"],
                  "context_pages": [[c["document_id"], c["page_no"]] for c in row["contexts"]],
                  "context_sha256": digest([[c["document_id"], c["page_no"], c.get("page_text_sha256")]
                                            for c in row["contexts"]]),

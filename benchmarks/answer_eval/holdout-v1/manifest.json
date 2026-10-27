@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "dataset_sha256": "10739d034242cc0474fe1c66fc98e2c921c2b70c7b026fc1fa6128910596749b",
+  "cases_sha256": "86c8968fff65ad435009f92e58592d2922ea99835b2837e4b67c6319e0b0443e",
+  "source_sha256": "66265fdbadf71e847f248525bf69ab273b9dc165d064fb960c58248ca33acfff",
+  "items": 24,
+  "cases": 6,
+  "pages": 24,
+  "categories": {
+    "contradiction": 6,
+    "insufficient": 3,
+    "irrelevant": 2,
+    "normal": 12,
+    "statute_missing": 1
+  }
+}

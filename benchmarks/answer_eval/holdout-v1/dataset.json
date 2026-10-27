@@ -1,0 +1,878 @@
+{
+  "name": "holdout-six-cases-v1",
+  "version": 2,
+  "case_fixture": "authored-cases-holdout-v1",
+  "annotation_source": "assistant_generated_from_authored_synthetic_fixture",
+  "notice": "六个完全虚构的合成案例，由编码助手编制，未经律师或独立人工标注。仅用于保留集回归，不代表法律准确率。",
+  "limitations": [
+    "案例、当事人、金额、编号均为虚构，与任何真实主体无关",
+    "每案 4 题，题量小，不能代表案件内或跨案件的统计分布",
+    "关键词式必需要点可能受同义表达与否定句影响",
+    "保留集一旦用于调参即转为开发数据，需另建未见过的保留集"
+  ],
+  "source_sha256": "66265fdbadf71e847f248525bf69ab273b9dc165d064fb960c58248ca33acfff",
+  "sources": [
+    {
+      "case_id": 1,
+      "document_name": "A01_结算确认单.txt",
+      "page": 1,
+      "text": "结算确认单（合成案例A）\n发包方甲公司与承包方乙公司于2025年6月30日确认工程结算价款人民币3,420,000元。",
+      "sha256": "96ab843a06a6de9c21116f66ef366d21197968529c065e4e64acce6a941ba9fe"
+    },
+    {
+      "case_id": 1,
+      "document_name": "A01_结算确认单.txt",
+      "page": 2,
+      "text": "双方确认截至2025年6月30日已支付2,900,000元，尚欠520,000元。确认单未记载质量验收结论，也未附验收报告。",
+      "sha256": "a8663786c7f491fc481a9a062fe1512f1a87b953fd5ae2c76b159119df7b3efe"
+    },
+    {
+      "case_id": 1,
+      "document_name": "A02_往来函件.txt",
+      "page": 1,
+      "text": "催款函（合成案例A）\n甲公司于2025年9月10日发函，主张欠付520,000元，并自2025年7月1日起按日万分之五计算逾期利息。",
+      "sha256": "bd8ae8a4f69cc88b6f970ddff6aab9a8b30313ec045be5d679b75a3e97c327a1"
+    },
+    {
+      "case_id": 1,
+      "document_name": "A02_往来函件.txt",
+      "page": 2,
+      "text": "乙公司回函（合成案例A）\n乙公司称已于2025年8月15日付清全部价款，并附付款凭证编号 HT-2025-0815，但未附银行回单。",
+      "sha256": "e444668f54e10ac9365c15eed2794980c3803463898441776f55257150b5a05f"
+    },
+    {
+      "case_id": 2,
+      "document_name": "B01_解除通知.txt",
+      "page": 1,
+      "text": "解除劳动合同通知（合成案例B）\n某公司于2025年3月3日通知员工丙解除劳动合同，理由为连续旷工5日，通知未载明工会意见。",
+      "sha256": "2c0f9eb527c356c55833aba1099ae356455ed0c3edec647a210c35823019f291"
+    },
+    {
+      "case_id": 2,
+      "document_name": "B01_解除通知.txt",
+      "page": 2,
+      "text": "通知载明月工资8,500元，经济补偿按工作年限3年计算，并要求丙于3月10日前办理离职交接。",
+      "sha256": "742f9b6e5265ba70b7830c6a60114aeb7c12016c5b2b71778c0965d26a1836bc"
+    },
+    {
+      "case_id": 2,
+      "document_name": "B02_考勤与工资表.txt",
+      "page": 1,
+      "text": "考勤记录（合成案例B）\n2025年2月考勤显示丙请假3日、出勤17日，未见旷工记录；请假单编号 QJ-0207 已审批。",
+      "sha256": "5f7653b452856db4c49ee45506a4fa1fc6885abd04a714732f95fd30b33087c0"
+    },
+    {
+      "case_id": 2,
+      "document_name": "B02_考勤与工资表.txt",
+      "page": 2,
+      "text": "工资表（合成案例B）\n2025年1月至2025年2月应发工资合计17,000元，已发12,000元，未发5,000元。",
+      "sha256": "716f53a99556b50355d723352205040a505037561c50556bbbd62a02c7eef2a6"
+    },
+    {
+      "case_id": 3,
+      "document_name": "C01_买卖合同.txt",
+      "page": 1,
+      "text": "买卖合同（合成案例C）\n买方丁公司向卖方戊公司购买精密轴承1,200套，单价260元，总价312,000元；约定检验期为收货后10日。",
+      "sha256": "8671698ac1f07a3d797ea9ca14b4fd67ca7ca76b30186f3d4db4d6b15d357eac"
+    },
+    {
+      "case_id": 3,
+      "document_name": "C01_买卖合同.txt",
+      "page": 2,
+      "text": "合同约定质量异议应以书面形式提出并加盖公章，逾期未提出视为验收合格。",
+      "sha256": "dca5cf0fc3b1e46eae5e8878f7c8bf59baebc4f863e94e9e1bbb04d2b7890ec9"
+    },
+    {
+      "case_id": 3,
+      "document_name": "C02_检验与异议记录.txt",
+      "page": 1,
+      "text": "检验记录（合成案例C）\n丁公司于2025年4月8日收货，4月20日出具检验报告，检出32套外径超差。",
+      "sha256": "ce8a01b726ceb9beddb506a856cdc6a477fd689f2d8c3d9726155be071d2994c"
+    },
+    {
+      "case_id": 3,
+      "document_name": "C02_检验与异议记录.txt",
+      "page": 2,
+      "text": "异议函（合成案例C）\n丁公司于2025年4月22日以电子邮件提出质量异议，要求更换32套并赔偿停机损失45,000元，未加盖公章。",
+      "sha256": "e96a66d0afdd5819ce183b815aad30a5318359d83dfc22f852378d605b9b4af7"
+    },
+    {
+      "case_id": 4,
+      "document_name": "D01_借款合同.txt",
+      "page": 1,
+      "text": "借款合同（合成案例D）\n出借人己与借款人庚于2024年5月20日签订合同，借款本金500,000元，年利率12%，期限12个月。",
+      "sha256": "85d55fc91eedc55bc90754c8932a2bbc52bf811f40c0d052596238bbcbe3a4c4"
+    },
+    {
+      "case_id": 4,
+      "document_name": "D01_借款合同.txt",
+      "page": 2,
+      "text": "合同约定逾期还款按未还本金的日万分之三支付违约金。",
+      "sha256": "d1a49e9934fc5319bbb4ab76a6852954269c8e9c009adacc94faee1bc8da7929"
+    },
+    {
+      "case_id": 4,
+      "document_name": "D02_还款流水.txt",
+      "page": 1,
+      "text": "还款流水（合成案例D）\n2024年6月至2025年2月，庚共转账9笔合计180,000元，摘要均为“还款”。",
+      "sha256": "23f6179988095f247669c74a5d7bb78f411fc67f892ac8d01407eff8a21aac74"
+    },
+    {
+      "case_id": 4,
+      "document_name": "D02_还款流水.txt",
+      "page": 2,
+      "text": "2025年3月起无转账记录。出借人己在情况说明中主张本金一分未还。",
+      "sha256": "a873ea35eaf0462ec983a10f34876ef0ce1807a13f0f8222215aa71c92bcf5eb"
+    },
+    {
+      "case_id": 5,
+      "document_name": "E01_事故认定书.txt",
+      "page": 1,
+      "text": "道路交通事故认定书（合成案例E）\n2025年1月12日，驾驶人辛与行人壬发生碰撞；认定辛负主要责任，壬负次要责任。",
+      "sha256": "88ac2248052ee19b3e2580666e410dccf89f7d3f19025e5afe9d53b443a0dd59"
+    },
+    {
+      "case_id": 5,
+      "document_name": "E01_事故认定书.txt",
+      "page": 2,
+      "text": "认定书载明事故路段限速40公里/小时，鉴定意见显示辛车速约58公里/小时。",
+      "sha256": "689b1c5a344019f88786432a60f8ebdab1dc910647dd6e67a0c0755143b5e1e5"
+    },
+    {
+      "case_id": 5,
+      "document_name": "E02_医疗与费用清单.txt",
+      "page": 1,
+      "text": "医疗费用清单（合成案例E）\n壬住院18日，医疗费合计96,400元，其中自费药12,000元。",
+      "sha256": "bd0189ed98a2dc84baaf2e62c8ba47ab1e5acd8b17844c6367664bd409fd3c1e"
+    },
+    {
+      "case_id": 5,
+      "document_name": "E02_医疗与费用清单.txt",
+      "page": 2,
+      "text": "误工证明（合成案例E）\n壬月收入7,200元，医嘱建议休养90日。",
+      "sha256": "083f2063d2cd5d04bf476ba8d2797e8504798e19588ff9425d04ac4c089f3638"
+    },
+    {
+      "case_id": 6,
+      "document_name": "F01_股权转让协议.txt",
+      "page": 1,
+      "text": "股权转让协议（合成案例F）\n转让方癸与受让方子于2025年2月10日约定转让某公司30%股权，对价2,400,000元，分两期支付。",
+      "sha256": "2e5d2fd8a83cef55c711c2750f1a9d53d661d69894b031d131432234c02ab65c"
+    },
+    {
+      "case_id": 6,
+      "document_name": "F01_股权转让协议.txt",
+      "page": 2,
+      "text": "协议约定首期1,200,000元于生效后10日内支付，余款于工商变更登记完成后30日内支付；逾期按日万分之四计违约金。",
+      "sha256": "361a996a7a847a786ea23563390d3cbda3e3e8b9d792753862793809c4ccac97"
+    },
+    {
+      "case_id": 6,
+      "document_name": "F02_工商与付款记录.txt",
+      "page": 1,
+      "text": "工商变更记录（合成案例F）\n2025年3月18日完成股东变更登记，受让方子持股30%。",
+      "sha256": "dfc1e86950e54685ef7d3b068990bff060f7c33ab13f2dffaf8b8e1ff0a15edd"
+    },
+    {
+      "case_id": 6,
+      "document_name": "F02_工商与付款记录.txt",
+      "page": 2,
+      "text": "付款记录（合成案例F）\n2025年2月18日收到首期1,200,000元；截至2025年5月20日未收到余款。",
+      "sha256": "1123d3e2a03d67f54426a8c43bb16837f20674cd622733fc762e82ab649e96dd"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": 1,
+      "title": "建设工程价款结算争议（合成案例A）",
+      "case_no": "（2026）合民初字第A01号",
+      "case_type": "经济纠纷",
+      "client_name": "甲公司",
+      "description": "完全虚构的建设工程价款结算争议：结算确认单、催款与回函对付款情况表述不同，材料中没有质量验收结论。",
+      "documents": [
+        {
+          "name": "A01_结算确认单.txt",
+          "doc_type": "书证",
+          "people": "甲公司、乙公司",
+          "date_range": "2025-06-30",
+          "summary": "确认工程结算价款、已付款与尚欠金额，未记载质量验收。",
+          "pages": [
+            "结算确认单（合成案例A）\n发包方甲公司与承包方乙公司于2025年6月30日确认工程结算价款人民币3,420,000元。",
+            "双方确认截至2025年6月30日已支付2,900,000元，尚欠520,000元。确认单未记载质量验收结论，也未附验收报告。"
+          ]
+        },
+        {
+          "name": "A02_往来函件.txt",
+          "doc_type": "书证",
+          "people": "甲公司、乙公司",
+          "date_range": "2025-09-10 至 2025-09-18",
+          "summary": "催款函主张欠款与逾期利息，回函称已付清并附付款凭证编号。",
+          "pages": [
+            "催款函（合成案例A）\n甲公司于2025年9月10日发函，主张欠付520,000元，并自2025年7月1日起按日万分之五计算逾期利息。",
+            "乙公司回函（合成案例A）\n乙公司称已于2025年8月15日付清全部价款，并附付款凭证编号 HT-2025-0815，但未附银行回单。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": 2,
+      "title": "劳动争议解除与工资支付（合成案例B）",
+      "case_no": "（2026）合劳人仲字第B02号",
+      "case_type": "经济纠纷",
+      "client_name": "丙",
+      "description": "完全虚构的劳动争议：解除通知以旷工为由，考勤记录显示请假；工资表显示部分工资未发。",
+      "documents": [
+        {
+          "name": "B01_解除通知.txt",
+          "doc_type": "书证",
+          "people": "丙、某公司",
+          "date_range": "2025-03-03",
+          "summary": "以连续旷工为由解除劳动合同，载明月工资与补偿年限。",
+          "pages": [
+            "解除劳动合同通知（合成案例B）\n某公司于2025年3月3日通知员工丙解除劳动合同，理由为连续旷工5日，通知未载明工会意见。",
+            "通知载明月工资8,500元，经济补偿按工作年限3年计算，并要求丙于3月10日前办理离职交接。"
+          ]
+        },
+        {
+          "name": "B02_考勤与工资表.txt",
+          "doc_type": "电子数据",
+          "people": "丙",
+          "date_range": "2025-01 至 2025-02",
+          "summary": "考勤显示请假与出勤天数，工资表显示应发、已发与未发金额。",
+          "pages": [
+            "考勤记录（合成案例B）\n2025年2月考勤显示丙请假3日、出勤17日，未见旷工记录；请假单编号 QJ-0207 已审批。",
+            "工资表（合成案例B）\n2025年1月至2025年2月应发工资合计17,000元，已发12,000元，未发5,000元。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": 3,
+      "title": "买卖合同质量异议（合成案例C）",
+      "case_no": "（2026）合民初字第C03号",
+      "case_type": "经济纠纷",
+      "client_name": "丁公司",
+      "description": "完全虚构的买卖合同纠纷：合同约定检验期与书面异议形式，买方以电子邮件提出异议；材料中没有法条文本。",
+      "documents": [
+        {
+          "name": "C01_买卖合同.txt",
+          "doc_type": "书证",
+          "people": "丁公司、戊公司",
+          "date_range": "2025-03-20",
+          "summary": "约定标的、单价、总价、检验期与质量异议形式。",
+          "pages": [
+            "买卖合同（合成案例C）\n买方丁公司向卖方戊公司购买精密轴承1,200套，单价260元，总价312,000元；约定检验期为收货后10日。",
+            "合同约定质量异议应以书面形式提出并加盖公章，逾期未提出视为验收合格。"
+          ]
+        },
+        {
+          "name": "C02_检验与异议记录.txt",
+          "doc_type": "书证",
+          "people": "丁公司",
+          "date_range": "2025-04-08 至 2025-04-22",
+          "summary": "收货、检验与异议时间及索赔金额。",
+          "pages": [
+            "检验记录（合成案例C）\n丁公司于2025年4月8日收货，4月20日出具检验报告，检出32套外径超差。",
+            "异议函（合成案例C）\n丁公司于2025年4月22日以电子邮件提出质量异议，要求更换32套并赔偿停机损失45,000元，未加盖公章。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": 4,
+      "title": "民间借贷本金与还款（合成案例D）",
+      "case_no": "（2026）合民初字第D04号",
+      "case_type": "经济纠纷",
+      "client_name": "己",
+      "description": "完全虚构的民间借贷纠纷：合同约定本金、利率与违约金，流水显示多笔还款，出借人主张本金未还。",
+      "documents": [
+        {
+          "name": "D01_借款合同.txt",
+          "doc_type": "书证",
+          "people": "己、庚",
+          "date_range": "2024-05-20",
+          "summary": "借款本金、年利率、期限与逾期违约金标准。",
+          "pages": [
+            "借款合同（合成案例D）\n出借人己与借款人庚于2024年5月20日签订合同，借款本金500,000元，年利率12%，期限12个月。",
+            "合同约定逾期还款按未还本金的日万分之三支付违约金。"
+          ]
+        },
+        {
+          "name": "D02_还款流水.txt",
+          "doc_type": "银行流水",
+          "people": "庚",
+          "date_range": "2024-06 至 2025-03",
+          "summary": "还款笔数与合计金额，以及出借人对还款的主张。",
+          "pages": [
+            "还款流水（合成案例D）\n2024年6月至2025年2月，庚共转账9笔合计180,000元，摘要均为“还款”。",
+            "2025年3月起无转账记录。出借人己在情况说明中主张本金一分未还。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": 5,
+      "title": "交通事故责任与费用（合成案例E）",
+      "case_no": "（2026）合交民初字第E05号",
+      "case_type": "经济纠纷",
+      "client_name": "壬",
+      "description": "完全虚构的交通事故纠纷：认定书载明责任比例与限速，鉴定意见给出车速，费用清单与误工证明给出金额。",
+      "documents": [
+        {
+          "name": "E01_事故认定书.txt",
+          "doc_type": "书证",
+          "people": "辛、壬",
+          "date_range": "2025-01-12",
+          "summary": "责任认定、限速与车速鉴定意见。",
+          "pages": [
+            "道路交通事故认定书（合成案例E）\n2025年1月12日，驾驶人辛与行人壬发生碰撞；认定辛负主要责任，壬负次要责任。",
+            "认定书载明事故路段限速40公里/小时，鉴定意见显示辛车速约58公里/小时。"
+          ]
+        },
+        {
+          "name": "E02_医疗与费用清单.txt",
+          "doc_type": "书证",
+          "people": "壬",
+          "date_range": "2025-01 至 2025-04",
+          "summary": "住院天数、医疗费构成与误工情况。",
+          "pages": [
+            "医疗费用清单（合成案例E）\n壬住院18日，医疗费合计96,400元，其中自费药12,000元。",
+            "误工证明（合成案例E）\n壬月收入7,200元，医嘱建议休养90日。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": 6,
+      "title": "股权转让价款支付（合成案例F）",
+      "case_no": "（2026）合民初字第F06号",
+      "case_type": "经济纠纷",
+      "client_name": "癸",
+      "description": "完全虚构的股权转让纠纷：协议约定分期对价与违约金，工商变更与付款记录显示首期已付、余款未付。",
+      "documents": [
+        {
+          "name": "F01_股权转让协议.txt",
+          "doc_type": "书证",
+          "people": "癸、子",
+          "date_range": "2025-02-10",
+          "summary": "转让比例、对价、分期节点与违约金标准。",
+          "pages": [
+            "股权转让协议（合成案例F）\n转让方癸与受让方子于2025年2月10日约定转让某公司30%股权，对价2,400,000元，分两期支付。",
+            "协议约定首期1,200,000元于生效后10日内支付，余款于工商变更登记完成后30日内支付；逾期按日万分之四计违约金。"
+          ]
+        },
+        {
+          "name": "F02_工商与付款记录.txt",
+          "doc_type": "电子数据",
+          "people": "子",
+          "date_range": "2025-02 至 2025-05",
+          "summary": "工商变更完成日期与首期收款记录，余款状态。",
+          "pages": [
+            "工商变更记录（合成案例F）\n2025年3月18日完成股东变更登记，受让方子持股30%。",
+            "付款记录（合成案例F）\n2025年2月18日收到首期1,200,000元；截至2025年5月20日未收到余款。"
+          ]
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "A-normal-01",
+      "category": "normal",
+      "question": "工程结算价款和尚欠金额分别是多少？",
+      "must_include": [
+        "3,420,000",
+        "520,000"
+      ],
+      "must_not_claim": [
+        "已经结清"
+      ],
+      "acceptable_pages": [
+        [
+          "A01_结算确认单.txt",
+          1
+        ],
+        [
+          "A01_结算确认单.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 1,
+      "case_description": "完全虚构的建设工程价款结算争议：结算确认单、催款与回函对付款情况表述不同，材料中没有质量验收结论。"
+    },
+    {
+      "id": "A-normal-02",
+      "category": "normal",
+      "question": "甲公司主张的逾期利息按什么标准计算？",
+      "must_include": [
+        "万分之五"
+      ],
+      "must_not_claim": [
+        "年利率24%"
+      ],
+      "acceptable_pages": [
+        [
+          "A02_往来函件.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 1,
+      "case_description": "完全虚构的建设工程价款结算争议：结算确认单、催款与回函对付款情况表述不同，材料中没有质量验收结论。"
+    },
+    {
+      "id": "A-contradiction-01",
+      "category": "contradiction",
+      "question": "关于欠款是否已经付清，两份材料有什么不一致？",
+      "must_include": [
+        "520,000",
+        "HT-2025-0815"
+      ],
+      "must_not_claim": [
+        "已经确认付清"
+      ],
+      "acceptable_pages": [
+        [
+          "A02_往来函件.txt",
+          1
+        ],
+        [
+          "A02_往来函件.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 1,
+      "case_description": "完全虚构的建设工程价款结算争议：结算确认单、催款与回函对付款情况表述不同，材料中没有质量验收结论。"
+    },
+    {
+      "id": "A-insufficient-01",
+      "category": "insufficient",
+      "question": "本案工程是否已经通过竣工验收？",
+      "must_include": [],
+      "must_not_claim": [
+        "验收合格"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 1,
+      "case_description": "完全虚构的建设工程价款结算争议：结算确认单、催款与回函对付款情况表述不同，材料中没有质量验收结论。"
+    },
+    {
+      "id": "B-normal-01",
+      "category": "normal",
+      "question": "解除通知载明的月工资和经济补偿年限是多少？",
+      "must_include": [
+        "8,500",
+        "3年"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "B01_解除通知.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 2,
+      "case_description": "完全虚构的劳动争议：解除通知以旷工为由，考勤记录显示请假；工资表显示部分工资未发。"
+    },
+    {
+      "id": "B-normal-02",
+      "category": "normal",
+      "question": "2025年1月至2月还有多少工资未发？",
+      "must_include": [
+        "5,000"
+      ],
+      "must_not_claim": [
+        "工资已结清"
+      ],
+      "acceptable_pages": [
+        [
+          "B02_考勤与工资表.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 2,
+      "case_description": "完全虚构的劳动争议：解除通知以旷工为由，考勤记录显示请假；工资表显示部分工资未发。"
+    },
+    {
+      "id": "B-contradiction-01",
+      "category": "contradiction",
+      "question": "解除理由与考勤记录是否一致？请指出差异。",
+      "must_include": [
+        "旷工",
+        "QJ-0207"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "B01_解除通知.txt",
+          1
+        ],
+        [
+          "B02_考勤与工资表.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 2,
+      "case_description": "完全虚构的劳动争议：解除通知以旷工为由，考勤记录显示请假；工资表显示部分工资未发。"
+    },
+    {
+      "id": "B-irrelevant-01",
+      "category": "irrelevant",
+      "question": "该公司是否取得高新技术企业认定？",
+      "must_include": [],
+      "must_not_claim": [
+        "已取得认定"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 2,
+      "case_description": "完全虚构的劳动争议：解除通知以旷工为由，考勤记录显示请假；工资表显示部分工资未发。"
+    },
+    {
+      "id": "C-normal-01",
+      "category": "normal",
+      "question": "合同约定的检验期和总价是多少？",
+      "must_include": [
+        "10日",
+        "312,000"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "C01_买卖合同.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 3,
+      "case_description": "完全虚构的买卖合同纠纷：合同约定检验期与书面异议形式，买方以电子邮件提出异议；材料中没有法条文本。"
+    },
+    {
+      "id": "C-normal-02",
+      "category": "normal",
+      "question": "检出多少套不合格，索赔金额是多少？",
+      "must_include": [
+        "32",
+        "45,000"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "C02_检验与异议记录.txt",
+          1
+        ],
+        [
+          "C02_检验与异议记录.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 3,
+      "case_description": "完全虚构的买卖合同纠纷：合同约定检验期与书面异议形式，买方以电子邮件提出异议；材料中没有法条文本。"
+    },
+    {
+      "id": "C-contradiction-01",
+      "category": "contradiction",
+      "question": "合同要求的异议形式与买方实际做法有什么区别？",
+      "must_include": [
+        "书面",
+        "电子邮件"
+      ],
+      "must_not_claim": [
+        "异议形式符合约定"
+      ],
+      "acceptable_pages": [
+        [
+          "C01_买卖合同.txt",
+          2
+        ],
+        [
+          "C02_检验与异议记录.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 3,
+      "case_description": "完全虚构的买卖合同纠纷：合同约定检验期与书面异议形式，买方以电子邮件提出异议；材料中没有法条文本。"
+    },
+    {
+      "id": "C-statute_missing-01",
+      "category": "statute_missing",
+      "question": "《民法典》关于质量异议期间的规定在本案如何适用？",
+      "must_include": [],
+      "must_not_claim": [
+        "根据民法典第621条本案必然胜诉"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 3,
+      "case_description": "完全虚构的买卖合同纠纷：合同约定检验期与书面异议形式，买方以电子邮件提出异议；材料中没有法条文本。"
+    },
+    {
+      "id": "D-normal-01",
+      "category": "normal",
+      "question": "借款本金和年利率分别是多少？",
+      "must_include": [
+        "500,000",
+        "12%"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "D01_借款合同.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 4,
+      "case_description": "完全虚构的民间借贷纠纷：合同约定本金、利率与违约金，流水显示多笔还款，出借人主张本金未还。"
+    },
+    {
+      "id": "D-normal-02",
+      "category": "normal",
+      "question": "截至2025年2月已还款多少、共几笔？",
+      "must_include": [
+        "180,000",
+        "9笔"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "D02_还款流水.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 4,
+      "case_description": "完全虚构的民间借贷纠纷：合同约定本金、利率与违约金，流水显示多笔还款，出借人主张本金未还。"
+    },
+    {
+      "id": "D-contradiction-01",
+      "category": "contradiction",
+      "question": "出借人主张与流水记录是否一致？",
+      "must_include": [
+        "一分未还",
+        "180,000"
+      ],
+      "must_not_claim": [
+        "本金确实一分未还"
+      ],
+      "acceptable_pages": [
+        [
+          "D02_还款流水.txt",
+          1
+        ],
+        [
+          "D02_还款流水.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 4,
+      "case_description": "完全虚构的民间借贷纠纷：合同约定本金、利率与违约金，流水显示多笔还款，出借人主张本金未还。"
+    },
+    {
+      "id": "D-insufficient-01",
+      "category": "insufficient",
+      "question": "该笔借款是否用于庚的家庭共同生活？",
+      "must_include": [],
+      "must_not_claim": [
+        "属于夫妻共同债务"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 4,
+      "case_description": "完全虚构的民间借贷纠纷：合同约定本金、利率与违约金，流水显示多笔还款，出借人主张本金未还。"
+    },
+    {
+      "id": "E-normal-01",
+      "category": "normal",
+      "question": "责任认定结论和事故路段限速是多少？",
+      "must_include": [
+        "主要责任",
+        "40公里"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "E01_事故认定书.txt",
+          1
+        ],
+        [
+          "E01_事故认定书.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 5,
+      "case_description": "完全虚构的交通事故纠纷：认定书载明责任比例与限速，鉴定意见给出车速，费用清单与误工证明给出金额。"
+    },
+    {
+      "id": "E-normal-02",
+      "category": "normal",
+      "question": "医疗费总额和住院天数是多少？",
+      "must_include": [
+        "96,400",
+        "18日"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "E02_医疗与费用清单.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 5,
+      "case_description": "完全虚构的交通事故纠纷：认定书载明责任比例与限速，鉴定意见给出车速，费用清单与误工证明给出金额。"
+    },
+    {
+      "id": "E-contradiction-01",
+      "category": "contradiction",
+      "question": "车速鉴定意见与路段限速是什么关系？",
+      "must_include": [
+        "58公里",
+        "40公里"
+      ],
+      "must_not_claim": [
+        "车速符合限速规定"
+      ],
+      "acceptable_pages": [
+        [
+          "E01_事故认定书.txt",
+          1
+        ],
+        [
+          "E01_事故认定书.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 5,
+      "case_description": "完全虚构的交通事故纠纷：认定书载明责任比例与限速，鉴定意见给出车速，费用清单与误工证明给出金额。"
+    },
+    {
+      "id": "E-insufficient-01",
+      "category": "insufficient",
+      "question": "壬事发时是否佩戴安全头盔？",
+      "must_include": [],
+      "must_not_claim": [
+        "未佩戴头盔"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 5,
+      "case_description": "完全虚构的交通事故纠纷：认定书载明责任比例与限速，鉴定意见给出车速，费用清单与误工证明给出金额。"
+    },
+    {
+      "id": "F-normal-01",
+      "category": "normal",
+      "question": "转让的股权比例和对价是多少？",
+      "must_include": [
+        "30%",
+        "2,400,000"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "F01_股权转让协议.txt",
+          1
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 6,
+      "case_description": "完全虚构的股权转让纠纷：协议约定分期对价与违约金，工商变更与付款记录显示首期已付、余款未付。"
+    },
+    {
+      "id": "F-normal-02",
+      "category": "normal",
+      "question": "工商变更完成日期和首期付款日期分别是哪天？",
+      "must_include": [
+        "3月18日",
+        "2月18日"
+      ],
+      "must_not_claim": [],
+      "acceptable_pages": [
+        [
+          "F02_工商与付款记录.txt",
+          1
+        ],
+        [
+          "F02_工商与付款记录.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 6,
+      "case_description": "完全虚构的股权转让纠纷：协议约定分期对价与违约金，工商变更与付款记录显示首期已付、余款未付。"
+    },
+    {
+      "id": "F-contradiction-01",
+      "category": "contradiction",
+      "question": "受让方是否按协议约定支付了余款？",
+      "must_include": [
+        "30日",
+        "未收到"
+      ],
+      "must_not_claim": [
+        "余款已按期支付"
+      ],
+      "acceptable_pages": [
+        [
+          "F01_股权转让协议.txt",
+          2
+        ],
+        [
+          "F02_工商与付款记录.txt",
+          2
+        ]
+      ],
+      "expect_refusal": false,
+      "requires_citation": true,
+      "case_id": 6,
+      "case_description": "完全虚构的股权转让纠纷：协议约定分期对价与违约金，工商变更与付款记录显示首期已付、余款未付。"
+    },
+    {
+      "id": "F-irrelevant-01",
+      "category": "irrelevant",
+      "question": "目标公司是否持有增值电信业务经营许可证？",
+      "must_include": [],
+      "must_not_claim": [
+        "持有许可证"
+      ],
+      "acceptable_pages": [],
+      "expect_refusal": true,
+      "requires_citation": false,
+      "case_id": 6,
+      "case_description": "完全虚构的股权转让纠纷：协议约定分期对价与违约金，工商变更与付款记录显示首期已付、余款未付。"
+    }
+  ]
+}
