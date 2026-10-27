@@ -31,17 +31,18 @@
 uv run --locked python scripts/demo_identity_report.py --output output/portfolio-demo/identity-YYYYMMDD.json
 ```
 
-2026-10-27 首次生成（`output/portfolio-demo/identity-20261027.json`，SHA-256 `1e2705aee5bdbc8520bcf93600ad8aeb440e243462b3994b0a6dae592a703958`）实测：
+2026-10-27 生成两份：首份 `identity-20261027.json`（SHA-256 `1e2705ae…3958`，当时前端未重建）；前端重建后重生成 `identity-20261027b.json`（SHA-256 `33ab8676cd86d52e4d3ba863c6bf1e5ad9f533245eb714b57eee70ca552fab29`），以下为后者实测：
 
 | 项 | 值 |
 |---|---|
-| 提交 / 分支 | `68139aae8e01b69e34cc3e287c74992ab0b94fab` / `codex/agent-portfolio-plan` |
+| 提交 / 分支 | `23c9f4a8966255b3c9b3e9e16ccdfb3bc21ccac1` / `codex/agent-portfolio-plan` |
 | 工作区 | `dirty=true`，仅 `tmp_eq/`（与本任务无关的本地草稿目录） |
 | 加载的后端入口 | `app/main.py` 的实际解析路径，随报告记录 |
 | 后端文件摘要 | 7 个文件逐个 SHA-256（`main/services/agents/review_collaboration/collaboration_ablation/ablation_analysis/answer_eval`） |
 | 提示与策略版本 | `chat-system-v4-multiturn-untrusted-history`、`candidate-answerability-v11-detail`、`answer-judge-v2-frozen-sources` |
 | 模型探针 | `available=false`，端点 `http://127.0.0.1:8000/v1`，模型 `Qwen3.6-35B-A3B-OptiQ-4bit` |
-| 前端构建绑定 | 存在：21 个资源，`build-info.json` 摘要 `f2b022b176d78835cc98eee86fccd031832137811a19422db684d5e7e464f4c6` |
+| 前端门禁 | `contract:check`/`typecheck`/`lint` 通过、单测 11、e2e 22、静态构建通过（见 [P4 5.1](portfolio-p4-reproducible-delivery-20261027.md)） |
+| 前端构建绑定 | 存在：21 个资源，`build-info.json` 摘要 `20c9c0ede5e5f9a65879898d50e92612846f7771b5505300c0173da96be0c52b`（`build:static` 重建后） |
 | 数据集 | 开发集 60 题 / 14 页（`b912f4ca…`）；保留集 24 题 / 24 页（`66265fdb…`） |
 
 该报告即录制前的“身份基线”：正式录制时需在同一提交上重跑并保存新报告，与成片、服务日志和模型用量相互核对。模型探针为 `false` 时不得录制主演示。

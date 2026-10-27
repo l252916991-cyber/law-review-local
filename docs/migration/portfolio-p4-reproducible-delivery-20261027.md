@@ -2,7 +2,7 @@
 
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 5.2 节；前置：[P0](portfolio-p0-scope-evidence-20261027.md)、[P1](portfolio-p1-ablation-driver-20261027.md)。
-- 结论：**源码路径复现成功**（离线依赖安装 + 隔离数据目录 + 离线 HTTP 合成验收 + 包内回归），仓库内全量离线检查为 **1431 passed / 2 既有资产失败 / 1 skip**。**Docker 与前端构建未验证，不声明可用。**
+- 结论：**源码路径复现成功**（离线依赖安装 + 隔离数据目录 + 离线 HTTP 合成验收 + 包内回归），仓库内全量离线检查为 **1473 passed / 2 既有资产失败 / 1 skip**（含 4 个此前未执行的 JS 相关用例文件）。**前端构建与 e2e 已验证（见 5.1）；Docker 未验证，不声明可用。**
 
 ## 1. 打包身份
 
@@ -73,20 +73,41 @@ uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snaps
 
 | 项 | 结果 |
 |---|---|
-| 通过 / 失败 / 跳过 | **1431 passed / 2 failed / 1 skipped**，另 278 subtests passed（220.85 s） |
-| 覆盖率 | 语句 13,996、缺失 1,636；分支 4,434、部分覆盖 673；**综合 85.83%**（门槛 70%，未调整） |
+| 通过 / 失败 / 跳过 | **1473 passed / 2 failed / 1 skipped**，另 287 subtests passed（237.37 s）；本次不再豁免任何 JS 用例文件 |
+| 覆盖率 | 语句 13,996、缺失 1,573；分支 4,434、缺失 944（部分覆盖 670）；**综合 86.34%**（门槛 70%，未调整） |
 | 跳过 | `tests/test_sft_pool.py::…` 需要未安装的 `mlx_lm`，不计为通过 |
 | 两处失败 | `test_corpus_audit.py::test_real_frozen_corpus_is_classified_cleanly`（`boundary_difference` 期望 1 实得 0）、`test_corpus_canonical.py::test_real_corpus_builds_clean_canonical`（`publication_count` 66 < 71）。与 [G1 记录](collaboration-release-readiness-evidence-20261027.md) 第 3 节同一资产问题：包内不含 `output/score85` 的本机法条快照；断言未放宽 |
-| 未执行（环境阻塞） | `test_chat_client.py`、`test_mobile_ui.py`、`test_pricing.py`、`test_usage_panel.py` 共 18 项需要 `node`；本机 `which node` 无结果，单独执行时报 `subprocess.run(["node", …])` 找不到可执行文件。**不计为通过**，也不是代码回归 |
+| 前端依赖用例 | `test_chat_client.py`、`test_mobile_ui.py`、`test_pricing.py`、`test_usage_panel.py` **42 passed**：安装 Node 24.22.1 后执行，不再豁免 |
+| 工具链 | Node **24.22.1**（`frontend/.node-version`）安装在 `~/.local/node/`，pnpm **11.25.0** 安装在 `~/.local/npm-global/`，均在仓库外；此前 `which node` 为空，JS 门禁只能标为未执行 |
 | 框架解释器 | 使用 `output/framework-083-20261027`（`scripts/setup_framework --offline` 新建，forgeharness 0.8.3）。仓库内既有 `.venv-framework-m2` 是 **0.6.0**（`DurableGraph` 导入即失败），直接使用会让约 84 项框架测试报错；本轮不修改该目录，只记录它不能代表当前绑定 |
 | 新增对比 | 本次 `agents.py` 因发现顺序缺陷重登记为 `specialist-review-v3`，`test_model_comparison.py` 在框架环境 **14 passed**，覆盖真实侧车与 native 对照 |
+
+## 5.1 前端门禁（本轮补齐）
+
+```sh
+export PATH="$HOME/.local/node/node-v24.22.1-darwin-arm64/bin:$HOME/.local/npm-global/bin:$PATH"
+for f in app/static/*.js; do node --check "$f"; done
+pnpm --dir frontend contract:check && pnpm --dir frontend typecheck && pnpm --dir frontend lint
+pnpm --dir frontend test && pnpm --dir frontend build:static && pnpm --dir frontend test:e2e
+```
+
+| 检查 | 结果 |
+|---|---|
+| 遗留静态脚本语法 | 通过（`app/static/*.js`） |
+| 契约 / 类型 / Lint | 通过（`contract.mjs --check`、`next typegen && tsc --noEmit`、`eslint --max-warnings 0`） |
+| 前端单测 | **11 passed**（`tsx --test tests/*.test.ts`） |
+| 静态构建 | 通过；`frontend/out` 21 个资源，`build-info.json` 摘要 `20c9c0ede5e5f9a65879898d50e92612846f7771b5505300c0173da96be0c52b` |
+| 端到端 | **22 passed**（desktop + mobile，26.2 s，Playwright chromium-1248） |
+| 依赖 Node 的 Python 用例 | **42 passed** |
+
+说明：e2e 中关于流式回答的用例会触发“模型不可用”的告警日志，脚本按既有设计断言失败与回退路径，未声明模型可用。
 
 ## 6. 限制与未覆盖
 
 | 项 | 状态 |
 |---|---|
 | Docker 构建与 Compose 启动 | **未验证**，不声明可用 |
-| 前端构建（`pnpm build:static`）与浏览器流程 | 未验证；本机无 Node，本批未改前端 |
+| 前端构建与浏览器流程 | **已验证**：`build:static` 与 22 项 e2e 通过（见 5.1）；产物在 `frontend/out`，不入 Git |
 | 模型模式（`--mode model`） | 未验证：本机无 LLM 端点，见 [P2 记录](portfolio-p2-precheck-blocked-20261027.md) |
 | Python 版本矩阵 | 全量检查在本机 3.12.13 执行；解压包内的安装与回归在 3.14.6 执行。3.11/3.14 的托管矩阵未跑 |
 | Redis / 队列导入 | 未启动 Redis，批量导入路径未验证 |
