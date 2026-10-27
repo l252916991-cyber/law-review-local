@@ -19,7 +19,8 @@ def test_report_binds_identity_without_a_model_or_case_content():
                              "available": False, "max_tokens": 900, "temperature": 0.2,
                              "seed_sent": False, "checked_at": "2026-10-27T00:00:00+0800"}):
         report = build_report(ROOT)
-    assert report["git"]["commit"] and len(report["git"]["commit"]) == 40
+    # A source archive is not a git checkout: the report must say so instead of failing.
+    assert report["git"]["commit"] is None or len(report["git"]["commit"]) == 40
     assert report["model"]["available"] is False
     assert {"prompt_version", "policy_version", "judge_prompt_version"} <= set(report["identity"])
     assert report["datasets"]["dev"]["items"] == 60
