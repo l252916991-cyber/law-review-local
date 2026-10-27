@@ -161,6 +161,66 @@ def score_answer(item: dict[str, Any], answer: str, *, citations: list[dict[str,
     }
 
 
+SCORING_VERSION = 2
+#: v2 refusal markers: a model that says the material does not contain the fact
+#: is refusing, even when it never writes the word "资料不足".
+REFUSAL_MARKERS_V2 = REFUSAL_MARKERS + (
+    "未包含", "未提供", "无法提供", "没有相关", "未发现", "建议补充", "请补充",
+)
+
+
+def score_answer_v2(
+    item: dict[str, Any], answer: str, *, citations: list[dict[str, Any]] | None = None,
+    answer_status: str | None = None, context_pages: list[tuple[str, int]] | None = None,
+) -> dict[str, Any]:
+    """Deterministic v2 score: required pages must be cited, extra citations are not errors.
+
+    v1 failed any answer whose citation set was not a subset of the item's
+    ``acceptable_pages``. Real RAG answers legitimately cite other retrieved
+    pages, so v2 keeps "every required page is cited" as the contract, reports
+    extra citations separately, and never calls a model.
+    """
+    text = normalise(answer)
+    required = [str(value) for value in item.get("must_include") or []]
+    matched = [value for value in required if normalise(value) in text]
+    coverage = len(matched) / len(required) if required else 1.0
+
+    forbidden = [str(value) for value in item.get("must_not_claim") or []]
+    violations = [value for value in forbidden if normalise(value) in text]
+
+    acceptable = {(name, page) for name, page in item.get("acceptable_pages") or []}
+    cited = _page_pairs(citations or [])
+    required_pages_cited = bool(acceptable) and acceptable <= cited
+    extra_citations = sorted(cited - acceptable)
+    out_of_context = (sorted(cited - set(context_pages)) if context_pages is not None else None)
+    citation_precision = None
+    if cited:
+        citation_precision = round(len(cited & acceptable) / len(cited), 4) if acceptable else 0.0
+
+    refused = answer_status in {"insufficient_evidence", "clarification"} or any(
+        marker in (answer or "") for marker in REFUSAL_MARKERS_V2)
+    if item.get("expect_refusal"):
+        passed = refused and not violations
+    else:
+        passed = coverage == 1.0 and not violations and (required_pages_cited or not acceptable)
+        if item.get("requires_citation") and not cited:
+            passed = False
+        if out_of_context:
+            passed = False
+
+    return {
+        "id": item["id"], "scoring_version": SCORING_VERSION, "passed": passed,
+        "coverage": round(coverage, 4), "matched": matched,
+        "missing": [value for value in required if value not in matched],
+        "violations": violations,
+        "required_pages_cited": required_pages_cited,
+        "extra_citations": [list(pair) for pair in extra_citations],
+        "out_of_context": None if out_of_context is None else [list(pair) for pair in out_of_context],
+        "citation_precision": citation_precision,
+        "refused": refused, "refusal_expected": bool(item.get("expect_refusal")),
+    }
+
+
 def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     if not results:
         raise ValueError("没有可汇总的题目结果")

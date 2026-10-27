@@ -17,7 +17,7 @@ import random
 from collections import defaultdict
 from typing import Any, Iterable
 
-from .answer_eval import score_answer
+from .answer_eval import score_answer_v2
 
 BLIND_VERSION = "ablation-blind-v1"
 SAMPLE_RULE = "two-per-category-case-coverage-then-sha256-order-v1"
@@ -154,7 +154,7 @@ def preview_scores(dataset: dict[str, Any], review: dict[str, Any], key: dict[st
         if set(mapping) != {candidate["label"] for candidate in entry["candidates"]}:
             raise ValueError(f"{entry['id']}: 候选标签与映射不一致")
         for candidate in entry["candidates"]:
-            score = score_answer(items[entry["id"]], candidate["answer"])
+            score = score_answer_v2(items[entry["id"]], candidate["answer"])
             rows.append({"id": entry["id"], "label": candidate["label"],
                          "group": mapping[candidate["label"]], "passed": bool(score["passed"])})
     return {"candidates": len(rows), "rows": rows}

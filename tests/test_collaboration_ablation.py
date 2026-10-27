@@ -294,3 +294,32 @@ def test_live_generator_targets_the_probed_endpoint_explicitly():
     assert captured["base_url_override"] == "http://127.0.0.1:18000/v1"
     assert captured["model_override"] == "stub-chat"
     assert generated.text.startswith("合成回答")
+
+
+def test_extra_citations_do_not_fail_an_answer_that_cites_the_required_page(batch):
+    dataset, _, directory = batch
+    _, prepared = load_prepared(directory)
+    item = [record for record in prepared if record["id"] == "normal-01"][0]
+    # The model cites the required page plus another retrieved page.
+    answer = ("累计流入2,860万元，涉及47名投资人[资料1][资料2][资料3]。"
+              "请律师复核原文与上述结论。")
+    run = directory.parent / "run-extra-citations"
+    report = run_batch(dataset, [item], run, generate=_stub(answer), model="stub-model", groups=["A"])
+    row = json.loads((run / "attempts.jsonl").read_text(encoding="utf-8").strip())
+    assert row["outcome"] == "ok"
+    assert row["score"]["required_pages_cited"] is True
+    assert row["score"]["extra_citations"]
+    assert row["passed"] is True
+    assert report["scoring"]["version"] == 2
+
+
+def test_citation_outside_the_frozen_context_fails(batch):
+    dataset, _, directory = batch
+    _, prepared = load_prepared(directory)
+    item = [record for record in prepared if record["id"] == "normal-01"][0]
+    answer = "累计流入2,860万元，涉及47名投资人[资料1][资料99]。请律师复核原文与上述结论。"
+    run = directory.parent / "run-context-escape"
+    run_batch(dataset, [item], run, generate=_stub(answer), model="stub-model", groups=["A"])
+    row = json.loads((run / "attempts.jsonl").read_text(encoding="utf-8").strip())
+    # An out-of-range marker is dropped by answer_citations, so the contract check fails instead.
+    assert row["outcome"] == "contract_failed" or row["passed"] is False

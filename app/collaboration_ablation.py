@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator
 
-from .answer_eval import load_dataset, score_answer
+from .answer_eval import SCORING_VERSION, load_dataset, score_answer_v2
 from .db import connect, db_scope, init_db
 from .review_collaboration import build_collaboration, review_appendix
 
@@ -440,9 +440,12 @@ def _attempt(
                 "final_answer": text, "detail": "模型原始回答未通过格式/来源/复核提醒校验"}
     # The model's own words are scored separately from the deterministic
     # appendix: otherwise a rule appendix could look like better reasoning.
-    raw_score = score_answer(dataset_item, text, citations=answer_citations(text, prepared["contexts"]))
+    context_pages = [(context["name"], context["page_no"]) for context in prepared["contexts"]]
+    raw_score = score_answer_v2(dataset_item, text, citations=answer_citations(text, prepared["contexts"]),
+                                context_pages=context_pages)
     final = text + review_appendix(prepared["collaboration"]) if group == "C" else text
-    final_score = score_answer(dataset_item, final, citations=answer_citations(final, prepared["contexts"]))
+    final_score = score_answer_v2(dataset_item, final, citations=answer_citations(final, prepared["contexts"]),
+                                  context_pages=context_pages)
     return {**record, "outcome": "ok", "passed": bool(raw_score["passed"]), "final_answer": final,
             "final_answer_sha256": digest(final), "appendix_withheld": False,
             "score": raw_score, "final_score": final_score,
@@ -672,7 +675,8 @@ def run_batch(
         "timeout_seconds": timeout,
         "sampling": {"temperature": _temperature(), "seed": None,
                      "seed_note": "本驱动不发送 seed；后端未声明 seed 能力，不承诺跨设备逐字一致"},
-        "attempts_file": "attempts.jsonl", "summary": summarise_attempts(rows, dataset),
+        "attempts_file": "attempts.jsonl", "scoring": {"version": SCORING_VERSION},
+        "summary": summarise_attempts(rows, dataset),
         "notice": "失败尝试计入分母；未知用量不写零；通过率不等同法律准确率。",
     }
     _private_write(run_output / "report.json", report)
