@@ -19,7 +19,7 @@
 | 提示长度 A 855 / B 7,568 / C 9,719 字符（中位） | 冻结批次 `output/portfolio-ablation/dev-20261027/manifest.json` | 读 `items[].prompt_chars` 取中位 |
 | 60 题、14 页、来源摘要 `b912f4…` | `benchmarks/answer_eval/v2/dataset.json` | `scripts/build_answer_eval.py` 幂等复算 |
 | 恢复片段 steps 9→9、`resume_count=1`、拒绝恢复 | `output/portfolio-demo/anomaly-20261027/*.json` | 重跑 `scripts/demo_recovery_check.py` 三个阶段 |
-| 1397 passed / 85.69% | 全量离线检查日志 `output/portfolio-ci/pytest3.log` | 按 P4 第 5 节命令重跑 |
+| 1413 passed / 85.77% | 全量离线检查日志 `output/portfolio-ci/pytest4.log` | 按 P4 第 5 节命令重跑 |
 | 448 成员、zip `bd9006b4…`、包内 99 passed | `output/portfolio-repro/lexvault-source-20261027c.zip` | 重新打包并核对清单 |
 
 ## 3. 明确不写的表述
