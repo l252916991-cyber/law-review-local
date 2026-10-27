@@ -186,3 +186,12 @@ def test_transport_preserves_unknown_usage_and_exact_judge_target():
     assert request.full_url == "http://127.0.0.1:19002/v1/chat/completions"
     assert json.loads(request.data)["model"] == "synthetic-judge"
     assert calls[0]["usage"] is None and calls[0]["estimated_cost"] is None
+
+
+def test_judge_text_mentioning_planning_words_is_not_blanked():
+    from app.answer_judge_client import strip_think_only
+
+    payload = '{"coverage_ok": true, "unsupported_claims": [], "citation_ok": true, "refusal_ok": true, ' \
+              '"rationale": "回答覆盖了问题要求的关键要点"}'
+    assert strip_think_only(payload) == payload
+    assert strip_think_only("<think>internal</think>" + payload) == payload

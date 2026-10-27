@@ -149,7 +149,8 @@ def package_review(directory: Path, archive: Path) -> None:
         bundle.writestr("PACK_MANIFEST.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
 
 
-def run_judges(dataset: dict[str, Any], answers: dict[str, Any], endpoint: str, model: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def run_judges(dataset: dict[str, Any], answers: dict[str, Any], endpoint: str, model: str,
+               timeout: int = 30, max_tokens: int = 500) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     from app.answer_judge_client import request_judge
 
     rows: list[dict[str, Any]] = []
@@ -163,7 +164,8 @@ def run_judges(dataset: dict[str, Any], answers: dict[str, Any], endpoint: str, 
         entry = answers[item["id"]]
         result = judge_answer(item, entry.get("answer", ""), entry.get("citations", []),
                               source_pages=dataset["sources"],
-                              call_model=lambda prompt: request_judge(prompt, endpoint=endpoint, model=model, calls=calls))
+                              call_model=lambda prompt: request_judge(prompt, endpoint=endpoint, model=model, calls=calls,
+                                                       timeout=timeout, max_tokens=max_tokens))
         rows.append(result)
         stopped = not result["available"]
     return rows, calls
@@ -202,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     judge.add_argument("--judge-results", type=Path, help="recompute agreement offline from a digest-bound prior report")
     parser.add_argument("--endpoint", default="http://127.0.0.1:8000/v1")
     parser.add_argument("--judge-model", default="Qwythos-9B-v2-OptiQ-4bit")
+    parser.add_argument("--judge-timeout", type=int, default=30)
+    parser.add_argument("--judge-max-tokens", type=int, default=500)
     parser.add_argument("--human-labels", type=Path)
     parser.add_argument("--review-directory", type=Path)
     parser.add_argument("--review-archive", type=Path, help="write an allowlisted blind-review ZIP without machine scores")
@@ -232,7 +236,9 @@ def main(argv: list[str] | None = None) -> int:
         prepare_review(args.review_directory, dataset, answers, manifest)
         if args.review_archive:
             package_review(args.review_directory, args.review_archive)
-    rows, calls = run_judges(dataset, answers, endpoint, args.judge_model) if args.judge else ([], [])
+    rows, calls = (run_judges(dataset, answers, args.endpoint, args.judge_model, args.judge_timeout,
+                                     args.judge_max_tokens)
+                   if args.judge else ([], []))
     if args.judge_results:
         rows = cached_judges(args.judge_results, dataset, manifest)
     agreement = human_agreement(manifest, rows, human)
