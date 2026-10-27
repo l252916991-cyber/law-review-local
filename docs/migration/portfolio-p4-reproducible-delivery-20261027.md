@@ -25,6 +25,8 @@
 | 开发依赖 | `uv sync --locked --group dev --offline` | 通过 |
 | 语法检查 | `python -m compileall -q app scripts tests` | 通过 |
 | 解释器 | uv 依 `requires-python` 选用宿主机 **Python 3.14.6** | 见第 5 节限制 |
+| 启动入口 | `bash run.sh`（隔离数据目录 + token 认证，默认端口 8765） | 通过：脚本先校验 `frontend/out/index.html`，随后 `/api/health` 与 `/` 均返回 200 |
+| 环境诊断 | `uv run --locked python scripts/doctor.py`（隔离数据目录） | 通过；`pdfinfo`/`pdftotext`/`pdftoppm`/`tesseract` 均缺失（OCR 不可用），模型服务器未探测 |
 | 工具版本 | uv 0.12.0、SQLite 3.54.0 | — |
 
 ## 3. 合成样例（实际进程）
@@ -142,6 +144,7 @@ uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:1877
 | 模型模式（`--mode model`） | 未验证：本机无 LLM 端点，见 [P2 记录](portfolio-p2-precheck-blocked-20261027.md) |
 | Python 版本矩阵 | 全量检查在本机 3.12.13 执行；解压包内的安装与回归在 3.14.6 执行。3.11/3.14 的托管矩阵未跑 |
 | Redis / 队列导入 | 未启动 Redis，批量导入路径未验证 |
+| PDF/图片导入 | 本机缺 Poppler 与 Tesseract，只验证了 TXT 合成材料；PDF/图片解析与 OCR 路径未验证 |
 
 ## 7. 复现结论
 
