@@ -63,6 +63,7 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
 | 保留集 24 题 × 3 组 × 3 轮 = 216 次生成 | 模型端点不可用（见 [P2 预检](portfolio-p2-precheck-blocked-20261027.md)） |
 | 轮换顺序的实际执行与波动统计 | 同上 |
 | Judge 与人工 κ | 无模型、无人工标签 |
+| 配对分析 | [分析层](portfolio-p2-analysis-20261027.md) 已实现并有回归，但没有真实账本可分析 |
 
 运行条件恢复后，按计划第 4.2 节：先用开发集定位问题并冻结候选，再在新批次目录上跑保留集三组各三轮；本文件冻结的 `dataset.json` 与 `cases.json` 不得因结果而修改，需要改动就建立 `holdout-v2`。
 

@@ -395,7 +395,8 @@ def _attempt(
 
     prompt = prepared["prompts"][group]
     record: dict[str, Any] = {
-        "item": prepared["id"], "category": prepared["category"], "group": group, "repeat": repeat,
+        "item": prepared["id"], "case_id": prepared.get("case_id"), "category": prepared["category"],
+        "group": group, "repeat": repeat,
         "model": model, "prompt_sha256": prompt["sha256"], "prompt_chars": prompt["chars"],
         "max_prompt_chars": max_prompt_chars, "timeout_seconds": timeout,
     }

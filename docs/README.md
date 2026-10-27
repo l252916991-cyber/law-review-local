@@ -10,6 +10,7 @@
 - [求职展示版 P5 交付记录](migration/portfolio-p5-materials-20261027.md)：材料清单、数字可追溯性核对、不写的表述、按依赖排序的待办。
 - [求职展示版 P2 前置：六案例保留集](migration/portfolio-p2-holdout-20261027.md)：24 题冻结身份、案例隔离方式、已验/未验清单与复算命令。
 - [对照批次可复现性修正](migration/portfolio-determinism-20261027.md)：专家发现顺序的集合迭代缺陷、`specialist-review-v3` 重登记与跨进程复验。
+- [三组账本配对分析](migration/portfolio-p2-analysis-20261027.md)：同题配对、精确 McNemar、分类/分案例、轮次波动与案例级重采样。
 - [2026-10-27 多人协作首版改进计划书](migration/collaboration-first-release-plan-20261027.md)：成员分工、人工任务、并发保护、报告签发与部署验收的工作包、阶段与验收用例。
 - [2026-10-27 多人协作首版交付前收尾计划书](migration/collaboration-release-readiness-plan-20261027.md)：权限交集、冻结签发内容及 R1–R3 实施记录，保留完整检查和验收用例。
 - [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：正式交付执行入口；关闭语料资产、Python 矩阵、gitleaks、容器路径门禁，再执行 M1 副本迁移及 U1 律所验收。

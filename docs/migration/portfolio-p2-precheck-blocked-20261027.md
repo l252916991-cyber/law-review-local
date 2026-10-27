@@ -54,6 +54,8 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 | Judge 打分与 κ 复算 | 未执行 | 无模型；无人工标签 |
 | 质量、token、时延、稳定性结论 | 未产生 | 不能用替身或历史报告替代 |
 
+分析口径已另行实现（[配对分析层](portfolio-p2-analysis-20261027.md)：同题配对、精确 McNemar、分类/分案例、案例级重采样），但只在真实账本存在时才有数值。
+
 计划第 7 节要求“所有失败和未知用量均保留”，本文件即该失败记录；对应的批次产物保留在 `output/portfolio-ablation/dev-20261027/`（含冻结提示、隔离库、预检与失败记录，`.gitignore` 已排除）。
 
 ## 4. 恢复条件与继续步骤
