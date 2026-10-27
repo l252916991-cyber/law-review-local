@@ -20,7 +20,7 @@
 | 60 题、14 页、来源摘要 `b912f4…` | `benchmarks/answer_eval/v2/dataset.json` | `scripts/build_answer_eval.py` 幂等复算 |
 | 恢复片段 steps 9→9、`resume_count=1`、拒绝恢复 | `output/portfolio-demo/anomaly-20261027/*.json` | 重跑 `scripts/demo_recovery_check.py` 三个阶段 |
 | 1423 passed / 85.82% | 全量离线检查日志 `output/portfolio-ci/pytest5.log` | 按 P4 第 5 节命令重跑 |
-| 448 成员、zip `bd9006b4…`、包内 99 passed | `output/portfolio-repro/lexvault-source-20261027c.zip` | 重新打包并核对清单 |
+| 460 成员、zip `03c65406…`、包内 133 passed | `output/portfolio-repro/lexvault-source-20261027d.zip` | 重新打包并核对清单 |
 
 ## 3. 明确不写的表述
 
