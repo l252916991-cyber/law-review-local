@@ -13,6 +13,7 @@
 - [对照批次可复现性修正](migration/portfolio-determinism-20261027.md)：专家发现顺序的集合迭代缺陷、`specialist-review-v3` 重登记与跨进程复验。
 - [三组账本配对分析](migration/portfolio-p2-analysis-20261027.md)：同题配对、精确 McNemar、分类/分案例、轮次波动与案例级重采样。
 - [三组盲审包](migration/portfolio-p2-blind-package-20261027.md)：隐藏组别的 X1–X3 呈现、分层抽样与案例覆盖、替身演练与裁判侧映射校验。
+- [模型切换与评分 v2](migration/portfolio-p2-model-switch-20261027.md)：本机 Qwen3.8-27B 身份、预检两轮结果、评分口径修正与开发集开跑记录。
 - [驱动链路端到端演练](migration/portfolio-p2-harness-drill-20261027.md)：用仓库替身服务跑通 prepare→run→analyse，记录暴露的三个问题与修复，明确非模型结果。
 - [求职展示版 P3 演示状态](migration/portfolio-p3-demo-status-20261027.md)：恢复片段证据、录制前身份核对报告（`scripts/demo_identity_report.py`）与主演示的阻塞条件。
 - [2026-10-27 多人协作首版改进计划书](migration/collaboration-first-release-plan-20261027.md)：成员分工、人工任务、并发保护、报告签发与部署验收的工作包、阶段与验收用例。
