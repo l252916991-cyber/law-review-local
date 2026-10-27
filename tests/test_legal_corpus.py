@@ -111,6 +111,45 @@ def test_amendment_sequence_can_start_above_one():
         build_document(source, raw.replace("第十八条".encode(), "第十七条".encode()), "today")
 
 
+def test_amendment_keeps_multiline_quoted_chapter_inside_its_clause():
+    text = ("第五十一条 修改说明。\n第五十二条 增加规定，内容如下：\n第七节 监察委员会\n"
+            "第一百二十三条 甲。\n第一百二十四条 乙。\n本节序号相应调整。")
+    articles = split_articles(text, embedded_articles={"52": [123, 124]})
+    assert [item["article_id"] for item in articles] == ["51", "52"]
+    assert articles[1]["text"] == text.split("\n", 1)[1]
+    assert articles[1]["section_heading"] is None
+    assert articles[1]["text_sha256"] == hashlib.sha256(articles[1]["text"].encode()).hexdigest()
+
+
+def test_embedded_articles_require_the_frozen_container_and_complete_sequence():
+    text = "第五十二条 内容如下：\n第一百二十三条 甲。\n第一百二十四条 乙。"
+    with pytest.raises(ValueError, match="Incomplete embedded article"):
+        split_articles(text, embedded_articles={"52": [123, 125]})
+    with pytest.raises(ValueError, match="Invalid embedded article"):
+        split_articles(text, embedded_articles={"51": [123, 124]})
+    with pytest.raises(ValueError, match="Incomplete embedded article"):
+        split_articles(text.replace("第一百二十四条", "第一百二十三条"),
+                       embedded_articles={"52": [123, 124]})
+    # Default parsing keeps unrelated publications' own article structure.
+    assert [article["article_id"] for article in split_articles(text)] == ["52", "123", "124"]
+
+
+def test_builder_repairs_merged_heading_but_keeps_sequence_and_footer_checks():
+    source = {"document_id": "merged", "source_url": "https://example.gov.cn/law", "version_date": "2012-12-28",
+              "version_evidence": "2012年12月28日", "last_sentence": "施行。", "expected_max": 2}
+    raw = "<p>2012年12月28日通过</p><p>第一条内容依照第二条处理。</p><p>第二条本法施行。</p><div>页脚</div>".encode()
+    doc = build_document(source, raw, "today")
+    assert doc["layout_repair"] == "merged_heading_separator_v1"
+    assert [item["article_id"] for item in doc["articles"]] == ["1", "2"]
+    assert doc["articles"][0]["text"] == "第一条 内容依照第二条处理。"
+    assert doc["articles"][1]["text"] == "第二条 本法施行。"
+    assert doc["raw_sha256"] == hashlib.sha256(raw).hexdigest()
+    with pytest.raises(ValueError, match="Incomplete statute"):
+        build_document({**source, "expected_max": 3}, raw, "today")
+    with pytest.raises(ValueError, match="Duplicate article headings"):
+        build_document(source, raw.replace("第二条本法".encode(), "第一条本法".encode()), "today")
+
+
 def test_builder_decompresses_gzip_publication_before_freezing(tmp_path, monkeypatch):
     source = {
         "document_id": "gzip-fixture", "law_name": "测试法", "aliases": ["测试法"],

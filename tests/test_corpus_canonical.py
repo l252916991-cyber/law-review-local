@@ -149,17 +149,34 @@ def test_rebuild_ignores_previous_canonical_output(tmp_path):
     assert again["classification_counts"]["exact_duplicate"] == 0
 
 
-def test_real_corpus_builds_clean_canonical(tmp_path):
+def test_real_corpus_builds_clean_canonical(tmp_path, frozen_corpus_regression):
     root = Path(__file__).resolve().parents[1] / "output/score85"
-    directories = sorted(str(path) for path in root.glob("legal_corpus*") if (path / "manifest.json").exists())
+    directories = (frozen_corpus_regression["directories"] if frozen_corpus_regression else
+                   sorted(str(path) for path in root.glob("legal_corpus*") if (path / "manifest.json").exists()))
     if len(directories) < 2:
         pytest.skip("frozen statute corpus not checked out")
     target = tmp_path / "canonical"
-    assert build_main(["--root", str(root), "--output", str(target)]) == 0
+    source_args = ([argument for directory in directories for argument in ["--corpus-dir", directory]]
+                   if frozen_corpus_regression else ["--root", str(root)])
+    assert build_main([*source_args, "--output", str(target)]) == 0
     manifest = json.loads((target / "manifest.json").read_text())
     # Counts grow as corpus directories are added; the invariants are what matter.
-    assert manifest["publication_count"] >= 71
-    assert manifest["duplicate_keys_merged"] == 19
+    if frozen_corpus_regression:
+        expected = frozen_corpus_regression["expected"]
+        assert manifest["publication_count"] == expected["publication_count"]
+        assert manifest["duplicate_keys_merged"] == expected["duplicate_keys_merged"]
+        assert manifest["source_as_of"] == expected["source_as_of"]
+        records = sorted([
+            {"law_name": doc["law_name"], "version_date": doc["version_date"],
+             "sha256": entry["document_sha256"], "article_count": len(doc["articles"])}
+            for entry, doc in zip(manifest["documents"], LegalCorpus(target).documents)
+        ], key=lambda item: (item["law_name"], item["version_date"]))
+        assert sum(item["article_count"] for item in records) == expected["article_count"]
+        encoded = json.dumps(records, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        assert hashlib.sha256(encoded).hexdigest() == expected["document_set_sha256"]
+    else:
+        assert manifest["publication_count"] >= 71
+        assert manifest["duplicate_keys_merged"] == 19
     assert audit([target])["duplicate_keys"] == 0
     docs = LegalCorpus(target).documents
     assert len(docs) == len({(doc["law_name"], doc["version_date"]) for doc in docs})

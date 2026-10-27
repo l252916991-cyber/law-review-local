@@ -1,8 +1,50 @@
 """Offline fixtures are synthetic and never require redistributing LawBench."""
+import hashlib
 import json
+import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+
+def _load_corpus_regression(root, contract):
+    """Verify the exact reviewed inputs before any real-corpus assertion runs."""
+    from app.legal_corpus import LegalCorpus
+
+    directories = []
+    for item in contract["sources"]:
+        directory = (root / item["path"]).resolve()
+        if not directory.is_relative_to(root.resolve()):
+            raise ValueError("Frozen corpus path escapes asset root")
+        manifest_path = directory / "manifest.json"
+        if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != item["manifest_sha256"]:
+            raise ValueError("Frozen corpus manifest identity mismatch")
+        corpus = LegalCorpus(directory)
+        if len(corpus.documents) != item["document_count"]:
+            raise ValueError("Frozen corpus document count mismatch")
+        for entry in corpus.manifest["documents"]:
+            raw_path = (directory / entry["raw_file"]).resolve()
+            if raw_path.parent != directory:
+                raise ValueError("Frozen raw publication escapes corpus directory")
+            if hashlib.sha256(raw_path.read_bytes()).hexdigest() != entry["raw_sha256"]:
+                raise ValueError("Frozen raw publication digest mismatch")
+        directories.append(str(directory))
+    return {"directories": directories, "expected": contract["expected"]}
+
+
+@pytest.fixture(scope="session")
+def frozen_corpus_regression():
+    configured = os.environ.get("LAW_REVIEW_CORPUS_REGRESSION_ROOT")
+    if configured is None:
+        return None  # Preserve the original legacy-asset assertions unchanged.
+    contract_path = Path(__file__).resolve().parents[1] / "docs/benchmarks/collaboration-corpus-freeze-20261028.json"
+    return _load_corpus_regression(Path(configured), json.loads(contract_path.read_text()))
+
+
+@pytest.fixture
+def corpus_regression_loader():
+    return _load_corpus_regression
 
 
 @pytest.fixture(scope="session", autouse=True)
