@@ -4,9 +4,10 @@
 
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
 - [威胁模型](security/threat-model.md)：资产、信任边界、提示注入与工具越权的缓解及未覆盖项。
+- [2026-10-27 求职展示版计划书](migration/agent-portfolio-plan-20261027.md)：面向 AI 应用 / Agent 工程求职，推进多专家真实模型对照、可复现演示和简历证据；与正式交付验收分别记录。
 - [2026-10-27 多人协作首版改进计划书](migration/collaboration-first-release-plan-20261027.md)：成员分工、人工任务、并发保护、报告签发与部署验收的工作包、阶段与验收用例。
 - [2026-10-27 多人协作首版交付前收尾计划书](migration/collaboration-release-readiness-plan-20261027.md)：权限交集、冻结签发内容及 R1–R3 实施记录，保留完整检查和验收用例。
-- [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：当前下一步执行入口；关闭语料资产、Python 矩阵、gitleaks、容器路径门禁，再执行 M1 副本迁移及 U1 律所验收。
+- [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：正式交付执行入口；关闭语料资产、Python 矩阵、gitleaks、容器路径门禁，再执行 M1 副本迁移及 U1 律所验收。
 - [多人协作部署与运行验收](runbook/collaboration-acceptance.md)：验收脚本、备份恢复演练、五个身份的人工验收、离职撤权与监控建议。
 - [AI 应用升级计划](migration/ai-application-upgrade-plan-20261024.md)：A01–A13 工作包、验收口径与未实施原因。
 - [AI 应用升级实施记录](migration/ai-application-upgrade-execution-20261024.md)：提交清单、验证结果、关键设计与发现的问题。
