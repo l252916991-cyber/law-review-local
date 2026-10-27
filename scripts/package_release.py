@@ -28,6 +28,12 @@ EXACT_FIXTURES = (
     "benchmarks/answer_eval/v2/questions.json",
     "benchmarks/answer_eval/v2/dataset.json",
     "benchmarks/answer_eval/v2/manifest.json",
+    # Six-case holdout: authored synthetic fixture plus its frozen dataset and
+    # manifest. Needed to rebuild the holdout batch from the package alone;
+    # contains no real parties, amounts or uploaded material.
+    "benchmarks/answer_eval/holdout-v1/cases.json",
+    "benchmarks/answer_eval/holdout-v1/dataset.json",
+    "benchmarks/answer_eval/holdout-v1/manifest.json",
     # Frozen experiment configuration (non-sensitive test fixture input);
     # tests/test_statutory_experiment.py fails closed without it. Restored
     # 2026-10-21 from the public origin repository, see docs/migration/ledger.md.
