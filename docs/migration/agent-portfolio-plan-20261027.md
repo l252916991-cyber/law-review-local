@@ -3,7 +3,7 @@
 - 日期：2026-10-27（Asia/Shanghai）。
 - 编制基线：`fce30f3`；多专家来源交接首批实现提交为 `580c5b7`。
 - 目标方向：AI 应用开发 / Agent 工程；以能验证效果、解释取舍、复现过程的个人项目材料支持简历和面试。
-- 当前状态：**本次仅编制计划，以下 P0–P5 尚未执行**。不将计划、历史实验或离线测试替身写成当前版本真实模型通过。
+- 当前状态（2026-10-27 更新）：**P0、P1、P4、P5 已完成**；**P2 的真实生成在执行前被模型资源阻塞**（预检 `available=false`，批量调用 0 次），但开发集、六案例保留集、驱动、账本、配对分析与盲审包均已冻结；**P3 的异常路径已完成**，真实问答主演示待端点恢复后录制。执行记录见文末与[文档索引](../README.md)。仍不将历史实验或离线测试替身写成当前版本真实模型通过。
 - 与交付计划的关系：[G1/M1/U1 计划](collaboration-g1-to-acceptance-plan-20261027.md)继续负责发布门禁、真实旧库迁移和律所验收。本计划不更改其放行标准；求职演示的验收范围单独记录。
 
 ## 1. 本轮要回答的问题
@@ -139,4 +139,23 @@
 
 模型预检失败时先定位资源/协议问题，停止无效批量调用；主实验遇到契约、安全或数据完整性问题时停止相关批次并保存证据。修复后使用新批次身份，重跑受影响项目。任何失败都不通过删题、放宽断言、隐藏未知用量或覆盖旧报告消除。
 
-阶段状态：P0 待执行；P1 待执行；P2 待执行；P3 待执行；P4 待执行；P5 待执行。计划编制不改变 G1、M1、U1 或 ForgeHarness 正式入口的既有状态。
+阶段状态：P0 已完成；P1 已完成；P2 执行中（真实生成阻塞于模型资源，方法与数据已冻结）；P3 部分完成（异常路径完成，主演示待端点）；P4 已完成；P5 已完成。计划编制不改变 G1、M1、U1 或 ForgeHarness 正式入口的既有状态。
+
+## 8. 执行记录
+
+| 阶段 | 记录 | 状态 |
+|---|---|---|
+| P0 范围与身份冻结 | [portfolio-p0-scope-evidence-20261027.md](portfolio-p0-scope-evidence-20261027.md) | 完成 |
+| P1 A/B/C 驱动与回归 | [portfolio-p1-ablation-driver-20261027.md](portfolio-p1-ablation-driver-20261027.md) | 完成 |
+| 协议冻结 v1 | [portfolio-protocol-20261027.md](portfolio-protocol-20261027.md) | 完成 |
+| 确定性缺陷与 v3 基线 | [portfolio-determinism-20261027.md](portfolio-determinism-20261027.md) | 完成 |
+| P2 保留集 holdout-v1 | [portfolio-p2-holdout-20261027.md](portfolio-p2-holdout-20261027.md) | 完成（未运行） |
+| P2 预检阻塞 | [portfolio-p2-precheck-blocked-20261027.md](portfolio-p2-precheck-blocked-20261027.md) | 阻塞 |
+| P2 配对分析 | [portfolio-p2-analysis-20261027.md](portfolio-p2-analysis-20261027.md) | 完成 |
+| P2 盲审包 | [portfolio-p2-blind-package-20261027.md](portfolio-p2-blind-package-20261027.md) | 完成（替身演练） |
+| P2 链路演练 | [portfolio-p2-harness-drill-20261027.md](portfolio-p2-harness-drill-20261027.md) | 完成（非模型结果） |
+| P3 演示状态与异常片段 | [portfolio-p3-demo-status-20261027.md](portfolio-p3-demo-status-20261027.md) | 部分完成 |
+| P4 可复现交付 | [portfolio-p4-reproducible-delivery-20261027.md](portfolio-p4-reproducible-delivery-20261027.md) | 完成 |
+| P5 投递材料 | [portfolio-p5-materials-20261027.md](portfolio-p5-materials-20261027.md) | 完成 |
+
+未完成项只有一个原因：本机没有登记的本地模型端点与权重（`/v1/models` 不可达、无权重目录、未安装 `mlx_lm`，且没有可复现的上游来源），协议禁止换用其他模型顶替。恢复条件与执行顺序见 [P2 预检记录](portfolio-p2-precheck-blocked-20261027.md) 第 4 节。
