@@ -4,7 +4,7 @@
 - 对应计划：[collaboration-release-readiness-plan-20261027.md](collaboration-release-readiness-plan-20261027.md)。
 - 受检代码：`19bdb68`（分支 `codex/collaboration-first-release`），工作区干净；本文件为其后的文档提交，不改变受检代码。
 - 结论范围：R1/R2/R3 三组修复的回归、Python/前端工程门禁、含前端构建的私有发布候选与隔离实例验收。**M1（真实旧库迁移）与 U1（律所五身份人工验收）未执行**，原因见第 6 节。
-- **放行结论：阶段 B（G1）不通过。** 按计划第 9 节，必要检查存在未解决失败即停止该阶段放行；本次唯一未解决项是两项法条语料资产失败（第 3 节），须在使用指定语料版本的机器上复验后才能改判。
+- **放行结论：阶段 B（G1）不通过。** 本次已执行的 Python 3.12 离线测试中仅剩两项法条语料资产失败（第 3 节）；整个 G1 还缺 Python 3.11/3.14 矩阵、gitleaks 和容器交付检查。语料复验通过不自动代表 G1 全部放行，剩余项按[续行计划](collaboration-g1-to-acceptance-plan-20261027.md)执行或明确交付范围裁决。
 
 ## 1. 环境与工具
 
@@ -49,7 +49,7 @@ uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snaps
   --cov-report=term-missing --cov-report=xml:... --cov-report=json:... --cov-report=html:...
 ```
 
-结果：**1411 passed / 2 failed / 1 skipped / 287 subtests passed，耗时 211 s**；语句 13449、缺失 1534，分支 4260、部分覆盖 650，**总覆盖率 86.13%**（门槛 70%，未调整）。JUnit/XML/JSON/HTML 见 `output/collaboration-readiness/ci/`。
+结果：**1411 passed / 2 failed / 1 skipped / 287 subtests passed，耗时 211 s**；语句 13449、缺失 1534，分支 4260、部分覆盖 650，**综合覆盖率（含分支）86.13%**（门槛 70%，未调整），**纯分支覆盖率 78.36%**（3338 / 4260，缺失分支 922）。JUnit/XML/JSON/HTML 见 `output/collaboration-readiness/ci/`。以上为 Python 3.12 单版本结果，不代表 3.11/3.14 宿主矩阵完成。
 
 跳过与失败均逐项裁决：
 
@@ -92,6 +92,7 @@ uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snaps
 
 | 项 | 状态 | 前提 |
 |---|---|---|
+| Python 3.11/3.14 宿主矩阵 | 未执行 | 按当前 `test.yml` 在独立环境执行；M2 另用独立 Python 3.12 框架环境 |
 | M1 旧库副本迁移与恢复 | 未执行 | 需登记获准源目录、`user_version`、独立 checkpoint 路径、保管配置与停写窗口；本机不得直接打开业务库 |
 | U1 五身份与真实环境验收 | 未执行 | 需登记目标硬件、人数/并发、典型页数与流水量、模型 ID、OCR 类型、时延/错误率、恢复目标、业务复核人与交付接收人 |
 | A13 真实模型与扫描件 OCR | 未执行 | 本机无 Poppler/Tesseract/中文语言包，也没有授权模型服务 |
