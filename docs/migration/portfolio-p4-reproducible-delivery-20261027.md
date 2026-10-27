@@ -2,7 +2,7 @@
 
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 5.2 节；前置：[P0](portfolio-p0-scope-evidence-20261027.md)、[P1](portfolio-p1-ablation-driver-20261027.md)。
-- 结论：**源码路径复现成功**（离线依赖安装 + 隔离数据目录 + 离线 HTTP 合成验收 + 包内回归），仓库内全量离线检查为 **1389 passed / 2 既有资产失败 / 1 skip**。**Docker 与前端构建未验证，不声明可用。**
+- 结论：**源码路径复现成功**（离线依赖安装 + 隔离数据目录 + 离线 HTTP 合成验收 + 包内回归），仓库内全量离线检查为 **1397 passed / 2 既有资产失败 / 1 skip**。**Docker 与前端构建未验证，不声明可用。**
 
 ## 1. 打包身份
 

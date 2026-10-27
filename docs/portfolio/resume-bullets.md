@@ -20,7 +20,7 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 `prepare` 阶段冻结隔离合成库、检索上下文、规则专家发现与三组提示（不调用模型）；`run` 阶段只读冻结批次、复算提示摘要、每次尝试写入账本；失败、未尝试、规则拒答与未知用量分别统计，失败计入分母，预算超限显式失败且不截断。
 
 - 证据：`app/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../migration/portfolio-p1-ablation-driver-20261027.md)
-- 实测：60 题冻结提示长度 A 中位 855、B 7,568、C 9,719 字符；15 项回归覆盖变量隔离与 fail-closed 行为。
+- 实测：60 题冻结提示长度 A 中位 855、B 7,568、C 9,719 字符；三组对照 16 项、六案例保留集 6 项、恢复演示 4 项回归覆盖变量隔离、跨案例引用拒绝与 fail-closed 行为。
 
 **4. 从允许清单源码包在新目录完成可复现交付**
 433 个成员的清单摘要逐项核对一致；离线 `uv sync`、隔离数据目录启动、`delivery_smoke.py --mode offline` 走通两页合成材料的导入、问答定位到第 2 页、导出包与清单哈希核对；包内 46 项回归通过。
