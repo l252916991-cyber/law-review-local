@@ -1,6 +1,7 @@
 # 多人协作首版收尾：G1 工程检查与发布候选证据
 
 - 日期：2026-10-27（Asia/Shanghai）。
+- 本文件保留 `19bdb68` 的历史负结果；2026-10-28 新冻结资产及 `2b1e786` 的本地 G1 结论见[续行执行证据](collaboration-g1-execution-evidence-20261028.md)，不将新契约通过写成旧输入组合复现成功。
 - 对应计划：[collaboration-release-readiness-plan-20261027.md](collaboration-release-readiness-plan-20261027.md)。
 - 受检代码：`19bdb68`（分支 `codex/collaboration-first-release`），工作区干净；本文件为其后的文档提交，不改变受检代码。
 - 结论范围：R1/R2/R3 三组修复的回归、Python/前端工程门禁、含前端构建的私有发布候选与隔离实例验收。**M1（真实旧库迁移）与 U1（律所五身份人工验收）未执行**，原因见第 6 节。

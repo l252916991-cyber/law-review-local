@@ -6,7 +6,7 @@
 - 状态：**R1–R3 已实施并本地提交；G1 已完成本机 Python 3.12 及部分交付检查，阶段门禁未通过**：两项法条语料失败未解决，Python 3.11/3.14 矩阵、gitleaks 和容器交付仍待关闭。M1/U1 未执行（前提未登记）。证据见[执行证据](collaboration-release-readiness-evidence-20261027.md)。未推送、未合并、未升级正式库、未发布。
 - 目标：将已有协同阅卷首版收尾为一家律所内部可验收、可维护的交付版本。继续沿用单组织、单实例、SQLite、FastAPI 与 Next.js 静态界面。
 
-> 后续执行入口：[G1 放行、M1 迁移与 U1 验收续行计划书](collaboration-g1-to-acceptance-plan-20261027.md)。以下设计和原始基线保留，第 10 节记录已实施范围，剩余工作按续行计划推进。
+> 后续执行入口：[G1 放行、M1 迁移与 U1 验收续行计划书](collaboration-g1-to-acceptance-plan-20261027.md)。2026-10-28 的 G1 本地验收结论见[续行执行证据](collaboration-g1-execution-evidence-20261028.md)；本文件状态和第 10 节保留 2026-10-27 原受检版本记录。
 
 ## 1. 当前判断与范围
 
