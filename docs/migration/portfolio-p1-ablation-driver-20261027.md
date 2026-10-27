@@ -57,6 +57,7 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 | 硬上限 | 单次提示 48,000 字符；超过即 `budget_exceeded`，不发起调用、不截断 |
 | 输出上限 | 登记 900 token；与实际配置不符时拒绝开始 |
 | 失败分类 | `model_unavailable`、`timeout`、`transport_error`、`invalid_response`、`contract_failed`、`budget_exceeded`、`not_attempted`，逐条写入 `attempts.jsonl` |
+| 评分口径 | 通过/不通过按**模型原始回答**判定；C 的附录另行计 `final_score`，`appendix_changed_verdict` 只记录“附录会把不通过变成通过”的次数，不计为模型推理收益 |
 | 不重试 | 任一失败都不自动重发；异常类型与截断原因入账 |
 | 未知用量 | 端点未报 token 时写 `null` 并计入 `unknown_usage`，从不写 0 |
 | 分母 | `pass_rate_all_planned` 含全部计划尝试；`pass_rate_executed_ok` 单列，二者同时报告 |
@@ -76,7 +77,7 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 
 ## 6. 替身回归
 
-`uv run --locked python -m pytest tests/test_collaboration_ablation.py -q` → **15 passed**。
+`uv run --locked python -m pytest tests/test_collaboration_ablation.py -q` → **16 passed**。
 
 覆盖点：
 
@@ -91,8 +92,9 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 9. 失败尝试留在分母，`pass_rate_all_planned < pass_rate_executed_ok`。
 10. 未知用量为 `null` 且计入计数；已知用量正确累加。
 11. 轮换顺序确定且三组首位次数均衡。
+12. 附录不能抬高被评分的模型原始回答：`passed` 取原始评分，附录只另计 `final_score` 与 `appendix_changed_verdict`。
 
-相关既有回归：`tests/test_review_collaboration.py`、`test_answer_eval.py`、`test_answer_eval_v2.py`、`test_answer_judge.py`、`test_collaboration_acceptance.py`、`test_agents.py` 共 **102 passed / 39 subtests passed**。静态检查：`ruff check app tests scripts` 通过，`mypy` 54 个文件无问题。
+相关既有回归：`tests/test_review_collaboration.py`、`test_answer_eval.py`、`test_answer_eval_v2.py`、`test_answer_judge.py`、`test_collaboration_acceptance.py`、`test_agents.py` 共 **102 passed / 39 subtests passed**。静态检查：`ruff check app tests scripts` 通过，`mypy` 无问题（本批为 54 个文件，新增恢复演示脚本后为 55 个）。
 
 ## 7. 结论与限制
 

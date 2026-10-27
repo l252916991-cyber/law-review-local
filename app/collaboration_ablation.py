@@ -381,12 +381,15 @@ def _attempt(
         # product contract, so C withholds it and records why.
         return {**record, "outcome": "contract_failed", "passed": False, "appendix_withheld": True,
                 "final_answer": text, "detail": "模型原始回答未通过格式/来源/复核提醒校验"}
+    # The model's own words are scored separately from the deterministic
+    # appendix: otherwise a rule appendix could look like better reasoning.
+    raw_score = score_answer(dataset_item, text, citations=answer_citations(text, prepared["contexts"]))
     final = text + review_appendix(prepared["collaboration"]) if group == "C" else text
-    score = score_answer(
-        dataset_item, final, citations=answer_citations(final, prepared["contexts"]),
-    )
-    return {**record, "outcome": "ok", "passed": bool(score["passed"]), "final_answer": final,
-            "final_answer_sha256": digest(final), "appendix_withheld": False, "score": score}
+    final_score = score_answer(dataset_item, final, citations=answer_citations(final, prepared["contexts"]))
+    return {**record, "outcome": "ok", "passed": bool(raw_score["passed"]), "final_answer": final,
+            "final_answer_sha256": digest(final), "appendix_withheld": False,
+            "score": raw_score, "final_score": final_score,
+            "appendix_changed_verdict": bool(final_score["passed"] and not raw_score["passed"])}
 
 
 def _median(values: list[float]) -> float | None:
@@ -443,6 +446,8 @@ def summarise_attempts(rows: list[dict[str, Any]], dataset: dict[str, Any]) -> d
             "elapsed_p90_seconds": round(statistics.quantiles(latencies, n=10)[-1], 3)
             if len(latencies) >= 10 else None,
             "appendix_applied": sum(1 for row in ok if not row["appendix_withheld"]),
+            "appendix_changed_verdict": sum(1 for row in ok if row.get("appendix_changed_verdict")),
+            "final_passed_including_appendix": sum(1 for row in ok if row["final_score"]["passed"]),
             "by_category": _by_category(subset),
         }
     return results

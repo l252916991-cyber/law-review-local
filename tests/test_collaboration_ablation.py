@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
@@ -251,3 +252,26 @@ def test_group_summary_rejects_an_unknown_item(batch):
              "appendix_withheld": False}]
     with pytest.raises(KeyError):
         summarise_attempts(rows, dataset)
+
+
+def test_appendix_cannot_inflate_the_scored_model_answer(batch):
+    dataset, _, directory = batch
+    _, prepared = load_prepared(directory)
+    item = [record for record in prepared if record["id"] == "normal-01"][0]
+    # Point the required phrase at text that only the deterministic appendix can
+    # contain: a raw answer that omits it must still be scored as failed.
+    adjusted = deepcopy(dataset)
+    target = next(row for row in adjusted["items"] if row["id"] == "normal-01")
+    target["must_include"] = ["专家交叉核对"]
+    answer = "材料显示资金往来情况[资料1][资料2]。请律师复核原文与上述结论。"
+    run = directory.parent / "run-appendix-effect"
+    report = run_batch(adjusted, [item], run, generate=_stub(answer), model="stub-model", groups=["C"])
+    row = json.loads((run / "attempts.jsonl").read_text(encoding="utf-8").strip())
+    assert row["outcome"] == "ok"
+    assert row["passed"] is False and row["score"]["coverage"] == 0.0
+    assert row["final_score"]["coverage"] == 1.0 and row["final_score"]["passed"] is True
+    assert row["appendix_changed_verdict"] is True
+    summary = report["summary"]["C"]
+    assert summary["pass_rate_all_planned"] == 0.0
+    assert summary["final_passed_including_appendix"] == 1
+    assert summary["appendix_changed_verdict"] == 1
