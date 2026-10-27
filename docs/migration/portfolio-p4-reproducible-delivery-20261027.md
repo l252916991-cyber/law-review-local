@@ -102,11 +102,33 @@ pnpm --dir frontend test && pnpm --dir frontend build:static && pnpm --dir front
 
 说明：e2e 中关于流式回答的用例会触发“模型不可用”的告警日志，脚本按既有设计断言失败与回退路径，未声明模型可用。
 
+## 5.2 含前端构建的候选包与签发链路
+
+前端重建后按允许清单打包含构建产物的私有候选包，在新目录启动隔离实例并执行签发链路脚本：
+
+```sh
+uv run --locked python scripts/package_release.py --with-frontend \
+  --output output/portfolio-repro/lexvault-frontend-20261027.zip
+# 解压到新目录后，用隔离数据目录 + token 认证启动
+uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:18770 \
+  --admin-token <本次随机令牌> --output /tmp/release-smoke-fe
+```
+
+| 项 | 值 |
+|---|---|
+| 候选包 | `output/portfolio-repro/lexvault-frontend-20261027.zip`，SHA-256 `92156f13b32fbaa5f2cb3a88869b28ba4e801bb8e78f3ffc1baa1907c5378414` |
+| 成员 | 482 个文件（解压 483），逐成员摘要 0 不匹配，`frontend_build_included=true` |
+| 前端产物 | `frontend/out/index.html` 与 `build-info.json` 均在包内 |
+| 实例 | 端口 18770，隔离数据目录，`/api/health` 与 `/`（首页）均 200 |
+| 签发链路 | **passed**：静态首页 5,192 字节且带 CSP；管理员登录；建案与复核成员；上传合成文档；报告冻结为版本 #1（正文摘要 `a3ca25987280`）；复核律师“可批准不可编制”；正式下载绑定冻结版本（包摘要 `f17172a9f657`） |
+
+说明：该链路验证的是包、静态托管、权限、冻结与导出一致性；全程未配置模型，输出中的 `model_used=false` 属预期，不构成模型效果证据。
+
 ## 6. 限制与未覆盖
 
 | 项 | 状态 |
 |---|---|
-| Docker 构建与 Compose 启动 | **未验证**，不声明可用 |
+| Docker 构建与 Compose 启动 | **未验证**，不声明可用；源码包 + 前端构建路径已通过（5.1、5.2） |
 | 前端构建与浏览器流程 | **已验证**：`build:static` 与 22 项 e2e 通过（见 5.1）；产物在 `frontend/out`，不入 Git |
 | 模型模式（`--mode model`） | 未验证：本机无 LLM 端点，见 [P2 记录](portfolio-p2-precheck-blocked-20261027.md) |
 | Python 版本矩阵 | 全量检查在本机 3.12.13 执行；解压包内的安装与回归在 3.14.6 执行。3.11/3.14 的托管矩阵未跑 |

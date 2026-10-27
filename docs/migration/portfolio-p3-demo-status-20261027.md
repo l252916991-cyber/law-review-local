@@ -47,6 +47,19 @@ uv run --locked python scripts/demo_identity_report.py --output output/portfolio
 
 该报告即录制前的“身份基线”：正式录制时需在同一提交上重跑并保存新报告，与成片、服务日志和模型用量相互核对。模型探针为 `false` 时不得录制主演示。
 
+## 2.2 演示链路的可运行部分（无需模型）
+
+前端构建与候选包签发链路已在本机跑通，可直接作为演示中“界面/权限/冻结/导出”环节的证据：
+
+| 项 | 结果 |
+|---|---|
+| 前端构建 | `pnpm --dir frontend build:static` 通过；21 个资源，`build-info.json` 摘要 `20c9c0ed…c52b` |
+| 浏览器流程 | Playwright e2e **22 passed**（desktop + mobile） |
+| 候选包 | `lexvault-frontend-20261027.zip`（482 成员，0 摘要不符，含前端构建） |
+| 签发链路 | `release_smoke.py` **passed**：静态首页带 CSP、管理员登录、建案、上传、报告冻结版本、复核权限、下载绑定冻结正文 |
+
+仍缺的是“真实模型回答、专家交接后的候选分歧、模型不可用时的降级说明”这三段画面；它们必须在端点可用后录制，不能用固定答案替身顶替。
+
 ## 3. 未录制的主演示与录制条件
 
 | 演示项 | 现状 | 前提 |
