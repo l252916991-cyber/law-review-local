@@ -24,7 +24,7 @@ def write_json(path: Path, value: Any) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="三组账本配对分析")
-    parser.add_argument("--run", type=Path, required=True, help="含 attempts.jsonl 的批次目录")
+    parser.add_argument("--run", type=Path, help="含 attempts.jsonl 的批次目录；与 --attempts 二选一")
     parser.add_argument("--attempts", type=Path, help="直接指定 attempts.jsonl")
     parser.add_argument("--baseline", choices=GROUPS, default="A")
     parser.add_argument("--compare", choices=GROUPS, default="C")
@@ -33,7 +33,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    attempts = args.attempts or (args.run / "attempts.jsonl")
+    if args.attempts is None and args.run is None:
+        parser.error("需要 --run 或 --attempts 指向账本")
+    if args.attempts is not None:
+        attempts = args.attempts
+    else:
+        assert args.run is not None
+        attempts = args.run / "attempts.jsonl"
     if not attempts.is_file():
         print(f"找不到账本：{attempts}", file=sys.stderr)
         return EXIT_PROTOCOL

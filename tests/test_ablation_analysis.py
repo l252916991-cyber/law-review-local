@@ -189,3 +189,16 @@ def test_rule_degradation_note_and_mapping_are_explicit():
     assert any("规则降级" in note for note in report["notes"])
     assert report["outcomes"]["C"]["outcomes"] == {"model_unavailable": 1}
     assert report["summary"]["pass_rate_compare"] == 0.0
+
+
+def test_cli_accepts_attempts_without_a_run_directory(tmp_path):
+    attempts = tmp_path / "attempts.jsonl"
+    rows = [row("i1", "A", True), row("i1", "C", True)]
+    attempts.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    output = tmp_path / "report.json"
+    assert main(["--attempts", str(attempts), "--baseline", "A", "--compare", "C",
+                 "--iterations", "200", "--output", str(output)]) == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["paired"] == 1 and report["run"] is None
+    with pytest.raises(SystemExit):
+        main(["--baseline", "A", "--compare", "C", "--output", str(tmp_path / "none.json")])

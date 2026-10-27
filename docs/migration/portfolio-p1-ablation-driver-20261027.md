@@ -67,8 +67,8 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 
 | 项 | 值 |
 |---|---|
-| 目录 | `output/portfolio-ablation/dev-20261027`（私有产物，`.gitignore` 已排除） |
-| manifest SHA-256 | `0573d72d540f64558fe59d55fdfc57498bfe7bcf50da06bdcb305ce198dd36c2`（67,302 字节） |
+| 目录 | `output/portfolio-ablation/dev-20261027`（私有产物，`.gitignore` 已排除）。该批次生成于 `specialist-review-v2`，已被修复后的 `dev-a`/`dev-b` 取代，只作缺陷证据，不再用于对照 |
+| manifest SHA-256 | `0573d72d540f64558fe59d55fdfc57498bfe7bcf50da06bdcb305ce198dd36c2`（67,302 字节，v2 基线）；修复后两次独立进程的批次为 `5b45ee0c…4e6` 且互为复算证据 |
 | 题目 | 60 题；检索状态 59 `frozen` / 1 `no_context`（`injection-01`：产品路径在生成前拒答） |
 | 隔离库 | 14 页，来源摘要与数据集 `source_sha256` 相同 |
 | 提示长度（字符） | A 364–901（中位 855）；B 364–8,556（中位 7,568）；C 364–10,734（中位 9,719） |
