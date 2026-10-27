@@ -234,3 +234,39 @@ class EvaluationTest(IsolatedDatabaseTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GapOrderingTest(IsolatedDatabaseTestCase):
+    """A frozen batch must not change because a set's iteration order changed."""
+
+    @classmethod
+    def setUpClass(cls):
+        init_db(seed=False)
+
+    def test_single_source_gaps_keep_the_declared_type_order(self):
+        from app.agents import GapDetectionAgent
+
+        contexts = [
+            {"document_id": 1, "page_no": 1, "name": "合同.txt", "doc_type": "合同", "text": "合成合同", "quote": "合成合同"},
+            {"document_id": 2, "page_no": 1, "name": "流水.txt", "doc_type": "银行流水", "text": "合成流水", "quote": "合成流水"},
+            {"document_id": 3, "page_no": 1, "name": "笔录.txt", "doc_type": "询问笔录", "text": "合成笔录", "quote": "合成笔录"},
+        ]
+        gaps = GapDetectionAgent(1).run("合成问题", contexts)["gaps"]
+        single = [gap["description"] for gap in gaps if gap["type"] == "单一来源"]
+        assert single == [
+            "询问笔录仅有一份，可能需要其他证据印证",
+            "银行流水仅有一份，可能需要其他证据印证",
+            "合同仅有一份，可能需要其他证据印证",
+        ], single
+
+    def test_reversed_context_order_does_not_change_single_source_gaps(self):
+        from app.agents import GapDetectionAgent
+
+        contexts = [
+            {"document_id": 1, "page_no": 1, "name": "合同.txt", "doc_type": "合同", "text": "合成合同", "quote": "合成合同"},
+            {"document_id": 2, "page_no": 1, "name": "流水.txt", "doc_type": "银行流水", "text": "合成流水", "quote": "合成流水"},
+            {"document_id": 3, "page_no": 1, "name": "笔录.txt", "doc_type": "询问笔录", "text": "合成笔录", "quote": "合成笔录"},
+        ]
+        forward = [g["description"] for g in GapDetectionAgent(1).run("合成问题", contexts)["gaps"]]
+        backward = [g["description"] for g in GapDetectionAgent(1).run("合成问题", list(reversed(contexts)))["gaps"]]
+        assert forward == backward

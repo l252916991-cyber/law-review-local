@@ -2,7 +2,7 @@
 
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 3、4 节；前置：[P0 范围与证据冻结](portfolio-p0-scope-evidence-20261027.md)。
-- 实施起点：`3c1a197`。本批次只增加隔离实验适配层与回归，未改动 `services.py`、`agents.py`、`review_collaboration.py` 等受摘要门禁保护的既有算法文件，native 对照基线仍为 `specialist-review-v2`。
+- 实施起点：`3c1a197`。本批次只增加隔离实验适配层与回归，未改动 `services.py`、`agents.py`、`review_collaboration.py` 等受摘要门禁保护的既有算法文件，native 对照基线仍为 `specialist-review-v2`（其后因专家发现顺序缺陷修复重登记为 `specialist-review-v3`，见[可复现性修正](portfolio-determinism-20261027.md)）。
 
 ## 1. 本批交付
 
@@ -100,4 +100,4 @@ uv run --locked python scripts/run_collaboration_ablation.py --mode run \
 
 - P1 退出标准“替身回归能验证三组只在规定变量上不同，来源和安全检查保持一致”已满足；驱动可复用现有采集/计量组件并按批冻结。
 - **替身回归不是模型效果证据**：本节所有通过项只说明流程按设计执行，不说明回答质量。真实模型对照（P2）因资源不可用而未开始，见 P0 第 4 节。
-- 已知未覆盖：保留集 24 题尚未编制；盲审三组配对与多案件输入尚未适配；框架子进程与原生/LangGraph 一致性未在本次新增驱动中重跑（未改动其代码路径）。
+- 已知未覆盖：保留集 24 题在编制时尚未存在（其后已冻结，见 [holdout 记录](portfolio-p2-holdout-20261027.md)）；盲审三组配对与多案件输入尚未适配；框架子进程与原生/LangGraph 一致性未在本次新增驱动中重跑（未改动其代码路径）。

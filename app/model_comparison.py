@@ -25,7 +25,7 @@ from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_i
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "c63abf953bf10f6f025c2ff22e5819247590e58a"
-NATIVE_BASELINE_REVISION = "specialist-review-v2"
+NATIVE_BASELINE_REVISION = "specialist-review-v3"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below confirms
@@ -35,9 +35,12 @@ NATIVE_BASELINE_REVIEW = (
     "188a342 报告批准绑定材料快照；f2d4bfd 交付包改为读取冻结正文并移出渲染代码。"
     "PROMPT_VERSION、LOCAL_PROMPT_VERSION、POLICY_VERSION 与消息/检索路径均未改动，"
     "因此对照算法未漂移，仅整文件摘要需要按本次评审重新登记。"
+    "2026-10-27（specialist-review-v3）：疏漏专家的单一来源检测改为按固定顺序遍历关键证据类型。"
+    "原先使用集合，迭代顺序随进程哈希种子变化，使同一冻结输入的专家发现顺序、审校附录与提示摘要不稳定；"
+    "本次只固定顺序，检测条件、检索、提示模板与回答契约均未改动，旧 v2 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "6ae41ec65c7bc174c7ee9bfb7ab98c63e739f1a6fa0862b1ed016b6e7d6ae55a",
+    "agents.py": "4dd5451bf26fd2df89efe077e0471e687fadee9200c27b89d875d7298b77aa2c",
     "review_collaboration.py": "512c03d6719bddfd98d422c7cb65e46c26331b8aab7ab56b40e651a4a07d632a",
     "agent_tools.py": "2af80bdaa3e1277de96a4127e2fd9bbabbb906b1213a94e6beb43a54d28dfb34",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",

@@ -19,6 +19,8 @@
 | `model_domain.py` | `f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc` |
 | `statutory_retrieval.py` | `d9d2f60c01ac03f405ca4e1da593ff049a32cd6e072d3fa4bcb98f8be4b9fbe8` |
 
+> 2026-10-27 后续：`agents.py` 因专家发现顺序缺陷修复而改动，native 基线重登记为 `specialist-review-v3`（见[可复现性修正](portfolio-determinism-20261027.md)）。本表保留为 P0 当时核对的快照，六个未改动的算法文件摘要仍然有效。
+
 提示、策略与评分身份（本次冻结值）：
 
 | 项 | 值 |

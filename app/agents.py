@@ -569,8 +569,9 @@ class GapDetectionAgent:
             doc_type = item.get("doc_type", "其他材料")
             type_counts[doc_type] += 1
 
-        # 关键证据类型只有一份时提示
-        critical_types = {"询问笔录", "银行流水", "合同"}
+        # 关键证据类型只有一份时提示。顺序固定为元组：集合的迭代顺序随进程
+        # 哈希种子变化，会让同一批冻结输入的专家发现与提示摘要不稳定。
+        critical_types = ("询问笔录", "银行流水", "合同")
         for doc_type in critical_types:
             if doc_type in type_counts and type_counts[doc_type] == 1:
                 gaps.append({
