@@ -275,3 +275,22 @@ def test_appendix_cannot_inflate_the_scored_model_answer(batch):
     assert summary["pass_rate_all_planned"] == 0.0
     assert summary["final_passed_including_appendix"] == 1
     assert summary["appendix_changed_verdict"] == 1
+
+
+def test_live_generator_targets_the_probed_endpoint_explicitly():
+    from unittest.mock import patch
+
+    from app.collaboration_ablation import live_generator
+
+    captured = {}
+
+    def fake_call(question, route, contexts, **kwargs):
+        captured.update(kwargs)
+        return "合成回答[资料1]。请律师复核原文与上述结论。"
+
+    with patch("app.services.call_local_llm", side_effect=fake_call):
+        generated = live_generator("stub-chat", 30, "http://127.0.0.1:18000/v1")(
+            "问题", "事实检索", [], "")
+    assert captured["base_url_override"] == "http://127.0.0.1:18000/v1"
+    assert captured["model_override"] == "stub-chat"
+    assert generated.text.startswith("合成回答")

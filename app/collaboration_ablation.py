@@ -533,13 +533,19 @@ def prepare_batch(
     from .model_comparison import native_baseline_identity
     from .services import PROMPT_VERSION
 
-    output = output.absolute()
-    output.mkdir(parents=True, mode=0o700)  # refuse an existing run; never resend it implicitly
-    (output / "items").mkdir(mode=0o700)
+    # Validate the selection before touching the filesystem: an unknown id must
+    # not leave a half-created batch directory behind.
     selected = set(item_ids) if item_ids else None
+    if selected is not None:
+        unknown = sorted(selected - {item["id"] for item in dataset["items"]})
+        if unknown:
+            raise ValueError(f"未知题目 id：{unknown[:3]}")
     items = [item for item in dataset["items"] if selected is None or item["id"] in selected]
     if not items:
         raise ValueError("选中的题目为空")
+    output = output.absolute()
+    output.mkdir(parents=True, mode=0o700)  # refuse an existing run; never resend it implicitly
+    (output / "items").mkdir(mode=0o700)
     prepared = []
     dataset_items = {item["id"]: item for item in items}
     with isolated_case(dataset, output / "case" / "law_review.db") as case:
@@ -619,12 +625,17 @@ def precheck(endpoint: str | None, model: str | None) -> dict[str, Any]:
             "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 
 
-def live_generator(model: str, timeout: int) -> Generator:
-    """The product chat call, with the group note in the registered slot."""
+def live_generator(model: str, timeout: int, endpoint: str | None = None) -> Generator:
+    """The product chat call, with the group note in the registered slot.
+
+    ``endpoint`` lets a drill or a second host target the probed endpoint instead
+    of the process default; the product's own loopback/egress checks still apply.
+    """
     from .services import call_local_llm, last_llm_usage
 
     def generate(question: str, route: str, contexts: list[dict[str, Any]], note: str) -> Generation:
-        text = call_local_llm(question, route, contexts, timeout=timeout, model_override=model, object_note=note)
+        text = call_local_llm(question, route, contexts, timeout=timeout, model_override=model,
+                              object_note=note, base_url_override=endpoint)
         return Generation(text=text, usage=last_llm_usage(), model=model)
 
     return generate

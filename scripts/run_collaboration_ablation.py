@@ -130,7 +130,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_PROTOCOL
     resolved_model = str(probe["model"])
     report = run_batch(
-        dataset, prepared, run_output, generate=live_generator(resolved_model, args.timeout),
+        dataset, prepared, run_output,
+        generate=live_generator(resolved_model, args.timeout, probe["endpoint"]),
         model=resolved_model, groups=args.groups, repeats=args.repeats,
         max_prompt_chars=args.max_prompt_chars, max_output_tokens=args.max_output_tokens,
         timeout=args.timeout, precheck_payload=probe,

@@ -98,3 +98,10 @@ def test_holdout_attempt_is_scored_by_its_own_case_item(tmp_path):
     assert row["outcome"] == "ok" and row["passed"] is True
     assert row["score"]["coverage"] == 1.0
     assert report["summary"]["A"]["planned_attempts"] == 1
+
+
+def test_prepare_rejects_an_unknown_item_id_instead_of_silently_dropping_it(tmp_path):
+    dataset = load_batch_dataset(DIRECTORY / "dataset.json")
+    with pytest.raises(ValueError, match="未知题目 id"):
+        prepare_batch(dataset, tmp_path / "batch", item_ids=["A-normal-01", "C-insufficient-01"])
+    assert not (tmp_path / "batch").exists()
