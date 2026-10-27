@@ -23,6 +23,29 @@
 - 复现入口已写入[录屏手册](../runbook/demo-recording.md)的“恢复校验片段（关闭模型，可离线复现）”一节。
 - 回归：`tests/test_recovery_demo_script.py` 4 项通过（复用、拒用、缺参数、目录不可复用）。
 
+## 2.1 录制前身份核对（已可执行）
+
+`scripts/demo_identity_report.py` 在不启动模型与服务的前提下记录 P3 清单要求的身份，输出排他创建、不含案件正文：
+
+```sh
+uv run --locked python scripts/demo_identity_report.py --output output/portfolio-demo/identity-YYYYMMDD.json
+```
+
+2026-10-27 首次生成（`output/portfolio-demo/identity-20261027.json`，SHA-256 `1e2705aee5bdbc8520bcf93600ad8aeb440e243462b3994b0a6dae592a703958`）实测：
+
+| 项 | 值 |
+|---|---|
+| 提交 / 分支 | `68139aae8e01b69e34cc3e287c74992ab0b94fab` / `codex/agent-portfolio-plan` |
+| 工作区 | `dirty=true`，仅 `tmp_eq/`（与本任务无关的本地草稿目录） |
+| 加载的后端入口 | `app/main.py` 的实际解析路径，随报告记录 |
+| 后端文件摘要 | 7 个文件逐个 SHA-256（`main/services/agents/review_collaboration/collaboration_ablation/ablation_analysis/answer_eval`） |
+| 提示与策略版本 | `chat-system-v4-multiturn-untrusted-history`、`candidate-answerability-v11-detail`、`answer-judge-v2-frozen-sources` |
+| 模型探针 | `available=false`，端点 `http://127.0.0.1:8000/v1`，模型 `Qwen3.6-35B-A3B-OptiQ-4bit` |
+| 前端构建绑定 | 存在：21 个资源，`build-info.json` 摘要 `f2b022b176d78835cc98eee86fccd031832137811a19422db684d5e7e464f4c6` |
+| 数据集 | 开发集 60 题 / 14 页（`b912f4ca…`）；保留集 24 题 / 24 页（`66265fdb…`） |
+
+该报告即录制前的“身份基线”：正式录制时需在同一提交上重跑并保存新报告，与成片、服务日志和模型用量相互核对。模型探针为 `false` 时不得录制主演示。
+
 ## 3. 未录制的主演示与录制条件
 
 | 演示项 | 现状 | 前提 |
