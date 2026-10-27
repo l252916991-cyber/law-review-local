@@ -85,6 +85,16 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 11、e2e 22、静态构建通过；含前端的候选包签发链路 passed |
 | 未执行 | Docker、模型模式、Redis 队列导入 |
 
+## 4.2 三组对照实测（Qwen3.8-27B）
+
+| 数据集 | A | B | C | 相对 A 的配对差 |
+|---|---|---|---|---|
+| 开发集（单案 60 题 × 1 轮） | 86.67% | 76.67% | 86.67% | B −10.0 pp / C 0.0 pp |
+| 保留集（6 案 24 题 × 3 轮） | 90.28% | 88.89% | 87.50% | B −1.39 pp / C −2.78 pp |
+
+成本：B/C 输入 token 为 A 的 4.9–6.4 倍，耗时中位 1.4–1.7 倍；保留集 6 案例重采样区间跨 0。
+结论：协作机制未观察到质量收益，成本显著更高；详见[开发集](../migration/portfolio-p2-dev-results-20261027.md)与[保留集](../migration/portfolio-p2-holdout-results-20261028.md)记录。
+
 ## 5. 证据索引
 
 | 主题 | 文件 |
