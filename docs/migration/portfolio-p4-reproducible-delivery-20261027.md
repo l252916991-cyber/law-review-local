@@ -135,6 +135,21 @@ uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:1877
 
 说明：该链路验证的是包、静态托管、权限、冻结与导出一致性；全程未配置模型，输出中的 `model_used=false` 属预期，不构成模型效果证据。
 
+## 5.3 最终候选包（含前端，最终提交）
+
+在代码冻结后重建并完整复验一次，作为交付身份的最终记录：
+
+| 项 | 值 |
+|---|---|
+| 归档 | `output/portfolio-repro/lexvault-final-20261027.zip`，SHA-256 `dcc3dcf2cb2179b44a09da9245858dc7c607d5a4b6cd01fd8d5a32c0eac90807` |
+| 成员 | 483 个文件（解压 484），逐成员摘要 0 不匹配，`frontend_build_included=true` |
+| 包内安装 | `uv sync --locked --no-dev --offline` 与 `--group dev` 均通过；`compileall` 通过 |
+| 包内回归 | **178 passed**（含 4 个依赖 Node 的 JS 用例文件与新增分析/盲审/可满足性回归） |
+| 离线合成验收 | `delivery_smoke.py --mode offline` 通过：`cited_page=2`、导出摘要 `88957a22…9523` |
+| 签发链路 | `release_smoke.py` **passed**：静态首页 5,192 字节带 CSP、管理员登录、建案、上传、报告冻结版本（正文摘要 `d81dadc3ef91`）、复核权限、下载绑定冻结正文（包摘要 `7a565da7348b`） |
+
+该包与当前提交的 `app/`、`scripts/`、`tests/`、`benchmarks/` 逐字节相同；`frontend/out` 为本地构建产物，不入 Git，其摘要由 `build-info.json` 单独绑定。
+
 ## 6. 限制与未覆盖
 
 | 项 | 状态 |
