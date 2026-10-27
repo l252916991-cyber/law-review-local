@@ -85,6 +85,15 @@ uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snaps
 ## 5.1 前端门禁（本轮补齐）
 
 ```sh
+# 工具链装在仓库外，避免把 node_modules 或 SDK 带进发布包
+curl -fsSL -o /tmp/node.tar.xz https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz
+mkdir -p "$HOME/.local/node" && tar -xf /tmp/node.tar.xz -C "$HOME/.local/node"
+export PATH="$HOME/.local/node/node-v24.22.1-darwin-arm64/bin:$PATH"
+export PATH="$HOME/.local/npm-global/bin:$PATH"
+npm config set prefix "$HOME/.local/npm-global" && npm i -g pnpm@11.25.0
+```
+
+```sh
 export PATH="$HOME/.local/node/node-v24.22.1-darwin-arm64/bin:$HOME/.local/npm-global/bin:$PATH"
 for f in app/static/*.js; do node --check "$f"; done
 pnpm --dir frontend contract:check && pnpm --dir frontend typecheck && pnpm --dir frontend lint
