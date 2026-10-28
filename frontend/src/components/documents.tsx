@@ -5,6 +5,14 @@ import { id, object, text, message, type Row } from "@/lib/data";
 import { ErrorBox, Fields, Modal, Empty, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
 
+const batchStatusLabels: Record<string, string> = {
+  queued: "等待导入",
+  processing: "正在导入",
+  completed: "导入完成",
+  completed_with_errors: "导入完成（部分失败）",
+  failed: "导入失败",
+};
+
 export function Documents({
   caseId,
   preview,
@@ -200,7 +208,7 @@ function BatchImport({
         );
         if (controller.signal.aborted) return;
         setProgress(result);
-        if (["completed", "failed", "partial"].includes(text(result.status)))
+        if (["completed", "completed_with_errors", "failed"].includes(text(result.status)))
           completed();
         else timer = setTimeout(() => void poll(), 1500);
       } catch (e) {
@@ -254,7 +262,7 @@ function BatchImport({
       {progress && (
         <div role="status">
           <p>
-            {text(progress.status)} · {text(progress.processed_files)}/
+            {batchStatusLabels[text(progress.status)] || text(progress.status)} · {text(progress.processed_files)}/
             {text(progress.total_files)} 个文件
           </p>
           <progress max={100} value={Number(progress.progress_percent) || 0} />
