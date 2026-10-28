@@ -947,6 +947,14 @@ def correct_page_text(document_id: int, page_no: int, payload: PageTextUpdate):
     changed = False
     new_version = document["version"]
     with transaction() as conn:
+        # Serialize the version check with the page/evidence writes. Two
+        # requests can both have read the same document before entering here.
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute("SELECT version FROM documents WHERE id = ?", (document_id,)).fetchone()
+        if current is None:
+            raise HTTPException(404, "文件不存在")
+        if current["version"] != document["version"]:
+            raise HTTPException(409, "材料已被他人修改，请刷新后重试")
         page = conn.execute(
             "SELECT id, text FROM pages WHERE document_id = ? AND page_no = ?", (document_id, page_no)
         ).fetchone()
@@ -955,8 +963,13 @@ def correct_page_text(document_id: int, page_no: int, payload: PageTextUpdate):
         if page["text"] != payload.text:
             changed = True
             new_version = document["version"] + 1
+            cursor = conn.execute(
+                "UPDATE documents SET version = version + 1, updated_at = ? WHERE id = ? AND version = ?",
+                (ts, document_id, document["version"]),
+            )
+            if cursor.rowcount != 1:
+                raise HTTPException(409, "材料已被他人修改，请刷新后重试")
             conn.execute("UPDATE pages SET text = ? WHERE id = ?", (payload.text, page["id"]))
-            conn.execute("UPDATE documents SET version = version + 1, updated_at = ? WHERE id = ?", (ts, document_id))
             record_field_changes(
                 conn, case_id=document["case_id"], action="纠错原文",
                 target=f"材料#{document_id}《{document['name']}》第{page_no}页", actor=actor_name(),
