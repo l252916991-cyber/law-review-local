@@ -11,15 +11,47 @@ from contextlib import ExitStack, closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 FORMAT = "lexvault-offline-snapshot-v1"
 DB_NAME = "law_review.db"
 CHECKPOINT_NAME = "langgraph_checkpoints.sqlite"
+MODEL_SETTINGS_NAME = "model_settings.json"
 PATH_TABLES = ("documents", "batch_import_files")
 # Every mutable directory a restore must carry. A new artifact kind belongs here,
 # otherwise a restored instance would silently lose approved report bodies.
 ARTIFACT_DIRS = ("uploads", "exports", "report_versions")
+
+
+def validate_model_settings(path: Path) -> None:
+    """Carry only the two non-secret operator overrides, never arbitrary config."""
+    def unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        settings = dict(pairs)
+        if len(settings) != len(pairs):
+            raise ValueError("Duplicate model_settings.json field")
+        return settings
+
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 8192:
+        raise ValueError("Expected a regular, bounded model_settings.json")
+    try:
+        settings = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_fields)
+    except (OSError, ValueError) as exc:
+        raise ValueError("Invalid model_settings.json") from exc
+    if not isinstance(settings, dict) or set(settings) != {"base_url", "model"}:
+        raise ValueError("model_settings.json must contain only base_url and model")
+    for field, limit in (("base_url", 500), ("model", 200)):
+        value = settings[field]
+        if not isinstance(value, str) or not 1 <= len(value.strip()) <= limit or any(ord(char) < 32 for char in value):
+            raise ValueError("Invalid model_settings.json field")
+    try:
+        endpoint = urlsplit(settings["base_url"].strip())
+        endpoint.port  # Validate the port without contacting the endpoint.
+        if (endpoint.scheme not in {"http", "https"} or not endpoint.hostname
+                or endpoint.username is not None or endpoint.password is not None or endpoint.query or endpoint.fragment):
+            raise ValueError("Model endpoint must not contain credentials or query parameters")
+    except ValueError as exc:
+        raise ValueError("Invalid model_settings.json endpoint") from exc
 
 
 def digest(path: Path) -> str:
@@ -142,6 +174,10 @@ def backup(source: Path, destination: Path, *, checkpoint: Path | None = None, q
     databases = {DB_NAME: source / DB_NAME}
     if checkpoint.exists():
         databases[CHECKPOINT_NAME] = checkpoint
+    model_settings = source / MODEL_SETTINGS_NAME
+    has_model_settings = model_settings.exists() or model_settings.is_symlink()
+    if has_model_settings:
+        validate_model_settings(model_settings)
     with ExitStack() as stack:
         connections = {name: stack.enter_context(closing(read_database(path))) for name, path in databases.items()}
         business = connections[DB_NAME]
@@ -162,6 +198,8 @@ def backup(source: Path, destination: Path, *, checkpoint: Path | None = None, q
         for directory in ARTIFACT_DIRS:
             if (source / directory).exists():
                 shutil.copytree(source / directory, destination / directory, symlinks=True)
+        if has_model_settings:
+            shutil.copy2(model_settings, destination / MODEL_SETTINGS_NAME, follow_symlinks=False)
         if inventory(source, ignore_sqlite_locks=True) != before or any(
             connection.execute("PRAGMA data_version").fetchone()[0] != versions[name]
             for name, connection in connections.items()
@@ -175,6 +213,7 @@ def backup(source: Path, destination: Path, *, checkpoint: Path | None = None, q
         "checkpoint_original": str(checkpoint) if CHECKPOINT_NAME in databases else None,
         "quiescent_operator_confirmed": True,
         "redis_included": False,
+        "model_settings_included": has_model_settings,
         "relocations": relocations,
         "files": [
             {"path": name, "size": (destination / name).stat().st_size, "sha256": digest(destination / name)}
@@ -208,6 +247,15 @@ def verify(snapshot: Path) -> dict[str, Any]:
             raise ValueError(f"Snapshot checksum mismatch: {relative}")
     if names != set(actual) - {"manifest.json"} or DB_NAME not in names:
         raise ValueError("Snapshot file set differs from manifest")
+    # v1 snapshots predating this field remain readable; absence is explicit in
+    # the restore report so operators know defaults need deployment verification.
+    if "model_settings_included" in manifest and (
+        not isinstance(manifest["model_settings_included"], bool)
+        or manifest["model_settings_included"] != (MODEL_SETTINGS_NAME in names)
+    ):
+        raise ValueError("Snapshot model settings metadata mismatch")
+    if MODEL_SETTINGS_NAME in names:
+        validate_model_settings(snapshot / MODEL_SETTINGS_NAME)
     for name in (DB_NAME, CHECKPOINT_NAME):
         if name in names:
             with closing(read_database(snapshot / name)) as database:
@@ -248,7 +296,9 @@ def restore(snapshot: Path, destination: Path) -> dict[str, Any]:
         database.commit()
         check_integrity(database)
     report = {"snapshot": str(snapshot), "data_dir": str(destination), "relocated_paths": len(manifest["relocations"]),
-              "checkpoint_env": str(destination / CHECKPOINT_NAME) if manifest["checkpoint_original"] else ""}
+              "checkpoint_env": str(destination / CHECKPOINT_NAME) if manifest["checkpoint_original"] else "",
+              "model_settings": "restored" if (destination / MODEL_SETTINGS_NAME).is_file()
+                                else "absent_verify_deployment_defaults"}
     (destination / "RESTORE_REPORT.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (destination / "RESTORE_INCOMPLETE").unlink()
     return report

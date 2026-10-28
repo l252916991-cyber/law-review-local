@@ -146,6 +146,72 @@ class SnapshotTests(unittest.TestCase):
         backup(self.source, self.snapshot, checkpoint=external, quiescent=True)
         self.assertTrue((self.snapshot / "langgraph_checkpoints.sqlite").is_file())
 
+    def test_model_override_is_restored_without_copying_other_settings(self) -> None:
+        from app.config import LLMConfig
+        from app.db import db_scope
+
+        settings = self.source / "model_settings.json"
+        settings.write_text(json.dumps({"base_url": "http://127.0.0.1:12345/v1", "model": "synthetic-validated-model"}))
+        settings.chmod(0o600)
+        (self.source / ".env").write_text("SYNTHETIC_SECRET=never-backup")
+        manifest = backup(self.source, self.snapshot, quiescent=True)
+        target = self.root / "restored"
+        report = restore(self.snapshot, target)
+        self.assertTrue(manifest["model_settings_included"])
+        self.assertEqual(report["model_settings"], "restored")
+        self.assertEqual((target / "model_settings.json").read_bytes(), settings.read_bytes())
+        self.assertEqual((target / "model_settings.json").stat().st_mode & 0o777, 0o600)
+        self.assertFalse((target / ".env").exists())
+        with db_scope(target / "law_review.db"):
+            restored = LLMConfig.load()
+        self.assertEqual((restored.base_url, restored.model), ("http://127.0.0.1:12345/v1", "synthetic-validated-model"))
+
+    def test_invalid_or_secret_model_settings_are_rejected(self) -> None:
+        invalid = ["broken JSON", "{}", "[]", '{"model":"first","model":"second","base_url":"http://localhost/v1"}',
+                   json.dumps({"base_url": "http://localhost/v1", "model": ""}),
+                   json.dumps({"base_url": "http://localhost/v1", "model": "model", "api_key": "synthetic"}),
+                   json.dumps({"base_url": "http://synthetic:secret@localhost/v1", "model": "model"}),
+                   json.dumps({"base_url": "http://localhost/v1?api_key=synthetic", "model": "model"})]
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                (self.source / "model_settings.json").write_text(payload)
+                with self.assertRaisesRegex(ValueError, "model_settings"):
+                    backup(self.source, self.snapshot, quiescent=True)
+                self.assertFalse(self.snapshot.exists())
+
+    def test_model_settings_symlink_is_rejected(self) -> None:
+        external = self.root / "external-model-settings.json"
+        external.write_text('{"base_url":"http://localhost/v1","model":"synthetic"}')
+        (self.source / "model_settings.json").symlink_to(external)
+        with self.assertRaisesRegex(ValueError, "model_settings"):
+            backup(self.source, self.snapshot, quiescent=True)
+        self.assertFalse(self.snapshot.exists())
+
+    def test_legacy_snapshot_restores_and_reports_model_settings_absent(self) -> None:
+        backup(self.source, self.snapshot, quiescent=True)
+        manifest_path = self.snapshot / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest.pop("model_settings_included")
+        manifest_path.write_text(json.dumps(manifest))
+        verify(self.snapshot)
+        report = restore(self.snapshot, self.root / "restored")
+        self.assertEqual(report["model_settings"], "absent_verify_deployment_defaults")
+
+    def test_invalid_model_settings_in_snapshot_rejected_before_restore(self) -> None:
+        (self.source / "model_settings.json").write_text('{"base_url":"http://localhost/v1","model":"synthetic"}')
+        backup(self.source, self.snapshot, quiescent=True)
+        settings = self.snapshot / "model_settings.json"
+        settings.write_text("{}")
+        manifest_path = self.snapshot / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        entry = next(item for item in manifest["files"] if item["path"] == "model_settings.json")
+        entry.update(size=settings.stat().st_size, sha256=digest(settings))
+        manifest_path.write_text(json.dumps(manifest))
+        target = self.root / "restored"
+        with self.assertRaisesRegex(ValueError, "model_settings"):
+            restore(self.snapshot, target)
+        self.assertFalse(target.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
