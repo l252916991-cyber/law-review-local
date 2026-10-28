@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, jsonBody } from "@/lib/api";
+import { ApiError, api, jsonBody } from "@/lib/api";
 import { id, message, object, strings, text, type Row } from "@/lib/data";
 import { Empty, ErrorBox, list, useData } from "./ui";
 
@@ -29,24 +29,29 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
     manager = Boolean(identity.admin) || (permissions.includes("edit") && role === "owner"),
     reviewer = Boolean(identity.admin) || (permissions.includes("approve") && ["owner", "reviewer"].includes(role)),
     canWork = Boolean(identity.admin) || permissions.includes("edit"),
-    members = useData(manager ? `/api/cases/${caseId}/members` : null);
+    members = useData(manager ? `/api/cases/${caseId}/task-assignees` : null);
   const body = tasks.data ? object(tasks.data) : {},
     items = list(body.tasks),
     counts = body.counts ? object(body.counts) : {},
-    candidates = list(members.data ? object(members.data).candidates : null).concat(
-      list(members.data ? object(members.data).assignments : null),
-    ),
+    candidates = list(members.data ? object(members.data).assignees : null),
     memberId = Number(identity.member_id) || null;
 
   async function act(task: Row, action: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
     setError("");
     try {
-      await api(`/api/tasks/${id(task.id)}`, jsonBody({ action, ...extra }, "PATCH"));
+      await api(
+        `/api/tasks/${id(task.id)}`,
+        jsonBody({ action, ...extra, expected_version: Number(task.version) }, "PATCH"),
+      );
       setNotice("");
       tasks.reload();
     } catch (e) {
       setError(message(e));
+      if (e instanceof ApiError && e.status === 409) {
+        tasks.reload();
+        members.reload();
+      }
     } finally {
       setBusy(false);
     }
@@ -111,6 +116,7 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
               tasks.reload();
             } catch (e) {
               setError(message(e));
+              if (e instanceof ApiError && e.status === 409) members.reload();
             } finally {
               setBusy(false);
             }
@@ -140,6 +146,7 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
                   </option>
                 ))}
               </select>
+              <small>仅显示可查看并编辑本案的启用成员；请先在案件分工中授权。</small>
             </label>
             <label>
               期限

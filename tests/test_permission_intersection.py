@@ -212,11 +212,11 @@ class TaskPermissionTest(PermissionIntersectionCase):
             self.client.patch(f"/api/tasks/{task['id']}", headers=headers, json={"action": "submit"}).status_code,
             200,
         )
+        second = self.create_task(assignee_id=member["id"])
         revoked = self.client.patch(
             f"/api/members/{member['id']}", headers=self.admin, json={"permissions": ["view"]}
         )
         self.assertEqual(revoked.status_code, 200, revoked.text)
-        second = self.create_task(assignee_id=member["id"])
         denied = self.client.patch(f"/api/tasks/{second['id']}", headers=headers, json={"action": "start"})
         self.assertEqual(denied.status_code, 403, denied.text)
         payload = self.client.get(f"/api/cases/{self.case_a}/tasks", headers=headers).json()
@@ -225,9 +225,12 @@ class TaskPermissionTest(PermissionIntersectionCase):
 
     def test_only_approver_can_return_or_complete(self):
         member, token = self.member("复核律师", "reviewer", ["view", "approve"])
-        task = self.create_task(assignee_id=member["id"])
-        self.client.patch(f"/api/tasks/{task['id']}", headers=self.admin, json={"action": "assign",
-                                                                             "assignee_member_id": member["id"]})
+        task = self.create_task()
+        invalid_assignment = self.client.patch(
+            f"/api/tasks/{task['id']}", headers=self.admin,
+            json={"action": "assign", "assignee_member_id": member["id"]},
+        )
+        self.assertEqual(invalid_assignment.status_code, 409, invalid_assignment.text)
         submitted = self.client.patch(
             f"/api/tasks/{task['id']}", headers=self.headers(token), json={"action": "start"}
         )
