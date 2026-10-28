@@ -3,6 +3,7 @@
 - 日期：2026-10-28（Asia/Shanghai）。
 - 前置：[G1 本地验收](collaboration-g1-execution-evidence-20261028.md)已完成，候选代码 `2b1e786`，目标 schema 26。
 - 状态：**已完成路径候选核对及执行准备，尚未开始真实库备份、迁移或停写**。需数据维护者登记源库身份和停写窗口后执行。
+- 后续范围（2026-10-28）：用户将本轮优先目标明确为求职展示，已完成[合成 schema 16→26 演练](collaboration-m1-synthetic-demo-20261028.md)及[复现入口](../runbook/migration-demo.md)。本执行单继续保留为将来的真实库操作步骤，合成演练不计为真实 M1 完成。
 
 ## 已核对事实
 

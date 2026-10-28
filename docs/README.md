@@ -9,6 +9,7 @@
 - [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：当前下一步执行入口；G1 本地验证已完成，继续登记 M1 副本迁移及 U1 律所验收参数。
 - [2026-10-28 G1 续行执行证据](migration/collaboration-g1-execution-evidence-20261028.md)：新冻结法条、双版本完整检查、gitleaks、指定基础镜像容器、真实队列/OCR 及含前端候选包。
 - [2026-10-28 M1 源库登记与执行单](migration/collaboration-m1-preparation-20261028.md)：已核对的候选路径、私有登记表及停写后副本演练步骤；真实库操作尚未开始。
+- [求职展示：合成迁移与恢复](runbook/migration-demo.md)：复现命令、工程取舍与五分钟讲解顺序；[2026-10-28 实测记录](migration/collaboration-m1-synthetic-demo-20261028.md)覆盖 schema 16→26、checkpoint、双身份签发及二次恢复交付。
 - [2026-10-28 法条恢复与冻结输入](benchmarks/collaboration-corpus-recovery-20261028.md)：五份官方历史文本、71 份独立资产契约及旧基准未复现的边界。
 - [多人协作部署与运行验收](runbook/collaboration-acceptance.md)：验收脚本、备份恢复演练、五个身份的人工验收、离职撤权与监控建议。
 - [AI 应用升级计划](migration/ai-application-upgrade-plan-20261024.md)：A01–A13 工作包、验收口径与未实施原因。
