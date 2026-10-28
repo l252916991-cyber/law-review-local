@@ -14,10 +14,47 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.package_release import source_files
+from scripts.migration_demo import package_contents, run as migration_demo
 from scripts.setup_models import inspect_model, pinned_download
 
 
 class EngineeringToolTests(unittest.TestCase):
+    def test_migration_demo_never_reuses_existing_data(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            marker = target / "law_review.db"
+            marker.write_bytes(b"existing synthetic database")
+            with patch("scripts.migration_demo.subprocess.check_output") as execute:
+                with self.assertRaisesRegex(ValueError, "new directory"):
+                    migration_demo(target)
+                execute.assert_not_called()
+            self.assertEqual(marker.read_bytes(), b"existing synthetic database")
+            self.assertEqual(list(target.iterdir()), [marker])
+
+    def test_migration_delivery_checks_identity_and_detects_corrupt_members(self) -> None:
+        def fixture(*, tampered: bool = False, artifact: bool = False) -> bytes:
+            stream = io.BytesIO()
+            item = {"archive_name": "正文.txt", "sha256": hashlib.sha256(b"synthetic").hexdigest()}
+            manifest = {"finalized": True, "report": {"id": 7, "content_hash": "body", "frozen_version_id": 9},
+                        "frozen": {"content_hash": "body", "version_id": 9},
+                        "files": [] if artifact else [item], "artifacts": [item] if artifact else []}
+            with zipfile.ZipFile(stream, "w") as archive:
+                archive.writestr("清单.json", json.dumps(manifest))
+                archive.writestr("正文.txt", b"corrupt" if tampered else b"synthetic")
+            return stream.getvalue()
+
+        for artifact in (False, True):
+            with self.subTest(artifact=artifact):
+                self.assertEqual(package_contents(fixture(artifact=artifact), 7, "body", 9),
+                                 {"正文.txt": hashlib.sha256(b"synthetic").hexdigest()})
+                with self.assertRaisesRegex(ValueError, "digest mismatch"):
+                    package_contents(fixture(tampered=True, artifact=artifact), 7, "body", 9)
+        for report, content_hash, version, error in ((8, "body", 9, "report mismatch"),
+                                                    (7, "different", 9, "content hash mismatch"),
+                                                    (7, "body", 10, "version mismatch")):
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                package_contents(fixture(), report, content_hash, version)
+
     def test_release_excludes_private_files_and_backups(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
