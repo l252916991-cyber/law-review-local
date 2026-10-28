@@ -11,12 +11,21 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
+from arq import Retry
+from arq.connections import ArqRedis
+from arq.constants import in_progress_key_prefix, job_key_prefix, result_key_prefix
+from fakeredis import FakeServer
+from fakeredis.aioredis import FakeRedis
 
 from app.config import config
 from app.db import connect, db_scope, now, transaction
 from app.main import app
 from app import tasks
 from app.services import index_upload
+
+
+class FakeArqRedis(FakeRedis, ArqRedis):
+    """Exercise arq's actual WATCH-based enqueue against in-memory Redis."""
 
 
 class QueueContractTests(unittest.TestCase):
@@ -30,6 +39,14 @@ class QueueContractTests(unittest.TestCase):
         self.pool_patch = patch("app.main.get_redis_pool", AsyncMock(return_value=self.pool))
         self.pool_patch.start()
         self.addCleanup(self.pool_patch.stop)
+        self.queue_server = FakeServer()
+
+        async def queue_pool():
+            return FakeArqRedis(server=self.queue_server)
+
+        self.queue_pool_patch = patch("app.tasks.get_redis_pool", queue_pool)
+        self.queue_pool_patch.start()
+        self.addCleanup(self.queue_pool_patch.stop)
         self.client_context = TestClient(app)
         self.client = self.client_context.__enter__()
         self.addCleanup(self.client_context.__exit__, None, None, None)
@@ -189,14 +206,93 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(dispatch["state"], "pending")
         self.assertEqual(dispatch["attempts"], 1)
 
-        # A batch already owned by a worker is never re-enqueued.
+        # A batch with arq's live worker marker is never re-enqueued.
         with transaction() as conn:
             conn.execute("UPDATE batch_imports SET status='processing' WHERE id=?", (batch_id,))
             conn.execute("UPDATE batch_dispatch SET state='pending', updated_at=?", (now(),))
+
+        async def mark_running():
+            pool = FakeArqRedis(server=self.queue_server)
+            await pool.set(in_progress_key_prefix + f"batch-import-{batch_id}", b"1", ex=60)
+            await pool.aclose()
+
+        asyncio.run(mark_running())
         redispatched = AsyncMock(return_value="job")
         with patch("app.tasks.enqueue_batch_import", redispatched):
             self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
         redispatched.assert_not_awaited()
+
+    def test_confirmed_dispatch_lost_from_redis_recovers_queued_and_processing_batches(self):
+        for status in ("queued", "processing"):
+            with self.subTest(status=status):
+                batch_id, files = self._stage_batch(1)
+                with transaction() as conn:
+                    conn.execute("UPDATE batch_imports SET status=? WHERE id=?", (status, batch_id))
+                    if status == "processing":
+                        conn.execute("UPDATE batch_import_files SET status='processing' WHERE batch_id=?", (batch_id,))
+                self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 1)
+
+                async def inspect_queue():
+                    pool = FakeArqRedis(server=self.queue_server)
+                    try:
+                        self.assertIsNotNone(await pool.zscore(config.redis.queue_name, f"batch-import-{batch_id}"))
+                        self.assertTrue(await pool.exists(job_key_prefix + f"batch-import-{batch_id}"))
+                    finally:
+                        await pool.aclose()
+
+                asyncio.run(inspect_queue())
+                self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
+                result = asyncio.run(tasks.process_batch_import({}, batch_id, self.case_id, files))
+                self.assertEqual(result["successful"], 1)
+                self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
+
+    def test_recovery_clears_stale_result_or_orphaned_payload_and_is_concurrent_idempotent(self):
+        batch_id, _ = self._stage_batch(1)
+
+        async def run():
+            pool = FakeArqRedis(server=self.queue_server)
+            try:
+                await pool.set(job_key_prefix + f"batch-import-{batch_id}", b"orphaned payload")
+                await pool.set(result_key_prefix + f"batch-import-{batch_id}", b"old failed result")
+                results = await asyncio.gather(tasks.reconcile_batch_dispatches(), tasks.reconcile_batch_dispatches())
+                self.assertEqual(sum(results), 1)
+                self.assertEqual(await pool.zcard(config.redis.queue_name), 1)
+                self.assertFalse(await pool.exists(result_key_prefix + f"batch-import-{batch_id}"))
+                self.assertNotEqual(await pool.get(job_key_prefix + f"batch-import-{batch_id}"), b"orphaned payload")
+            finally:
+                await pool.aclose()
+
+        asyncio.run(run())
+
+    def test_live_native_thread_is_not_replayed_when_redis_marker_is_lost(self):
+        batch_id, files = self._stage_batch(1)
+        started, release = threading.Event(), threading.Event()
+        calls = []
+
+        def slow_index(*args, **kwargs):
+            calls.append(kwargs["import_key"])
+            started.set()
+            if not release.wait(3):
+                raise TimeoutError("test thread was not released")
+            return index_upload(*args, **kwargs)
+
+        async def run():
+            work = asyncio.create_task(tasks.process_batch_import({}, batch_id, self.case_id, files))
+            try:
+                while not started.is_set():
+                    await asyncio.sleep(0.001)
+                # The in-memory Redis is empty, simulating loss during a live import.
+                self.assertEqual(await tasks.reconcile_batch_dispatches(), 0)
+                with self.assertRaises(Retry):
+                    await tasks.process_batch_import({}, batch_id, self.case_id, files)
+            finally:
+                release.set()
+                result = await work
+            self.assertEqual(result["successful"], 1)
+
+        with patch("app.tasks.index_upload", slow_index):
+            asyncio.run(run())
+        self.assertEqual(len(calls), 1)
 
     def test_lost_queue_ack_preserves_files_owned_by_worker(self):
         async def accepted_but_lost_ack(batch_id, case_id, files):
@@ -256,6 +352,7 @@ class QueueContractTests(unittest.TestCase):
                                 import_key=f"batch:{batch_id}:{item['file_key']}")
         with transaction() as conn:
             conn.execute("UPDATE batch_import_files SET status='processing' WHERE batch_id=?", (batch_id,))
+        self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 1)
         result = asyncio.run(tasks.process_batch_import({}, batch_id, self.case_id, files))
         self.assertEqual(result["successful"], 1)
         with closing(connect()) as conn:

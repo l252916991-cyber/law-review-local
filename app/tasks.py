@@ -3,20 +3,47 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
 import logging
+import os
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
-from arq import create_pool
+from arq import Retry, create_pool, cron
 from arq.connections import ArqRedis, RedisSettings
+from arq.constants import in_progress_key_prefix, job_key_prefix, result_key_prefix, retry_key_prefix
+from redis.exceptions import WatchError
 
 from .config import config
-from .db import init_db, now, transaction
+from .db import get_db_path, init_db, now, transaction
 from .services import index_upload, upload_error_message
 
 logger = logging.getLogger(__name__)
 TERMINAL_BATCH_STATES = {"completed", "completed_with_errors", "failed"}
+
+
+@contextmanager
+def batch_ownership(batch_id: int) -> Iterator[bool]:
+    """Protect an active native indexing thread even if Redis loses its locks.
+
+    This deployment shares one local filesystem. Never unlink the lock file:
+    separate inodes would allow two owners after a restart.
+    """
+    if batch_id <= 0:
+        raise ValueError("Invalid batch ID")
+    path = get_db_path().parent / f".batch-import-{batch_id}.lock"
+    descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+        else:
+            yield True
+    finally:
+        os.close(descriptor)
 
 
 async def get_redis_pool() -> ArqRedis:
@@ -80,6 +107,17 @@ def _index_staged_file(batch_id: int, case_id: int, item: dict[str, Any]) -> dic
 
 
 async def process_batch_import(
+    ctx: dict[str, Any], batch_id: int, case_id: int, files: list[dict[str, Any]],
+) -> dict[str, Any]:
+    with batch_ownership(batch_id) as owned:
+        if not owned:
+            # A reconciler may have just queued this job while still publishing
+            # its dispatch record, or an old thread survived Redis data loss.
+            raise Retry(defer=1)
+        return await _process_batch_import(ctx, batch_id, case_id, files)
+
+
+async def _process_batch_import(
     ctx: dict[str, Any], batch_id: int, case_id: int, files: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Resume only unfinished files; document import keys close commit/replay gaps."""
@@ -157,17 +195,16 @@ async def process_batch_import(
 async def worker_startup(ctx: dict[str, Any]) -> None:
     init_db(seed=False)
     ctx["indexing_semaphore"] = asyncio.Semaphore(max(1, config.indexing_concurrency))
-    # The worker owns a live Redis connection, so it can discharge batches whose
-    # enqueue outcome was never confirmed (crash between commit and enqueue).
+    # Repair both unconfirmed dispatches and confirmed jobs lost from Redis.
     await reconcile_batch_dispatches()
 
 
-def _load_pending_dispatches() -> list[dict[str, Any]]:
+def _load_unfinished_dispatches() -> list[dict[str, Any]]:
     with transaction() as conn:
         return [dict(row) for row in conn.execute(
             """SELECT d.batch_id, d.case_id, d.attempts
                FROM batch_dispatch d JOIN batch_imports b ON b.id = d.batch_id
-               WHERE d.state = 'pending' AND b.status = 'queued'
+               WHERE b.status IN ('queued','processing')
                ORDER BY d.batch_id"""
         ).fetchall()]
 
@@ -180,44 +217,83 @@ def _dispatch_files(batch_id: int) -> list[dict[str, Any]]:
         ).fetchall()]
 
 
-def _mark_dispatched(batch_id: int, *, success: bool) -> None:
+def _mark_dispatched(batch_id: int, *, success: bool, attempted: bool = True) -> None:
     with transaction() as conn:
         state = "discharged" if success else "pending"
         conn.execute(
-            "UPDATE batch_dispatch SET state=?, attempts=attempts+1, updated_at=? WHERE batch_id=?",
-            (state, now(), batch_id),
+            "UPDATE batch_dispatch SET state=?, attempts=attempts+?, updated_at=? WHERE batch_id=?",
+            (state, int(attempted), now(), batch_id),
         )
 
 
-async def reconcile_batch_dispatches() -> int:
-    """Re-enqueue registered batches with unconfirmed enqueue outcomes.
+async def _repair_batch_queue(batch_id: int, case_id: int, files: list[dict[str, Any]]) -> bool:
+    """Repair an absent job only after checking arq's live queue/worker markers."""
+    pool = await get_redis_pool()
+    job_id = f"batch-import-{batch_id}"
+    job_key, running_key = job_key_prefix + job_id, in_progress_key_prefix + job_id
+    result_key = result_key_prefix + job_id
+    try:
+        # WATCH prevents deleting a payload claimed/enqueued by arq between the
+        # status check and cleanup. Filesystem ownership also serializes our
+        # reconcilers and protects threads whose Redis marker disappeared.
+        async with pool.pipeline(transaction=True) as pipe:
+            await pipe.watch(job_key, running_key, result_key, config.redis.queue_name)
+            if await pipe.exists(running_key):
+                return False
+            if await pipe.zscore(config.redis.queue_name, job_id) is not None and await pipe.exists(job_key):
+                return False
+            pipe.multi()
+            pipe.delete(job_key, result_key, retry_key_prefix + job_id)
+            pipe.zrem(config.redis.queue_name, job_id)
+            await pipe.execute()
+        await enqueue_batch_import(batch_id, case_id, files)
+        return True
+    finally:
+        try:
+            await pool.aclose()
+        except Exception:
+            logger.exception("Could not close batch reconciliation Redis pool")
 
-    Deterministic job IDs make this at-least-once: arq deduplicates a still
-    queued job, and process_batch_import resumes only unfinished files.
+
+async def reconcile_batch_dispatches(ctx: dict[str, Any] | None = None) -> int:
+    """Re-enqueue nonterminal batches missing from Redis without replaying live work.
+
+    SQLite manifests are authoritative after Redis loss. Local ownership,
+    Redis WATCH and deterministic arq IDs cover concurrent startup/repair;
+    import keys make recovery after a committed document idempotent.
     """
     dispatched = 0
-    for entry in _load_pending_dispatches():
+    for entry in _load_unfinished_dispatches():
         batch_id = entry["batch_id"]
-        files = _dispatch_files(batch_id)
-        if not files:
-            # A queued batch without staged files cannot be processed; keep it
-            # pending so the state stays visible instead of vanishing silently.
-            logger.warning("Batch %s has no staged files; dispatch stays pending", batch_id)
-            continue
-        try:
-            await enqueue_batch_import(batch_id, entry["case_id"], files)
-        except Exception as exc:
-            logger.warning("Batch %s re-dispatch failed (%s)", batch_id, type(exc).__name__)
-            _mark_dispatched(batch_id, success=False)
-            continue
-        _mark_dispatched(batch_id, success=True)
-        dispatched += 1
+        with batch_ownership(batch_id) as owned:
+            if not owned:
+                continue
+            with transaction() as conn:
+                row = conn.execute("SELECT status FROM batch_imports WHERE id=?", (batch_id,)).fetchone()
+                if not row or row["status"] not in {"queued", "processing"}:
+                    continue
+            files = _dispatch_files(batch_id)
+            if not files:
+                logger.warning("Batch %s has no staged files; dispatch stays pending", batch_id)
+                continue
+            try:
+                repaired = await _repair_batch_queue(batch_id, entry["case_id"], files)
+            except WatchError:
+                # A live queue transition won the race; reconsider next cycle.
+                continue
+            except Exception as exc:
+                logger.warning("Batch %s re-dispatch failed (%s)", batch_id, type(exc).__name__)
+                _mark_dispatched(batch_id, success=False)
+                continue
+            _mark_dispatched(batch_id, success=True, attempted=repaired)
+            dispatched += int(repaired)
     return dispatched
 
 
 class WorkerSettings:
     functions = [process_batch_import]
     on_startup = worker_startup
+    cron_jobs = [cron(reconcile_batch_dispatches, second={0, 15, 30, 45})]
     redis_settings = RedisSettings.from_dsn(config.redis.url)
     job_timeout = config.redis.job_timeout
     max_jobs = config.redis.max_jobs

@@ -73,7 +73,7 @@ token 模式的 `LAW_REVIEW_API_TOKENS_JSON` 是“随机 token → principal �
 2. 模拟原环境不可用：清空 `LAW_REVIEW_DATA_DIR` 指向的新目录，将快照恢复到该目录，并确认恢复工具的路径重定位输出。
 3. 用恢复后的目录启动服务（`LAW_REVIEW_AUTH_MODE=local`、指向空 Redis 或跳过批量导入），验证：案件列表可读、文档原文可下载、证据与确认状态完整、清单哈希与快照清单一致。
 4. 故障注入核查：`PRAGMA integrity_check` 与外键检查在恢复副本上执行；缺失文件应被恢复工具标记而非静默跳过。
-5. Redis 恢复另测：Redis 丢库后，已登记批量导入按 outbox 在下一次启动重派；中断的阅卷任务保持 interrupted 并可从 checkpoint 恢复。
+5. Redis 恢复另测：Redis 丢库后，Web/worker 启动及 worker 每 15 秒巡检会核对 SQLite 中 queued/processing 批次的实际队列记录，重派丢失的任务（包括先前已确认入队的批次），保留已提交材料和逐文件进度；Redis 执行标记或本地批次锁仍存活时不重放。批次锁文件不可手工删除；故障后应让原 worker 退出或完成写入，再等执行标记过期及下轮巡检。此机制要求单实例共用本地数据目录，不支持 NFS/跨主机 worker。中断的阅卷任务保持 interrupted，并在有效 checkpoint 存在时恢复。
 6. 填写演练记录：快照耗时、恢复耗时、校验结果、发现的问题；两次演练之间至少一次使用与生产相同的部署方式（容器化部署后用 compose 卷恢复）。
 
 边界：当前快照要求停写，不含 Redis 数据与 `.env` 密钥；异地副本加密与 RPO/RTO 目标需按组织制度另行确定，见企业化报告 E18。
