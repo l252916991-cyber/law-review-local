@@ -295,6 +295,21 @@ class FrozenIntegrityTest(FrozenDeliveryCase):
         blocked = self.client.get(f"/api/cases/{case_id}/export?final=true&report_id={report['id']}")
         self.assertEqual(blocked.status_code, 400)
 
+    def test_hash_only_sheet_matches_rendered_bytes_at_chunk_boundaries(self):
+        from app.report_delivery import transaction_sheet
+
+        for count in (0, 500, 620):
+            with self.subTest(count=count):
+                case_id = self.create_case()
+                self._transaction_rows(case_id, count=count)
+                rendered = transaction_sheet(case_id)
+                hashed = transaction_sheet(case_id, include_text=False)
+                self.assertNotIn("text", hashed)
+                self.assertEqual(hashed["count"], count)
+                self.assertEqual(hashed["sha256"], sha256(rendered["text"].encode("utf-8")))
+                self.assertEqual(hashed["sha256"], rendered["sha256"])
+                self.assertEqual(hashed["currencies"], rendered["currencies"])
+
     def test_missing_attachment_blocks_freeze_and_delivery(self):
         case_id = self.create_case()
         document = self.upload(case_id)
@@ -389,6 +404,60 @@ class FrozenIntegrityTest(FrozenDeliveryCase):
 
 
 class FrozenConcurrencyTest(FrozenDeliveryCase):
+    def test_basis_changes_during_packaging_refuse_delivery_registration(self):
+        from app import report_delivery
+
+        original = report_delivery._write_package
+        for change in ("evidence", "page", "transactions"):
+            with self.subTest(change=change):
+                case_id = self.create_case()
+                evidence = self.evidence(case_id)
+                document = self.upload(case_id)
+                report = self.report(case_id)
+                self.assertEqual(self.act(report["id"], "submit").status_code, 200)
+                self.assertEqual(self.act(report["id"], "approve").status_code, 200)
+
+                def race(*args, **kwargs):
+                    package_sha = original(*args, **kwargs)
+                    # A distinct connection commits after source validation and
+                    # ZIP assembly, before the final delivery transaction.
+                    with transaction() as conn:
+                        if change == "evidence":
+                            conn.execute(
+                                "UPDATE evidence SET fact='并发更正的待证事实', version=version+1 WHERE id=?",
+                                (evidence["id"],),
+                            )
+                        elif change == "page":
+                            conn.execute(
+                                "UPDATE pages SET text='并发更正的卷宗原文' WHERE document_id=? AND page_no=1",
+                                (document["id"],),
+                            )
+                            conn.execute("UPDATE documents SET version=version+1 WHERE id=?", (document["id"],))
+                        else:
+                            conn.execute(
+                                "INSERT INTO bank_transactions(case_id, source_row_number, account, direction, "
+                                "amount_minor, currency, transaction_time, counterparty, memo, parser_version, "
+                                "row_fingerprint, created_at) "
+                                "VALUES (?,2,'合成账户','inflow',1200,'CNY','2026-01-02','合成对手','并发新增',"
+                                "'test','race-new',?)",
+                                (case_id, now()),
+                            )
+                    return package_sha
+
+                with patch.object(report_delivery, "_write_package", side_effect=race):
+                    refused = self.client.get(f"/api/cases/{case_id}/export?final=true&report_id={report['id']}")
+                self.assertEqual(refused.status_code, 400, refused.text)
+                self.assertIn("导出期间已变化", refused.text)
+                self.assertIn("已拒绝本次交付", refused.text)
+                listed = self.client.get(f"/api/cases/{case_id}/reports").json()
+                self.assertTrue(listed["reports"][0]["stale"])
+                self.assertFalse(listed["deliverable"])
+                with closing(connect()) as conn:
+                    rows = conn.execute(
+                        "SELECT COUNT(*) FROM audit_log WHERE case_id=? AND action='正式交付登记'", (case_id,),
+                    ).fetchone()[0]
+                self.assertEqual(rows, 0)
+
     def test_state_change_during_export_is_refused_at_registration(self):
         case_id = self.create_case()
         self.evidence(case_id)
