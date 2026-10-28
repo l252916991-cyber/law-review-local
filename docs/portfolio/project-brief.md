@@ -95,7 +95,7 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 成本：B/C 输入 token 为 A 的 4.9–6.4 倍，耗时中位 1.4–1.7 倍；保留集 6 案例重采样区间跨 0。
 结论：协作机制未观察到质量收益，成本显著更高；详见[开发集](../migration/portfolio-p2-dev-results-20261027.md)与[保留集](../migration/portfolio-p2-holdout-results-20261028.md)记录。
 
-Judge 交叉检查（同模型、开发集 60 题 × 3 组）：三组均为 57/60，与规则一致率 43–51/60；空答案被判通过，说明 Judge 只可作观察辅助，主口径仍用确定性 v2（[记录](../migration/portfolio-p2-judge-results-20261028.md)）。
+Judge 交叉检查（同模型、开发集 60 题 × 3 组）：开发集三组均为 57/60（与规则一致 43–51/60），保留集 A/B 22/24、C 14/24 后中断；空答案被判通过，说明 Judge 只可作观察辅助，主口径仍用确定性 v2（[记录](../migration/portfolio-p2-judge-results-20261028.md)）。
 
 ## 5. 证据索引
 
