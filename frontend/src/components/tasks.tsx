@@ -5,6 +5,20 @@ import { id, message, object, strings, text, type Row } from "@/lib/data";
 import { Empty, ErrorBox, list, useData } from "./ui";
 
 const KINDS = ["阅卷", "核证", "补证", "复核", "归档", "其他"];
+const ACTION_LABELS: Record<string, string> = {
+  create: "创建任务",
+  start: "开始处理",
+  submit: "提交复核",
+  return: "退回",
+  complete: "确认完成",
+  cancel: "取消",
+  assign: "调整负责人",
+  due: "调整期限",
+};
+
+function actionLabel(action: unknown) {
+  return ACTION_LABELS[text(action)] || text(action);
+}
 
 function flag(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
@@ -14,7 +28,7 @@ function lastEventText(task: Row) {
   const events = list(task.events);
   if (!events.length) return "";
   const last = events[events.length - 1];
-  return ` · ${text(last.actor)} ${text(last.action)}`;
+  return ` · ${text(last.actor)} ${actionLabel(last.action)}`;
 }
 
 export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Row }) {
@@ -164,6 +178,8 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
       )}
       <div className="card">
         {items.map((task) => {
+          const events = list(task.events);
+          const lastReturn = [...events].reverse().find((event) => text(event.action) === "return");
           const assignedToMe = memberId !== null && Number(task.assignee_member_id) === memberId;
           const open = ["待处理", "进行中", "待复核"].includes(text(task.status));
           const canManage = flag(task.can_manage, manager);
@@ -171,7 +187,7 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
           const canWorkTask = flag(task.can_work, canWork && (assignedToMe || manager));
           return (
             <article className="row" key={id(task.id)}>
-              <span>
+              <div>
                 <strong>{text(task.title)}</strong>
                 <small>
                   {text(task.kind)} · {text(task.assignee_name) || "未指派"}
@@ -183,7 +199,26 @@ export function ReviewTasks({ caseId, identity }: { caseId: number; identity: Ro
                   {task.overdue ? "（已逾期）" : ""}
                   {lastEventText(task)}
                 </small>
-              </span>
+                {lastReturn && text(lastReturn.note) ? (
+                  <p className="audit-note">最近退回说明：{text(lastReturn.note)}</p>
+                ) : null}
+                {events.length > 0 ? (
+                  <details>
+                    <summary>流转记录（{events.length}）</summary>
+                    <ol>
+                      {events.map((event, index) => (
+                        <li key={index}>
+                          <strong>{actionLabel(event.action)}</strong> · {text(event.actor)}
+                          <small>
+                            {text(event.created_at)} · {text(event.from) || "新建"} → {text(event.to)}
+                          </small>
+                          {text(event.note) ? <p className="audit-note">{text(event.note)}</p> : null}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ) : null}
+              </div>
               <span>
                 {task.overdue ? <span className="badge">逾期</span> : null}
                 <span className="badge">{text(task.status_label)}</span>

@@ -71,3 +71,62 @@ test('stale task action sends its read version, reports conflict and refreshes',
   expect(retried.status()).toBe(200);
   await expect(row).toContainText('已取消');
 });
+
+test('assistant can read reviewer return reasons and retain their full history after restarting', async ({ page, browser }, info) => {
+  await login(page);
+  const suffix = `${info.project.name}-${Date.now()}`;
+  const created = await page.request.post('/api/cases', { data: { title: `任务退回说明验收 ${suffix}` } });
+  expect(created.status()).toBe(201);
+  const caseRow = await created.json();
+  const assistantResponse = await page.request.post('/api/members', { data: {
+    name: `补证助理 ${suffix}`, permissions: ['view', 'edit'], assignments: [{ case_id: caseRow.id, role: 'assistant' }],
+  } });
+  expect(assistantResponse.status()).toBe(201);
+  const assistant = await assistantResponse.json();
+  const reviewerResponse = await page.request.post('/api/members', { data: {
+    name: `独立复核 ${suffix}`, permissions: ['view', 'approve'], assignments: [{ case_id: caseRow.id, role: 'reviewer' }],
+  } });
+  expect(reviewerResponse.status()).toBe(201);
+  const reviewer = await reviewerResponse.json();
+  const createdTask = await page.request.post(`/api/cases/${caseRow.id}/tasks`, { data: {
+    title: `补证需看退回原因 ${suffix}`, assignee_member_id: assistant.member.id,
+  } });
+  expect(createdTask.status()).toBe(201);
+  const task = (await createdTask.json()).task;
+  const assistantContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+  const reviewerContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+  try {
+    const worker = await assistantContext.newPage();
+    await worker.goto('/');
+    await worker.getByLabel('访问令牌').fill(assistant.token);
+    await worker.getByRole('button', { name: '登录工作空间', exact: true }).click();
+    await expect(worker.getByRole('navigation', { name: '案件列表' })).toBeVisible();
+    await worker.goto(`/?case=${caseRow.id}&view=tasks`);
+    const row = worker.locator('article.row').filter({ hasText: task.title });
+    await row.getByRole('button', { name: '开始', exact: true }).click();
+    await expect(row).toContainText('进行中');
+    await row.getByRole('button', { name: '提交复核', exact: true }).click();
+    await expect(row).toContainText('待复核');
+    expect((await reviewerContext.request.post('/api/auth/session', { data: { token: reviewer.token } })).status()).toBe(200);
+    const reason = '签字页不清楚，请补拍完整签字及日期';
+    const returned = await reviewerContext.request.patch(`/api/tasks/${task.id}`, { data: { action: 'return', note: reason } });
+    expect(returned.status()).toBe(200);
+    await worker.reload();
+    await expect(row).toContainText(`最近退回说明：${reason}`);
+    const history = row.locator('details');
+    await history.locator('summary').click();
+    await expect(history.locator('li')).toHaveCount(4);
+    await expect(history.getByText(reason, { exact: true })).toBeVisible();
+    await expect(history).toContainText(reviewer.member.name);
+    await row.getByRole('button', { name: '开始', exact: true }).click();
+    await expect(row).toContainText('进行中');
+    await expect(history.locator('li')).toHaveCount(5);
+    await expect(history.getByText(reason, { exact: true })).toBeVisible();
+    await expect(history).toContainText('提交复核');
+    await expect(row).toContainText(`最近退回说明：${reason}`);
+    await worker.screenshot({ path: info.outputPath('assistant-task-return-history.png'), fullPage: true });
+  } finally {
+    await assistantContext.close();
+    await reviewerContext.close();
+  }
+});
