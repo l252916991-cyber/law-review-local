@@ -1936,6 +1936,7 @@ def resume_agent_run(run_id: int):
 def model_operation_error(exc: Exception, fallback: str) -> HTTPException:
     code = str(exc).split(":", 1)[0]
     messages = {
+        "model_unavailable_or_invalid": "生成模型暂不可用或返回内容未通过校验，请检查本地模型服务、可用内存及模型配置后重试。",
         "embedding_model_unavailable": "嵌入模型不可用，请检查本地模型服务及嵌入模型配置后重试。",
         "rerank_model_unavailable": "重排模型不可用，请检查本地模型服务及重排模型配置后重试。",
         "embedding_backend_changed_during_index": "嵌入模型在索引期间发生变化，请确认模型配置后重新构建索引。",
