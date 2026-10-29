@@ -1,0 +1,344 @@
+{
+  "format": "lexvault-local-model-acceptance-v1",
+  "frozen_at": "2026-10-29T02:14:27+0800",
+  "scope": "current Mac / five synthetic identities / technical pilot, not a contractual SLA or legal accuracy benchmark",
+  "model_ids": {
+    "llm": "Qwen3.8-27B-oQ4e-mtp",
+    "embedding": "Qwen3-Embedding-4B-4bit-DWQ",
+    "reranker": "bge-reranker-v2-m3-mlx"
+  },
+  "thresholds": {
+    "fixed_fact_accuracy": 1.0,
+    "reference_existence": 1.0,
+    "required_fact_support": 1.0,
+    "missing_without_invention": 1.0,
+    "conflict_disclosed": 1.0,
+    "unexpected_failure_rate": 0.0,
+    "llm_p95_seconds": 90.0,
+    "minimum_actual_llm_answers": 10
+  },
+  "concurrency": {
+    "llm_edit_identities": 3,
+    "concurrent_read_identities": 2,
+    "maximum_concurrent_llm_calls": 3
+  },
+  "warmup_excluded_from_quality_and_latency": true,
+  "fixtures": {
+    "contract": {
+      "name": "模型验收合成借款合同.txt",
+      "pages": [
+        "合成技术验收材料。借款合同编号HT-2026-071，签订日期2026年3月18日。出借方甲公司，借款方乙公司。借款本金人民币128000元。",
+        "借款合同HT-2026-071约定到期日为2026年9月30日。支付分两笔：第一笔48000元，第二笔80000元。本合同未约定保证人或担保责任。"
+      ]
+    },
+    "transfer": {
+      "name": "模型验收合成转账记录.txt",
+      "pages": [
+        "合成转账记录编号ZZ-2026-011。2026年3月20日，甲公司向乙公司支付48000元，银行附言为首期借款。",
+        "合成转账记录编号ZZ-2026-012。2026年3月23日，甲公司向乙公司支付80000元，银行附言为第二期借款。"
+      ]
+    },
+    "reconciliation": {
+      "name": "模型验收合成对账单.txt",
+      "pages": [
+        "合成对账单编号DZ-2026-021，日期2026年4月2日。甲公司在对账单中记录借款本金总额为130000元。该金额与借款合同HT-2026-071所载128000元不一致。对账单未说明差异原因，待核对，不能据此认定差额实际发生。"
+      ]
+    },
+    "notice": {
+      "name": "模型验收合成催款函.txt",
+      "pages": [
+        "合成催款函编号CK-2026-008，发出日期2026年10月5日，要求乙公司在2026年10月12日前回复欠款情况。催款函未附送达回证，卷宗无收件人签收日期或签字。"
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": "Q01",
+      "kind": "fact",
+      "question": "仅依据《模型验收合成借款合同》，借款本金是多少元？",
+      "required_any": [
+        [
+          "128000",
+          "12.8万",
+          "十二万八千"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 1,
+          "tokens": [
+            "128000"
+          ]
+        }
+      ],
+      "forbidden": [
+        "130000"
+      ]
+    },
+    {
+      "id": "Q02",
+      "kind": "fact",
+      "question": "仅依据《模型验收合成借款合同》，合同签订日期是哪一天？",
+      "required_any": [
+        [
+          "2026年3月18日",
+          "2026-03-18",
+          "2026/3/18"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 1,
+          "tokens": [
+            "2026年3月18日"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q03",
+      "kind": "fact",
+      "question": "《模型验收合成借款合同》的合同编号是什么？",
+      "required_any": [
+        [
+          "HT-2026-071"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 1,
+          "tokens": [
+            "HT-2026-071"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q04",
+      "kind": "fact",
+      "question": "《模型验收合成借款合同》约定的借款到期日是哪一天？",
+      "required_any": [
+        [
+          "2026年9月30日",
+          "2026-09-30",
+          "2026/9/30"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 2,
+          "tokens": [
+            "2026年9月30日"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q05",
+      "kind": "fact",
+      "question": "《模型验收合成转账记录》中编号ZZ-2026-011的首期转账金额是多少？",
+      "required_any": [
+        [
+          "48000",
+          "4.8万",
+          "四万八千"
+        ]
+      ],
+      "support": [
+        {
+          "document": "transfer",
+          "page": 1,
+          "tokens": [
+            "48000"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q06",
+      "kind": "fact",
+      "question": "《模型验收合成转账记录》中编号ZZ-2026-011的转账发生于哪一天？",
+      "required_any": [
+        [
+          "2026年3月20日",
+          "2026-03-20",
+          "2026/3/20"
+        ]
+      ],
+      "support": [
+        {
+          "document": "transfer",
+          "page": 1,
+          "tokens": [
+            "2026年3月20日"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q07",
+      "kind": "fact",
+      "question": "《模型验收合成转账记录》中编号ZZ-2026-012的第二期转账金额是多少？",
+      "required_any": [
+        [
+          "80000",
+          "8万",
+          "八万"
+        ]
+      ],
+      "support": [
+        {
+          "document": "transfer",
+          "page": 2,
+          "tokens": [
+            "80000"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q08",
+      "kind": "fact",
+      "question": "《模型验收合成转账记录》中编号ZZ-2026-012的转账发生于哪一天？",
+      "required_any": [
+        [
+          "2026年3月23日",
+          "2026-03-23",
+          "2026/3/23"
+        ]
+      ],
+      "support": [
+        {
+          "document": "transfer",
+          "page": 2,
+          "tokens": [
+            "2026年3月23日"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q09",
+      "kind": "fact",
+      "question": "《模型验收合成催款函》的发出日期是哪一天？",
+      "required_any": [
+        [
+          "2026年10月5日",
+          "2026-10-05",
+          "2026/10/5"
+        ]
+      ],
+      "support": [
+        {
+          "document": "notice",
+          "page": 1,
+          "tokens": [
+            "2026年10月5日"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q10",
+      "kind": "conflict",
+      "question": "比较《模型验收合成借款合同》和《模型验收合成对账单》的借款本金记载，有无冲突？请分别列出金额并说明能否直接确定哪份正确。",
+      "required_any": [
+        [
+          "128000",
+          "12.8万",
+          "十二万八千"
+        ],
+        [
+          "130000",
+          "13万",
+          "十三万"
+        ],
+        [
+          "冲突",
+          "不一致",
+          "矛盾",
+          "差异"
+        ],
+        [
+          "核验",
+          "核对",
+          "复核",
+          "无法确定",
+          "不能确定"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 1,
+          "tokens": [
+            "128000"
+          ]
+        },
+        {
+          "document": "reconciliation",
+          "page": 1,
+          "tokens": [
+            "130000"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q11",
+      "kind": "missing",
+      "question": "《模型验收合成借款合同》记载的保证人姓名是什么？资料没有就明确说明，不要推测。",
+      "required_any": [
+        [
+          "未约定",
+          "未记载",
+          "未提供",
+          "无法确认",
+          "不能确定",
+          "没有记载",
+          "无保证人"
+        ]
+      ],
+      "support": [
+        {
+          "document": "contract",
+          "page": 2,
+          "tokens": [
+            "未约定保证人"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q12",
+      "kind": "missing",
+      "question": "《模型验收合成催款函》实际签收日期是哪一天？只回答卷宗可证明的内容，不能以发函日或回复期限代替签收日。",
+      "required_any": [
+        [
+          "未附",
+          "未提供",
+          "未记载",
+          "无法确认",
+          "无法确定",
+          "不能确定",
+          "没有签收",
+          "无签收"
+        ]
+      ],
+      "support": [
+        {
+          "document": "notice",
+          "page": 1,
+          "tokens": [
+            "无收件人签收日期"
+          ]
+        }
+      ]
+    }
+  ],
+  "review_scope": "Automated exact known-value and citation-source checks plus manual review of all synthetic raw answers; no claim of general semantic/legal correctness."
+}
