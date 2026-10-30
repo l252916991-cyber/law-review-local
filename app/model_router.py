@@ -7,12 +7,18 @@ existing failure path (rule summary plus diagnostic) instead of a second model;
 that keeps the two failure classes distinguishable. It is not a general
 multi-model scheduler, and it never weakens the contract — the fallback answer
 has to pass the same checks with the same case scope.
+
+The target carries its own wire api: a fallback commonly runs on a different
+backend than the primary, and assuming the primary's protocol would send an
+OpenAI-shaped body to an Anthropic-shaped endpoint (or the reverse) and fail with
+an opaque 4xx instead of an answer.
 """
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
 
+from .model_ports import DEFAULT_MODEL_API, MODEL_APIS, configured_api
 from .services import assert_model_endpoint_allowed
 
 
@@ -20,6 +26,7 @@ from .services import assert_model_endpoint_allowed
 class FallbackTarget:
     base_url: str
     model: str
+    api: str = DEFAULT_MODEL_API
 
 
 class FallbackConfigError(ValueError):
@@ -28,6 +35,18 @@ class FallbackConfigError(ValueError):
 
 def fallback_enabled() -> bool:
     return os.getenv("LAW_REVIEW_LLM_FALLBACK", "off").strip().lower() in {"1", "on", "true", "yes"}
+
+
+def fallback_api() -> str:
+    """Wire api for the fallback endpoint; defaults to the deployment default."""
+    value = os.getenv("LAW_REVIEW_LLM_FALLBACK_API", "").strip()
+    if not value:
+        return configured_api()
+    if value not in MODEL_APIS:
+        raise FallbackConfigError(
+            f"LAW_REVIEW_LLM_FALLBACK_API 只能是 {sorted(MODEL_APIS)} 之一，收到 {value!r}"
+        )
+    return value
 
 
 def fallback_target() -> FallbackTarget | None:
@@ -47,4 +66,4 @@ def fallback_target() -> FallbackTarget | None:
         assert_model_endpoint_allowed(url)
     except ValueError as exc:
         raise FallbackConfigError(f"回退端点不被允许：{exc}") from exc
-    return FallbackTarget(base_url=url, model=model)
+    return FallbackTarget(base_url=url, model=model, api=fallback_api())

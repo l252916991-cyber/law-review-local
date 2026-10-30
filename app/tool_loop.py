@@ -28,6 +28,7 @@ from typing import Any, Callable
 from .agent_tools import READONLY_TOOL_NAMES, TOOL_SCHEMAS, execute_readonly_tool
 from .config import LLMConfig
 from .llm_usage import record_llm_call
+from .model_ports import MODEL_API_OPENAI_COMPLETIONS, configured_api
 from .services import (
     CHAT_SYSTEM_PROMPT,
     assert_model_endpoint_allowed,
@@ -209,6 +210,12 @@ def run_tool_loop(
         # Host-governed runs deny network backends through the admission ledger;
         # this loop bypasses that ledger, so it must not run there at all.
         raise RuntimeError("tool_loop_unavailable_under_host_governance")
+    # Tool calling is implemented for the OpenAI-compatible tool-call shape only.
+    # Declining here (instead of sending an OpenAI body to an anthropic-messages
+    # endpoint) lets the caller fall back to the single-shot answer path, which
+    # speaks both protocols.
+    if configured_api() != MODEL_API_OPENAI_COMPLETIONS:
+        raise ToolsUnsupportedError("tool_loop_requires_openai_completions")
     rounds, call_budget = _resolve_limits(max_rounds, max_tool_calls)
     config = LLMConfig.load()
     timeout = config.timeout if timeout is None else timeout

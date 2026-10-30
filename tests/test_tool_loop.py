@@ -160,6 +160,14 @@ class ToolLoopTests(unittest.TestCase):
             row = conn.execute("SELECT kind,status,input_tokens FROM llm_calls ORDER BY id DESC LIMIT 1").fetchone()
         self.assertEqual((row["kind"], row["status"], row["input_tokens"]), ("tool_loop", "failed", None))
 
+    def test_tool_loop_refuses_a_non_openai_protocol(self):
+        # The loop builds openai-completions payloads and reads tool_calls from
+        # them; under another wire api it declines instead of misparsing, which
+        # is what lets chat() fall back to a single-shot call.
+        with patch.dict(os.environ, {"LAW_REVIEW_LLM_API": "anthropic-messages"}):
+            with self.assertRaises(ToolsUnsupportedError):
+                self._run(_ScriptedOpener())
+
     def test_limits_are_validated(self):
         for kwargs in ({"max_rounds": 0}, {"max_rounds": MAX_ROUNDS_LIMIT + 1}, {"max_tool_calls": 0}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):

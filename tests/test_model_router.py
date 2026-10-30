@@ -41,6 +41,32 @@ class FallbackConfigTests(unittest.TestCase):
         assert target is not None
         self.assertEqual(target.model, "big-model")
         self.assertEqual(target.base_url, "http://127.0.0.1:8001/v1")
+        # The target states its own protocol instead of inheriting the primary's
+        # transport code: a fallback commonly runs on a different backend.
+        self.assertEqual(target.api, "openai-completions")
+
+    def test_fallback_declares_its_own_protocol(self):
+        env = {
+            "LAW_REVIEW_LLM_FALLBACK": "on",
+            "LAW_REVIEW_LLM_FALLBACK_URL": "http://127.0.0.1:8001",
+            "LAW_REVIEW_LLM_FALLBACK_MODEL": "claude",
+            "LAW_REVIEW_LLM_FALLBACK_API": "anthropic-messages",
+        }
+        with patch.dict(os.environ, env):
+            target = fallback_target()
+        assert target is not None
+        self.assertEqual(target.api, "anthropic-messages")
+
+    def test_unknown_fallback_protocol_is_refused(self):
+        env = {
+            "LAW_REVIEW_LLM_FALLBACK": "on",
+            "LAW_REVIEW_LLM_FALLBACK_URL": "http://127.0.0.1:8001",
+            "LAW_REVIEW_LLM_FALLBACK_MODEL": "m",
+            "LAW_REVIEW_LLM_FALLBACK_API": "grpc",
+        }
+        with patch.dict(os.environ, env):
+            with self.assertRaises(FallbackConfigError):
+                fallback_target()
 
 
 class FallbackRoutingTests(unittest.TestCase):

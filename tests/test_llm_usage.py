@@ -4,7 +4,7 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 
-from app.db import db_scope, init_db, now, transaction
+from app.db import connect, db_scope, init_db, now, transaction
 from app.llm_usage import percentile, record_llm_call, token_counts, usage_summary
 
 
@@ -60,6 +60,24 @@ class AccountingTests(unittest.TestCase):
         # v25 report signing, v26 frozen delivery bodies.
         self.assertEqual(version, 26)
         self.assertTrue({"case_id", "run_id", "input_tokens", "ttft_ms", "kind"} <= columns)
+
+    def test_explicit_price_column_is_stored_verbatim(self):
+        # The caller may have resolved the snapshot column itself (a declared
+        # model spec carries it); accounting must not re-derive a different one.
+        record_llm_call(case_id=self.case_id, kind="chat", model="undeclared-model",
+                        usage={"prompt_tokens": 5, "completion_tokens": 1}, latency_ms=80,
+                        price_column="snapshot-from-spec")
+        with closing(connect()) as conn:
+            stored = conn.execute("SELECT pricing_json FROM llm_calls").fetchone()[0]
+        self.assertEqual(stored, "snapshot-from-spec")
+
+    def test_absent_price_column_falls_back_to_the_model_lookup(self):
+        record_llm_call(case_id=self.case_id, kind="chat", model="unknown-model",
+                        usage={"prompt_tokens": 5, "completion_tokens": 1}, latency_ms=80)
+        with closing(connect()) as conn:
+            stored = conn.execute("SELECT pricing_json FROM llm_calls").fetchone()[0]
+        # No pricing configuration in this isolated data directory: unknown, not zero.
+        self.assertIsNone(stored)
 
     def test_unknown_usage_keeps_average_unknown(self):
         record_llm_call(case_id=self.case_id, kind="chat", model="m", usage=None, latency_ms=120)

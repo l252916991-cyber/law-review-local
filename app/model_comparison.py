@@ -25,11 +25,12 @@ from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_i
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "c63abf953bf10f6f025c2ff22e5819247590e58a"
-NATIVE_BASELINE_REVISION = "specialist-review-v3"
+NATIVE_BASELINE_REVISION = "specialist-review-v4"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
-# module, so a non-algorithmic edit still moves it; the review below confirms
-# that no prompt, retrieval, answerability or model-call path changed.
+# module, so a non-algorithmic edit still moves it; the review below states, for
+# each re-registration, whether prompt, retrieval, answerability or the model-call
+# path changed, and why the comparison stays comparable.
 NATIVE_BASELINE_REVIEW = (
     "services.py: 0bbb8ef 增加流水全量迭代（列表分页不变，汇总/图谱/导出覆盖全部行）；"
     "188a342 报告批准绑定材料快照；f2d4bfd 交付包改为读取冻结正文并移出渲染代码。"
@@ -38,13 +39,18 @@ NATIVE_BASELINE_REVIEW = (
     "2026-10-27（specialist-review-v3）：疏漏专家的单一来源检测改为按固定顺序遍历关键证据类型。"
     "原先使用集合，迭代顺序随进程哈希种子变化，使同一冻结输入的专家发现顺序、审校附录与提示摘要不稳定；"
     "本次只固定顺序，检测条件、检索、提示模板与回答契约均未改动，旧 v2 结果保留且不被覆盖。"
+    "2026-10-30（specialist-review-v4）：模型调用改由 app/model_ports.py 决定 wire 协议与凭证，"
+    "services.py 的多轮对话请求/响应编解码移出内联字典，审计记录增加 api/provider/declared 三个字段。"
+    "CHAT_SYSTEM_PROMPT、PROMPT_VERSION、检索、回答契约、校验与工具循环行为均未改动："
+    "默认协议仍是 openai-completions，请求体与响应解析结果与改动前逐字段一致（test_chat_stream.py 覆盖）。"
+    "agents.py 仅把回退目标自带的协议透传给 call_local_llm，专家发现顺序与提示模板未变。"
 )
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "4dd5451bf26fd2df89efe077e0471e687fadee9200c27b89d875d7298b77aa2c",
+    "agents.py": "53cdd159704eddd8152fb39a1b2cbdb129b2a241cde3e810a7cd060f083e37da",
     "review_collaboration.py": "512c03d6719bddfd98d422c7cb65e46c26331b8aab7ab56b40e651a4a07d632a",
     "agent_tools.py": "2af80bdaa3e1277de96a4127e2fd9bbabbb906b1213a94e6beb43a54d28dfb34",
     "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
-    "services.py": "4c2047b9ca49ec85619351e8b877bdadb672b5c5ae8fca30509fdd6d8eab9468",
+    "services.py": "08228d5e90fa86a1d26495761967d159f5a756ad622f666bc36f1711bb086d11",
     "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
     "statutory_retrieval.py": "d9d2f60c01ac03f405ca4e1da593ff049a32cd6e072d3fa4bcb98f8be4b9fbe8",
 }

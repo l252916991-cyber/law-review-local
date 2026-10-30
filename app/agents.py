@@ -755,6 +755,7 @@ class CriticAgent:
                 timeout=self.timeout,
                 model_override=target.model,
                 base_url_override=target.base_url,
+                api_override=target.api,
                 history=history,
                 memory=memory,
                 object_note=object_note,

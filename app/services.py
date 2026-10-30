@@ -27,6 +27,17 @@ from docx import Document as DocxDocument
 
 from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .config import LLMConfig
+from .model_ports import (
+    MODEL_API_OPENAI_COMPLETIONS,
+    ResolvedModel,
+    auth_headers,
+    build_chat_request,
+    default_models,
+    end_frame_types,
+    parse_completion,
+    parse_stream_frame,
+    request_path,
+)
 from .context import (
     ArchivedConversationError,
     ConversationNotFoundError,
@@ -771,15 +782,26 @@ def read_sse_with_deadline(
     deadline: float | None = None,
     max_bytes: int = 8 * 1024 * 1024,
     on_event: "Callable[[dict[str, Any]], None] | None" = None,
+    parse_frame: "Callable[[dict[str, Any]], tuple[str | None, dict[str, Any] | None]] | None" = None,
+    end_frame_types: frozenset[str] = frozenset(),
 ) -> tuple[str, dict[str, Any] | None]:
-    """Consume an OpenAI-compatible SSE stream under the same guards as JSON reads.
+    """Consume an SSE stream under the same guards as JSON reads.
 
     The deadline is absolute, so a server that keeps a connection alive but never
     finishes still fails at the configured total limit. ``on_event`` receives each
-    decoded frame; the return value is the concatenated delta text and the last
-    reported ``usage`` object (``None`` when the server never sends one).
+    decoded frame that carried text; the return value is the concatenated delta
+    text and the usage object reported across frames.
+
+    ``parse_frame`` decouples the transport from the wire protocol: the default
+    reader is the OpenAI-compatible shape, and ``app.model_ports`` supplies the
+    Anthropic one. Usage from successive frames is merged rather than replaced,
+    because ``anthropic-messages`` reports prompt tokens at the start of the
+    stream and completion tokens at the end, so replacing would lose one half.
     """
     deadline = time.monotonic() + timeout if deadline is None else deadline
+    reader_frame = parse_frame or (
+        lambda frame: parse_stream_frame(MODEL_API_OPENAI_COMPLETIONS, frame)
+    )
     buffer = bytearray()
     text_parts: list[str] = []
     usage: dict[str, Any] | None = None
@@ -804,13 +826,16 @@ def read_sse_with_deadline(
             return
         if not isinstance(frame, dict):
             return
-        if isinstance(frame.get("usage"), dict):
-            usage = frame["usage"]
-        choices = frame.get("choices")
-        if not isinstance(choices, list) or not choices:
-            return
-        delta = choices[0].get("delta") if isinstance(choices[0], dict) else None
-        content = delta.get("content") if isinstance(delta, dict) else None
+        content, frame_usage = reader_frame(frame)
+        if isinstance(frame_usage, dict):
+            usage = {**(usage or {}), **frame_usage}
+        if end_frame_types:
+            kind = frame.get("type")
+            if isinstance(kind, str) and kind in end_frame_types:
+                # A terminal frame ends the stream; its text (if any) is not
+                # answer content, so it is merged for usage and then dropped.
+                finished = True
+                return
         if isinstance(content, str) and content:
             text_parts.append(content)
             if on_event is not None:
@@ -864,6 +889,7 @@ def call_local_llm(
     object_note: str = "",
     on_token: Callable[[str], None] | None = None,
     base_url_override: str | None = None,
+    api_override: str | None = None,
 ) -> str:
     llm = LLMConfig.load()
     base_url = (base_url_override or llm.base_url).rstrip("/")
@@ -876,6 +902,10 @@ def call_local_llm(
     available, model = local_llm_available(model_override, base_url=base_url)
     if not available:
         raise RuntimeError(f"本地模型不可用：{model}")
+    # One resolution decides the wire api, the endpoint credentials and the
+    # model's declared capabilities for this call; everything below reads from
+    # `target` so a second backend is a registration, not a second code path.
+    target = resolve_model_target(model, base_url, api_override)
     context_text = "\n\n".join(
         f"[资料{i}｜{item['name']}｜第{item['page_no']}页]\n{item['quote']}"
         for i, item in enumerate(contexts, 1)
@@ -892,24 +922,21 @@ def call_local_llm(
         user_blocks.append(memory)
     user_blocks.append(f"本轮卷宗片段：\n{context_text}")
     body = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": "\n\n".join(user_blocks)},
-            ],
-            "temperature": llm.temperature,
-            "max_tokens": llm.max_tokens,
-            "stream": on_token is not None,
-            "chat_template_kwargs": {"enable_thinking": False},
-            **({"stream_options": {"include_usage": True}} if on_token is not None else {}),
-        },
+        build_chat_request(
+            api=target.api,
+            model=model,
+            system=system,
+            user="\n\n".join(user_blocks),
+            temperature=llm.temperature,
+            max_tokens=llm.max_tokens,
+            stream=on_token is not None,
+        ),
         ensure_ascii=False,
     ).encode("utf-8")
     req = urllib.request.Request(
-        f"{base_url}/chat/completions",
+        f"{base_url}{request_path(target.api)}",
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=auth_headers(target.api, target.auth),
         method="POST",
     )
     opener = egress_opener()
@@ -961,20 +988,28 @@ def call_local_llm(
         with opener.open(req, timeout=timeout) as response:
             if on_token is None:
                 payload = read_json_with_deadline(response, timeout, deadline=deadline)
-                answer = strip_reasoning(payload["choices"][0]["message"]["content"])
-                usage = payload.get("usage") if isinstance(payload, dict) else None
+                text, usage = parse_completion(target.api, payload)
+                answer = strip_reasoning(text)
             else:
                 streamed, usage = read_sse_with_deadline(
-                    response, timeout, deadline=deadline, on_event=lambda frame: forward(frame["content"])
+                    response,
+                    timeout,
+                    deadline=deadline,
+                    on_event=lambda frame: forward(frame["content"]),
+                    parse_frame=lambda frame: parse_stream_frame(target.api, frame),
+                    end_frame_types=end_frame_types(target.api),
                 )
                 answer = strip_reasoning(streamed)
         if not answer:
             raise RuntimeError("本地模型返回了推理草稿或空正文")
-        _last_llm_provenance.set(llm_provenance(route, model))
+        _last_llm_provenance.set(llm_provenance(route, model, target=target))
         _last_llm_usage.set(
             {
                 "usage": usage,
                 "model": model,
+                "api": target.api,
+                "provider": target.spec.provider,
+                "price_column": target.spec.price_column,
                 "latency_ms": int((time.perf_counter() - started) * 1000),
                 "ttft_ms": (
                     int((first_token_at[0] - started_at) * 1000) if first_token_at else None
@@ -985,6 +1020,19 @@ def call_local_llm(
     except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as exc:
         logger.warning("Local model response failed error_type=%s", type(exc).__name__)
         raise RuntimeError(f"本地模型调用失败（{type(exc).__name__}）") from exc
+
+
+def resolve_model_target(model: str, base_url: str, api_override: str | None = None) -> ResolvedModel:
+    """Resolve one call target from the effective model registry.
+
+    ``allow_undeclared`` keeps a deployment working without a catalog file: an
+    undeclared model is still called, and ``declared=False`` travels with the
+    provenance so the audit record shows that its capabilities were assumed
+    rather than configured.
+    """
+    return default_models().resolve(
+        model, base_url=base_url, api=api_override, allow_undeclared=True
+    )
 
 
 def tool_loop_enabled() -> bool:
@@ -1049,20 +1097,29 @@ def _account_llm_call(
             run_id=run_id,
             conversation_id=conversation_id,
             turn_key=turn_key if turn_key is not None else _active_turn_key.get(),
+            price_column=observed.get("price_column"),
         )
     except Exception as exc:  # accounting must never fail a case workflow
         logger.warning("LLM call accounting failed error_type=%s", type(exc).__name__)
 
 
 
-def llm_provenance(route: str, model: str) -> dict[str, Any]:
-    """Identity of the exact inference setup behind one answer (E23)."""
+def llm_provenance(route: str, model: str, *, target: ResolvedModel | None = None) -> dict[str, Any]:
+    """Identity of the exact inference setup behind one answer (E23).
+
+    With ``target`` the record also names the wire api and provider that served
+    the call, so an answer stays attributable after the deployment is pointed at
+    a different backend or protocol.
+    """
     llm = LLMConfig.load()
     prompt_digest = hashlib.sha256(
         f"{PROMPT_VERSION}|{route}|{CHAT_SYSTEM_PROMPT}".encode()
     ).hexdigest()[:16]
-    return {"prompt_version": PROMPT_VERSION, "prompt_sha256_16": prompt_digest,
-            "model": model, "temperature": llm.temperature, "max_tokens": llm.max_tokens}
+    record: dict[str, Any] = {"prompt_version": PROMPT_VERSION, "prompt_sha256_16": prompt_digest,
+                              "model": model, "temperature": llm.temperature, "max_tokens": llm.max_tokens}
+    if target is not None:
+        record.update(target.provenance())
+    return record
 
 
 def fallback_answer(question: str, route: str, contexts: list[dict[str, Any]], scope_label: str = "") -> str:
@@ -1341,6 +1398,7 @@ def chat(
                             question, route, contexts, history=history_text,
                             memory=memory_clues["text"], object_note=note,
                             model_override=target.model, base_url_override=target.base_url,
+                            api_override=target.api,
                         )
                         fallback_validation = validate_review_answer(retry_answer, contexts)
                         if fallback_validation["valid"]:

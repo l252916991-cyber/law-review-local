@@ -52,6 +52,19 @@ class _FakeOpener:
         return _FakeResponse(self.payload)
 
 
+class _CapturingOpener(_FakeOpener):
+    """Records the exact request so the wire api can be asserted."""
+
+    def __init__(self, payload: bytes):
+        super().__init__(payload)
+        self.requests: list[tuple[str, dict[str, str], bytes]] = []
+
+    def open(self, request, timeout=None):
+        headers = {str(key).lower(): str(value) for key, value in request.header_items()}
+        self.requests.append((request.full_url, headers, request.data or b""))
+        return _FakeResponse(self.payload)
+
+
 def _sse(*frames: str) -> bytes:
     return "".join(f"data: {frame}\n\n" for frame in frames).encode("utf-8")
 
@@ -93,6 +106,39 @@ class SSEReaderTests(unittest.TestCase):
     def test_absolute_deadline_applies_before_the_first_read(self):
         with self.assertRaises(TimeoutError):
             read_sse_with_deadline(_FakeResponse(b""), 5, deadline=0)
+
+    def test_anthropic_frames_are_parsed_and_usage_is_merged(self):
+        from app.model_ports import (
+            MODEL_API_ANTHROPIC_MESSAGES,
+            end_frame_types,
+            parse_stream_frame,
+        )
+
+        body = _sse(
+            json.dumps({"type": "message_start", "message": {"usage": {"input_tokens": 12}}}),
+            json.dumps({"type": "content_block_delta",
+                        "delta": {"type": "thinking_delta", "thinking": "内部推理"}}),
+            json.dumps({"type": "content_block_delta",
+                        "delta": {"type": "text_delta", "text": "根据"}}),
+            json.dumps({"type": "content_block_delta",
+                        "delta": {"type": "text_delta", "text": "材料[资料1]"}}),
+            json.dumps({"type": "message_delta", "usage": {"output_tokens": 6}}),
+            json.dumps({"type": "message_stop"}),
+            json.dumps({"type": "content_block_delta",
+                        "delta": {"type": "text_delta", "text": "迟到帧"}}),
+        )
+        seen: list[str] = []
+        text, usage = read_sse_with_deadline(
+            _FakeResponse(body), 5,
+            on_event=lambda frame: seen.append(frame["content"]),
+            parse_frame=lambda frame: parse_stream_frame(MODEL_API_ANTHROPIC_MESSAGES, frame),
+            end_frame_types=end_frame_types(MODEL_API_ANTHROPIC_MESSAGES),
+        )
+        self.assertEqual(text, "根据材料[资料1]")
+        self.assertEqual(seen, ["根据", "材料[资料1]"])
+        # Prompt tokens arrive at the start and completion tokens at the end, so
+        # the reader must merge them instead of keeping only the last object.
+        self.assertEqual(usage, {"input_tokens": 12, "output_tokens": 6})
 
 
 class StreamingModelCallTests(unittest.TestCase):
@@ -140,6 +186,82 @@ class StreamingModelCallTests(unittest.TestCase):
         self.assertEqual(answer, "答案")
         self.assertEqual("".join(tokens), "答案")
         self.assertNotIn("hidden", "".join(tokens))
+
+
+class SecondProtocolCallTests(unittest.TestCase):
+    """A second wire api is a registration, not a second transport."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix="lexvault-protocol-")
+        self.addCleanup(self.directory.cleanup)
+        scope = db_scope(Path(self.directory.name) / "law_review.db")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+        init_db(seed=False)
+        base_env = {
+            "LAW_REVIEW_LLM_URL": "http://127.0.0.1:8000/v1",
+            "LAW_REVIEW_LLM_API": "",
+            "LAW_REVIEW_LLM_API_KEY": "",
+            "LAW_REVIEW_MODEL_CATALOG": "",
+            "LAW_REVIEW_MODEL_CATALOG_FILE": "",
+            "LAW_REVIEW_MODEL_CREDENTIALS_FILE": "",
+        }
+        env = patch.dict("os.environ", base_env)
+        env.start()
+        self.addCleanup(env.stop)
+
+    def _call(self, payload: bytes, **kwargs):
+        opener = _CapturingOpener(payload)
+        with patch.object(services, "local_llm_available", return_value=(True, "test-model")), \
+                patch.object(services, "egress_opener", return_value=opener):
+            answer = services.call_local_llm(
+                "问题", "事实检索",
+                [{"name": "卷宗", "page_no": 1, "quote": "原文", "document_id": 1}],
+                **kwargs,
+            )
+        return answer, opener.requests[0]
+
+    def test_default_protocol_keeps_the_openai_body(self):
+        body = json.dumps({"choices": [{"message": {"content": "答案[资料1]"}}]}).encode()
+        answer, (url, headers, sent) = self._call(body)
+        self.assertEqual(answer, "答案[资料1]")
+        self.assertTrue(url.endswith("/chat/completions"))
+        decoded = json.loads(sent)
+        self.assertEqual(decoded["messages"][0]["role"], "system")
+        self.assertEqual(decoded["chat_template_kwargs"], {"enable_thinking": False})
+        self.assertNotIn("authorization", headers)
+
+    def test_anthropic_protocol_uses_the_messages_endpoint(self):
+        body = json.dumps({"content": [
+            {"type": "thinking", "thinking": "内部推理"},
+            {"type": "text", "text": "答案[资料1]"},
+        ]}).encode()
+        with patch.dict("os.environ", {"LAW_REVIEW_LLM_API_KEY": "sk-test"}):
+            answer, (url, headers, sent) = self._call(body, api_override="anthropic-messages")
+        self.assertEqual(answer, "答案[资料1]")
+        self.assertTrue(url.endswith("/messages"))
+        self.assertEqual(headers["x-api-key"], "sk-test")
+        self.assertIn("anthropic-version", headers)
+        decoded = json.loads(sent)
+        self.assertEqual([message["role"] for message in decoded["messages"]], ["user"])
+        self.assertIn("system", decoded)
+        self.assertNotIn("chat_template_kwargs", decoded)
+
+    def test_provenance_names_the_protocol_and_provider(self):
+        body = json.dumps({"choices": [{"message": {"content": "答案[资料1]"}}]}).encode()
+        self._call(body)
+        provenance = services._last_llm_provenance.get()
+        assert provenance is not None
+        self.assertEqual(provenance["model"], "test-model")
+        self.assertEqual(provenance["api"], "openai-completions")
+        self.assertEqual(provenance["provider"], "local")
+        self.assertFalse(provenance["declared"])
+
+    def test_unknown_protocol_fails_closed(self):
+        with patch.dict("os.environ", {"LAW_REVIEW_LLM_API": "carrier-pigeon"}):
+            with self.assertRaises(RuntimeError) as raised:
+                self._call(b"{}")
+        self.assertIn("LAW_REVIEW_LLM_API", str(raised.exception))
 
 
 class ChatStreamEndpointTests(unittest.TestCase):

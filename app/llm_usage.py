@@ -68,17 +68,22 @@ def record_llm_call(
     run_id: int | None = None,
     conversation_id: int | None = None,
     turn_key: str | None = None,
+    price_column: str | None = None,
 ) -> None:
     """Append one inference call with the price snapshot used to price it.
 
     Never raises into the answer path: a missing or unusable pricing
     configuration still records the call, with a ``NULL`` snapshot (cost unknown).
+    ``price_column`` lets the caller that already resolved the model's snapshot
+    column pass it through; when absent the column is looked up by model id.
     """
     input_tokens, output_tokens = token_counts(usage)
     snapshot, error = load_pricing()
     if error:
         snapshot = None
-    pricing_column = snapshot.column_for(model) if snapshot is not None else None
+    pricing_column = price_column
+    if pricing_column is None and snapshot is not None:
+        pricing_column = snapshot.column_for(model)
     # Agent runs already carry a run id; other turns use the client request id or
     # a per-turn key, so both can be grouped as one logical question.
     if turn_key is None and run_id is not None:
