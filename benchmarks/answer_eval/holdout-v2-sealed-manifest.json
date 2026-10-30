@@ -1,0 +1,26 @@
+{
+  "format": "lexvault-sealed-coverage-v2",
+  "questions": 48,
+  "cases": 8,
+  "pages": 32,
+  "categories": {
+    "normal": 8,
+    "contradiction": 8,
+    "insufficient": 8,
+    "irrelevant": 8,
+    "statute_missing": 8,
+    "injection": 8
+  },
+  "exact_old_overlap": 0,
+  "near_duplicate_review_flags": [],
+  "semantic_independence_verified": false,
+  "dataset_sha256": "a80851cfde392025118dc53be3feaae800019647b6007c811f19edd015323e7d",
+  "protocol_sha256": "cef0770f91fda5bce4e3ab7b6ce4c8cd7ea42148015a2c913576fd55ba24beeb",
+  "candidate_commit": "ff2856afb9b9decc07d6de7642db2f73d95deb41",
+  "status": "sealed_synthetic_draft",
+  "model_evaluation_opened": false,
+  "human_annotation_complete": false,
+  "annotation_provenance": "coding_agent_draft_not_lawyer_gold",
+  "power_analysis_complete": false,
+  "business_qualified": false
+}
