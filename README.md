@@ -1,12 +1,56 @@
 # LexVault：本地优先法律卷宗智能阅卷系统
 
-![CI](https://github.com/l252916991-cyber/law-review-local/actions/workflows/test.yml/badge.svg) ![Supply-chain scans](https://github.com/l252916991-cyber/law-review-local/actions/workflows/security.yml/badge.svg)
+![CI](https://github.com/l252916991-cyber/law-review-local/actions/workflows/test.yml/badge.svg) ![Frontend](https://github.com/l252916991-cyber/law-review-local/actions/workflows/frontend.yml/badge.svg) ![Delivery](https://github.com/l252916991-cyber/law-review-local/actions/workflows/delivery.yml/badge.svg) ![Supply-chain scans](https://github.com/l252916991-cyber/law-review-local/actions/workflows/security.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
 [English documentation](README.en.md)
 
-[求职展示：合成旧库迁移、复核签发与备份恢复](docs/runbook/migration-demo.md)提供可复现命令、实际校验项和五分钟讲解顺序，无需真实卷宗或模型服务。
-
 FastAPI + SQLite 的私有化法律阅卷工作台：多格式卷宗导入、页级混合检索、证据管理与审批、可审计的双运行时 Agent 分析。核心设计是**证据优先**——法律检索结果必须能追溯到受控法条语料与案件原文页；法条核验节点无法精确核验时，不提供可核验法条引用。普通聊天的引用检查主要验证格式与来源存在性，不能据此声称语义支持或法律有效性已验证。**AI 输出仅辅助审阅，不能代替律师判断；系统不自动出具法律结论。**
+
+## 30 秒看懂
+
+![案件工作台：合成演示案件的总览](docs/images/workbench-overview.png)
+
+![离线模式下的阅卷问答：每条结论带资料编号，资料卡可点回原文页](docs/images/chat-citations.png)
+
+<sub>截图均为完全虚构的演示案件；第二张关闭了模型，回答由规则检索摘要生成。</sub>
+
+**它做什么**：把“检索 → 多专家结构化交接 → 交叉核对 → 审校生成 → 引用校验 → 人工复核 → 版本化导出”做成一条可恢复、可校验、可对照实验的流水线，而不是一次性的聊天封装。
+
+```mermaid
+flowchart LR
+    A[卷宗导入<br/>PDF/DOCX/图片 OCR] --> B[页级混合检索<br/>BM25 + 向量 + RRF]
+    B --> C[规则专家<br/>事实/证据/矛盾/疏漏]
+    C --> D[交叉来源核对]
+    D --> E[审校生成<br/>本地 LLM]
+    E --> F{引用契约校验}
+    F -- 不通过 --> G[一次回退或明确失败]
+    F -- 通过 --> H[律师复核与批准]
+    H --> I[冻结报告 + 导出包<br/>清单哈希]
+    B -. 法条走独立命名空间 .-> J[法条精确核验]
+```
+
+**关键结果**（全部可从仓库与私有产物复算，口径见[项目说明](docs/portfolio/project-brief.md)）：
+
+| 问题 | 实测 |
+|---|---|
+| 多专家结构化交接与交叉审校是否让回答更好？ | 在本机 Qwen3.8-27B（4-bit）上同题配对：开发集 60 题 A/B/C 通过率 86.7% / 76.7% / 86.7%，六案例保留集 24 题 × 3 轮 90.3% / 88.9% / 87.5%；B/C 输入 token 是 A 的 4.9–6.4 倍。**没有观察到收益**，因此默认不开启交叉审校。 |
+| 法条库对模型有多大帮助？ | LawBench 同题配对（4-bit，1,000 题）：混合均分 58.81% → 62.49%（+3.68 pp，95% CI [+2.76, +4.69]），其余 18 项逐题不变。 |
+| 断点恢复会不会复用过期分析？ | checkpoint 记录每页原文摘要：未改动时独立进程恢复、专家节点不重跑；改动一页后拒绝恢复且不消耗重试次数。 |
+| 工程质量 | 全量离线测试（禁网、隔离数据目录）{{TESTS}}；ruff（E9/F/I/UP/B）与 mypy 门禁；Docker 构建与 HTTP 冒烟在 CI 中执行。 |
+
+**没做到的**也写在明处：独立人工评分（双人盲标注包已备好）、真实模型主演示视频、跨模型对照、律所业务签收。
+
+**开发方式**：维护者主导方向、实验设计、验收标准与结果取舍，编码大量借助 AI 编程助手（Codex、Claude）完成。按 [MIT 许可证](LICENSE) 开源。
+
+**快速体验（无需模型）**：
+
+```bash
+python3 -m pip install uv==0.12.0 && uv sync --locked
+pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build:static
+./run.sh   # 打开 http://127.0.0.1:8765，内置演示案件；在「AI 阅卷」关闭「使用模型」即可离线体验检索与引用定位
+```
+
+更完整的演示：[合成旧库迁移、复核签发与备份恢复](docs/runbook/migration-demo.md)（可复现命令与五分钟讲解顺序，无需真实卷宗或模型服务）。
 
 ## 1. 项目定位
 
@@ -18,16 +62,17 @@ FastAPI + SQLite 的私有化法律阅卷工作台：多格式卷宗导入、页
 | 有明确使用授权的卷宗数字化与证据整理 | 对外提供法律意见或法条依据（法条引用功能未达验收） |
 | 律师主导、AI 辅助的人机协同流程 | 无人复核的全自动决策 |
 
-当前版本 **v0.3.0**。发布序列：`v0.1.0` 工程基线 → `v0.1.1` 首个 CI 全绿 → `v0.2.0` 治理批次（权限矩阵、OIDC、证据链、审计事件、容器化、供应链扫描）→ `v0.3.0` 可验证源码包与合成案件部署验收。接收者的安装与验收入口见[交付指南](docs/runbook/delivery.md)；版本历史见[企业化改进报告](docs/runbook/enterprise-improvement-report.md)第 10–11 节。
+当前版本 **v0.4.0**。发布序列：`v0.1.0` 工程基线 → `v0.1.1` 首个 CI 全绿 → `v0.2.0` 治理批次（权限矩阵、OIDC、证据链、审计事件、容器化、供应链扫描）→ `v0.3.0` 可验证源码包与合成案件部署验收 → `v0.4.0` Next.js 前端、多人协作（成员分工、人工任务、报告签发）、三组对照评测、本机五人技术试点，以及代码质量整理（接口按领域拆分、lint 与类型门禁、MIT 许可）。`v0.3.0` 及之前的标签属于 2026-10-23 之前的旧提交历史。接收者的安装与验收入口见[交付指南](docs/runbook/delivery.md)；版本历史见[企业化改进报告](docs/runbook/enterprise-improvement-report.md)第 10–11 节。
 
 ### 1.1 仓库结构
 
 ```text
-app/          产品代码：API、Agent 双运行时、检索、语料、权限与审计
+app/          产品代码：生命周期与中间件（main.py）、按领域划分的接口（routes/）、Agent 双运行时、检索、语料、权限与审计
+frontend/     Next.js + React + TypeScript 正式界面，静态构建后由 FastAPI 同源托管
 tests/        离线自动化测试（CI 禁网运行）
 benchmarks/   评测数据集与历史实验产物（LawBench 上游数据、结果 JSON）
 scripts/      发布、运维与维护工具（环境自检、备份、语料构建、发布打包）
-docs/         架构说明、运维手册与工程记录
+docs/         架构说明、运维手册、评测口径与求职材料；过程记录归档在 docs/history/
 
 unified_benchmark_runner.py   模型评测公开入口
 rag_project_benchmark.py      项目 RAG 页级检索回归入口
@@ -209,7 +254,7 @@ docker compose up -d
 - **健康检查**：`GET /api/health`（存活）；`GET /api/system/health`（就绪：启动完成 + 数据库可读才 200，Redis 状态单独报告，批量导入能力随之启停）。
 - **备份恢复**：`scripts/data_snapshot.py` 基于停写快照，含完整性/外键校验、清单哈希与恢复工具；Redis 与 `.env` 不在默认备份内。恢复演练流程见[发布手册](docs/runbook/release.md)。
 - **日志与排查**：`LAW_REVIEW_JSON_LOGS=1` 输出结构化日志；日志不含原始卷宗内容、令牌或连接串。批量导入问题按运维手册的 503/排队排查节处理。
-- **升级**：SQLite schema 有序迁移（当前 v17），拒绝未来版本；跨版本升级前先做备份，迁移失败自动回滚。v13 增加页内子块缓存，v16/v17 增加隔离宿主回执、恢复映射和受控后端调用账本；这些表不自动开放正式模型入口。
+- **升级**：SQLite schema 有序迁移（当前 v26），拒绝未来版本；跨版本升级前先做备份，迁移失败自动回滚。v13 增加页内子块缓存，v16/v17 增加隔离宿主回执、恢复映射和受控后端调用账本（这些表不自动开放正式模型入口），v18–v20 增加多轮会话关联、模型调用账本与聊天请求幂等记录，v23–v26 增加成员与案件分工、人工任务、报告复核与版本化签发。旧库升级已在获准旧库的副本上从 v13 实测到 v26 并验证旧程序回退。
 
 ## 9. 质量保障与评测
 
@@ -221,6 +266,8 @@ uv run --locked mypy
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py \
   scripts/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
+# 本机若存在 output/score85 下的旧法条资产，需显式指定冻结资产根目录，否则两项旧断言会失败（见 docs/benchmarks/collaboration-corpus-recovery-20261028.md）
+# LAW_REVIEW_CORPUS_REGRESSION_ROOT=<冻结资产目录> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest ...
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir frontend contract:check
 pnpm --dir frontend typecheck
@@ -264,23 +311,23 @@ pnpm --dir frontend test:e2e
 
 | 文档 | 内容 |
 |---|---|
-| [文档总入口](docs/README.md) | 全部文档导航 |
+| [文档总入口](docs/README.md) | 六份必读 + 按任务索引 + 历史入口 |
+| [项目说明](docs/portfolio/project-brief.md) | 一页定位、架构、实测结果与未覆盖项 |
+| [面试材料](docs/portfolio/interview-notes.md) | 设计取舍问答与证据位置 |
 | [架构说明](docs/architecture/system.md) | 组件、数据流与运行时边界 |
-| [AI 应用升级计划](docs/history/migration/ai-application-upgrade-plan-20261024.md) | 流式、工具、MCP、评测、路由与未实施项 |
+| [威胁模型](docs/security/threat-model.md) | 资产、信任边界、提示注入与工具越权 |
+| [评测协议](docs/benchmarks/README.md) | 四层指标口径 |
 | [运维手册](docs/runbook/operations.md) | 配置、鉴权、健康检查、故障排查 |
-| [发布手册](docs/runbook/release.md) | 发布白名单、升级与恢复演练 |
-| [质量门禁](docs/runbook/quality.md) | 依赖锁定、干净安装、测试约定 |
-| [组件许可](docs/runbook/licenses.md) | 第三方组件来源、许可与治理 |
-| [42 项修复映射](docs/runbook/improvement-checklist.md) | 历史改进逐项落点 |
-| [企业化改进报告](docs/runbook/enterprise-improvement-report.md) | 分阶段目标、工作包与验收证据（第 10–11 节为已实施记录） |
-| [历史验证记录](docs/runbook/validation-20260905.md) | 2026-09-05 验收快照 |
-| [优化编年史](docs/history/optimization-chronicle.md) | 已归档早期报告的正/负优化与口径裁决 |
+| [质量门禁](docs/runbook/quality.md) | 依赖锁定、lint/类型/测试约定 |
+| [组件许可](docs/runbook/licenses.md) | 第三方组件来源与许可 |
+| [过程文档归档](docs/history/migration/README.md) | 2026-10-21—11-01 的计划书、实施记录与证据 |
 
 ## 11. 维护、支持与合规
 
 - **维护模式**：个人维护项目；问题与变更经本地分支 + CI 验证后合入 `main` 并打版本标签。
 - **已知待验收项**（不因代码合入而视为达标）：真实 OIDC issuer 连通、独立外部审计存储、组织数据保留政策、律师标注验收集、真实硬件容量与 SLA、法律合规评审。进展见企业化改进报告。
-- **许可**：项目尚未指定开源许可证，公开分发前由维护者选择；LawBench 题库等第三方数据的再分发条件见[许可清单](docs/runbook/licenses.md)，题库本体有意不入库。
+- **许可**：源码按 [MIT 许可证](LICENSE) 发布；第三方依赖与 LawBench 题库等数据按各自许可，见[许可清单](docs/runbook/licenses.md)，题库本体有意不入库。
+- **开发方式**：维护者主导设计与验证，编码使用 AI 编程助手辅助；2026-11-01 统一了提交作者，见[作者改写说明](docs/history/author-rewrite-20261101.md)。
 - **隐私**：`.gitignore` 与发布白名单排除案件数据、密钥、模型与运行产物；仓库不含真实卷宗。部署方需按所在辖区法律自行建立数据保留与删除流程。
 
 [架构](docs/architecture/system.md) · [运维](docs/runbook/operations.md) · [发布](docs/runbook/release.md) · [评测](docs/benchmarks/README.md)

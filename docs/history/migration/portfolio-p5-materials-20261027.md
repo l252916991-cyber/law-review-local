@@ -1,5 +1,7 @@
 # 求职展示版 P5：项目说明、面试材料与简历条目
 
+> **2026-11-01 状态更新**：本文写于真实模型对照之前，“质量数字仍留空”“保留集已冻结但未运行”已过时。开发集与保留集结果已回填到[简历条目](../../portfolio/resume-bullets.md)与[项目说明](../../portfolio/project-brief.md)；第 4 节待办中仍未完成的是独立评分人（κ）与主演示录制。
+
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 6 节；素材来源：[P0](portfolio-p0-scope-evidence-20261027.md)、[P1](portfolio-p1-ablation-driver-20261027.md)、[P2](portfolio-p2-precheck-blocked-20261027.md)、[P3](portfolio-p3-demo-status-20261027.md)、[P4](portfolio-p4-reproducible-delivery-20261027.md)。
 - 结论：**材料已成形，质量数字仍留空**。所有已写的数字都能回溯到命令与产物；真实模型对照未完成，因此“提升多少”类表述继续为占位。
