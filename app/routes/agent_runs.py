@@ -15,6 +15,7 @@ from ..context import (
     run_context_identity,
 )
 from ..db import connect, now, transaction
+from ..schemas import AgentRunTrace
 from ..security import actor_name
 from .common import model_operation_error, require_case
 
@@ -214,7 +215,7 @@ def build_vector_index(case_id: int):
         raise model_operation_error(exc, "索引失败，请查看服务端诊断事件") from exc
 
 
-@router.get("/api/agent-runs/{run_id}")
+@router.get("/api/agent-runs/{run_id}", response_model=AgentRunTrace)
 def agent_run_trace(run_id: int):
     from ..agents import get_run_trace
 

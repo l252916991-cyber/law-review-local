@@ -1313,6 +1313,80 @@ export interface components {
              */
             use_remote_embeddings: boolean;
         };
+        /** AgentRunTrace */
+        AgentRunTrace: {
+            /** Id */
+            id: number;
+            /** Case Id */
+            case_id: number;
+            /** Question */
+            question: string;
+            /** Route */
+            route: string;
+            /** Status */
+            status: string;
+            /** Retrieval Mode */
+            retrieval_mode: string;
+            /** Final Answer */
+            final_answer: string;
+            /** Total Ms */
+            total_ms: number;
+            /** Runtime */
+            runtime: string;
+            /** Checkpoint Thread Id */
+            checkpoint_thread_id: string;
+            /** Resume Count */
+            resume_count: number;
+            /** Created At */
+            created_at: string;
+            /** Finished At */
+            finished_at: string;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Resumable */
+            resumable: boolean;
+            /** Steps */
+            steps: components["schemas"]["AgentStep"][];
+            /** Citations */
+            citations: {
+                [key: string]: unknown;
+            }[];
+            /** Usage */
+            usage: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /** AgentStep */
+        AgentStep: {
+            /** Id */
+            id: number;
+            /** Run Id */
+            run_id: number;
+            /** Node Name */
+            node_name: string;
+            /** Agent Role */
+            agent_role: string;
+            /** Status */
+            status: string;
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
+            /** Output */
+            output: {
+                [key: string]: unknown;
+            };
+            /** Latency Ms */
+            latency_ms: number;
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string;
+        } & {
+            [key: string]: unknown;
+        };
         /** AnnotationCreate */
         AnnotationCreate: {
             /**
@@ -1392,6 +1466,55 @@ export interface components {
              */
             description: string;
         };
+        /** CaseDetail */
+        CaseDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Case No */
+            case_no: string;
+            /** Case Type */
+            case_type: string;
+            /** Client Name */
+            client_name: string;
+            /** Status */
+            status: string;
+            /** Description */
+            description: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Lifecycle Status */
+            lifecycle_status: string;
+            /** Archived At */
+            archived_at: string | null;
+            /** Archived By */
+            archived_by: string | null;
+            /** Trashed At */
+            trashed_at: string | null;
+            /** Purge After */
+            purge_after: string | null;
+            /** Version */
+            version: number;
+            metrics: components["schemas"]["CaseMetrics"];
+        } & {
+            [key: string]: unknown;
+        };
+        /** CaseMetrics */
+        CaseMetrics: {
+            /** Documents */
+            documents: number;
+            /** Pages */
+            pages: number;
+            /** Evidence */
+            evidence: number;
+            /** Confirmed */
+            confirmed: number;
+        } & {
+            [key: string]: unknown;
+        };
         /** CaseRoleIn */
         CaseRoleIn: {
             /**
@@ -1399,6 +1522,82 @@ export interface components {
              * @enum {string}
              */
             role: "owner" | "reviewer" | "assistant" | "viewer";
+        };
+        /** CaseRow */
+        CaseRow: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Case No */
+            case_no: string;
+            /** Case Type */
+            case_type: string;
+            /** Client Name */
+            client_name: string;
+            /** Status */
+            status: string;
+            /** Description */
+            description: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Lifecycle Status */
+            lifecycle_status: string;
+            /** Archived At */
+            archived_at: string | null;
+            /** Archived By */
+            archived_by: string | null;
+            /** Trashed At */
+            trashed_at: string | null;
+            /** Purge After */
+            purge_after: string | null;
+            /** Version */
+            version: number;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CaseSummary */
+        CaseSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Case No */
+            case_no: string;
+            /** Case Type */
+            case_type: string;
+            /** Client Name */
+            client_name: string;
+            /** Status */
+            status: string;
+            /** Description */
+            description: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Lifecycle Status */
+            lifecycle_status: string;
+            /** Archived At */
+            archived_at: string | null;
+            /** Archived By */
+            archived_by: string | null;
+            /** Trashed At */
+            trashed_at: string | null;
+            /** Purge After */
+            purge_after: string | null;
+            /** Version */
+            version: number;
+            /** Document Count */
+            document_count: number;
+            /** Page Count */
+            page_count: number;
+            /** Evidence Count */
+            evidence_count: number;
+        } & {
+            [key: string]: unknown;
         };
         /** CaseUpdate */
         CaseUpdate: {
@@ -1441,6 +1640,104 @@ export interface components {
             /** Request Id */
             request_id?: string | null;
         };
+        /** ChatResult */
+        ChatResult: {
+            /** Conversation Id */
+            conversation_id: number;
+            /** Message Id */
+            message_id: number;
+            /** Answer */
+            answer: string;
+            /** Answer Status */
+            answer_status: string;
+            /** Clarification */
+            clarification: {
+                [key: string]: unknown;
+            } | null;
+            /** Route */
+            route: string;
+            /** Semantic Expansion */
+            semantic_expansion: string[];
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            /** Llm Used */
+            llm_used: boolean;
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Validation */
+            validation: {
+                [key: string]: unknown;
+            };
+            /** Citation Check */
+            citation_check: string;
+            /** Rejected Llm Validation */
+            rejected_llm_validation: {
+                [key: string]: unknown;
+            } | null;
+            /** Fallback Reason */
+            fallback_reason: string | null;
+            /** Failure Diagnostic */
+            failure_diagnostic: {
+                [key: string]: unknown;
+            } | null;
+            /** Retrieval Metrics */
+            retrieval_metrics: {
+                [key: string]: unknown;
+            };
+            /** Context */
+            context: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * Citation
+         * @description A citation card produced in this turn: one-to-one with a prompt context.
+         */
+        Citation: {
+            /** Index */
+            index: number;
+            /** Document Id */
+            document_id: number;
+            /** Document Name */
+            document_name: string;
+            /** Page */
+            page: number;
+            /** Quote */
+            quote: string;
+            /** Url */
+            url: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ConversationSummary */
+        ConversationSummary: {
+            /** Id */
+            id: number;
+            /** Case Id */
+            case_id: number;
+            /** User Name */
+            user_name: string;
+            /** Title */
+            title: string;
+            /** Created At */
+            created_at: string;
+            /** Archived At */
+            archived_at: string | null;
+            /** Archive Expires At */
+            archive_expires_at: number | null;
+            /** Archived By */
+            archived_by: string | null;
+            /** Message Count */
+            message_count: number;
+            /** Archived */
+            archived: boolean;
+        } & {
+            [key: string]: unknown;
+        };
         /** DirectoryUpdate */
         DirectoryUpdate: {
             /** Doc Type */
@@ -1455,6 +1752,43 @@ export interface components {
             status?: string | null;
             /** Expected Version */
             expected_version?: number | null;
+        };
+        /** DocumentSummary */
+        DocumentSummary: {
+            /** Id */
+            id: number;
+            /** Case Id */
+            case_id: number;
+            /** Name */
+            name: string;
+            /** Stored Path */
+            stored_path: string;
+            /** Import Key */
+            import_key: string | null;
+            /** Mime Type */
+            mime_type: string;
+            /** Pages */
+            pages: number;
+            /** Status */
+            status: string;
+            /** Doc Type */
+            doc_type: string;
+            /** People */
+            people: string;
+            /** Date Range */
+            date_range: string;
+            /** Summary */
+            summary: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Content Hash */
+            content_hash: string | null;
+            /** Version */
+            version: number;
+        } & {
+            [key: string]: unknown;
         };
         /** EvidenceCreate */
         EvidenceCreate: {
@@ -1508,6 +1842,71 @@ export interface components {
              * @default
              */
             quote: string;
+        };
+        /** EvidenceItem */
+        EvidenceItem: {
+            /** Id */
+            id: number;
+            /** Case Id */
+            case_id: number;
+            /** Title */
+            title: string;
+            /** Category */
+            category: string;
+            /** Fact */
+            fact: string;
+            /** Credibility */
+            credibility: string;
+            /** Source Document Id */
+            source_document_id: number | null;
+            /** Source Page Start */
+            source_page_start: number;
+            /** Source Page End */
+            source_page_end: number;
+            /** Quote */
+            quote: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /** Approved By */
+            approved_by: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Version */
+            version: number;
+            /** Updated At */
+            updated_at: string | null;
+            /** Source Name */
+            source_name: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** EvidenceList */
+        EvidenceList: {
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceItem"][];
+            /** Relations */
+            relations: components["schemas"]["EvidenceRelation"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /** EvidenceRelation */
+        EvidenceRelation: {
+            /** Id */
+            id: number;
+            /** Case Id */
+            case_id: number;
+            /** From Evidence Id */
+            from_evidence_id: number;
+            /** To Evidence Id */
+            to_evidence_id: number;
+            /** Relation Type */
+            relation_type: string;
+            /** Note */
+            note: string;
+        } & {
+            [key: string]: unknown;
         };
         /** EvidenceUpdate */
         EvidenceUpdate: {
@@ -1614,6 +2013,33 @@ export interface components {
             /** Active */
             active?: boolean | null;
         };
+        /** Message */
+        Message: {
+            /** Id */
+            id: number;
+            /** Conversation Id */
+            conversation_id: number;
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
+            /** Route */
+            route: string;
+            /** Created At */
+            created_at: string;
+            /** Provenance Json */
+            provenance_json: string;
+            /** Kind */
+            kind: string;
+            /** Source Run Id */
+            source_run_id: number | null;
+            /** Citations */
+            citations: {
+                [key: string]: unknown;
+            }[];
+        } & {
+            [key: string]: unknown;
+        };
         /** ModelConfigTest */
         ModelConfigTest: {
             /** Base Url */
@@ -1637,6 +2063,27 @@ export interface components {
              * @default
              */
             reason: string;
+        };
+        /** PageView */
+        PageView: {
+            /** Id */
+            id: number;
+            /** Document Id */
+            document_id: number;
+            /** Page No */
+            page_no: number;
+            /** Text */
+            text: string;
+            /** Summary */
+            summary: string;
+            /** Name */
+            name: string;
+            /** Doc Type */
+            doc_type: string;
+            /** Document Version */
+            document_version: number;
+        } & {
+            [key: string]: unknown;
         };
         /** ReadonlyToolCall */
         ReadonlyToolCall: {
@@ -1697,6 +2144,35 @@ export interface components {
              * @default true
              */
             use_remote_embeddings: boolean;
+        };
+        /** SearchHit */
+        SearchHit: {
+            /** Page Id */
+            page_id: number;
+            /** Document Id */
+            document_id: number;
+            /** Name */
+            name: string;
+            /** Page No */
+            page_no: number;
+            /** Text */
+            text: string;
+            /** Summary */
+            summary: string;
+            /** Doc Type */
+            doc_type: string;
+            /** People */
+            people: string;
+            /** Date Range */
+            date_range: string;
+            /** Score */
+            score: number;
+            /** Matches */
+            matches: string[];
+            /** Quote */
+            quote: string;
+        } & {
+            [key: string]: unknown;
         };
         /** TaskAction */
         TaskAction: {
@@ -2724,7 +3200,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CaseSummary"][];
                 };
             };
         };
@@ -2779,7 +3255,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CaseDetail"];
                 };
             };
             /** @description Validation Error */
@@ -2938,7 +3414,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CaseRow"][];
                 };
             };
             /** @description Validation Error */
@@ -3031,7 +3507,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DocumentSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -3199,7 +3675,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PageView"];
                 };
             };
             /** @description Validation Error */
@@ -3299,7 +3775,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SearchHit"][];
                 };
             };
             /** @description Validation Error */
@@ -3330,7 +3806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EvidenceList"];
                 };
             };
             /** @description Validation Error */
@@ -3755,7 +4231,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConversationSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -3848,7 +4324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Message"][];
                 };
             };
             /** @description Validation Error */
@@ -3883,7 +4359,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ChatResult"];
                 };
             };
             /** @description Validation Error */
@@ -4081,7 +4557,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AgentRunTrace"];
                 };
             };
             /** @description Validation Error */

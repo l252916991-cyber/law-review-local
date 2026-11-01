@@ -24,6 +24,7 @@ from ..chat_idempotency import finish as finish_chat_request
 from ..context import ArchivedConversationError, ConversationNotFoundError
 from ..db import CONVERSATION_ARCHIVE_RETENTION_SECONDS, connect, now, purge_expired_conversations, transaction
 from ..llm_usage import token_counts
+from ..schemas import ChatResult, ConversationSummary, Message
 from ..security import actor_name
 from ..services import auto_analyze_case, chat, rowdict
 from .common import model_operation_error, require_case
@@ -68,7 +69,7 @@ def analyze(case_id: int):
     return auto_analyze_case(case_id)
 
 
-@router.get("/api/cases/{case_id}/conversations")
+@router.get("/api/cases/{case_id}/conversations", response_model=list[ConversationSummary])
 def list_conversations(case_id: int):
     require_case(case_id)
     with transaction() as cleanup_conn:
@@ -144,7 +145,7 @@ def delete_conversation(conversation_id: int):
     return {"conversation_id": conversation_id, "deleted": True, "messages_deleted": message_count, "message": "会话及其消息已永久删除，无法恢复"}
 
 
-@router.get("/api/conversations/{conversation_id}/messages")
+@router.get("/api/conversations/{conversation_id}/messages", response_model=list[Message])
 def conversation_messages(conversation_id: int):
     with transaction() as cleanup_conn:
         purge_expired_conversations(cleanup_conn)
@@ -177,7 +178,7 @@ def _replay_chat_result(began: Any) -> dict[str, Any]:
     return stored
 
 
-@router.post("/api/cases/{case_id}/chat")
+@router.post("/api/cases/{case_id}/chat", response_model=ChatResult)
 def case_chat(case_id: int, payload: ChatRequest):
     require_case(case_id)
     request_id = payload.request_id

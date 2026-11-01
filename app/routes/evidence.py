@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..audit_trail import record_field_changes
 from ..db import connect, now, transaction
+from ..schemas import EvidenceList
 from ..security import actor_name, require_case_access, require_permission
 from ..services import preview_gap_analysis, rowdict, save_gap_analysis
 from .common import require_case
@@ -116,7 +117,7 @@ class AnnotationUpdate(BaseModel):
     status: Literal["待处理", "已处理"] | None = None
 
 
-@router.get("/api/cases/{case_id}/evidence")
+@router.get("/api/cases/{case_id}/evidence", response_model=EvidenceList)
 def list_evidence(case_id: int):
     require_case(case_id)
     conn = connect()

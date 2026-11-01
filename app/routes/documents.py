@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from ..audit_trail import record_field_changes
 from ..config import config
 from ..db import connect, now, record_security_event, sync_fts_index, transaction
+from ..schemas import DocumentSummary, PageView, SearchHit
 from ..security import actor_name, require_case_access, require_permission
 from ..services import (
     contained_path,
@@ -78,7 +79,7 @@ class PageTextUpdate(BaseModel):
     reason: str = Field(default="", max_length=300)
 
 
-@router.get("/api/cases/{case_id}/documents")
+@router.get("/api/cases/{case_id}/documents", response_model=list[DocumentSummary])
 def list_documents(case_id: int):
     require_case(case_id)
     conn = connect()
@@ -390,7 +391,7 @@ def document_file(document_id: int, request: Request):
     return PlainTextResponse(text, headers={"Content-Disposition": f'inline; filename="document-{document_id}.txt"'})
 
 
-@router.get("/api/documents/{document_id}/pages/{page_no}")
+@router.get("/api/documents/{document_id}/pages/{page_no}", response_model=PageView)
 def document_page(document_id: int, page_no: int):
     conn = connect()
     try:
@@ -409,7 +410,7 @@ def document_page(document_id: int, page_no: int):
         conn.close()
 
 
-@router.get("/api/cases/{case_id}/search")
+@router.get("/api/cases/{case_id}/search", response_model=list[SearchHit])
 def search(case_id: int, q: str = Query(min_length=1, max_length=500)):
     require_case(case_id)
     return search_pages(case_id, q, 20)

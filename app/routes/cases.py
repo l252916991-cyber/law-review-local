@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..audit_trail import record_field_changes
 from ..db import connect, now, record_security_event, transaction
+from ..schemas import CaseDetail, CaseRow, CaseSummary
 from ..security import actor_name, allowed_case_ids, identity, require_permission
 from ..services import rowdict
 from .common import require_case
@@ -34,7 +35,7 @@ class CaseUpdate(BaseModel):
     expected_version: int | None = Field(default=None, ge=1)
 
 
-@router.get("/api/cases")
+@router.get("/api/cases", response_model=list[CaseSummary])
 def list_cases():
     conn = connect()
     try:
@@ -156,7 +157,7 @@ def trash_case(case_id: int):
     return require_case(case_id)
 
 
-@router.get("/api/cases/lifecycle/{lifecycle_status}")
+@router.get("/api/cases/lifecycle/{lifecycle_status}", response_model=list[CaseRow])
 def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
     require_permission("view")
     conn = connect()
@@ -175,7 +176,7 @@ def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
     finally: conn.close()
 
 
-@router.get("/api/cases/{case_id}")
+@router.get("/api/cases/{case_id}", response_model=CaseDetail)
 def case_detail(case_id: int):
     case = require_case(case_id)
     conn = connect()
