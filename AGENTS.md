@@ -37,8 +37,7 @@
 
 - 纯文档或规则调整：核对内容、路径、命令与 Git 差异；无需运行无关的业务测试。
 - Python 代码调整：运行受影响测试及 `uv run --locked ruff check app tests scripts`；涉及工程脚本或类型配置时运行 `uv run --locked mypy`。
-- 前端脚本调整：运行 `for script in app/static/*.js; do node --check "$script"; done`，并验证受影响的实际页面流程。
-- Next.js 前端调整：在 `frontend/` 使用 `.node-version` 和 `package.json` 固定的工具版本，执行 `pnpm install --frozen-lockfile`、`pnpm contract:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build:static` 与受影响的 `pnpm test:e2e`。正式界面由 FastAPI 托管静态构建，修改后必须重建并确认实际进程加载该构建。遗留 `app/static/*.js` 作为回滚参考保留时，原语法门禁继续执行。
+- Next.js 前端调整：在 `frontend/` 使用 `.node-version` 和 `package.json` 固定的工具版本，执行 `pnpm install --frozen-lockfile`、`pnpm contract:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build:static` 与受影响的 `pnpm test:e2e`。正式界面由 FastAPI 托管静态构建，修改后必须重建并确认实际进程加载该构建。旧版 `app/static/` 前端已于 2026-11-01 删除，需要核对时查看 `v0.4.0` 之前的提交。
 - 修改业务行为或修复缺陷时，按风险补充有实际断言价值的测试，覆盖正常流程与相关异常、边界条件。
 - 跨模块、数据结构、检索链路、依赖或 CI 调整，以及准备合并时，执行现有 CI 对应的完整检查，包括离线测试、覆盖率、依赖导出一致性与发布清单检查。
 - 集成测试使用隔离数据目录和数据库，禁止写入真实案件数据。默认离线执行；需要外部服务或付费模型时先确认任务授权和环境。
@@ -51,7 +50,6 @@
 ```sh
 uv run --locked ruff check app tests scripts
 uv run --locked mypy
-for script in app/static/*.js; do node --check "$script"; done
 pnpm --dir frontend contract:check
 pnpm --dir frontend typecheck
 pnpm --dir frontend lint

@@ -1,7 +1,6 @@
 """Question-level cost estimation (A02.2): snapshot pricing, honest unknown buckets."""
 import json
 import os
-import subprocess
 import tempfile
 import unittest
 from decimal import Decimal
@@ -15,7 +14,6 @@ from app.llm_usage import record_llm_call, usage_summary
 from app.main import app
 from app.pricing import (
     PricingConfigError,
-    PriceSnapshot,
     call_cost,
     format_money,
     load_pricing,
@@ -239,99 +237,6 @@ class CostApiTests(unittest.TestCase):
         self.assertEqual(payload["cost"]["total"], "0.0120 CNY")
         self.assertEqual(payload["cost"]["known_calls"], 1)
         self.assertEqual(payload["turns"][0]["turn_key"], "request:abc")
-
-
-class CostPanelRenderTests(unittest.TestCase):
-    """Drive the real renderer with a stub DOM; no browser required."""
-
-    def _run(self, body: str) -> None:
-        harness = r'''
-const assert = require('node:assert/strict');
-const vm = require('node:vm');
-const fs = require('node:fs');
-const source = fs.readFileSync('app/static/app.js', 'utf8');
-const sliced = source.slice(
-  source.indexOf('async function loadLabMetrics('),
-  source.indexOf('function renderAgentResult(')
-);
-const nodes = new Map();
-const $ = key => { if (!nodes.has(key)) nodes.set(key, {textContent: '', innerHTML: ''}); return nodes.get(key); };
-const $$ = () => [];
-const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'})[char]);
-const context = vm.createContext({console, $, $$, escapeHtml, Number, String});
-vm.runInContext(sliced, context, {filename: 'app.js'});
-const text = id => $(`#${id}`).textContent;
-const html = id => $(`#${id}`).innerHTML;
-'''
-        script = harness + "(async () => {\n" + body + "\n})().catch(e => {console.error(e); process.exitCode = 1;});\n"
-        result = subprocess.run(["node", "-e", script], cwd=ROOT, text=True, capture_output=True, timeout=60)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_unconfigured_pricing_never_renders_zero_money(self):
-        self._run(r'''
-  context.renderCost({calls: 2, turn_count: 1, turns: [{turn_key: 't1', calls: 2, models: ['m'], known_calls: 0, unknown_calls: 2, cost: null, partial_cost: null}],
-    cost: {configured: false, config_error: null, currency: null, mixed_currency: false, unit_tokens: null,
-           version: null, versions: [], source: null, calls: 2, known_calls: 0, no_price_calls: 2,
-           usage_missing_calls: 0, partial_total: null, total: null}});
-  assert.equal(text('usage-cost-total'), '—');
-  assert.equal(text('usage-cost-note'), '2 次调用无单价（未配置成本）');
-  assert.equal(text('usage-cost-scope'), '未配置成本');
-  assert.ok(!html('usage-turns').includes('0.0000'));
-''')
-
-    def test_complete_and_partial_totals_are_labelled(self):
-        self._run(r'''
-  const base = {configured: true, config_error: null, currency: 'CNY', mixed_currency: false,
-    unit_tokens: 1000000, version: '2026-10-25.1', versions: ['2026-10-25.1'], source: 's',
-    calls: 2, known_calls: 2, no_price_calls: 0, usage_missing_calls: 0};
-  context.renderCost({calls: 2, turn_count: 1, turns: [], cost: {...base, partial_total: '0.0120 CNY', total: '0.0120 CNY'}});
-  assert.equal(text('usage-cost-total'), '0.0120 CNY');
-  assert.equal(text('usage-cost-note'), '全部 2 次调用');
-  assert.equal(text('usage-cost-coverage'), '2/2');
-  assert.equal(text('usage-cost-scope'), '定价版本 2026-10-25.1');
-
-  context.renderCost({calls: 3, turn_count: 1, turns: [], cost: {...base, calls: 3, known_calls: 2,
-    usage_missing_calls: 1, partial_total: '0.0120 CNY', total: null}});
-  assert.equal(text('usage-cost-total'), '≥0.0120 CNY');
-  assert.equal(text('usage-cost-note'), '已知部分 · 2/3 次调用可计价');
-  assert.equal(text('usage-cost-coverage'), '2/3');
-''')
-
-    def test_mixed_currency_and_config_errors_are_explicit(self):
-        self._run(r'''
-  context.renderCost({calls: 2, turn_count: 0, turns: [], cost: {configured: true, config_error: null,
-    currency: null, mixed_currency: true, unit_tokens: null, version: null, versions: ['a','b'], source: null,
-    calls: 2, known_calls: 2, no_price_calls: 0, usage_missing_calls: 0, partial_total: null, total: null}});
-  assert.equal(text('usage-cost-total'), '—');
-  assert.equal(text('usage-cost-note'), '多币种不可合计');
-
-  context.renderCost({calls: 1, turn_count: 0, turns: [], cost: {configured: false,
-    config_error: '定价配置不可用（PricingConfigError）', currency: null, mixed_currency: false,
-    unit_tokens: null, version: null, versions: [], source: null, calls: 1, known_calls: 0,
-    no_price_calls: 1, usage_missing_calls: 0, partial_total: null, total: null}});
-  assert.equal(text('usage-cost-scope'), '定价配置不可用');
-  assert.match(text('usage-cost-note'), /定价配置不可用/);
-''')
-
-    def test_turn_rows_escape_the_question_key(self):
-        self._run(r'''
-  context.renderCost({calls: 1, turn_count: 1, turns: [{turn_key: 'request:<script>', calls: 1,
-    models: ['m'], known_calls: 1, unknown_calls: 0, cost: '0.0020 CNY', partial_cost: '0.0020 CNY'}],
-    cost: {configured: true, config_error: null, currency: 'CNY', mixed_currency: false, unit_tokens: 1000000,
-      version: 'v1', versions: ['v1'], source: 's', calls: 1, known_calls: 1, no_price_calls: 0,
-      usage_missing_calls: 0, partial_total: '0.0020 CNY', total: '0.0020 CNY'}});
-  assert.ok(html('usage-turns').includes('request:&lt;script&gt;'));
-  assert.ok(html('usage-turns').includes('0.0020 CNY'));
-  assert.equal(text('usage-turn-count'), '1');
-''')
-
-    def test_missing_summary_is_not_shown_as_unconfigured(self):
-        self._run(r'''
-  context.renderCost(undefined);
-  assert.equal(text('usage-cost-total'), '—');
-  assert.equal(text('usage-cost-note'), '指标缺失');
-  assert.equal(text('usage-cost-scope'), '指标不可用');
-''')
 
 
 if __name__ == "__main__":

@@ -221,7 +221,6 @@ uv run --locked mypy
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py \
   scripts/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
-for script in app/static/*.js; do node --check "$script"; done
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir frontend contract:check
 pnpm --dir frontend typecheck

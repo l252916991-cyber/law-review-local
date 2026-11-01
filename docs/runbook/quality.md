@@ -27,7 +27,7 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 - Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行关键语法/未定义名检查；不宣称全套风格规则已达标。
 - mypy：先纳管 `scripts/`，要求函数类型；历史业务模块的类型迁移逐步扩大，不用全仓 `ignore_errors` 掩盖问题。
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
-- 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`；`app/static/*.js` 作为历史回滚参考保留时继续语法检查。详见[前端运行手册](frontend.md)。
+- 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`。旧版 `app/static/` 前端已于 2026-11-01 删除，不再有对应门禁。详见[前端运行手册](frontend.md)。
 
 ## 真实页面流程验证
 

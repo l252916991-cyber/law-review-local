@@ -54,7 +54,6 @@ jobs:
           uv run --locked python -m compileall -q app tests scripts
           uv run --locked ruff check app tests scripts
           uv run --locked mypy
-          for script in app/static/*.js; do node --check "$script"; done
       - name: Install separate framework interpreter from the reviewed wheel
         run: |
           uv run --locked python -m scripts.setup_framework --output "$RUNNER_TEMP/lexvault-framework"

@@ -18,7 +18,7 @@
 | ESLint | 9.39.5 | MIT |
 | Prettier | 3.9.10 | MIT |
 
-录屏使用 Playwright 管理的 FFmpeg 1013，本机缓存附 COPYING.LGPLv2.1；二进制不进入源码发布包。新前端通过 Next 构建生成，不再从正式路由加载下列历史 vendored 库；归档文件的声明继续保留。
+录屏使用 Playwright 管理的 FFmpeg 1013，本机缓存附 COPYING.LGPLv2.1；二进制不进入源码发布包。新前端通过 Next 构建生成。下列历史 vendored 库随旧版 `app/static/` 前端于 2026-11-01 从仓库删除，声明保留供核对旧版本。
 
 项目源码自 2026-11-01 起按 [MIT 许可证](../../LICENSE) 发布（维护者选择）。MIT 只覆盖本仓库作者编写的代码与文档；第三方依赖、vendored 组件和 LawBench 等数据继续按各自许可，题库本体不入库，不因项目采用 MIT 而改变再分发条件。
 
@@ -30,7 +30,7 @@
 |---|---|---|
 | [pi-mono](https://github.com/badlogic/pi-mono)（`pi-ai` 包） | MIT | 仅参照其文档描述的 provider / wire-api 二分、`ModelSpec` 可序列化字段、跨 provider 交接丢弃 thinking 块三条约定；`app/model_ports.py` 为独立实现，未复制源码 |
 
-## Vendored 前端库
+## 已删除的 Vendored 前端库（v0.4.0 之前的版本）
 
 | 文件 | 组件 | 许可声明 |
 |---|---|---|
