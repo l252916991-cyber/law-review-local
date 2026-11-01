@@ -533,7 +533,8 @@ def _register_oidc_session(subject: str, flow=None) -> str:
                 # Refund only this flow's reservation in its original window.
                 # A late callback must not decrement a newer window's count.
                 conn.execute(
-                    "UPDATE auth_login_limits SET attempts=MAX(0,attempts-1) WHERE bucket=? AND expires_at=?",
+                    "UPDATE auth_login_limits SET attempts=CASE WHEN attempts > 0 THEN attempts-1 ELSE 0 END "
+                    "WHERE bucket=? AND expires_at=?",
                     (flow["limit_bucket"], flow["limit_expires_at"]),
                 )
     except HTTPException:
@@ -703,7 +704,7 @@ def _check_login_limit(conn, bucket: str, limit: int = LOGIN_LIMIT) -> None:
 def _count_login_attempt(conn, bucket: str) -> None:
     conn.execute(
         "INSERT INTO auth_login_limits(bucket,attempts,expires_at) VALUES (?,1,?) "
-        "ON CONFLICT(bucket) DO UPDATE SET attempts=attempts+1",
+        "ON CONFLICT(bucket) DO UPDATE SET attempts=auth_login_limits.attempts+1",
         (bucket, int(time.time()) + LOGIN_WINDOW),
     )
 

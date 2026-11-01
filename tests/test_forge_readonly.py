@@ -65,6 +65,8 @@ def prepare(session):
 
 
 class SnapshotHostTests(IsolatedDatabaseTestCase):
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
         init_db(seed=True)
@@ -194,6 +196,8 @@ FRAMEWORK_PYTHON = os.getenv("LAW_REVIEW_FORGE_PYTHON", "")
 
 @unittest.skipUnless(FRAMEWORK_PYTHON, "set LAW_REVIEW_FORGE_PYTHON to the separately installed Python 3.12 sidecar")
 class FrameworkProcessTests(IsolatedDatabaseTestCase):
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
         init_db(seed=True)

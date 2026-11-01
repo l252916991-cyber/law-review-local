@@ -11,6 +11,7 @@ from pathlib import Path
 from threading import BoundedSemaphore, Event
 from unittest.mock import patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -321,6 +322,7 @@ class ReviewJobTests(unittest.TestCase):
         self.assertEqual(coordinator.principal.name, name)
         self.assertFalse(coordinator.principal.admin)
 
+    @pytest.mark.sqlite_only("resolves the SQLite file from LAW_REVIEW_DATA_DIR")
     def test_environment_derived_database_is_frozen_before_execution(self):
         coordinator = FakeCoordinator(1)
         marker = _scoped_db.set(None)

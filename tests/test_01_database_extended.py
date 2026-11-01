@@ -14,7 +14,8 @@ from tests.support import IsolatedDatabaseTestCase
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-db-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, now, sync_fts_index, transaction  # noqa: E402
+from app.db import connect, init_db, now, sync_fts_index, table_names, transaction  # noqa: E402
+from app.search_backend import fts_page_candidates  # noqa: E402
 
 
 def insert_case(conn, title, case_no):
@@ -369,7 +370,7 @@ class DatabaseCrossCaseIsolationTest(IsolatedDatabaseTestCase):
             case_n_id = insert_case(tx, "案件N", "AGENT-002")
 
             # 检查表结构
-            tables = [t[0] for t in tx.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            tables = table_names(tx)
             if "agent_runs" not in tables:
                 self.skipTest("agent_runs 表不存在")
 
@@ -414,8 +415,9 @@ class DatabaseFTS5Test(IsolatedDatabaseTestCase):
         sync_fts_index()
 
         with closing(connect()) as conn, conn:
-            results = conn.execute("SELECT COUNT(*) FROM pages_fts WHERE pages_fts MATCH ?", ("合同",)).fetchone()[0]
-            self.assertGreater(results, 0, "FTS 索引应该包含内容")
+            # The backend's own full-text query: FTS5 MATCH or PostgreSQL tsvector.
+            results = fts_page_candidates(conn, ["合同"], case_id, 10)
+            self.assertGreater(len(results), 0, "FTS 索引应该包含内容")
 
     def test_fts_search_returns_relevant_pages(self):
         """FTS 搜索应该返回相关页面"""
@@ -428,7 +430,7 @@ class DatabaseFTS5Test(IsolatedDatabaseTestCase):
 
         with closing(connect()) as conn, conn:
             # 检查 FTS 表是否存在
-            tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            tables = table_names(conn)
             if "pages_fts" not in tables:
                 self.skipTest("pages_fts 表不存在")
 

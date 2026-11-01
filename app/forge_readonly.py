@@ -28,7 +28,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from . import agents
-from .db import connect, db_scope, get_db_path, init_db
+from .db import SQLITE_FILE_ONLY, connect, database_url, db_scope, get_db_path, init_db
 from .forge_governance import BackendLedger
 from .forge_sources import statute_source, verify_statutes
 from .host_ports import (
@@ -42,7 +42,7 @@ from .host_ports import (
 )
 from .legal_corpus import LegalCorpus
 from .runtime_adapter import current_actor_identity
-from .runtime_ports import DEFAULT_TENANT_ID, AccessDeniedError, RunRequest
+from .runtime_ports import DEFAULT_TENANT_ID, AccessDeniedError, RunRequest, UnsupportedCapabilityError
 from .security import require_case_access, require_permission
 
 
@@ -129,6 +129,8 @@ class ReadonlyCaseSession:
         self.actor = current_actor_identity()
         if self.actor != request.actor:
             raise AccessDeniedError("request actor does not match the authenticated principal")
+        if database_url():
+            raise UnsupportedCapabilityError(SQLITE_FILE_ONLY)
         self.source = get_db_path().resolve(strict=True)
         self.max_pages, self.max_chars = max_pages, max_chars
         self.outputs: dict[str, Any] = {}

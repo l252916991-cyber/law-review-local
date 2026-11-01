@@ -12,6 +12,9 @@ from unittest.mock import patch
 from app.bank_transactions import parse_csv
 from scripts.seed_demo_case import _bank_transactions, _documents, _evidence, seed
 
+#: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
+SQLITE_ONLY = "the seeding tool writes the SQLite file in --data-dir"
+
 
 class DemoCaseSeedTests(unittest.TestCase):
     def _seed(self, directory: str) -> dict:

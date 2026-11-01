@@ -77,3 +77,65 @@ def synthetic_lawbench(tmp_path_factory):
         yield
     lawbench.load_task.cache_clear()
     task_label_space.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def postgres_database_per_test(request):
+    """With LAW_REVIEW_TEST_POSTGRES_URL, every test gets an empty PostgreSQL database.
+
+    Tests that pick their own SQLite file (``db_scope``, a patched ``DB_PATH``)
+    keep it: an explicit file scope wins over the URL. Classes built on
+    ``IsolatedDatabaseTestCase`` manage one database per class instead, and a
+    module or class that sets ``SQLITE_ONLY`` / ``sqlite_only`` is about the
+    SQLite file itself and runs on SQLite.
+    """
+    admin_url = os.environ.get("LAW_REVIEW_TEST_POSTGRES_URL")
+    from tests.support import IsolatedDatabaseTestCase
+
+    if (not admin_url or getattr(request.module, "SQLITE_ONLY", "")
+            or request.node.get_closest_marker("sqlite_only") is not None
+            or (request.cls is not None and issubclass(request.cls, IsolatedDatabaseTestCase))):
+        yield
+        return
+    import uuid
+
+    from app.db_postgres import create_database, drop_database
+
+    name = f"lexvault_f_{os.getpid()}_{uuid.uuid4().hex[:12]}"
+    url = create_database(admin_url, name)
+    try:
+        with patch.dict(os.environ, {"LAW_REVIEW_DATABASE_URL": url}):
+            yield
+    finally:
+        drop_database(admin_url, name)
+
+
+_POSTGRES_TESTS: set[str] = set()
+_ALL_TESTS: set[str] = set()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    if not os.environ.get("LAW_REVIEW_TEST_POSTGRES_URL"):
+        yield
+        return
+    from app import db_postgres
+
+    before = db_postgres.connections_opened
+    yield
+    _ALL_TESTS.add(item.nodeid)
+    if db_postgres.connections_opened > before:
+        _POSTGRES_TESTS.add(item.nodeid)
+
+
+def pytest_terminal_summary(terminalreporter):
+    if not os.environ.get("LAW_REVIEW_TEST_POSTGRES_URL"):
+        return
+    line = (f"PostgreSQL: {len(_POSTGRES_TESTS)} of {len(_ALL_TESTS)} executed tests opened a "
+            "PostgreSQL connection; the rest did not touch a database or are marked sqlite_only")
+    terminalreporter.write_line(line)
+    report = os.environ.get("LAW_REVIEW_TEST_POSTGRES_REPORT")
+    if report:
+        Path(report).parent.mkdir(parents=True, exist_ok=True)
+        Path(report).write_text(json.dumps({"postgres_tests": sorted(_POSTGRES_TESTS),
+                                            "executed_tests": len(_ALL_TESTS)}, indent=1), encoding="utf-8")

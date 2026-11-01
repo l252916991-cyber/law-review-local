@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--endpoint", help="model mode: loopback OpenAI-compatible base URL")
     parser.add_argument("--model", help="model mode: model id served by the endpoint")
+    parser.add_argument("--postgres", metavar="ADMIN_URL",
+                        help="run against a throwaway PostgreSQL database created through this URL")
     parser.add_argument("--report", type=Path, help="write the full JSON report here")
     parser.add_argument("--markdown", type=Path, help="append a Markdown summary here (e.g. $GITHUB_STEP_SUMMARY)")
     parser.add_argument("--update-baseline", action="store_true")
@@ -58,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with tempfile.TemporaryDirectory(prefix="lexvault-eval-gate-") as directory:
             report = run(args.mode, dataset_path=args.dataset.resolve(), workdir=Path(directory),
-                         endpoint=args.endpoint, model=args.model)
+                         endpoint=args.endpoint, model=args.model, postgres_admin_url=args.postgres)
         verdict = compare(report, baseline) if baseline and not args.update_baseline else None
         if args.update_baseline:
             new = baseline_from(report, reason=args.reason, previous=baseline)

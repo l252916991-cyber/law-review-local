@@ -7,8 +7,10 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("LAW_REVIEW_DATA_DIR", ROOT / "data"))
@@ -17,6 +19,7 @@ EXPORT_DIR = DATA_DIR / "exports"
 DB_PATH = DATA_DIR / "law_review.db"
 _INITIAL_DB_PATH = DB_PATH
 _scoped_db: ContextVar[Path | None] = ContextVar("lexvault_db", default=None)
+_scoped_url: ContextVar[str | None] = ContextVar("lexvault_database_url", default=None)
 
 
 def get_db_path() -> Path:
@@ -29,11 +32,85 @@ def get_db_path() -> Path:
 
 @contextmanager
 def db_scope(path: str | Path):
+    """Route connections in this context to one SQLite file (innermost scope wins)."""
     token = _scoped_db.set(Path(path))
+    url_token = _scoped_url.set(None)
     try:
         yield
     finally:
+        _scoped_url.reset(url_token)
         _scoped_db.reset(token)
+
+
+@contextmanager
+def postgres_scope(url: str):
+    """Route connections in this context to one PostgreSQL database (innermost scope wins)."""
+    token = _scoped_url.set(url)
+    db_token = _scoped_db.set(None)
+    try:
+        yield
+    finally:
+        _scoped_db.reset(db_token)
+        _scoped_url.reset(token)
+
+
+@dataclass(frozen=True)
+class PostgresTarget:
+    url: str
+
+
+DatabaseTarget = Path | PostgresTarget
+
+
+def current_target() -> DatabaseTarget:
+    """The database this context uses, for re-entering it from another thread."""
+    url = database_url()
+    return PostgresTarget(url) if url else get_db_path()
+
+
+@contextmanager
+def target_scope(target: DatabaseTarget):
+    if isinstance(target, PostgresTarget):
+        with postgres_scope(target.url):
+            yield
+    else:
+        with db_scope(target):
+            yield
+
+
+def database_url() -> str | None:
+    """The PostgreSQL URL in effect, or ``None`` for the SQLite file.
+
+    An explicit ``db_scope`` (a SQLite file such as a snapshot) wins over the
+    environment, so file-based features keep working on a PostgreSQL deployment.
+    """
+    scoped = _scoped_url.get()
+    if scoped:
+        return scoped
+    if _scoped_db.get() is not None or DB_PATH != _INITIAL_DB_PATH:
+        return None
+    return os.getenv("LAW_REVIEW_DATABASE_URL") or None
+
+
+#: Features that copy or open the SQLite *file* (snapshots for the isolated
+#: framework sidecar) are refused on PostgreSQL instead of silently reading a
+#: stale or missing file.
+SQLITE_FILE_ONLY = "该功能基于 SQLite 文件快照，PostgreSQL 部署暂不支持"
+
+
+def table_names(conn: sqlite3.Connection) -> set[str]:
+    """Tables and views visible on this connection, on either backend."""
+    from .search_backend import is_postgres
+
+    if is_postgres(conn):
+        query = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()"
+    else:
+        query = "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+    return {row[0] for row in conn.execute(query)}
+
+
+def backend_name() -> str:
+    return "postgresql" if database_url() else "sqlite"
 
 
 def now() -> str:
@@ -49,6 +126,12 @@ def ensure_dirs() -> None:
 
 def connect() -> sqlite3.Connection:
     ensure_dirs()
+    url = database_url()
+    if url:
+        from .db_postgres import PgConnection
+
+        # PgConnection implements the sqlite3.Connection surface the app uses.
+        return cast(sqlite3.Connection, PgConnection(url))
     conn = sqlite3.connect(get_db_path(), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -1066,6 +1149,18 @@ def purge_expired_conversations(conn: sqlite3.Connection, current_epoch: int | N
 
 def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
     ensure_dirs()
+    url = database_url()
+    if url:
+        from .db_postgres import apply_schema
+
+        # PostgreSQL starts at the latest schema; SQLite upgrades step by step.
+        apply_schema(url, SCHEMA_VERSION)
+    else:
+        _migrate_sqlite()
+    _finish_init(seed, recover_runs)
+
+
+def _migrate_sqlite() -> None:
     with transaction() as conn:
         conn.execute("BEGIN IMMEDIATE")
         version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -1080,6 +1175,9 @@ def init_db(seed: bool = True, *, recover_runs: bool = False) -> None:
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
             conn.execute(f"PRAGMA user_version = {target}")
+
+
+def _finish_init(seed: bool, recover_runs: bool) -> None:
     if seed:
         seed_demo()
     # A synchronous local-model call can be interrupted by an app restart.

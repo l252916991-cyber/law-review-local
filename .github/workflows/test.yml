@@ -82,3 +82,59 @@ jobs:
           path: output/ci/
           if-no-files-found: warn
           retention-days: 14
+
+  postgres:
+    # The same offline suite with PostgreSQL + pgvector as the database. Every
+    # test gets its own database; tests about the SQLite file itself stay on
+    # SQLite (marked sqlite_only). pgvector comes from the Ubuntu archive, the
+    # same 0.6.0 build used for the recorded benchmark.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      LAW_REVIEW_AUTH_MODE: local
+      LAW_REVIEW_LLM_URL: http://127.0.0.1:1/v1
+      REDIS_URL: redis://127.0.0.1:1/0
+      PYTHONHASHSEED: '0'
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Start PostgreSQL 16 with pgvector
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-16 postgresql-16-pgvector
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/pg" -U postgres --auth=trust -E UTF8 --locale=C.UTF-8
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/pg" -l "$RUNNER_TEMP/pg.log" \
+            -o "-p 55432 -k $RUNNER_TEMP -c listen_addresses=127.0.0.1 -c max_connections=300 -c fsync=off" start
+          echo "LAW_REVIEW_TEST_POSTGRES_URL=host=127.0.0.1 port=55432 user=postgres dbname=postgres" >> "$GITHUB_ENV"
+      - name: Install locked dependencies
+        run: |
+          python -m pip install uv==0.12.0
+          uv sync --locked --group dev --python "$(command -v python)"
+      - name: Schema generated from the current SQLite migrations
+        run: uv run --locked python scripts/generate_postgres_schema.py --check
+      - name: Answer-quality gate on PostgreSQL
+        run: |
+          mkdir -p output/ci
+          uv run --locked python scripts/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL" \
+            --report output/ci/eval-gate-postgres.json --markdown "$GITHUB_STEP_SUMMARY"
+      - name: Offline tests against PostgreSQL
+        run: |
+          export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
+          export LAW_REVIEW_TEST_POSTGRES_REPORT=output/ci/postgres-tests.json
+          set -o pipefail
+          uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py scripts/test_snapshot_runtime.py \
+            -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
+            --junitxml=output/ci/junit-postgres.xml --cov=app --cov-branch --cov-report=term:skip-covered \
+            --cov-report=json:output/ci/coverage-postgres.json 2>&1 | tee output/ci/pytest-postgres.log
+      - name: Upload PostgreSQL test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: offline-results-postgresql
+          path: output/ci/
+          if-no-files-found: warn

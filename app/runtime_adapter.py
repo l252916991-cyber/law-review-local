@@ -47,7 +47,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from . import agents, langgraph_agents
-from .db import connect, db_scope, get_db_path, now, transaction
+from .db import connect, current_target, now, target_scope, transaction
 from .runtime_ports import (
     DEFAULT_TENANT_ID,
     EXECUTION_MODE_SYNC,
@@ -114,7 +114,7 @@ def current_actor_identity() -> ActorIdentity:
 def _with_database_scope(method: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(method)
     def scoped(*args: Any, **kwargs: Any) -> Any:
-        with db_scope(get_db_path()):
+        with target_scope(current_target()):
             return method(*args, **kwargs)
     return scoped
 

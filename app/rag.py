@@ -1,8 +1,9 @@
 """Hybrid retrieval and persistent semantic memory.
 
-The implementation intentionally keeps orchestration framework-agnostic: SQLite
-FTS5 provides BM25 keyword recall, the local oMLX embedding endpoint provides
-semantic recall, and Reciprocal Rank Fusion combines the two ranked lists.
+The implementation intentionally keeps orchestration framework-agnostic: full
+text (SQLite FTS5 or PostgreSQL tsvector, see ``search_backend``) provides
+keyword recall, the local oMLX embedding endpoint provides semantic recall, and
+Reciprocal Rank Fusion combines the two ranked lists.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from .config import LLMConfig
 from .db import connect, now, transaction
 from .forge_governance import governed_backend
 from .rag_chunks import DEFAULT_CHUNK_PROFILE
+from .search_backend import fts_page_candidates, scored_page_vectors
 from .services import (
     assert_model_endpoint_allowed,
     best_quote,
@@ -324,19 +326,9 @@ class HybridRetriever:
         terms = [term for term in query_terms(query) if len(term) >= 2][:12]
         if not terms:
             return search_pages(self.case_id, query, limit, allow_fallback=any(term in query for term in ("本案", "证据", "疏漏", "缺失", "待补", "卷宗")))
-        match = " OR ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
         conn = connect()
         try:
-            rows = conn.execute(
-                """
-                SELECT page_id, document_id, page_no, document_name AS name, doc_type, text,
-                       bm25(pages_fts, 0, 0, 0, 0, 1.6, 1.2, 1.0) AS bm25_score
-                FROM pages_fts WHERE pages_fts MATCH ? AND case_id = ?
-                ORDER BY bm25_score LIMIT ?
-                """,
-                (match, self.case_id, limit),
-            ).fetchall()
-            results = [rowdict(row) for row in rows]
+            results = [rowdict(row) for row in fts_page_candidates(conn, terms, self.case_id, limit)]
         except Exception as exc:
             self.keyword_diagnostics = {"fts_available": False, "error_type": type(exc).__name__}
             logger.warning("fts_fallback case_id=%s error_type=%s", self.case_id, type(exc).__name__)
@@ -446,40 +438,25 @@ class HybridRetriever:
                                 "remote_embedding_unavailable" if query_failure else
                                 "offline_embeddings_requested" if not self.embedding_client.prefer_remote else None),
         }
+        # Hash collisions are not evidence of semantic relevance: the hashed
+        # fallback only keeps pages that contain a query term.
+        required = ([term for term in query_terms(query) if len(term) >= 2]
+                    if backend == "hashed-local" else None)
         conn = connect()
         try:
-            rows = conn.execute(
-                """
-                SELECT p.id AS page_id, p.page_no, p.text, d.id AS document_id,
-                       d.name, d.doc_type, e.vector_json, e.backend, e.model, e.dimensions
-                FROM embedding_cache e JOIN pages p ON p.id = e.page_id
-                JOIN documents d ON d.id = p.document_id WHERE d.case_id = ?
-                """,
-                (self.case_id,),
-            ).fetchall()
+            scored, skipped = scored_page_vectors(
+                conn, case_id=self.case_id, query_vector=query_vector, backend=backend, model=model,
+                required_terms=required, limit=limit,
+            )
         finally:
             conn.close()
-        scored = []
-        for row in rows:
-            item = rowdict(row)
-            page_vector = decode_vector(item.pop("vector_json"), len(query_vector))
-            if (item["backend"] != backend or item["model"] != model or
-                    item["dimensions"] != len(query_vector) or not page_vector):
-                self.vector_diagnostics["incompatible_vectors_skipped"] += 1
-                continue
-            if backend == "hashed-local" and not any(
-                term in item["text"] for term in query_terms(query) if len(term) >= 2
-            ):
-                # Hash collisions are not evidence of semantic relevance.
-                continue
-            score = cosine_similarity(query_vector, page_vector)
-            if score > 0:
-                item["vector_score"] = round(score, 6)
-                item["query_embedding_backend"] = backend
-                item["quote"] = best_quote(item["text"], query_terms(query))
-                scored.append((score, item))
-        scored.sort(key=lambda value: -value[0])
-        output = [item for _, item in scored[:limit]]
+        self.vector_diagnostics["incompatible_vectors_skipped"] += skipped
+        output = []
+        for score, item in scored:
+            item["vector_score"] = round(score, 6)
+            item["query_embedding_backend"] = backend
+            item["quote"] = best_quote(item["text"], query_terms(query))
+            output.append(item)
         for rank, item in enumerate(output, 1):
             item["vector_rank"] = rank
         return output

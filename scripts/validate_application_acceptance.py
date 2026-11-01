@@ -36,6 +36,7 @@ def loopback_endpoint(value: str) -> str:
 def isolated_environment(directory: Path, endpoint: str, model: str, fallback: str) -> Iterator[None]:
     values = {
         "LAW_REVIEW_DATA_DIR": str(directory),
+        "LAW_REVIEW_DATABASE_URL": "",  # isolated SQLite file, never a configured PostgreSQL
         "LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB": str(directory / "checkpoints.sqlite"),
         "LAW_REVIEW_AUTH_MODE": "local", "LAW_REVIEW_ALLOW_REMOTE_MODELS": "off",
         "LAW_REVIEW_LLM_URL": endpoint, "LAW_REVIEW_LLM_MODEL": model,

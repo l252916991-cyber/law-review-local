@@ -110,6 +110,9 @@ class BackendGovernanceTests(unittest.TestCase):
 
 @unittest.skipUnless(os.getenv("LAW_REVIEW_FORGE_PYTHON"), "separate framework interpreter required")
 class GovernedModelProcessTests(IsolatedDatabaseTestCase):
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    sqlite_only = "framework snapshot reads the SQLite file"
+
     @classmethod
     def setUpClass(cls):
         init_db(seed=True)

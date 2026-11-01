@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from scripts.collaboration_acceptance import run_checks
 
+#: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
+SQLITE_ONLY = "installation checks and the backup drill read the SQLite data directory"
+
 ADMIN_TOKEN = "a" * 40
 
 

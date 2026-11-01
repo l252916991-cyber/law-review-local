@@ -18,7 +18,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .db import connect, db_scope, get_db_path, init_db, now, transaction
+from .db import SQLITE_FILE_ONLY, connect, database_url, db_scope, get_db_path, init_db, now, transaction
 from .runtime_ports import (
     DEFAULT_TENANT_ID,
     MAX_PAGE_TEXT_CHARS,
@@ -26,6 +26,7 @@ from .runtime_ports import (
     ContractValidationError,
     RequestConflictError,
     RunScope,
+    UnsupportedCapabilityError,
     WriteAction,
     WriteReceipt,
     WriteRequest,
@@ -148,6 +149,8 @@ class LocalHostWritePort:
     _database_guard = staticmethod(isolated_guard)
 
     def __init__(self, scope: RunScope):
+        if database_url():
+            raise UnsupportedCapabilityError(SQLITE_FILE_ONLY)
         self.scope, self.path = scope, get_db_path().resolve()
         self.principal_key = authorize(scope)
         with closing(connect()) as conn:

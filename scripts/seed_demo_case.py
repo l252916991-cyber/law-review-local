@@ -1484,6 +1484,9 @@ def seed(data_dir: Path, *, seed_value: int = 20260911) -> dict[str, Any]:
     data_dir = data_dir.expanduser().resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
     os.environ["LAW_REVIEW_DATA_DIR"] = str(data_dir)
+    # The target is the SQLite file in this data directory, never a configured
+    # PostgreSQL database (which may hold real cases).
+    os.environ["LAW_REVIEW_DATABASE_URL"] = ""
     os.environ.setdefault("LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB", str(data_dir / "checkpoints.sqlite"))
     os.environ.setdefault("LAW_REVIEW_AUTH_MODE", "local")
 

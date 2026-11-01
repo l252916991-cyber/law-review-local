@@ -1,0 +1,58 @@
+{
+  "pages_per_case": 10000,
+  "cases": 5,
+  "dimensions": 384,
+  "queries": 30,
+  "limit": 20,
+  "embedding": "hashed-local (synthetic)",
+  "within_case": {
+    "sqlite_python_scan": {
+      "p50_ms": 1288.82,
+      "p95_ms": 1600.61,
+      "max_ms": 1715.61
+    },
+    "postgresql_pgvector_exact": {
+      "p50_ms": 47.99,
+      "p95_ms": 62.23,
+      "max_ms": 64.25
+    },
+    "top_k_overlap": 1.0,
+    "identical_order": 30
+  },
+  "cross_case": {
+    "index_build_seconds": 20.6,
+    "exact_cross_case": {
+      "p50_ms": 38.8,
+      "p95_ms": 43.44,
+      "max_ms": 46.7
+    },
+    "hnsw": [
+      {
+        "ef_search": 40,
+        "p50_ms": 2.62,
+        "p95_ms": 3.41,
+        "max_ms": 4.37,
+        "recall_at_k": 0.5033
+      },
+      {
+        "ef_search": 100,
+        "p50_ms": 2.91,
+        "p95_ms": 3.88,
+        "max_ms": 4.81,
+        "recall_at_k": 0.6867
+      },
+      {
+        "ef_search": 200,
+        "p50_ms": 6.02,
+        "p95_ms": 6.76,
+        "max_ms": 8.17,
+        "recall_at_k": 0.8667
+      }
+    ]
+  },
+  "postgresql": {
+    "server": "16.15",
+    "pgvector": "0.6.0"
+  },
+  "sqlite": "3.45.1"
+}

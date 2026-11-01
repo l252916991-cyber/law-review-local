@@ -11,6 +11,9 @@ from unittest.mock import patch
 
 from scripts.capacity_seed import build_page_text, seed
 
+#: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
+SQLITE_ONLY = "the seeding tool writes the SQLite file in --data-dir"
+
 
 class SeedTests(unittest.TestCase):
     def test_seed_creates_expected_counts(self) -> None:

@@ -61,6 +61,8 @@ class StatuteIntegrityTests(unittest.TestCase):
 
 
 class SourceBoundaryTests(IsolatedDatabaseTestCase):
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
         init_db(seed=True)

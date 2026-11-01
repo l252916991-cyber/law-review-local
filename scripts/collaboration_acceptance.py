@@ -380,6 +380,9 @@ def run_checks(
 ) -> dict[str, Any]:
     data_dir = data_dir.expanduser().resolve()
     os.environ["LAW_REVIEW_DATA_DIR"] = str(data_dir)
+    # The target is the SQLite file in this data directory, never a configured
+    # PostgreSQL database (which may hold real cases).
+    os.environ["LAW_REVIEW_DATABASE_URL"] = ""
     db_path = _db_path(data_dir)
     checks = check_environment(require_ocr)
     checks.extend(check_storage(data_dir))

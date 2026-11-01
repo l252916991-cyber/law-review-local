@@ -270,6 +270,7 @@ def test_settings_change_invalidates_flow(enterprise, provider, monkeypatch):
     assert provider["data"] is None
 
 
+@pytest.mark.sqlite_only("SQLite schema migration from v10; PostgreSQL starts at the latest schema")
 def test_v10_migration_preserves_absolute_lifetime(tmp_path, monkeypatch):
     monkeypatch.setenv("LAW_REVIEW_DATA_DIR", str(tmp_path))
     with monkeypatch.context() as context:
@@ -318,6 +319,7 @@ def test_same_nat_many_successes_refund_only_own_reservation(enterprise, provide
         assert conn.execute("SELECT attempts FROM auth_login_limits").fetchone()[0] == 1
 
 
+@pytest.mark.sqlite_only("injects the failure with a SQLite trigger")
 def test_rotation_failure_rolls_back_old_session_and_refund(enterprise, provider):
     client, _ = enterprise
     client.post("/api/auth/session", json={"token": TOKEN})

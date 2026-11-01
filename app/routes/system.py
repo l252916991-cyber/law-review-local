@@ -8,13 +8,14 @@ import os
 import sqlite3
 import urllib.parse
 import urllib.request
+from contextlib import closing
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from ..config import LLMConfig, clear_model_override, load_model_override, save_model_override
-from ..db import connect, get_db_path, record_security_event
+from ..db import connect, database_url, get_db_path, record_security_event
 from ..security import actor_name, identity, require_permission
 from ..services import assert_model_endpoint_allowed, local_llm_available, rowdict
 from ..statutory_retrieval import corpus_status
@@ -164,6 +165,10 @@ async def system_health():
     database_ok = False
     if getattr(app_state(), "ready", False):
         def check_database():
+            if database_url():
+                with closing(connect()) as pg:
+                    pg.execute("SELECT id FROM cases LIMIT 1").fetchone()
+                return
             # Never create a missing database or alter journal mode during a probe.
             conn = sqlite3.connect(get_db_path().resolve().as_uri() + "?mode=ro", uri=True, timeout=1)
             try:

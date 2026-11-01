@@ -80,6 +80,8 @@ def write_corpus(directory: Path, text: str = "当前受控合成原文。"):
 class HostReadPortTestCase(IsolatedDatabaseTestCase):
     """Shared helpers; concrete classes declare their own seeded setUpClass
     because tests/support.py wraps only the class-dict setUpClass."""
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    sqlite_only = "framework snapshot reads the SQLite file"
 
     @classmethod
     def seed(cls):

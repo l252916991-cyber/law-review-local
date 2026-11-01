@@ -44,7 +44,8 @@ DEFAULT_BASELINES = {
 #: citation cards. A digest change means "the inference path changed".
 INFERENCE_MODULES = (
     "agents.py", "answerability.py", "context.py", "model_domain.py", "rag.py",
-    "rag_child_index.py", "review_collaboration.py", "services.py", "statutory_retrieval.py",
+    "rag_child_index.py", "review_collaboration.py", "search_backend.py", "services.py",
+    "statutory_retrieval.py",
 )
 #: Pre-registered tolerances. Rules mode is deterministic: nothing may drop.
 #: Model mode tolerates sampling noise of up to two questions out of sixty.
@@ -68,8 +69,7 @@ def _sha256(data: bytes) -> str:
 
 
 def inference_manifest(mode: str, *, dataset_path: Path, model: str | None = None,
-                       endpoint: str | None = None) -> dict[str, Any]:
-    from . import db
+                       endpoint: str | None = None, backend: str = "sqlite") -> dict[str, Any]:
     from .answerability import POLICY_VERSION
     from .context import CONTEXT_POLICY_VERSION
     from .model_domain import LOCAL_PROMPT_VERSION
@@ -87,7 +87,7 @@ def inference_manifest(mode: str, *, dataset_path: Path, model: str | None = Non
         "context_policy": CONTEXT_POLICY_VERSION,
         "system_prompt_sha256": _sha256(CHAT_SYSTEM_PROMPT.encode("utf-8")),
         "modules": {name: _sha256((here / name).read_bytes()) for name in INFERENCE_MODULES},
-        "database_backend": getattr(db, "backend_name", lambda: "sqlite")(),
+        "database_backend": backend,
         "embeddings": "hashed-local",
     }
     if mode == "model":
@@ -102,9 +102,30 @@ def inference_manifest(mode: str, *, dataset_path: Path, model: str | None = Non
 
 
 @contextmanager
-def _isolated_case(directory: Path, *, endpoint: str, model: str) -> Iterator[None]:
-    """A throwaway data directory holding only the seeded demo case."""
-    from .db import db_scope, init_db
+def _database(directory: Path, postgres_admin_url: str | None) -> Iterator[None]:
+    """A throwaway SQLite file, or a throwaway PostgreSQL database."""
+    from .db import db_scope, postgres_scope
+
+    if not postgres_admin_url:
+        with db_scope(directory / "law_review.db"):
+            yield
+        return
+    from .db_postgres import create_database, drop_database
+
+    name = f"lexvault_gate_{os.getpid()}_{time.monotonic_ns()}"
+    url = create_database(postgres_admin_url, name)
+    try:
+        with postgres_scope(url):
+            yield
+    finally:
+        drop_database(postgres_admin_url, name)
+
+
+@contextmanager
+def _isolated_case(directory: Path, *, endpoint: str, model: str,
+                   postgres_admin_url: str | None = None) -> Iterator[None]:
+    """A throwaway database holding only the seeded demo case."""
+    from .db import init_db
 
     values = {
         "LAW_REVIEW_DATA_DIR": str(directory),
@@ -118,7 +139,7 @@ def _isolated_case(directory: Path, *, endpoint: str, model: str) -> Iterator[No
     previous = {key: os.environ.get(key) for key in values}
     os.environ.update(values)
     try:
-        with db_scope(directory / "law_review.db"):
+        with _database(directory, postgres_admin_url):
             init_db(seed=True)
             yield
     finally:
@@ -130,13 +151,14 @@ def _isolated_case(directory: Path, *, endpoint: str, model: str) -> Iterator[No
 
 
 def collect(dataset: dict[str, Any], directory: Path, *, mode: str, endpoint: str | None = None,
-            model: str | None = None) -> dict[str, dict[str, Any]]:
+            model: str | None = None, postgres_admin_url: str | None = None) -> dict[str, dict[str, Any]]:
     """Ask every question once through ``chat`` and keep what scoring needs."""
     from .services import chat
 
     use_llm = mode == "model"
     answers: dict[str, dict[str, Any]] = {}
-    with _isolated_case(directory, endpoint=endpoint or "http://127.0.0.1:1/v1", model=model or "no-model"):
+    with _isolated_case(directory, endpoint=endpoint or "http://127.0.0.1:1/v1", model=model or "no-model",
+                        postgres_admin_url=postgres_admin_url):
         for item in dataset["items"]:
             started = time.perf_counter()
             try:
@@ -228,13 +250,16 @@ def compare(current: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]
 
 
 def run(mode: str = "rules", *, dataset_path: Path = DEFAULT_DATASET, workdir: Path,
-        endpoint: str | None = None, model: str | None = None) -> dict[str, Any]:
+        endpoint: str | None = None, model: str | None = None,
+        postgres_admin_url: str | None = None) -> dict[str, Any]:
     dataset = load_dataset(dataset_path)
-    answers = collect(dataset, workdir, mode=mode, endpoint=endpoint, model=model)
+    answers = collect(dataset, workdir, mode=mode, endpoint=endpoint, model=model,
+                      postgres_admin_url=postgres_admin_url)
     if mode == "model" and not any(answer["llm_used"] for answer in answers.values()):
         raise GateConfigurationError("模型模式下没有任何一题实际调用了模型；检查端点与模型名")
     report = evaluate(dataset, answers)
-    report["manifest"] = inference_manifest(mode, dataset_path=dataset_path, model=model, endpoint=endpoint)
+    report["manifest"] = inference_manifest(mode, dataset_path=dataset_path, model=model, endpoint=endpoint,
+                                            backend="postgresql" if postgres_admin_url else "sqlite")
     report["generated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     return report
 

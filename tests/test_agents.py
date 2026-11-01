@@ -16,7 +16,7 @@ from app.agents import (  # noqa: E402
     create_coordinator,
     get_run_trace,
 )
-from app.db import connect, init_db  # noqa: E402
+from app.db import connect, init_db, table_names  # noqa: E402
 from app.evaluation import evaluate_case, platform_metrics  # noqa: E402
 from app.lawbench import extract_choice, lawbench_summary, sample_questions, validate_lawbench  # noqa: E402
 from app.rag import HybridRetriever, expand_retrieval_query, hashed_embedding, recall_memories  # noqa: E402
@@ -200,12 +200,7 @@ class EvaluationTest(IsolatedDatabaseTestCase):
     def test_schema_contains_interview_grade_runtime_tables(self):
         conn = connect()
         try:
-            names = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
-                )
-            }
+            names = table_names(conn)
         finally:
             conn.close()
         for name in ("pages_fts", "embedding_cache", "agent_runs", "agent_steps", "memories", "rag_evaluations"):

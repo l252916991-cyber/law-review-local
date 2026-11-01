@@ -25,7 +25,7 @@ from .context import (
     record_agent_turn,
     validate_conversation,
 )
-from .db import connect, db_scope, get_db_path, now, transaction
+from .db import connect, current_target, now, target_scope, transaction
 from .security import actor_name, current_principal, require_case_access
 
 router = APIRouter(tags=["review-jobs"])
@@ -139,7 +139,7 @@ def submit_review(case_id: int, body: ReviewJobRequest):
         if not admission.acquire(blocking=False):
             raise HTTPException(429, "后台阅卷队列已满，请稍后重试")
     job_id = uuid.uuid4().hex
-    path = get_db_path()
+    path = current_target()
     try:
         body = body.model_copy(update={"user_name": actor_name(body.user_name)})
         with transaction() as conn:
@@ -147,7 +147,7 @@ def submit_review(case_id: int, body: ReviewJobRequest):
                          (job_id,case_id,current_principal().name,body.model_dump_json(),now()))
         # An unbound ContextVar reads the environment dynamically. Freeze the
         # resolved DB path as well as the authenticated principal before submit.
-        with db_scope(path):
+        with target_scope(path):
             context = copy_context()
         future = executor.submit(context.run, _execute, job_id, case_id, body)
     except Exception as exc:
@@ -163,7 +163,7 @@ def submit_review(case_id: int, body: ReviewJobRequest):
     def finished(completed):
         try:
             if completed.cancelled():
-                with db_scope(path), transaction() as conn:
+                with target_scope(path), transaction() as conn:
                     conn.execute("UPDATE review_jobs SET status='interrupted',error_json=?,finished_at=? WHERE id=? AND status='queued'",
                                  (json.dumps({"type": "Cancelled", "message": "服务关闭，排队任务未执行"}), now(), job_id))
         except Exception:

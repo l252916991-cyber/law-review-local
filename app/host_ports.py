@@ -31,7 +31,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from .agent_tools import _search
-from .db import SCHEMA_VERSION, connect, get_db_path
+from .db import SCHEMA_VERSION, SQLITE_FILE_ONLY, connect, database_url, get_db_path
 from .legal_corpus import LegalCorpus
 from .rag import recall_memories
 from .runtime_ports import (
@@ -111,6 +111,8 @@ def capture_case_rows(
     already be migrated by its owning application; bounds are enforced instead of
     truncating, and a missing case is an authorization failure.
     """
+    if source_path is None and database_url():
+        raise UnsupportedCapabilityError(SQLITE_FILE_ONLY)
     path = Path(source_path) if source_path is not None else get_db_path()
     with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as source:
         source.row_factory = sqlite3.Row

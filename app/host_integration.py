@@ -22,7 +22,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .db import connect, get_db_path, now, transaction
+from .db import SQLITE_FILE_ONLY, connect, database_url, get_db_path, now, transaction
 from .forge_bridge import ROOT, SidecarProtocolError, _read_message, _send, framework_binding
 from .forge_runtime import resolve_framework_python
 from .host_writes import (
@@ -94,6 +94,8 @@ class IsolatedHostIntegration:
                  require_execution_approval: bool = False):
         if not 0 < timeout_seconds <= 600:
             raise ContractValidationError("timeout_seconds must be in (0,600]")
+        if database_url():
+            raise UnsupportedCapabilityError(SQLITE_FILE_ONLY)
         self.path = get_db_path().resolve()
         self.python = framework_python
         self.timeout = timeout_seconds

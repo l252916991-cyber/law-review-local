@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import time
@@ -317,6 +318,10 @@ def main() -> int:
     restore_parser.add_argument("snapshot", type=Path)
     restore_parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    if args.action == "backup" and os.environ.get("LAW_REVIEW_DATABASE_URL"):
+        # The snapshot copies the SQLite file; on PostgreSQL it would silently
+        # back up uploads without the database.
+        parser.error("LAW_REVIEW_DATABASE_URL 已设置：数据库在 PostgreSQL 上，请用 pg_dump 备份数据库；本脚本只备份 SQLite 数据目录")
     if args.action == "backup":
         result = backup(args.data_dir, args.output, checkpoint=args.checkpoint_db, quiescent=args.quiescent)
     elif args.action == "verify":

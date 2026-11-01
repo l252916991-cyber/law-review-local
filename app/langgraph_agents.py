@@ -46,7 +46,7 @@ from .context import (
     source_pages_exist,
     validate_resume_identity,
 )
-from .db import connect, db_scope, get_db_path, now, transaction
+from .db import connect, current_target, get_db_path, now, target_scope, transaction
 from .rag import recall_memories, remember
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def _with_database_scope(method):
     """Keep every orchestration read/write on the coordinator's captured DB."""
     @wraps(method)
     def scoped(self, *args, **kwargs):
-        with db_scope(self.db_path):
+        with target_scope(self.db_target):
             return method(self, *args, **kwargs)
     return scoped
 
@@ -128,6 +128,8 @@ class LangGraphCoordinator:
         # transaction (see LawReviewCoordinator for the nesting rationale).
         self.on_run_started = on_run_started
         self.db_path = get_db_path()
+        # Business rows follow the active backend; checkpoints stay a local SQLite file.
+        self.db_target = current_target()
         configured = os.getenv("LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB", "").strip()
         self.checkpoint_path = Path(checkpoint_path or configured or self.db_path.parent / "langgraph_checkpoints.sqlite")
 
@@ -135,7 +137,7 @@ class LangGraphCoordinator:
         self, question: str, route: str, *, context: dict[str, Any] | None = None
     ) -> tuple[int, str]:
         context = context or {}
-        with db_scope(self.db_path), transaction() as conn:
+        with target_scope(self.db_target), transaction() as conn:
             run_id = conn.execute(
                 """INSERT INTO agent_runs(case_id, question, route, status, runtime, conversation_id,
                                         context_json, created_at)
@@ -164,7 +166,7 @@ class LangGraphCoordinator:
         latency_ms: int,
     ) -> dict[str, Any]:
         finished_at = now()
-        with db_scope(self.db_path), transaction() as conn:
+        with target_scope(self.db_target), transaction() as conn:
             conn.execute(
                 """
                 INSERT INTO agent_steps(run_id, node_name, agent_role, status, input_json, output_json,
@@ -214,7 +216,7 @@ class LangGraphCoordinator:
         started_at = now()
         started = time.perf_counter()
         try:
-            with db_scope(self.db_path):
+            with target_scope(self.db_target):
                 if self.failure_injector:
                     self.failure_injector(node_name, state)
                 output = function()

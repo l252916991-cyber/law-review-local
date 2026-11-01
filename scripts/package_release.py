@@ -53,7 +53,7 @@ TREE_TYPES = {
     "frontend/scripts": {".mjs"},
     "frontend/tests": {".ts"},
     "frontend/e2e": {".ts"},
-    "app": {".py", ".html", ".js", ".css", ".svg"},
+    "app": {".py", ".html", ".js", ".css", ".svg", ".sql"},
     "tests": {".py"},
     "scripts": {".py", ".json"},
     "docs": {".md", ".json"},
