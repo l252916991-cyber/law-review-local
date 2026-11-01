@@ -9,3 +9,6 @@ be469d2796b737e50ccd2eedac3370e9988d90b4:app/rag_benchmark_dataset.py:generic-ap
 092ecacf56621251184035f6aa05b03f5bbe5b6c:app/rag_benchmark_dataset.py:generic-api-key:207
 # Same vendored _getDistanceToBezierEdge2 method name in the local baseline.
 092ecacf56621251184035f6aa05b03f5bbe5b6c:app/static/vendor/vis-network.min.js:generic-api-key:32
+# Keyword argument `api=api_override` (wire-protocol selector, not a credential)
+# introduced with the provider/wire-api split. Exact historical finding only.
+e80dd06012e0ce5f2de15ea3ac405f58f98ba082:app/services.py:generic-api-key:1034
