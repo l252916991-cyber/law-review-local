@@ -27,6 +27,8 @@ EXACT_FIXTURES = (
     "benchmarks/answer_eval/v2/questions.json",
     "benchmarks/answer_eval/v2/dataset.json",
     "benchmarks/answer_eval/v2/manifest.json",
+    # Committed answer-quality gate baseline; tests/test_eval_gate.py needs it.
+    "benchmarks/eval_gate/baseline-rules.json",
     # Six-case holdout: authored synthetic fixture plus its frozen dataset and
     # manifest. Needed to rebuild the holdout batch from the package alone;
     # contains no real parties, amounts or uploaded material.

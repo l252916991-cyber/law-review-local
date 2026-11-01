@@ -69,6 +69,9 @@ jobs:
             --cov-report=term-missing --cov-report=xml:output/ci/coverage.xml \
             --cov-report=json:output/ci/coverage.json --cov-report=html:output/ci/htmlcov \
             2>&1 | tee output/ci/pytest.log
+      - name: Answer-quality gate (rules mode, no model)
+        run: |
+          uv run --locked python scripts/eval_gate.py --report output/ci/eval-gate.json --markdown "$GITHUB_STEP_SUMMARY"
       - name: Validate release allowlist
         run: uv run --locked python scripts/package_release.py --dry-run > output/ci/release-manifest.json
       - name: Upload test evidence (including failures)
