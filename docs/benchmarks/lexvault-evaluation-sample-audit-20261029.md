@@ -1,7 +1,7 @@
 # LexVault 评测样本量、标注与旧账本审计
 
 - 日期：2026-10-29（Asia/Shanghai）；只涉及本律所项目。
-- 基线：`ff2856a` 的答案评测 pipeline；分支 `codex/lexvault-eval-completion`。与多人协作部署验收分支分别保留，本文不把 HTTP/权限/备份验收当成模型评测。
+- 基线：`b70d783` 的答案评测 pipeline；分支 `codex/lexvault-eval-completion`。与多人协作部署验收分支分别保留，本文不把 HTTP/权限/备份验收当成模型评测。
 - 原始资产来自主检出 `/Users/xiaoy/Documents/本地律所`，仅只读复算；不改旧题、旧回答或六臂忠实度 JSON。新增复算记录放在忽略目录 `output/evaluation-gap-audit-20261029/`。
 
 ## 1. 题、案件、重复采样和 claim 是不同分母

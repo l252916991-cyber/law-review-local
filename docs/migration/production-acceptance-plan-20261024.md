@@ -1,6 +1,6 @@
 # E12/E13 生产全范围验收准备
 
-日期：2026-10-24（北京时间）。编制基线 `c14b93d`，承接[稳定性实施记录](g2-stability-execution-20261024.md)、[领域实施记录](domain-integration-execution-20261023.md)和[总执行计划](execution-plan-20261022.md)。本文件交付验收设计和证据清单；生产全范围验收尚未执行。
+日期：2026-10-24（北京时间）。编制基线 `eb5ccae`，承接[稳定性实施记录](g2-stability-execution-20261024.md)、[领域实施记录](domain-integration-execution-20261023.md)和[总执行计划](execution-plan-20261022.md)。本文件交付验收设计和证据清单；生产全范围验收尚未执行。
 
 执行补充：本次公开真实案例的成功/业务拒绝结果完成新进程复用检查，并据此修复历史成功在 deadline 后被误拒的宿主边界；见 [S07 记录](g2-public-development-execution-20261024.md)第 5 节。该证据属于获准的开发验收副本，不改变目标生产全范围状态。
 

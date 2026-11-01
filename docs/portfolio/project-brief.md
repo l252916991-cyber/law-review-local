@@ -79,7 +79,7 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率） | 1476 passed / 2 failed（既有法条语料资产）/ 1 skipped（未装 `mlx_lm`）；综合覆盖率 86.38%，门槛 70%（提交 `e31593e`） |
+| 全量离线测试（隔离数据目录、禁网、覆盖率） | 1476 passed / 2 failed（既有法条语料资产）/ 1 skipped（未装 `mlx_lm`）；综合覆盖率 86.38%，门槛 70%（提交 `d79914c`） |
 | 允许清单包内回归 | 99 passed（三组对照、六案例保留集、恢复演示、答案评分、Judge、专家交接） |
 | 解压包离线 HTTP 合成验收 | 通过：两页合成材料、问答定位第 2 页、导出包与清单哈希核对；含前端包另通过签发链路（冻结版本 + 权限 + 下载绑定） |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 11、e2e 22、静态构建通过；含前端的候选包签发链路 passed |

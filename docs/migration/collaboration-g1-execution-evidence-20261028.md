@@ -1,7 +1,7 @@
 # G1 续行执行证据：法条恢复、版本矩阵与候选交付
 
 - 执行日期：2026-10-27 至 2026-10-28（Asia/Shanghai）。
-- 业务代码及资产契约受检提交：`2b1e786`；凭证扫描误报裁决：`fce30f3`。本报告为后续文档提交。
+- 业务代码及资产契约受检提交：`fb7b0aa`；凭证扫描误报裁决：`476c5a8`。本报告为后续文档提交。
 - 工作分支：`codex/collaboration-g1-execution`。原共享目录切换到其他任务并出现未提交改动后，本轮在独立工作树继续，未搬动或提交其他任务的改动。
 - **结论：G1-A–E 本地验收完成，放行范围限定为本报告登记的新冻结资产、macOS Python 矩阵和指定基础镜像覆盖的 Linux 容器路径。** 未运行托管 CI；默认 Docker Hub 基础镜像路径在本机超时，不能记作通过。M1 真实旧库迁移及 U1 律所验收仍未执行，不作生产就绪结论。
 
@@ -13,7 +13,7 @@
 | G1-B Python 矩阵 | 3.11/3.14 各 1421 passed / 0 failed / 1 skipped；独立 3.12 框架实际进程测试已执行 | 两套 JUnit、覆盖率及逐步退出码，见第 2 节 |
 | G1-C 历史扫描 | gitleaks 8.30.1 完整本地 Git 历史扫描通过，代码受检时 146 个提交、退出 0 | 第 3 节；脱敏 JSON 和日志 |
 | G1-D 容器交付 | 源码 ZIP 429 文件，解包摘要 0 差异；指定镜像覆盖后成功构建，真实 HTTP 验收通过 | 第 4 节；保留默认镜像超时记录 |
-| G1-E 候选冻结 | 含前端 ZIP 451 文件，摘要 0 差异；解包进程加载候选自身代码，签发链路通过 | 第 5 节；候选提交固定为 `2b1e786` |
+| G1-E 候选冻结 | 含前端 ZIP 451 文件，摘要 0 差异；解包进程加载候选自身代码，签发链路通过 | 第 5 节；候选提交固定为 `fb7b0aa` |
 | M1/U1 | 待登记源库、checkpoint、停写窗口、目标设备、模型及人工复核安排 | 第 7 节；未打开业务库或调用真实模型 |
 
 ## 2. 完整离线矩阵
@@ -47,7 +47,7 @@ pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py scripts/t
 
 从 [官方 v8.30.1 发布](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)获取 arm64 二进制并核对官方 checksums：归档 SHA-256 `b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5`。工具保存在临时工具目录，未写入系统或仓库。
 
-使用 `gitleaks git --log-opts=--all --redact=100 --report-format=json`，非浅克隆，默认规则和已有精确 `.gitleaksignore`。首次扫描发现本地初始提交中的两处已知误报：合成案件键 `v2-tender-withdrawal`、vis-network 的 `_getDistanceToBezierEdge2` 方法名；历史源文件与当前字节一致。`fce30f3` 仅追加这两个历史指纹，未关闭规则、未整路径排除，复扫退出 0。`2b1e786` 上全历史复扫同样为 0 findings。
+使用 `gitleaks git --log-opts=--all --redact=100 --report-format=json`，非浅克隆，默认规则和已有精确 `.gitleaksignore`。首次扫描发现本地初始提交中的两处已知误报：合成案件键 `v2-tender-withdrawal`、vis-network 的 `_getDistanceToBezierEdge2` 方法名；历史源文件与当前字节一致。`476c5a8` 仅追加这两个历史指纹，未关闭规则、未整路径排除，复扫退出 0。`fb7b0aa` 上全历史复扫同样为 0 findings。
 
 ## 4. Linux 容器与真实队列/OCR
 
@@ -67,7 +67,7 @@ docker build \
 
 ## 5. 含前端候选包
 
-将本次镜像内实际构建的 `frontend/out` 复制到工作树的忽略目录，再执行 `scripts/package_release.py --with-frontend`。候选绑定 `2b1e786`，451 个清单文件，`private_runtime_data_included=false`；逐成员摘要核对 0 差异。
+将本次镜像内实际构建的 `frontend/out` 复制到工作树的忽略目录，再执行 `scripts/package_release.py --with-frontend`。候选绑定 `fb7b0aa`，451 个清单文件，`private_runtime_data_included=false`；逐成员摘要核对 0 差异。
 
 - ZIP SHA-256：`b29038b1c053ce60fb439f93a9d29d5c78370eb354e558179452ed30bb096ba4`。
 - 解包后使用独立 token、数据与 checkpoint 启动，启动日志证明模块来自解包目录。

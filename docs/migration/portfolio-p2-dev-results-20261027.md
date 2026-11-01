@@ -4,7 +4,7 @@
 - 模型：`Qwen3.8-27B-oQ4e-mtp`（`Jundot/Qwen3.8-27B-oQ4e-mtp` @ `b47cb89d…`，oMLX 0.7.0，127.0.0.1:8000）。
 - 批次：`output/portfolio-ablation/dev-qwen38-27b-20261027`（60 题 × 3 组 × 1 轮 = 180 次）。
 - 评分：`scoring.version=2`（可接受页必须被引用；额外引用只记录；上下文外引用判失败；拒答词表扩展）。
-- 身份：驱动 `e31593e` 之后新增评分 v2（`5478dc2`）；提示与检索未改，native 基线 `specialist-review-v3`。
+- 身份：驱动 `d79914c` 之后新增评分 v2（`c2be822`）；提示与检索未改，native 基线 `specialist-review-v3`。
 
 ## 1. 总体结果
 

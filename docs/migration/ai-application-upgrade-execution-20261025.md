@@ -1,6 +1,6 @@
 # AI 应用升级实施记录（A-E0 至 A06.1）
 
-日期：2026-10-25（北京时间）。分支 `codex/ai-app-upgrade`。开始基线 `9630e45`；计划见[收尾与验收计划书](ai-application-upgrade-continuation-plan-20261024.md)，证据口径见[证据与环境核对](ai-application-upgrade-evidence-20261025.md)。
+日期：2026-10-25（北京时间）。分支 `codex/ai-app-upgrade`。开始基线 `1af63f5`；计划见[收尾与验收计划书](ai-application-upgrade-continuation-plan-20261024.md)，证据口径见[证据与环境核对](ai-application-upgrade-evidence-20261025.md)。
 
 本批按计划顺序实施 A-E0、A02.1、A01.1、A04.1、A09.1、A02.2、A06.1，每包单独提交。A11（Next.js 前端）**未实施**：本机没有 `npm`/`pnpm`，无法安装依赖或生成锁文件（见证据文档 §7）。A05.1、A07.1、A08.1、A13.1 不在本批范围。
 
@@ -8,13 +8,13 @@
 
 | 提交 | 包 | 结果 |
 | --- | --- | --- |
-| `0bf57ec` | A-E0 | 统计口径更正（78→100/104、81%→85.42%）、环境事实、工程/模型/业务分列 |
-| `765974b` | A02.1 | 用量与延迟面板、`*_known_calls` 覆盖计数、真实浏览器页面验证工具 |
-| `8a9d8a4` | A01.1 | 流式事件契约（citations/done）、`chat_requests` 幂等（schema v20）、协作取消、客户端同键重试 |
-| `bf7d049` | A04.1 + A09.1 | 审校节点复用只读工具循环、一次性模型回退、轨迹与归属 |
-| `6fd4c7f` | A02.2 | 定价快照（schema v21）、`turn_key`、问答级费用估算与面板 |
-| `c75ed49` | A06.1 | 轨迹用量展示、切案清理、回退端点探测修复、workbench 页面流程 |
-| `3126c5a` | 修复 | v21 迁移可重复执行（降级重跑不再报重复列） |
+| `28bd637` | A-E0 | 统计口径更正（78→100/104、81%→85.42%）、环境事实、工程/模型/业务分列 |
+| `79f7b2a` | A02.1 | 用量与延迟面板、`*_known_calls` 覆盖计数、真实浏览器页面验证工具 |
+| `185cb91` | A01.1 | 流式事件契约（citations/done）、`chat_requests` 幂等（schema v20）、协作取消、客户端同键重试 |
+| `bade056` | A04.1 + A09.1 | 审校节点复用只读工具循环、一次性模型回退、轨迹与归属 |
+| `d2293d8` | A02.2 | 定价快照（schema v21）、`turn_key`、问答级费用估算与面板 |
+| `eff2fae` | A06.1 | 轨迹用量展示、切案清理、回退端点探测修复、workbench 页面流程 |
+| `f71cf99` | 修复 | v21 迁移可重复执行（降级重跑不再报重复列） |
 
 A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回答生成路径，拆开会得到不能独立验证的中间状态。
 
@@ -81,7 +81,7 @@ A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回�
 
 ### 3.1 完整离线套件
 
-最近一次完整运行（`output/final/`，源码 `3126c5a`）：**1254 passed / 2 failed / 1 skipped / 285 subtests**，覆盖率 **86%**（分支 78%），以 `output/final/coverage.json` 为准。
+最近一次完整运行（`output/final/`，源码 `f71cf99`）：**1254 passed / 2 failed / 1 skipped / 285 subtests**，覆盖率 **86%**（分支 78%），以 `output/final/coverage.json` 为准。
 
 - 2 项失败是 `test_corpus_audit.py` 与 `test_corpus_canonical.py`，读取被 `.gitignore` 的本地过期 `output/score85/legal_corpus*`；CI 中该目录不存在时会跳过。未修改断言、未删除测试。
 - 1 项跳过是 `test_sft_pool.py`（`mlx_lm` 未安装）。
@@ -94,7 +94,7 @@ A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回�
 
 ### 3.3 测试数量变化
 
-本批新增测试文件：`test_usage_panel.py`（7）、`test_chat_client.py`（6）、`test_agent_tool_loop.py`（16）、`test_agent_fallback.py`（13）；`test_chat_stream.py` 扩到 22 项；`test_llm_usage.py` 增至 12 项。统一收集口径：基线 `9630e45` 为 1180 项，本批结束为 **1257 项**，新增 77 项收集用例。
+本批新增测试文件：`test_usage_panel.py`（7）、`test_chat_client.py`（6）、`test_agent_tool_loop.py`（16）、`test_agent_fallback.py`（13）；`test_chat_stream.py` 扩到 22 项；`test_llm_usage.py` 增至 12 项。统一收集口径：基线 `1af63f5` 为 1180 项，本批结束为 **1257 项**，新增 77 项收集用例。
 
 ## 4. 过程中发现并修复的真实缺陷
 

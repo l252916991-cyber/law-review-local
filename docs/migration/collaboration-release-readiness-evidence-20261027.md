@@ -1,9 +1,9 @@
 # 多人协作首版收尾：G1 工程检查与发布候选证据
 
 - 日期：2026-10-27（Asia/Shanghai）。
-- 本文件保留 `19bdb68` 的历史负结果；2026-10-28 新冻结资产及 `2b1e786` 的本地 G1 结论见[续行执行证据](collaboration-g1-execution-evidence-20261028.md)，不将新契约通过写成旧输入组合复现成功。
+- 本文件保留 `e7028ed` 的历史负结果；2026-10-28 新冻结资产及 `fb7b0aa` 的本地 G1 结论见[续行执行证据](collaboration-g1-execution-evidence-20261028.md)，不将新契约通过写成旧输入组合复现成功。
 - 对应计划：[collaboration-release-readiness-plan-20261027.md](collaboration-release-readiness-plan-20261027.md)。
-- 受检代码：`19bdb68`（分支 `codex/collaboration-first-release`），工作区干净；本文件为其后的文档提交，不改变受检代码。
+- 受检代码：`e7028ed`（分支 `codex/collaboration-first-release`），工作区干净；本文件为其后的文档提交，不改变受检代码。
 - 结论范围：R1/R2/R3 三组修复的回归、Python/前端工程门禁、含前端构建的私有发布候选与隔离实例验收。**M1（真实旧库迁移）与 U1（律所五身份人工验收）未执行**，原因见第 6 节。
 - **放行结论：阶段 B（G1）不通过。** 本次已执行的 Python 3.12 离线测试中仅剩两项法条语料资产失败（第 3 节）；整个 G1 还缺 Python 3.11/3.14 矩阵、gitleaks 和容器交付检查。语料复验通过不自动代表 G1 全部放行，剩余项按[续行计划](collaboration-g1-to-acceptance-plan-20261027.md)执行或明确交付范围裁决。
 

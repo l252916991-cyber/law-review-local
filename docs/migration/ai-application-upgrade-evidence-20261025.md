@@ -1,6 +1,6 @@
 # AI 应用升级：证据口径与验证环境核对（A-E0）
 
-日期：2026-10-25（北京时间）。分支 `codex/ai-app-upgrade`，核实时 `HEAD` = `9630e45`（相对 `origin/codex/ai-app-upgrade` 领先 4 个提交，工作区干净）。编制依据：[收尾与验收计划书](ai-application-upgrade-continuation-plan-20261024.md) §4 A-E0。
+日期：2026-10-25（北京时间）。分支 `codex/ai-app-upgrade`，核实时 `HEAD` = `1af63f5`（相对 `origin/codex/ai-app-upgrade` 领先 4 个提交，工作区干净）。编制依据：[收尾与验收计划书](ai-application-upgrade-continuation-plan-20261024.md) §4 A-E0。
 
 本文只登记本轮核对到的事实、命令与数字，不表示任何功能已通过模型或业务验收。凡无法复现的历史数字，一律标记为"历史陈述，未复核"。
 
@@ -8,14 +8,14 @@
 
 1. 在仓库根目录执行本文 §3、§5 列出的命令，记录退出码与关键输出。
 2. 覆盖率的唯一本轮依据是 `output/baseline-full/coverage.json`（私有运行产物，不入库）；历史百分比只作为对照。
-3. 测试数量用统一收集口径比对：在 `760a24b` 的独立 `git worktree` 中收集一次，在当前 `HEAD` 收集一次，两者之差即本批新增用例数。
+3. 测试数量用统一收集口径比对：在 `81a441d` 的独立 `git worktree` 中收集一次，在当前 `HEAD` 收集一次，两者之差即本批新增用例数。
 4. 环境能力只按实测记录；"本 shell 找不到某工具"必须继续核查其它安装位置，不直接当作整机缺失。
 
 ## 2. 统计口径更正
 
 | 项 | 历史陈述 | 本轮核对 | 依据 |
 | --- | --- | --- | --- |
-| 新增测试数 | 实施记录写"新增测试 78 项"，正文十组相加为 100 | **十组所列即 100 个 `def test_` 方法，且全部位于本批新增的 10 个测试文件**；按统一收集口径（含参数化展开）由 `760a24b` 的 1076 项增至 `9630e45` 的 1180 项，即**新增 104 项收集用例** | `git worktree add /tmp/lv-760a24b 760a24b` 后 `pytest --collect-only -q`；`HEAD` 同命令；`grep -c "    def test_"` 逐文件计数 |
+| 新增测试数 | 实施记录写"新增测试 78 项"，正文十组相加为 100 | **十组所列即 100 个 `def test_` 方法，且全部位于本批新增的 10 个测试文件**；按统一收集口径（含参数化展开）由 `81a441d` 的 1076 项增至 `1af63f5` 的 1180 项，即**新增 104 项收集用例** | `git worktree add /tmp/lv-81a441d 81a441d` 后 `pytest --collect-only -q`；`HEAD` 同命令；`grep -c "    def test_"` 逐文件计数 |
 | 覆盖率 | 实施记录写 81%；另一会话称 80% | **本轮实测 85.42%**（`--cov=app --cov-branch`）。差异来自是否安装独立框架解释器、是否装有 Node、以及收集方式，不能互相替代 | `output/baseline-full/coverage.json`、`.github/workflows/test.yml` 同口径参数 |
 | 全量测试 | 实施记录写 1055 passed / 85 skipped / 2 deselected | 本轮为 **1177 passed / 2 failed / 1 skipped / 280 subtests passed**。2 项失败均为本地过期语料（§5）；"2 deselected"本轮未复现，记为历史陈述，未复核 | `output/baseline-full/junit.xml`、`pytest.log` |
 | `test_mobile_ui.py` 4 项失败 | 实施记录写"本机无 node" | 该结论只对该次 PATH 成立：本机存在真实 node 运行时（§3），补 PATH 后 6 项全部通过 | `tests/test_mobile_ui.py` 实跑 |
@@ -69,7 +69,7 @@ uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snaps
 `tests/test_corpus_audit.py::test_real_frozen_corpus_is_classified_cleanly` 与 `tests/test_corpus_canonical.py::test_real_corpus_builds_clean_canonical` 读取 `output/score85/legal_corpus*`。该目录被 `.gitignore` 忽略（`output/`），本机存在 `legal_corpus`、`legal_corpus_canonical_v2`、`legal_corpus_supplement_npc_v10` 三个**未提交、未更新**的语料目录，因此断言（`boundary_difference == 1`、`publication_count >= 71`）与实际不符。
 
 - 两项测试在语料目录不足两个时会 `skip`，说明它们断言的是外部冻结语料，而非仓库内代码。
-- 处置：本轮不修改断言、不删除测试；语料重建属独立任务（`2d142bd` 记录的法条库重建），未纳入本批。
+- 处置：本轮不修改断言、不删除测试；语料重建属独立任务（`510699a` 记录的法条库重建），未纳入本批。
 - 结论：**可解释的本地环境差异，不是本批代码回归**；CI 中该目录不存在，两项会跳过。
 
 ## 6. 验收分列

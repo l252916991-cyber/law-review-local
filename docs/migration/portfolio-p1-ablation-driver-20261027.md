@@ -2,7 +2,7 @@
 
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md) 第 3、4 节；前置：[P0 范围与证据冻结](portfolio-p0-scope-evidence-20261027.md)。
-- 实施起点：`3c1a197`。 协议见[冻结版 v1](portfolio-protocol-20261027.md)。本批次只增加隔离实验适配层与回归，未改动 `services.py`、`agents.py`、`review_collaboration.py` 等受摘要门禁保护的既有算法文件，native 对照基线仍为 `specialist-review-v2`（其后因专家发现顺序缺陷修复重登记为 `specialist-review-v3`，见[可复现性修正](portfolio-determinism-20261027.md)）。
+- 实施起点：`665397d`。 协议见[冻结版 v1](portfolio-protocol-20261027.md)。本批次只增加隔离实验适配层与回归，未改动 `services.py`、`agents.py`、`review_collaboration.py` 等受摘要门禁保护的既有算法文件，native 对照基线仍为 `specialist-review-v2`（其后因专家发现顺序缺陷修复重登记为 `specialist-review-v3`，见[可复现性修正](portfolio-determinism-20261027.md)）。
 
 ## 1. 本批交付
 

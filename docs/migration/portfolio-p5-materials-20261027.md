@@ -19,7 +19,7 @@
 | 提示长度 A 855 / B 7,568 / C 9,719 字符（中位） | 冻结批次 `output/portfolio-ablation/dev-20261027/manifest.json` | 读 `items[].prompt_chars` 取中位 |
 | 60 题、14 页、来源摘要 `b912f4…` | `benchmarks/answer_eval/v2/dataset.json` | `scripts/build_answer_eval.py` 幂等复算 |
 | 恢复片段 steps 9→9、`resume_count=1`、拒绝恢复 | `output/portfolio-demo/anomaly-20261027/*.json` | 重跑 `scripts/demo_recovery_check.py` 三个阶段 |
-| 1476 passed / 86.38%（提交 `e31593e`） | 全量离线检查日志 `output/portfolio-ci/pytest8.log` | 按 P4 第 5 节命令重跑（含前端门禁见 5.1） |
+| 1476 passed / 86.38%（提交 `d79914c`） | 全量离线检查日志 `output/portfolio-ci/pytest8.log` | 按 P4 第 5 节命令重跑（含前端门禁见 5.1） |
 | 460 成员、zip `03c65406…`、包内 133 passed | `output/portfolio-repro/lexvault-source-20261027d.zip` | 重新打包并核对清单 |
 | 开发集 A/B/C 86.67/76.67/86.67%、保留集 90.28/88.89/87.50% | `output/portfolio-ablation/{dev,holdout}-qwen38-27b-20261027/run/` | 用 `analyse_collaboration_ablation.py` 复算 |
 | Judge 57/57/57（60 题）、与 v2 一致 51/43/49 | `output/portfolio-judge/dev-{A,B,C}-judge*.json` | 用 `export_ablation_answers.py` + `run_answer_judge.py` 复算 |

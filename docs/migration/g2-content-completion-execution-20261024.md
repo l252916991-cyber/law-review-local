@@ -1,6 +1,6 @@
 # G2 内容完善、内容验收与未知对账执行记录
 
-日期：2026-10-24（北京时间）。基线 `bb16b0d`（计划书）、`cb52af5`（候选 v10）。证据目录为 Git 忽略的私有目录 `output/migration/g2-stability-20261024/s08-content/`。生成、embedding、reranker 继续为 `Qwythos-9B-v2-OptiQ-4bit`、`Qwen3-Embedding-4B-4bit-DWQ`、`bge-reranker-v2-m3-mlx`；框架仍为精确 0.8.3 wheel；语法仍为 `omlx-guided-grammar-v1`。
+日期：2026-10-24（北京时间）。基线 `959ebd4`（计划书）、`7122c9b`（候选 v10）。证据目录为 Git 忽略的私有目录 `output/migration/g2-stability-20261024/s08-content/`。生成、embedding、reranker 继续为 `Qwythos-9B-v2-OptiQ-4bit`、`Qwen3-Embedding-4B-4bit-DWQ`、`bge-reranker-v2-m3-mlx`；框架仍为精确 0.8.3 wheel；语法仍为 `omlx-guided-grammar-v1`。
 
 **S08～S13 已执行。角色混淆缺陷已修复，空泛元陈述不再出现；但按冻结内容断言，仍有 3 道题未答到要求的细节，另 1 条断言本身口径错误。完整 G2/E07 仍不通过，生产路由未切换。** 本次共 28 次题目评估、56 条双对照（回归 22 次、新保留 6 次），候选系统失败 0 次、这 28 次的用量全部已知；另有两次模型加载被 safe 守卫以 HTTP 507 拒绝（S07 一次、本批 `regression/comparison-01` 一次），各留下一条 unknown 调用，均登记为未决对账责任，不计入上述 28 次及其用量。
 
@@ -10,7 +10,7 @@
 
 ## 2. S08/S09 缺陷修复与内容验收口径
 
-提交 `cb52af5`。协议由 `candidate-answerability-v9-grammar` 升级为 `candidate-answerability-v10-content`：
+提交 `7122c9b`。协议由 `candidate-answerability-v9-grammar` 升级为 `candidate-answerability-v10-content`：
 
 - 提示新增两项硬要求：finding 必须写出资料中的具体事实（金额、日期、期限、地点、行为、文书名称或处理结论），禁止「均有明确记载」「已记录」一类空泛说法；涉及多方或多阶段时必须写明主体与角色（当事人主张写「某公司请求…」，裁判或处理写「仲裁委员会驳回…」）。
 - 宿主新增窄口径 `content_free_finding` 闸门：finding 只复述问题加记录类谓词、无新增实词时失败关闭，`content_free_finding` 与 `answerability_rejected` 分别登记；「本次材料未见…」类限定范围回答不受影响。闸门只做失败关闭，不补写、不改写、不做规则总结。
@@ -22,7 +22,7 @@
 | 项目 | 说明 | 身份 |
 | --- | --- | --- |
 | 回归集 | 沿用 S07 归一化 v2 数据库，材料身份不变，仅新增内容断言；18 题、22 次（两道缺陷题各预排三次） | 库 `7084a902…`；题面/预期/参考锚点逐项保持 |
-| 新保留集 v3 | 官方页面中本批从未使用的两个案例：最高法「案例三 张某诉某健身公司」、北京人社局「案例3 离职补偿陷阱条款」，2 案 6 题 21 个逻辑块 | 新库、新冻结，首次推理由 `cb52af5` 产出 |
+| 新保留集 v3 | 官方页面中本批从未使用的两个案例：最高法「案例三 张某诉某健身公司」、北京人社局「案例3 离职补偿陷阱条款」，2 案 6 题 21 个逻辑块 | 新库、新冻结，首次推理由 `7122c9b` 产出 |
 | 断言形式 | `content_anchors` 为候选词组，全部命中才通过；`role_checks` 对触发项要求出现主体 | 均在首次推理前冻结，失败不回溯调整 |
 
 ## 4. S11 实测

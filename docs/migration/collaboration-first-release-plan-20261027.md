@@ -1,11 +1,11 @@
 # 多人协作首版改进计划书
 
 - 编写日期：2026-10-27（Asia/Shanghai）
-- 代码基线：`580c5b7 feat(agents): 实现来源绑定的专家交接与交叉审校`
+- 代码基线：`bc935b0 feat(agents): 实现来源绑定的专家交接与交叉审校`
 - 状态：**执行中**。第 1–3 节为核对结论，第 6–10 节为工作包与验收口径，第 12 节随实施更新。
 - 定位：把项目收敛为**一家律所内部使用的协同阅卷系统**（单组织、单实例、受控设备）。本计划不再扩展 AI 能力，主线是多人分工、责任闭环与交付可信。
 
-> 后续入口：[交付前收尾计划书](collaboration-release-readiness-plan-20261027.md)以 `326b71f` 为基线，安排权限与签发边界修复、完整工程检查、旧库副本迁移和律所人工验收。本文件保留原计划与第 12 节的阶段记录；其中“主线已落地”不代表后续交付验收已经通过。
+> 后续入口：[交付前收尾计划书](collaboration-release-readiness-plan-20261027.md)以 `94ebb03` 为基线，安排权限与签发边界修复、完整工程检查、旧库副本迁移和律所人工验收。本文件保留原计划与第 12 节的阶段记录；其中“主线已落地”不代表后续交付验收已经通过。
 
 ## 1. 结论
 
@@ -184,10 +184,10 @@
 
 | 提交 | 内容 |
 |---|---|
-| `93bc8f4` | 本计划书与文档索引 |
-| `0bbb8ef` | D2：流水汇总、资金链路图与导出覆盖全部记录（620 条回归，含清单哈希复算） |
-| `469873e` | D1/D3/D4：schema v22 版本列、`app/audit_trail.py` 字段级审计、`PATCH /api/cases/{id}`、单页原文纠错与审批失效 |
-| `76eb1c4` | 前端接入：证据与目录冲突提示、案件信息编辑、原文纠错、审计摘要 |
+| `e52af15` | 本计划书与文档索引 |
+| `2e57cce` | D2：流水汇总、资金链路图与导出覆盖全部记录（620 条回归，含清单哈希复算） |
+| `6679b71` | D1/D3/D4：schema v22 版本列、`app/audit_trail.py` 字段级审计、`PATCH /api/cases/{id}`、单页原文纠错与审批失效 |
+| `0721da9` | 前端接入：证据与目录冲突提示、案件信息编辑、原文纠错、审计摘要 |
 
 已完成行为（与第 4 节逐项对应）：
 
@@ -200,17 +200,17 @@
 
 - 协作专项 `tests/test_collaboration_concurrency.py`：12 项通过（含两名律师并发与审批归属）。
 - 受影响 Python 套件：186 passed；`ruff check app tests scripts` 通过。
-- 全量离线 `pytest -q`：**1240 passed, 4 failed, 85 skipped**；4 项失败在基线提交 `580c5b7` 上同样失败（见 12.3），非本批引入。
+- 全量离线 `pytest -q`：**1240 passed, 4 failed, 85 skipped**；4 项失败在基线提交 `bc935b0` 上同样失败（见 12.3），非本批引入。
 - 前端：`contract:check`、`typecheck`、`lint`、`test`、`build:static` 通过；Playwright e2e 16 项（desktop + mobile）全部通过，构建产物已由 FastAPI 静态入口验证。
 
 ### 12.2 2026-10-27：W1 成员分工 + W2 人工任务
 
 | 提交 | 内容 |
 |---|---|
-| `684475e` | W1 后端：schema v23（`members`/`member_tokens`/`case_members`）、目录成员令牌、按案件角色收窄权限、停用与轮换即撤权 |
-| `04de37f` | W1 前端：“成员与权限”页、案件分工面板、一次性令牌弹窗 |
-| `9461ad3` | W2 后端：schema v24（`review_tasks`/`review_task_events`）、任务状态机与流转审计、`/api/tasks/mine` |
-| `0b7df0a` | W2 前端：“任务”页、状态计数、开始/提交/退回/完成/取消 |
+| `607fcfd` | W1 后端：schema v23（`members`/`member_tokens`/`case_members`）、目录成员令牌、按案件角色收窄权限、停用与轮换即撤权 |
+| `1268107` | W1 前端：“成员与权限”页、案件分工面板、一次性令牌弹窗 |
+| `e7a8eae` | W2 后端：schema v24（`review_tasks`/`review_task_events`）、任务状态机与流转审计、`/api/tasks/mine` |
+| `5b8240b` | W2 前端：“任务”页、状态计数、开始/提交/退回/完成/取消 |
 
 已完成行为：
 
@@ -227,8 +227,8 @@
 
 | 提交 | 内容 |
 |---|---|
-| `188a342` | W4 后端：schema v25（`case_reports`/`case_report_events`）、`report_basis` 材料快照、报告状态机、导出侧强制绑定 |
-| `86674e0` | W4 前端：报告签发面板、正式交付前置提示 |
+| `2582573` | W4 后端：schema v25（`case_reports`/`case_report_events`）、`report_basis` 材料快照、报告状态机、导出侧强制绑定 |
+| `58dd637` | W4 前端：报告签发面板、正式交付前置提示 |
 | 本批 | W5：`scripts/collaboration_acceptance.py` 只读验收（身份、成员、schema、容量、逾期、依据失效、备份恢复演练）与[部署验收手册](../runbook/collaboration-acceptance.md) |
 
 已完成行为：

@@ -1,6 +1,6 @@
 # G2 内容完善、内容验收与未知对账计划书
 
-日期：2026-10-24（北京时间）。编制基线 `94ab448`（分支 `codex/g2-answerability`），编制前工作区干净。依据：[S07 公开真实开发材料执行记录](g2-public-development-execution-20261024.md)、[G2 稳定性计划书](g2-stability-plan-20261024.md)、[E03 验收参数](e03-acceptance-parameters-20261022.md)及[总执行计划](execution-plan-20261022.md)。
+日期：2026-10-24（北京时间）。编制基线 `7cb02da`（分支 `codex/g2-answerability`），编制前工作区干净。依据：[S07 公开真实开发材料执行记录](g2-public-development-execution-20261024.md)、[G2 稳定性计划书](g2-stability-plan-20261024.md)、[E03 验收参数](e03-acceptance-parameters-20261022.md)及[总执行计划](execution-plan-20261022.md)。
 
 执行状态更新（2026-10-24）：S08～S13 已执行，候选 `candidate-answerability-v10-content`，28 次评估、56 条双对照，0 次候选系统失败；角色混淆与空泛回答已修复，但内容断言 20/24 通过，仍有 3 道题具体化不足、1 条断言口径错误，**完整 G2/E07 仍不通过**。结果见[内容完善执行记录](g2-content-completion-execution-20261024.md)；以下保留编制时的安排作为快照。
 

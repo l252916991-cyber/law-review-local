@@ -35,7 +35,7 @@ uv run --locked python scripts/demo_identity_report.py --output output/portfolio
 
 | 项 | 值 |
 |---|---|
-| 提交 / 分支 | `23c9f4a8966255b3c9b3e9e16ccdfb3bc21ccac1` / `codex/agent-portfolio-plan` |
+| 提交 / 分支 | `03dcc5c477b0ed0ee75d73018b6db03c1d1c5ed7` / `codex/agent-portfolio-plan` |
 | 工作区 | `dirty=true`，仅 `tmp_eq/`（与本任务无关的本地草稿目录） |
 | 加载的后端入口 | `app/main.py` 的实际解析路径，随报告记录 |
 | 后端文件摘要 | 7 个文件逐个 SHA-256（`main/services/agents/review_collaboration/collaboration_ablation/ablation_analysis/answer_eval`） |

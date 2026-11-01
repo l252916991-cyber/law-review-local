@@ -1,6 +1,6 @@
 # 回答可靠性与使用者核验：下一步计划书
 
-日期：2026-10-24（北京时间）。编制基线：`4670bdd`，编制前工作区干净。
+日期：2026-10-24（北京时间）。编制基线：`ef848e6`，编制前工作区干净。
 
 依据：[当前质量记录](g2-content-completion-execution-20261024.md)、[既有内容完善计划](g2-content-completion-plan-20261024.md)、[E03 验收参数](e03-acceptance-parameters-20261022.md)与[总执行计划](execution-plan-20261022.md)。
 

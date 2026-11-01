@@ -2,12 +2,12 @@
 
 - 日期：2026-10-27（Asia/Shanghai）。
 - 对应计划：[agent-portfolio-plan-20261027.md](agent-portfolio-plan-20261027.md)。
-- 受检代码：`3c1a197`（分支 `codex/agent-portfolio-plan`）。工作区仅有一个与本任务无关的未跟踪目录 `tmp_eq/`（本地图片草稿），未纳入本次任何产物。
+- 受检代码：`665397d`（分支 `codex/agent-portfolio-plan`）。工作区仅有一个与本任务无关的未跟踪目录 `tmp_eq/`（本地图片草稿），未纳入本次任何产物。
 - 结论：**P0 通过（可进入 P1）**；**P2 真实模型调用在资源层不可开始**，原因见第 4 节，不写任何推测数值。
 
 ## 1. 代码与算法身份
 
-`app/model_comparison.py` 的固定摘要门禁在本机运行通过：`schema_version=2`、`revision=specialist-review-v2`、`source_commit=c63abf953bf10f6f025c2ff22e5819247590e58a`，七个算法文件摘要与登记值逐字节一致。
+`app/model_comparison.py` 的固定摘要门禁在本机运行通过：`schema_version=2`、`revision=specialist-review-v2`、`source_commit=31a811c92acae30caf82c9c5109ce812bd99bb04`，七个算法文件摘要与登记值逐字节一致。
 
 | 算法文件 | SHA-256（与登记值一致） |
 |---|---|
@@ -47,8 +47,8 @@
 
 | 证据 | 绑定身份 | 本轮可用性 |
 |---|---|---|
-| [多专家交接实施记录](specialist-collaboration-20261026.md)：121 passed，含框架子进程与恢复检查 | `c63abf9` 起点的实现快照 | **可复用**：算法摘要仍一致，代码自该记录后未变 |
-| [G1 工程检查证据](collaboration-release-readiness-evidence-20261027.md)：Python 3.12 离线 1411 passed / 2 failed / 1 skipped，综合覆盖率 86.13% | `19bdb68` | **可复用为前提，但需按新提交重跑**：`19bdb68..3c1a197` 只改文档与 `.gitleaksignore`，`app/ tests/ scripts/ frontend/ benchmarks/` 无差异；本轮新增模块后测试数与覆盖率会变 |
+| [多专家交接实施记录](specialist-collaboration-20261026.md)：121 passed，含框架子进程与恢复检查 | `31a811c` 起点的实现快照 | **可复用**：算法摘要仍一致，代码自该记录后未变 |
+| [G1 工程检查证据](collaboration-release-readiness-evidence-20261027.md)：Python 3.12 离线 1411 passed / 2 failed / 1 skipped，综合覆盖率 86.13% | `e7028ed` | **可复用为前提，但需按新提交重跑**：`e7028ed..665397d` 只改文档与 `.gitleaksignore`，`app/ tests/ scripts/ frontend/ benchmarks/` 无差异；本轮新增模块后测试数与覆盖率会变 |
 | 前端构建、签发与权限流程 | 同上 | 本轮未改前端，沿用；演示前需确认进程加载的构建摘要 |
 | 离线评分、Judge、20 题盲审包 | `test_answer_eval_v2.py`、`test_answer_judge.py`、`test_blind_review_package.py` 通过 | **可复用** |
 | 三组 A/B/C 对照 | 从未存在 | **缺失**，见 P1 |

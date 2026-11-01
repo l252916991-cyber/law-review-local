@@ -1,6 +1,6 @@
 # 回答可靠性与使用者核验执行记录（S14～S19）
 
-日期：2026-10-24（北京时间）。计划书：[回答可靠性与使用者核验下一步计划](reliability-review-plan-20261024.md)（`93bb515`）。执行分支 `codex/reliability-review-execution`（起点另含并存的 `61ce851` 多轮追问计划，本任务未改动其文件）。证据目录为 Git 忽略的私有目录 `output/migration/reliability-review-20261024/`。
+日期：2026-10-24（北京时间）。计划书：[回答可靠性与使用者核验下一步计划](reliability-review-plan-20261024.md)（`540b2ad`）。执行分支 `codex/reliability-review-execution`（起点另含并存的 `b7f7c46` 多轮追问计划，本任务未改动其文件）。证据目录为 Git 忽略的私有目录 `output/migration/reliability-review-20261024/`。
 
 **摘要：** 完成原文参考清单、24 次 v10 回答的逐项核验、评分口径修正、候选 v11 与 2 个未用官方案例 7 题的新保留集；在用户授权暂停无关 LawBench 基准后，完成 35 次题目评估、70 条双对照复验（回归 22 次、新保留 7 次、原保留转开发材料 6 次）。核验未发现 P0（无虚构事实、无与原文矛盾、无引用身份错误、无主体错置）；3 项 P1 中，“公司类别遗漏”已由 v11 实测关闭（`employment-transfer-facts` 由失败转为通过），“培训地点/日期”与“‘陷阱条款/无效’认定”确认为单文档 4 页检索上限导致的事实未进入上下文，未关闭。1 条评分口径错误已按 v11 清单修正；复验另发现 1 条空白字符导致的评分误判，按新清单版本离线重评、未重跑推理。无独立复核人、无法律背景试用者，使用者核验与专业意见均未执行；**完整 G2/E07 仍不通过，生产入口未切换**。
 
@@ -45,7 +45,7 @@
 
 ## 5. 候选 v11 与修复映射
 
-代码提交 `5704088`（`feat(answerability): 要求回答写出所问具体项与认定结论`）。协议由 `candidate-answerability-v10-content` 升为 `candidate-answerability-v11-detail`：
+代码提交 `043481a`（`feat(answerability): 要求回答写出所问具体项与认定结论`）。协议由 `candidate-answerability-v10-content` 升为 `candidate-answerability-v11-detail`：
 
 - 新增两条硬要求：问时间/地点/金额/数量/公司或主体类别/认定结论时必须写出资料中的对应内容，不得用“很远”“关联公司”“转嫁风险”一类概括代替；问“如何认定、是否有效、如何处理”时必须写出结论或处理结果并写明认定主体。
 - 未改语法（`omlx-guided-grammar-v1`）、宿主解析、来源范围校验、拒绝语义与编排；仍为单节点、失败关闭、不重发。
@@ -53,7 +53,7 @@
 
 | 问题 | 修复 | 身份 |
 | --- | --- | --- |
-| `employment-transfer-facts` 缺类别词 | 提示 v11 要求写出所问类别 | 代码提交 `5704088`；v11 复验通过 |
+| `employment-transfer-facts` 缺类别词 | 提示 v11 要求写出所问类别 | 代码提交 `043481a`；v11 复验通过 |
 | `gym-refund-court-order` 断言口径 | 评分清单 `applies_to=disposition` | 私有 v11 清单；v3 开发材料复验通过 |
 | 日期空格导致误判 | 评分清单 v12 空白归一 | 私有 v12 清单；对已记录输出离线重评 |
 | `training-facts`、`severance-trap-clause` 缺事实 | 未修复：检索覆盖上限 | 记录原因与成本，列入下一轮 |

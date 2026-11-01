@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.data_snapshot import backup, restore, verify  # noqa: E402
 
-BASELINE = "54b7d7c9d4eee2e3c3ade9d633324a3519231f0b"
+BASELINE = "092ecacf56621251184035f6aa05b03f5bbe5b6c"
 
 
 def sha(path: Path) -> str:

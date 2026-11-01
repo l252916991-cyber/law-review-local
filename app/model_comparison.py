@@ -24,7 +24,7 @@ from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_i
 
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
-NATIVE_BASELINE_SOURCE_COMMIT = "c63abf953bf10f6f025c2ff22e5819247590e58a"
+NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
 NATIVE_BASELINE_REVISION = "specialist-review-v4"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
@@ -32,8 +32,8 @@ NATIVE_BASELINE_REVISION = "specialist-review-v4"
 # each re-registration, whether prompt, retrieval, answerability or the model-call
 # path changed, and why the comparison stays comparable.
 NATIVE_BASELINE_REVIEW = (
-    "services.py: 0bbb8ef 增加流水全量迭代（列表分页不变，汇总/图谱/导出覆盖全部行）；"
-    "188a342 报告批准绑定材料快照；f2d4bfd 交付包改为读取冻结正文并移出渲染代码。"
+    "services.py: 2e57cce 增加流水全量迭代（列表分页不变，汇总/图谱/导出覆盖全部行）；"
+    "2582573 报告批准绑定材料快照；c88cebd 交付包改为读取冻结正文并移出渲染代码。"
     "PROMPT_VERSION、LOCAL_PROMPT_VERSION、POLICY_VERSION 与消息/检索路径均未改动，"
     "因此对照算法未漂移，仅整文件摘要需要按本次评审重新登记。"
     "2026-10-27（specialist-review-v3）：疏漏专家的单一来源检测改为按固定顺序遍历关键证据类型。"
