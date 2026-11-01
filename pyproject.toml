@@ -85,7 +85,7 @@ extend-immutable-calls = ["fastapi.Body", "fastapi.Depends", "fastapi.File", "fa
 
 [tool.mypy]
 python_version = "3.11"
-files = ["scripts"]
+files = ["scripts", "app"]
 check_untyped_defs = true
 disallow_untyped_defs = true
 warn_unused_ignores = true
@@ -96,3 +96,50 @@ follow_imports = "silent"
 [[tool.mypy.overrides]]
 module = ["huggingface_hub.*"]
 ignore_missing_imports = true
+
+# The reviewed framework wheel runs only in its separate interpreter.
+[[tool.mypy.overrides]]
+module = ["forgeharness", "forgeharness.*"]
+ignore_missing_imports = true
+
+# Workers typed against the framework: its types resolve only inside the
+# framework interpreter, so an ignore needed there looks unused here.
+[[tool.mypy.overrides]]
+module = ["app.forge_worker", "app.host_integration_worker"]
+warn_unused_ignores = false
+
+# Business modules are type-checked with a lenient profile first: annotated code
+# is checked, untyped function bodies are not yet. Tighten module by module.
+[[tool.mypy.overrides]]
+module = ["app", "app.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+# Modules with type errors recorded on 2026-11-01 (79 errors in 22 modules).
+# This list may only shrink: remove a module once it passes, never add one.
+[[tool.mypy.overrides]]
+module = [
+  "app.agents",
+  "app.answer_review",
+  "app.bank_transactions",
+  "app.benchmark_metrics",
+  "app.benchmark_reporting",
+  "app.context",
+  "app.forge_bridge",
+  "app.forge_governance",
+  "app.forge_readonly",
+  "app.forge_sources",
+  "app.host_writes",
+  "app.logger",
+  "app.model_ports",
+  "app.rag",
+  "app.rag_benchmark_dataset",
+  "app.report_delivery",
+  "app.review_collaboration",
+  "app.review_jobs",
+  "app.routes.agent_runs",
+  "app.routes.evidence",
+  "app.security",
+  "app.services",
+]
+ignore_errors = true
