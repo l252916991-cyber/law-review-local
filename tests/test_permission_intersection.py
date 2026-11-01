@@ -3,7 +3,7 @@
 Review and management actions require the member permission *and* the matching
 case role; the middleware's coarse check is not the authorization. These
 regressions cover the R1 matrix in
-``docs/migration/collaboration-release-readiness-plan-20261027.md``.
+``docs/history/migration/collaboration-release-readiness-plan-20261027.md``.
 """
 import json
 import tempfile

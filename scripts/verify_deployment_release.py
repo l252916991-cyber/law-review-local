@@ -1,6 +1,6 @@
 """Verify that the source release package can rebuild the framework binding.
 
-B3 acceptance (docs/migration/status-and-improvement-plan-20261021.md): from
+B3 acceptance (docs/history/migration/status-and-improvement-plan-20261021.md): from
 the actual release archive, in an isolated environment, rebuild the framework
 binding, verify digests and run a contract smoke check - without depending on
 development-machine absolute paths or unpackaged local files.

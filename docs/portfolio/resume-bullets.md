@@ -7,25 +7,25 @@
 **1. 设计并实现法律材料多专家审阅流水线（原生 DAG + LangGraph 双运行时）**
 把检索、四类结构化专家、交叉来源核对、审校生成与引用校验拆成显式节点；专家输出带稳定编号与来源绑定摘要，分歧与待补事项进入确定性附录，原始回答必须先通过产品引用契约才允许追加附录。两条运行时共享同一份专家规格并对结果做一致性校验。
 
-- 证据：`app/agents.py`、`app/review_collaboration.py`、[specialist-collaboration-20261026.md](../migration/specialist-collaboration-20261026.md)
+- 证据：`app/agents.py`、`app/review_collaboration.py`、[specialist-collaboration-20261026.md](../history/migration/specialist-collaboration-20261026.md)
 - 可核验点：来源被篡改/上下文变化时拒绝旧交接；附录不能挽救不合格回答。
 
 **2. 实现基于页摘要的断点恢复校验，区分“复用”与“过期拒用”**
 checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文；来源改动后拒绝恢复旧分析且不消耗重试次数。提供了三阶段（中断 / 新进程恢复 / 篡改）可复现脚本与证据 JSON。
 
-- 证据：`app/langgraph_agents.py`、`scripts/demo_recovery_check.py`、[P3](../migration/portfolio-p3-demo-status-20261027.md)
+- 证据：`app/langgraph_agents.py`、`scripts/demo_recovery_check.py`、[P3](../history/migration/portfolio-p3-demo-status-20261027.md)
 - 实测：审校完成后中断，独立进程恢复 `steps 9 → 9`（未重复专家节点）、`resume_count=1`、审校摘要一致；改动一页后恢复被拒绝、`resume_count=0`。
 
 **3. 设计三组隔离对照实验（基础 RAG / 结构化交接 / 交叉审校）并实现冻结与记账**
 `prepare` 阶段冻结隔离合成库、检索上下文、规则专家发现与三组提示（不调用模型）；`run` 阶段只读冻结批次、复算提示摘要、每次尝试写入账本；失败、未尝试、规则拒答与未知用量分别统计，失败计入分母，预算超限显式失败且不截断。
 
-- 证据：`app/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../migration/portfolio-p1-ablation-driver-20261027.md)
+- 证据：`app/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md)
 - 实测：60 题冻结提示长度 A 中位 855、B 7,568、C 9,719 字符；三组对照 16 项、六案例保留集 6 项、恢复演示 4 项回归覆盖变量隔离、跨案例引用拒绝与 fail-closed 行为。
 
 **4. 从允许清单源码包在新目录完成可复现交付**
 433 个成员的清单摘要逐项核对一致；离线 `uv sync`、隔离数据目录启动、`delivery_smoke.py --mode offline` 走通两页合成材料的导入、问答定位到第 2 页、导出包与清单哈希核对；包内 46 项回归通过。
 
-- 证据：[P4](../migration/portfolio-p4-reproducible-delivery-20261027.md)
+- 证据：[P4](../history/migration/portfolio-p4-reproducible-delivery-20261027.md)
 - 实测：仓库内全量离线检查 1476 passed / 2 项既有法条语料资产失败 / 1 skipped，综合覆盖率 86.38%（门槛 70%）；前端契约/类型/Lint/单测 11/e2e；静态构建通过；解压包内 178 项回归通过，并可从包内复算 6 案例 24 题保留集。
 
 ## 已有实测（Qwen3.8-27B，2026-10-27/28）

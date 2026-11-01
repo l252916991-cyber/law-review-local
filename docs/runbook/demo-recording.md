@@ -47,4 +47,4 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper \
 
 三条命令各自独立进程：`interrupt` 在审校完成后合成中断，`resume` 把保存的审校结果原样复用且不重复专家节点，`tamper` 改动一页来源后拒绝恢复且不消耗重试次数。证据 JSON 含运行标识、步骤数、`resume_count` 与审校摘要；画面必须同时录到 `model_disabled=true`，不得把该片段描述成模型效果。
 
-真实问答、专家交接、候选分歧与导出的主演示仍须在登记模型端点可用后重录（见 [P3 记录](../migration/portfolio-p3-demo-status-20261027.md)），不得沿用固定答案替身的成片充当真实模型响应。
+真实问答、专家交接、候选分歧与导出的主演示仍须在登记模型端点可用后重录（见 [P3 记录](../history/migration/portfolio-p3-demo-status-20261027.md)），不得沿用固定答案替身的成片充当真实模型响应。

@@ -6,7 +6,7 @@ tests and paired evaluation; expected facts point at the exact page that must
 support them. Do not treat these samples as legal advice or as a benchmark of
 legal knowledge.
 
-Frozen by docs/migration/multiturn-context-baseline-20261024.md (M01). Changing
+Frozen by docs/history/migration/multiturn-context-baseline-20261024.md (M01). Changing
 sample text or expected facts after evaluation starts requires a new freeze and
 a fresh held-out set.
 """

@@ -13,3 +13,11 @@
 | 一次性运维脚本 | 根目录 `auto_fix_*`、`monitor_*`、`download_*`、`rescore_*` 等 | 历史快照，可能覆盖文件；不要未经审查运行 |
 
 新的权威入口是 [docs/README.md](../README.md) 和 [2026-09-05 验收记录](../runbook/validation-20260905.md)。历史报告需要公开时应单独审校、脱敏并附明确版本，不混入默认源码发布包。
+
+## 2026-11-01 起归档的过程文档
+
+| 类别 | 位置 | 阅读限制 |
+|---|---|---|
+| 计划书、实施记录与证据（2026-10-21—11-01） | [migration/](migration/README.md) | 内容按原样保留；其中“待执行”“未运行”等状态是当时的事实，现行状态以 [项目说明](../portfolio/project-brief.md) 为准 |
+| 旧版 `app/static/` 前端说明 | [legacy-ui/](legacy-ui/mobile-workspace.md) | 旧界面已删除，仅供核对旧版本 |
+| 提交作者改写 | [author-rewrite-20261101.md](author-rewrite-20261101.md) | 文档中出现的旧提交哈希可用对照表换算 |

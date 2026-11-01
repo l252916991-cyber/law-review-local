@@ -4,7 +4,7 @@
 
 版本：1.0（实施提案）
 
-状态：总体路线提案；M0/M1 后续已有实现，M2 离线工程接入见[2026-10-22 实施记录](../migration/m2-engineering-20261022.md)；初次检查见[现状检查与改进计划](../migration/status-and-improvement-plan-20261021.md)。本文的“当前基线”“拟新增”和估算保留初稿时点，不表示完整迁移或业务验收已经完成。
+状态：总体路线提案；M0/M1 后续已有实现，M2 离线工程接入见[2026-10-22 实施记录](../history/migration/m2-engineering-20261022.md)；初次检查见[现状检查与改进计划](../history/migration/status-and-improvement-plan-20261021.md)。本文的“当前基线”“拟新增”和估算保留初稿时点，不表示完整迁移或业务验收已经完成。
 
 适用项目：LexVault「本地律所」与 ForgeHarness「多agent协作」；电商作为第二个实际应用验证对象，其他项目在启动阶段登记。
 

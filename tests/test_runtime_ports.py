@@ -232,7 +232,7 @@ class CapabilityDeclarationTest(unittest.TestCase):
 
     def test_contract_version_values_are_frozen(self):
         # Any change here is a contract decision, not a refactor: bump
-        # deliberately and register it in docs/migration/m1-contracts.md §8.
+        # deliberately and register it in docs/history/migration/m1-contracts.md §8.
         self.assertEqual(runtime_ports.RUNTIME_PROTOCOL_VERSION, 2)
         self.assertEqual(runtime_ports.RUN_EVENT_VERSION, 2)
         self.assertEqual(runtime_ports.RUN_RESULT_VERSION, 1)

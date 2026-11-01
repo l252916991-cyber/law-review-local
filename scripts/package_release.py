@@ -35,7 +35,7 @@ EXACT_FIXTURES = (
     "benchmarks/answer_eval/holdout-v1/manifest.json",
     # Frozen experiment configuration (non-sensitive test fixture input);
     # tests/test_statutory_experiment.py fails closed without it. Restored
-    # 2026-10-21 from the public origin repository, see docs/migration/ledger.md.
+    # 2026-10-21 from the public origin repository, see docs/history/migration/ledger.md.
     "benchmarks/statutory-experiment-v1.json",
     # B3 delivery path (status-and-improvement-plan-20261021.md): the exact
     # locked framework wheel plus its vetted binding record ship inside the

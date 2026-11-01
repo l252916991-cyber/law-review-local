@@ -1,7 +1,7 @@
 """Legacy-runtime implementation of the public RuntimeControl contract (M1).
 
 Plan reference: docs/architecture/forgeharness-migration-plan-20261021.md §5 M1
-("先用旧运行时实现兼容接口") and docs/migration/m1-contracts.md.
+("先用旧运行时实现兼容接口") and docs/history/migration/m1-contracts.md.
 
 This adapter gives the existing native DAG and LangGraph runtimes the frozen
 public interface without changing any legacy behaviour:

@@ -78,7 +78,7 @@ uv run --locked python -m scripts.collaboration_acceptance \
 
 ## 4. 人工业务验收（五个身份）
 
-用管理员、承办律师、复核律师、助理、只读各登录一次，按[计划书第 9 节](../../docs/migration/collaboration-first-release-plan-20261027.md#9-验收用例)执行：
+用管理员、承办律师、复核律师、助理、只读各登录一次，按[计划书第 9 节](../history/migration/collaboration-first-release-plan-20261027.md#9-验收用例)执行：
 
 1. 未授权人员无法查看、下载或导出案件。
 2. 两人同时修改同一条证据，第二人得到冲突提示，内容不被覆盖。

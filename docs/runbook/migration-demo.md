@@ -49,4 +49,4 @@ uv run --locked python -m scripts.migration_demo \
 
 > 为本地法律阅卷系统实现可复现的旧库迁移与备份恢复演练：以固定历史提交生成合成数据，验证 SQLite schema 16→26 升级、外部 LangGraph checkpoint 保留、双身份报告签发及恢复后冻结正文与附件一致性，并提供旧程序回退检查与自动化校验。
 
-具体运行数字与验证版本见[2026-10-28 演练记录](../migration/collaboration-m1-synthetic-demo-20261028.md)。
+具体运行数字与验证版本见[2026-10-28 演练记录](../history/migration/collaboration-m1-synthetic-demo-20261028.md)。

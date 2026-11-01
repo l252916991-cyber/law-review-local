@@ -10,7 +10,7 @@ in docs/architecture/forgeharness-migration-plan-20261021.md §4.1:
 - ``RunResult``        the existing result semantics, losslessly round-tripped
 - ``RuntimeControl``   start/inspect/resume/status with declared capabilities
 
-Rules frozen with this contract (see docs/migration/m1-contracts.md):
+Rules frozen with this contract (see docs/history/migration/m1-contracts.md):
 
 1. Boundary purity: this module imports the standard library only. It must
    never import app business modules (agents/db/rag/security/services) and
