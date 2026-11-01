@@ -1,9 +1,9 @@
 """Frozen answer-set provenance, independent source grounding and strict citations."""
-from copy import deepcopy
 import json
-from pathlib import Path
 import shutil
 import tempfile
+from copy import deepcopy
+from pathlib import Path
 
 import pytest
 

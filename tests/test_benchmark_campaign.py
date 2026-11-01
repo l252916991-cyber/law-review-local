@@ -1,5 +1,5 @@
-import json
 import io
+import json
 from collections import Counter
 from pathlib import Path
 from unittest.mock import patch

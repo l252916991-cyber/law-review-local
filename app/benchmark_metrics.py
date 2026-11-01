@@ -11,13 +11,13 @@ import math
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from functools import lru_cache
-from typing import Iterable
 
-import jieba
 import cn2an
+import jieba
 
 SCORER_VERSION = "lawbench-local-v3"
 

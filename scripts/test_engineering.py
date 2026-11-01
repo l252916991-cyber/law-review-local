@@ -13,8 +13,9 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.migration_demo import package_contents
+from scripts.migration_demo import run as migration_demo
 from scripts.package_release import source_files
-from scripts.migration_demo import package_contents, run as migration_demo
 from scripts.setup_models import inspect_model, pinned_download
 
 

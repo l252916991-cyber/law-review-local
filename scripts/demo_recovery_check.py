@@ -20,9 +20,10 @@ import hashlib
 import json
 import os
 import sys
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -66,7 +67,7 @@ def interrupt_once(checkpoint: Path, question: str) -> tuple[int, dict[str, Any]
     from app.agents import get_run_trace
     from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
 
-    def fail_memory(node: str, state: "ReviewState") -> None:
+    def fail_memory(node: str, state: ReviewState) -> None:
         if node == "memory":
             raise RuntimeError("演示用合成中断：审校完成后停止")
 

@@ -311,7 +311,7 @@ class TaskWorkflowTest(unittest.TestCase):
         self.assertEqual(reassigned.json()["task"]["assignee_name"], "另一位助理")
 
     def test_mine_lists_only_open_assigned_tasks(self):
-        first = self.create_task(title="我的任务甲")
+        self.create_task(title="我的任务甲")
         second = self.create_task(title="我的任务乙")
         self.act(second["id"], self.assistant_token, "start")
         self.act(second["id"], self.assistant_token, "submit")
@@ -349,12 +349,13 @@ class TaskWorkflowTest(unittest.TestCase):
         self.assertEqual(hidden.status_code, 404)
         hidden_action = self.act(task["id"], "c" * 40, "start")
         self.assertEqual(hidden_action.status_code, 404)
-        listed = self.client.get(f"/api/tasks/mine", headers=self.headers("c" * 40))
+        listed = self.client.get("/api/tasks/mine", headers=self.headers("c" * 40))
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["tasks"], [])
 
     def test_task_transitions_are_audited(self):
         from contextlib import closing
+
         from app.db import connect
 
         task = self.create_task()

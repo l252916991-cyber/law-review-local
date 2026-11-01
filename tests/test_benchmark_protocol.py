@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import unified_benchmark_runner as runner
-from app.benchmark_metrics import score_lawbench_item, extract_final_amount, extract_final_months
-from app.benchmark_reporting import metrics, prompt_for, paired_baseline, source_hashes
+from app.benchmark_metrics import extract_final_amount, extract_final_months, score_lawbench_item
+from app.benchmark_reporting import metrics, paired_baseline, prompt_for, source_hashes
 
 
 class ScoringRegressionTest(unittest.TestCase):

@@ -175,7 +175,7 @@ class BrowserSession:
         self._message_id = 0
 
     # -- lifecycle ---------------------------------------------------------
-    def __enter__(self) -> "BrowserSession":
+    def __enter__(self) -> BrowserSession:
         assert self.executable is not None
         self.process = subprocess.Popen(
             [
@@ -300,7 +300,7 @@ class BrowserSession:
         params: dict[str, Any] = {"format": "png"}
         if selector:
             box = self.evaluate(
-                "(() => { const node = document.querySelector(%s);"
+                "(() => { const node = document.querySelector(%s);"  # noqa: UP031 - JS braces
                 " if (!node) return null;"
                 " node.scrollIntoView({block: 'center', inline: 'nearest'});"
                 " const rect = node.getBoundingClientRect();"

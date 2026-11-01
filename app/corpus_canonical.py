@@ -21,9 +21,10 @@ import hashlib
 import json
 import shutil
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 from urllib.parse import urlparse
 
 from .corpus_audit import audit, dedup_digest, heading_leak_articles
@@ -190,7 +191,7 @@ def build(directories: Sequence[str | Path], output: str | Path,
         "schema_version": SCHEMA_VERSION, "canonical_schema_version": CANONICAL_SCHEMA_VERSION,
         # ``source_as_of`` is the law's data freshness; ``built_at`` only says when
         # this run happened. A deployment reads source_as_of as "law current to".
-        "built_at": datetime.now(timezone.utc).isoformat(),
+        "built_at": datetime.now(UTC).isoformat(),
         "source_as_of": source_as_of or _latest_source_date(sources),
         "corpus_version": CANONICAL_SCHEMA_VERSION,
         "source_corpora": [str(Path(directory)) for directory in sources],

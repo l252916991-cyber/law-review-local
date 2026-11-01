@@ -10,10 +10,11 @@ import hashlib
 import io
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Any, Iterable
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from typing import Any
 
 try:
     import openpyxl

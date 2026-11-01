@@ -25,9 +25,10 @@ import shutil
 import subprocess
 import threading
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # httpx is a dev-group dependency; import lazily at runtime.
     import httpx
@@ -134,7 +135,7 @@ def build_model_endpoint(case_id: int) -> Endpoint:
     return Endpoint("chat-model", "POST", f"/api/cases/{case_id}/chat", {"question": MODEL_QUESTION, "use_llm": True})
 
 
-def _new_client(timeout: float, base_url: str = "") -> "httpx.Client":
+def _new_client(timeout: float, base_url: str = "") -> httpx.Client:
     import httpx
 
     return httpx.Client(
@@ -145,7 +146,7 @@ def _new_client(timeout: float, base_url: str = "") -> "httpx.Client":
     )
 
 
-def request_once(client: "httpx.Client", endpoint: Endpoint, headers: dict[str, str], phase: str) -> Result:
+def request_once(client: httpx.Client, endpoint: Endpoint, headers: dict[str, str], phase: str) -> Result:
     started = time.perf_counter()
     try:
         if endpoint.method == "POST":

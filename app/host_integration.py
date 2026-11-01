@@ -7,16 +7,16 @@ No framework imports enter the host interpreter.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
+import re
 import secrets
 import selectors
+import shutil
 import subprocess
 import time
 import zipfile
-import hashlib
-import re
-import shutil
 from contextlib import closing, contextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -26,11 +26,24 @@ from .db import connect, get_db_path, now, transaction
 from .forge_bridge import ROOT, SidecarProtocolError, _read_message, _send, framework_binding
 from .forge_runtime import resolve_framework_python
 from .host_writes import (
-    ISOLATED_RUNTIME, LocalHostWritePort, authorize, canonical, digest, isolated_guard, source_version,
+    ISOLATED_RUNTIME,
+    LocalHostWritePort,
+    authorize,
+    canonical,
+    digest,
+    isolated_guard,
 )
 from .runtime_ports import (
-    AccessDeniedError, ContractValidationError, IdentityMismatchError, RequestConflictError,
-    RequestInProgressError, RunRequest, RunScope, UnsupportedCapabilityError, WriteAction, WriteRequest,
+    AccessDeniedError,
+    ContractValidationError,
+    IdentityMismatchError,
+    RequestConflictError,
+    RequestInProgressError,
+    RunRequest,
+    RunScope,
+    UnsupportedCapabilityError,
+    WriteAction,
+    WriteRequest,
     compute_request_digest,
 )
 from .security import actor_name, current_principal
@@ -356,7 +369,7 @@ class IsolatedHostIntegration:
         with zipfile.ZipFile(wheel) as archive:
             files = {n: hashlib.sha256(archive.read(n)).hexdigest() for n in archive.namelist()
                      if n.startswith("forgeharness/") and n.endswith(".py")}
-        scope = RunScope(row["case_id"])
+        RunScope(row["case_id"])  # validates the persisted case id before launch
         actions = {a["id"]: a for a in json.loads(row["graph_json"])}
         token = secrets.token_hex(32)
         # Control/reconciliation may run after the original deadline; no new tool

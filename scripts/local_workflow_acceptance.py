@@ -30,7 +30,6 @@ from scripts.data_snapshot import backup, restore, verify  # noqa: E402
 from scripts.migration_demo import server  # noqa: E402
 from scripts.release_smoke import _multipart, _opener, _request  # noqa: E402
 
-
 ROLES = {
     "owner": ["view", "edit", "approve", "export"],
     "reviewer": ["view", "approve", "export"],

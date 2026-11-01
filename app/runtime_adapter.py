@@ -39,9 +39,10 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from contextlib import closing
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import HTTPException
 

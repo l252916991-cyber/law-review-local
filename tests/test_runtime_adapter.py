@@ -18,8 +18,6 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-runtime-adapter-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from tests.support import IsolatedDatabaseTestCase  # noqa: E402
-
 from app.db import connect, init_db, now, transaction  # noqa: E402
 from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator  # noqa: E402
 from app.runtime_adapter import LegacyRuntimeControl, current_actor_identity  # noqa: E402
@@ -43,6 +41,7 @@ from app.runtime_ports import (  # noqa: E402
     new_request_id,
 )
 from app.security import Principal, _principal, current_principal  # noqa: E402
+from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 QUESTION = "张某关于固定回报审批的陈述是否矛盾？"
 

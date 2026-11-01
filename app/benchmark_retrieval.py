@@ -11,8 +11,9 @@ import json
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from app.legal_corpus import LegalCorpus, article_number
 

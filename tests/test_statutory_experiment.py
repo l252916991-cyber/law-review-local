@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import LegalCorpus, SCHEMA_VERSION, split_articles
+from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
 from app.statutory_benchmark import evaluate, metrics, paired_delta
 from app.statutory_hybrid import MODES, StatutoryHybrid
 from app.statutory_index import IndexSpec, StatutoryIndex

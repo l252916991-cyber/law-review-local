@@ -15,7 +15,6 @@ from .db import now, transaction
 from .security import actor_name, require_case_access, require_permission
 from .services import concise, rowdict
 
-
 READONLY_TOOL_NAMES = frozenset({
     "documents", "evidence", "search", "saved_gap_analysis",
     "get_page", "document_outline", "case_overview", "verify_statute", "search_statutes",

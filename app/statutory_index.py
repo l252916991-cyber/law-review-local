@@ -4,13 +4,14 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import date
 from operator import mul
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-from .legal_corpus import LegalCorpus, SCHEMA_VERSION
+from .legal_corpus import SCHEMA_VERSION, LegalCorpus
 
 
 def digest(value: Any) -> str:
@@ -58,7 +59,7 @@ def build_validity(corpus: LegalCorpus) -> dict[str, dict[str, Any]]:
     for doc in corpus.documents:
         by_law.setdefault(doc["law_name"], []).append(doc)
     validity: dict[str, dict[str, Any]] = {}
-    for law, docs in by_law.items():
+    for docs in by_law.values():
         ordered = sorted(docs, key=lambda item: item["effective_date"] or item["version_date"])
         for position, doc in enumerate(ordered):
             start = doc["effective_date"] or doc["version_date"]

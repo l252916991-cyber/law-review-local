@@ -48,9 +48,10 @@ import hashlib
 import json
 import re
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Protocol
 
 # ---------------------------------------------------------------------------
 # Versions and frozen constants
@@ -107,7 +108,7 @@ def _canonical_sha256(payload: Any) -> str:
 
 
 def compute_request_digest(
-    request: "RunRequest", *, principal_name: str, effective_author: str
+    request: RunRequest, *, principal_name: str, effective_author: str
 ) -> str:
     """Versioned canonical digest binding one request_id to one exact request.
 
@@ -432,7 +433,7 @@ class RunResult:
     })
 
     @classmethod
-    def from_legacy(cls, payload: dict[str, Any]) -> "RunResult":
+    def from_legacy(cls, payload: dict[str, Any]) -> RunResult:
         extra = {k: v for k, v in payload.items() if k not in cls._TYPED_KEYS}
         return cls(
             run_id=payload.get("run_id"),
@@ -512,7 +513,7 @@ class RunEvent:
     event_version: int = RUN_EVENT_VERSION
 
     @classmethod
-    def from_legacy_step(cls, run_id: int, seq: int, step: dict[str, Any]) -> "RunEvent":
+    def from_legacy_step(cls, run_id: int, seq: int, step: dict[str, Any]) -> RunEvent:
         output = step.get("output") or {}
         diagnostic = output.get("diagnostic") if isinstance(output, dict) else None
         return cls(
@@ -789,7 +790,7 @@ class HostReadPort(Protocol):
 # ---------------------------------------------------------------------------
 
 
-class WriteAction(str, Enum):
+class WriteAction(str, Enum):  # noqa: UP042 - StrEnum would change str() of persisted action names
     """Exhaustive M1 action set. The framework may only request these exact
     actions; the host owns transaction, permission check and unique-key
     enforcement for each (plan §4.2). New actions require a contract version

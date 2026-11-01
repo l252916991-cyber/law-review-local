@@ -6,15 +6,15 @@ export is recorded separately from model evaluation; no command runs a model.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import hashlib
 import json
-from pathlib import Path
 import random
 import sys
-from typing import Any
 import unicodedata
 import zipfile
+from collections import Counter
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

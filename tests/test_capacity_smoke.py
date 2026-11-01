@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from scripts.capacity_smoke import (
     Counter,
-    Endpoint,
     Result,
     _new_client,
     build_endpoints,

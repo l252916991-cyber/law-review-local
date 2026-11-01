@@ -45,7 +45,6 @@ def main() -> int:
     # Rebuild the round-1 rows in split order: the cluster file stores candidate
     # indices and round-1 assigned them with the same seed, so re-deriving the
     # assignment keeps splits identical.
-    import random
 
     manifest = json.loads(args.round1_manifest.read_text())
     if manifest["split_seed"] != "38-sft-v1":

@@ -16,19 +16,40 @@ from typing import Any, Literal
 # Only trusted, stdlib-only host source contracts are imported here. The host
 # package initializer has no application imports; framework remains isolated.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.forge_sources import verify_statutes  # noqa: E402
-from app.forge_governance import OfflineModelTest  # noqa: E402
-
 import forgeharness
-from pydantic import BaseModel, ConfigDict
 from forgeharness.applications.legal.lexvault import BundleCitationVerifier, CaseBundle
 from forgeharness.sdk import (
-    API_VERSION, Actor, AuthorizationRequest, Capability, FinalAction, Harness,
-    PolicyDecision, PolicyDecisionType, ResourceScope, RiskLevel, RunBudget,
-    RunContext, RunKernel, ToolCall, ToolContext, ToolEffectClass, ToolOutput,
-    Message, MessageRole, ModelResult, ModelUsage,
-    ToolSpec, VerificationRequest, VerificationResult, compose_application, verify_trace,
+    API_VERSION,
+    Actor,
+    AuthorizationRequest,
+    Capability,
+    FinalAction,
+    Harness,
+    Message,
+    MessageRole,
+    ModelResult,
+    ModelUsage,
+    PolicyDecision,
+    PolicyDecisionType,
+    ResourceScope,
+    RiskLevel,
+    RunBudget,
+    RunContext,
+    RunKernel,
+    ToolCall,
+    ToolContext,
+    ToolEffectClass,
+    ToolOutput,
+    ToolSpec,
+    VerificationRequest,
+    VerificationResult,
+    compose_application,
+    verify_trace,
 )
+from pydantic import BaseModel, ConfigDict
+
+from app.forge_governance import OfflineModelTest  # noqa: E402
+from app.forge_sources import verify_statutes  # noqa: E402
 
 MAX_MESSAGE_BYTES = 2_000_000
 WIRE_VERSION = 1

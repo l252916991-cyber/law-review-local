@@ -15,14 +15,14 @@ import time
 import unicodedata
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.legal_corpus import ARTICLE_RE, LegalCorpus, SCHEMA_VERSION, article_number, split_articles  # noqa: E402
+from app.legal_corpus import ARTICLE_RE, SCHEMA_VERSION, LegalCorpus, article_number, split_articles  # noqa: E402
 from scripts.benchmark_campaign import read_rows  # noqa: E402
 
 SEARCH_URL = "https://flk.npc.gov.cn/law-search/search/list"
@@ -355,7 +355,7 @@ def download_law(name: str, aliases: set[str], cutoff: str) -> tuple[dict[str, A
               "detail_response_sha256": _sha(detail_raw), "preview_response_sha256": _sha(preview_raw),
               "reader_info_sha256": _sha(info_raw), "page_response_sha256": page_hashes,
               "detail": detail, "reader_info": info, "pages": pages}
-    document = extract_document(bundle, sorted(aliases), datetime.now(timezone.utc).isoformat())
+    document = extract_document(bundle, sorted(aliases), datetime.now(UTC).isoformat())
     return bundle, document
 
 
@@ -367,7 +367,7 @@ def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: st
     output.mkdir(parents=True)
     documents, failures = [], []
     for name, aliases in sorted(laws.items()):
-        attempted = datetime.now(timezone.utc).isoformat()
+        attempted = datetime.now(UTC).isoformat()
         try:
             bundle, document = download_law(name, aliases | {name}, cutoff)
             stem = document["document_id"]
@@ -385,7 +385,7 @@ def build(output: Path, campaign: Path, existing_corpora: list[Path], cutoff: st
     # ``source_as_of`` is the real freshness of the law data; ``built_at`` only says
     # when this run happened. A deployment must never read the build time as the
     # law's freshness, so both are recorded and labelled separately.
-    manifest = {"schema_version": SCHEMA_VERSION, "built_at": datetime.now(timezone.utc).isoformat(),
+    manifest = {"schema_version": SCHEMA_VERSION, "built_at": datetime.now(UTC).isoformat(),
                 "source_as_of": source_as_of or cutoff,
                 "source_policy": "National Laws and Regulations Database complete OFD publications",
                 "selection_policy": "question-law-name only; newest publication no later than source_as_of",
@@ -413,7 +413,7 @@ def verify(directory: Path) -> dict[str, Any]:
         count += len(original["articles"])
     return {"schema_version": SCHEMA_VERSION, "valid": not errors, "errors": errors,
             "document_count": len(corpus.documents), "verified_articles": count,
-            "checked_at": datetime.now(timezone.utc).isoformat()}
+            "checked_at": datetime.now(UTC).isoformat()}
 
 
 def main() -> int:

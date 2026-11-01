@@ -11,9 +11,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from app.correction_candidates import MODES, predict
 from app.benchmark_metrics import score_lawbench_item
 from app.benchmark_reporting import atomic_json
+from app.correction_candidates import MODES, predict
 from app.lawbench import load_task
 from scripts.benchmark_campaign import digest, probe_model, service_may_still_be_busy
 

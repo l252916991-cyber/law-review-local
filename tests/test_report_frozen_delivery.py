@@ -44,7 +44,7 @@ class FrozenDeliveryCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()["id"]
 
-    def upload(self, case_id, name="借条.txt", text="今借到人民币十万元整。".encode("utf-8")):
+    def upload(self, case_id, name="借条.txt", text="今借到人民币十万元整。".encode()):  # noqa: B008 - bytes are immutable
         from app.services import index_upload
         return index_upload(case_id, name, text, "text/plain")
 

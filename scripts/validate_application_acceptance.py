@@ -6,16 +6,17 @@ Only synthetic seed data is used; live execution has a fixed request budget.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 import json
 import os
-from pathlib import Path
 import select
 import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]

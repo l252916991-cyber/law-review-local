@@ -24,11 +24,12 @@ import os
 import re
 import statistics
 import time
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any
 
 from .answer_eval import SCORING_VERSION, load_dataset, score_answer_v2
 from .db import connect, db_scope, init_db
@@ -208,7 +209,11 @@ def raw_specialists(
 ) -> dict[str, dict[str, Any]]:
     """Run the deterministic rule layers; no model call and no upstream review."""
     from .agents import (
-        ContradictionAgent, EvidenceAgent, FactAgent, GapDetectionAgent, validate_specialist_output,
+        ContradictionAgent,
+        EvidenceAgent,
+        FactAgent,
+        GapDetectionAgent,
+        validate_specialist_output,
     )
 
     runners: dict[str, Callable[[str, list[dict[str, Any]]], dict[str, Any]]] = {

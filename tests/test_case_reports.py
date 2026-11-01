@@ -5,16 +5,16 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-report-tests-")
 
-from app.main import app  # noqa: E402
 from app.db import db_scope, init_db, now, transaction  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 class ReportFlowTest(IsolatedDatabaseTestCase):

@@ -11,7 +11,6 @@ from .answer_eval import JUDGE_INSTRUCTION
 from .forge_governance import governed_backend
 from .services import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline
 
-
 _THINK = re.compile(r"<think[\s\S]*?</think>", re.IGNORECASE)
 
 

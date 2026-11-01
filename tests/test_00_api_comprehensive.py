@@ -2,12 +2,12 @@ import io
 import os
 import tempfile
 import unittest
-from contextlib import closing
-from tests.support import IsolatedDatabaseTestCase
 import zipfile
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-api-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA

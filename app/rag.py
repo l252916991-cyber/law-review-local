@@ -32,7 +32,6 @@ from .services import (
     search_pages,
 )
 
-
 EMBEDDING_MODEL = "Qwen3-Embedding-4B-4bit-DWQ"
 RERANK_MODEL = "bge-reranker-v2-m3-mlx"
 EMBEDDING_TEXT_VERSION = "raw-text-v1"
@@ -208,7 +207,7 @@ class RerankClient:
         except (urllib.error.URLError, OSError, KeyError, TypeError, ValueError, IndexError) as exc:
             self.last_failure = type(exc).__name__
             logger.warning("rerank_fallback error_type=%s", self.last_failure)
-            raise RuntimeError(f"rerank_model_unavailable:{self.last_failure or 'unknown'}")
+            raise RuntimeError(f"rerank_model_unavailable:{self.last_failure or 'unknown'}") from exc
 
 
 class HybridRetriever:
@@ -715,8 +714,9 @@ class HybridRetriever:
         query: str, children: list[dict[str, Any]], query_vector: list[float],
     ) -> tuple[dict[int, float], dict[int, float]]:
         """Chinese bigram BM25 and cosine similarity for every child, plus RRF."""
-        from .legal_corpus import _terms
         from collections import Counter
+
+        from .legal_corpus import _terms
 
         terms = [_terms(child["text"]) for child in children]
         df = Counter(term for bag in terms for term in bag)
@@ -790,10 +790,11 @@ class HybridRetriever:
 
     def _retrieve_children(self, query: str, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Experimental exact-scan child recall backed by a persistent vector cache."""
+        from collections import Counter
+
+        from .legal_corpus import _terms
         from .rag_child_index import load_or_build_child_index
         from .rag_chunks import CHUNK_VERSION
-        from .legal_corpus import _terms
-        from collections import Counter
 
         query_vectors, backend = self.embedding_client.embed([query])
         if len(query_vectors) != 1 or not valid_vector(query_vectors[0]):

@@ -9,7 +9,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-
 LAW_BENCH_DIR = Path(__file__).resolve().parent.parent / "benchmarks" / "lawbench" / "zero_shot"
 LAW_BENCH_SOURCE = "https://github.com/open-compass/LawBench"
 LAW_BENCH_COMMIT = "e30981bb3ff54c41571f222e0b23e92d27375388"

@@ -4,9 +4,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import sys
 import tempfile
+from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]

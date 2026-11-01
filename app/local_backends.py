@@ -7,8 +7,8 @@ import time
 from contextlib import closing
 from copy import deepcopy
 from pathlib import Path
-from urllib.parse import quote, urlsplit
 from urllib.error import HTTPError
+from urllib.parse import quote, urlsplit
 from urllib.request import Request
 
 from .db import connect, db_scope, now, transaction

@@ -190,7 +190,7 @@ def _revoke_sessions(conn, member_id: int) -> int:
     return removed
 
 
-def _assignments(conn, member_id: int, assignments: list["MemberAssignmentIn"], actor: str) -> None:
+def _assignments(conn, member_id: int, assignments: list[MemberAssignmentIn], actor: str) -> None:
     for item in assignments:
         if not _case_exists(conn, item.case_id):
             raise HTTPException(404, f"案件 {item.case_id} 不存在")

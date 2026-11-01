@@ -13,10 +13,12 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any, Callable
+from typing import Any
 
-from .chat_idempotency import ChatCancelled, commit as commit_request
+from .chat_idempotency import ChatCancelled
+from .chat_idempotency import commit as commit_request
 from .db import connect, now, transaction
 
 logger = logging.getLogger(__name__)
@@ -735,7 +737,7 @@ def _option(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _selection(question: str, options: tuple[dict[str, Any], ...] | list[dict[str, Any]]) -> dict[str, Any] | None:
-    for index, option in enumerate(options, 1):
+    for option in options:
         name = str(option.get("name") or "")
         if name and (name in question or _document_stem(name) in question):
             return option

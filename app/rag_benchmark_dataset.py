@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 SURNAMES = ["赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈", "褚", "卫"]
 INDUSTRIES = ["新能源", "医疗器械", "物流", "教育", "软件", "农业", "建筑", "传媒", "环保", "零售", "制造", "旅游"]
 DATASET_VERSION = "lexvault-rag-240-v2"

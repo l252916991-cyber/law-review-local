@@ -17,10 +17,10 @@ from app.domain_writes import DOMAIN_RUNTIME
 from app.host_integration import IsolatedHostIntegration
 from app.runtime_adapter import current_actor_identity
 from app.runtime_ports import AccessDeniedError, ModelConfig, RequestConflictError, RunRequest, RunScope
+from app.security import Principal, _principal
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_forge_readonly import write_corpus
 from tests.test_host_writes import isolated  # noqa: F401
-from app.security import Principal, _principal
 
 actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="installed independent Python3.12 required")
 

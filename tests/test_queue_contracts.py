@@ -5,22 +5,22 @@ import tempfile
 import threading
 import time
 import unittest
-from pathlib import Path
 from contextlib import closing
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
 from arq import Retry
 from arq.connections import ArqRedis
 from arq.constants import in_progress_key_prefix, job_key_prefix, result_key_prefix
 from fakeredis import FakeServer
 from fakeredis.aioredis import FakeRedis
+from fastapi.testclient import TestClient
 
+from app import tasks
 from app.config import config
 from app.db import connect, db_scope, now, transaction
 from app.main import app
-from app import tasks
 from app.services import index_upload
 
 

@@ -7,9 +7,10 @@ import fcntl
 import json
 import logging
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from arq import Retry, create_pool, cron
 from arq.connections import ArqRedis, RedisSettings

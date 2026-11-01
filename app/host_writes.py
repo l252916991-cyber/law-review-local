@@ -20,8 +20,15 @@ from fastapi import HTTPException
 
 from .db import connect, db_scope, get_db_path, init_db, now, transaction
 from .runtime_ports import (
-    DEFAULT_TENANT_ID, MAX_PAGE_TEXT_CHARS, AccessDeniedError, ContractValidationError, RequestConflictError,
-    RunScope, WriteAction, WriteReceipt, WriteRequest,
+    DEFAULT_TENANT_ID,
+    MAX_PAGE_TEXT_CHARS,
+    AccessDeniedError,
+    ContractValidationError,
+    RequestConflictError,
+    RunScope,
+    WriteAction,
+    WriteReceipt,
+    WriteRequest,
 )
 from .security import auth_mode, configured_tokens, current_principal, oidc_settings
 

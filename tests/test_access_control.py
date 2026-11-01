@@ -111,7 +111,6 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/cases").status_code, 401)
 
     def test_session_expiry_revocation_rotation_and_replay(self):
-        from app import security
         self.client.post('/api/auth/session', json={'token': self.token})
         session = self.client.cookies.get('lexvault_session')
         self.assertNotEqual(session, self.token)
@@ -138,7 +137,6 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
 
     def test_persisted_session_survives_security_module_reload_and_expiry_is_purged(self):
-        import importlib
         import app.security as security
         response = self.client.post("/api/auth/session", json={"token": self.token})
         self.assertEqual(response.status_code, 200)
@@ -277,7 +275,7 @@ class AccessControlTests(unittest.TestCase):
 
     def test_security_events_survive_case_deletion(self):
         from app.db import connect
-        self.client.get(f"/api/dashboard", headers=self.headers)  # record a denial
+        self.client.get("/api/dashboard", headers=self.headers)  # record a denial
         # Business deletion cascades case-owned rows; the security trail has
         # no foreign key and must survive it.
         with transaction() as conn:
@@ -497,8 +495,8 @@ class AccessControlTests(unittest.TestCase):
         principal_env.start()
         self.addCleanup(principal_env.stop)
         with patch.object(security_module, "fetch_json", side_effect=fake_fetch):
-            from urllib.parse import parse_qs
             import urllib.parse as parse
+            from urllib.parse import parse_qs
             # discover endpoints through login redirect
             login_response = self.client.get("/api/auth/oidc/login", follow_redirects=False)
             self.assertEqual(login_response.status_code, 302, login_response.text)

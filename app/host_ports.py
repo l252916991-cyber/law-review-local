@@ -23,9 +23,10 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -473,7 +474,7 @@ class LocalHostReadPort:
     def search_statutes(
         self, scope: RunScope, query: str, *, limit: int = SEARCH_LIMIT_DEFAULT
     ) -> tuple[StatuteHit, ...]:
-        case_id = self._bind(scope)
+        self._bind(scope)
         query = _bounded_query(query)
         limit = _bounded_int(
             limit, name="limit", default=SEARCH_LIMIT_DEFAULT,
@@ -496,7 +497,7 @@ class LocalHostReadPort:
         hits/warning) for the statutory expert; ``search_statutes`` above is the
         typed public surface.
         """
-        case_id = self._bind(scope)
+        self._bind(scope)
         query = _bounded_query(query)
         self.assert_current()
         if self.corpus is None:

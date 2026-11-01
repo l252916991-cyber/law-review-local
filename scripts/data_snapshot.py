@@ -8,11 +8,10 @@ import shutil
 import sqlite3
 import time
 from contextlib import ExitStack, closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
-
 
 FORMAT = "lexvault-offline-snapshot-v1"
 DB_NAME = "law_review.db"
@@ -46,7 +45,7 @@ def validate_model_settings(path: Path) -> None:
             raise ValueError("Invalid model_settings.json field")
     try:
         endpoint = urlsplit(settings["base_url"].strip())
-        endpoint.port  # Validate the port without contacting the endpoint.
+        endpoint.port  # noqa: B018 - validate the port without contacting the endpoint.
         if (endpoint.scheme not in {"http", "https"} or not endpoint.hostname
                 or endpoint.username is not None or endpoint.password is not None or endpoint.query or endpoint.fragment):
             raise ValueError("Model endpoint must not contain credentials or query parameters")
@@ -208,7 +207,7 @@ def backup(source: Path, destination: Path, *, checkpoint: Path | None = None, q
         require_idle(business)
     manifest: dict[str, Any] = {
         "format": FORMAT,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "source_data_dir": str(source),
         "checkpoint_original": str(checkpoint) if CHECKPOINT_NAME in databases else None,
         "quiescent_operator_confirmed": True,

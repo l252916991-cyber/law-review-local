@@ -10,7 +10,6 @@ import json
 from copy import deepcopy
 from typing import Any
 
-
 GROUNDING_VERSION = "case-findings-v1"
 REVIEW_VERSION = "specialist-review-v1"
 MAX_HANDOFF_CHARS = 40_000

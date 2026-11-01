@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise SystemExit("another fullscale run is active")
+            raise SystemExit("another fullscale run is active") from None
         profiles = {"tg": load_profile(args.profile_tg), "lex": load_profile(args.profile_rag)}
         if profiles["tg"].get("corpus_directories") or not profiles["lex"].get("corpus_directories"):
             raise ValueError("tg profile must be retrieval-free; rag profile must carry corpus_directories")

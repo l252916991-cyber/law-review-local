@@ -24,7 +24,7 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 
 ## 渐进质量范围
 
-- Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行关键语法/未定义名检查；不宣称全套风格规则已达标。
+- Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行 `E9`（语法）、`F`（Pyflakes：未使用/未定义名、重复定义、无用赋值）、`I`（导入排序）、`UP`（按 Python 3.11 升级语法）与 `B`（bugbear）；测试目录对 `F811` 例外，因为从兄弟模块导入的 pytest fixture 会以同名参数注入。`B905`（zip 未指定 strict）与 `B023`（循环内闭包）暂不启用：前者需要逐处评估截断语义，后者经 2026-11-01 逐处核对均在同一轮迭代内调用。FastAPI 的 `File()`/`Body()` 等默认参数登记为不可变调用。
 - mypy：先纳管 `scripts/`，要求函数类型；历史业务模块的类型迁移逐步扩大，不用全仓 `ignore_errors` 掩盖问题。
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
 - 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`。旧版 `app/static/` 前端已于 2026-11-01 删除，不再有对应门禁。详见[前端运行手册](frontend.md)。

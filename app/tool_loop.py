@@ -16,14 +16,15 @@ The loop is deliberately small and closed:
 """
 from __future__ import annotations
 
-import json
 import io
+import json
 import logging
 import os
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .agent_tools import READONLY_TOOL_NAMES, TOOL_SCHEMAS, execute_readonly_tool
 from .config import LLMConfig

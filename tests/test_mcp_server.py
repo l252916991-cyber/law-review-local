@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.db import db_scope, init_db, now, transaction
-from app.mcp_server import PROTOCOL_VERSION, McpServer, main, serve, tool_definitions
+from app.mcp_server import PROTOCOL_VERSION, McpServer, main, serve
 
 
 class McpServerTests(unittest.TestCase):

@@ -11,12 +11,12 @@ expose.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .db import now, transaction
-from .pricing import DISPLAY_QUANTUM, call_cost, format_money, load_pricing
-
+from .pricing import call_cost, format_money, load_pricing
 
 PROMPT_KEYS: tuple[str, ...] = ("prompt_tokens", "input_tokens")
 COMPLETION_KEYS: tuple[str, ...] = ("completion_tokens", "output_tokens")

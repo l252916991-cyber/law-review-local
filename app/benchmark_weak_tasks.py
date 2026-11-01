@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.benchmark_solver import solve as base_solve
 from app.benchmark_rag_solver import solve as rag_solve
+from app.benchmark_solver import solve as base_solve
 
 RAG_TASKS = {"1-1", "2-1", "3-2"}
 

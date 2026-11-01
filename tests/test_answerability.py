@@ -5,17 +5,26 @@ from contextlib import closing
 
 import pytest
 
-from app.answerability import (ANSWERABILITY_GRAMMAR, GRAMMAR_VERSION, POLICY_VERSION, SYSTEM_PROMPT,
-                                ContentFreeFinding, answer_body, answerability_payload, content_free_finding,
-                                parse_decision, policy_identity)
+from app.answerability import (
+    ANSWERABILITY_GRAMMAR,
+    GRAMMAR_VERSION,
+    POLICY_VERSION,
+    SYSTEM_PROMPT,
+    ContentFreeFinding,
+    answer_body,
+    answerability_payload,
+    content_free_finding,
+    parse_decision,
+    policy_identity,
+)
 from app.db import connect
 from app.local_backends import LocalModels
 from app.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError, UnsupportedCapabilityError
-from tests.test_candidate_domain import candidate, candidate_request, actual  # noqa: F401
+from tests.test_candidate_domain import actual, candidate, candidate_request  # noqa: F401
+from tests.test_domain_integration import counts
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401
 from tests.test_local_backends import local_models  # noqa: F401
-from tests.test_domain_integration import counts
 
 CONTEXTS = [{"document_id": 1, "page_no": 1, "quote": "审批记录"}]
 ANSWER = "审批记录需核验 [资料1]。请律师复核。"

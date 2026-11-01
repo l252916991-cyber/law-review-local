@@ -1,15 +1,13 @@
 """Agent one-shot model fallback (A09.1): same scope, same contract, one retry."""
-import json
 import os
 import unittest
 from unittest.mock import patch
-
-from tests.support import IsolatedDatabaseTestCase
 
 from app import agents, services
 from app.agents import CriticAgent
 from app.db import connect, init_db, now, transaction
 from app.model_router import FallbackConfigError
+from tests.support import IsolatedDatabaseTestCase
 
 CONTEXTS = [
     {

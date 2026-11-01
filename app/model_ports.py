@@ -48,9 +48,10 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,7 @@ class ModelSpec:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "ModelSpec":
+    def from_dict(cls, payload: Mapping[str, Any]) -> ModelSpec:
         if not isinstance(payload, Mapping):
             raise ModelPortError("模型声明必须是 JSON 对象")
         flags = {}

@@ -1,7 +1,6 @@
 import hashlib
 import io
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -83,7 +82,12 @@ class BankTransactionServiceTest(IsolatedDatabaseTestCase):
 
     def test_persist_summary_graph_and_replay_are_exact(self):
         from app.db import connect
-        from app.services import bank_transaction_graph, list_bank_transactions, persist_bank_transactions, summarize_bank_transactions
+        from app.services import (
+            bank_transaction_graph,
+            list_bank_transactions,
+            persist_bank_transactions,
+            summarize_bank_transactions,
+        )
         payload = "账号,收支方向,交易金额,交易日期,对方户名,摘要\nA,收入,100.00,2024-01-02,B,入账\nA,支出,20.00,2024-01-03,C,付款\n".encode()
         with tempfile.TemporaryDirectory(prefix="bank-source-") as directory:
             source = Path(directory) / "流水.csv"
@@ -158,7 +162,12 @@ class BankTransactionVolumeTest(IsolatedDatabaseTestCase):
         import zipfile
 
         from app.db import connect, now, transaction
-        from app.services import bank_transaction_graph, build_export_package, list_bank_transactions, summarize_bank_transactions
+        from app.services import (
+            bank_transaction_graph,
+            build_export_package,
+            list_bank_transactions,
+            summarize_bank_transactions,
+        )
 
         total = 620
         rows = [

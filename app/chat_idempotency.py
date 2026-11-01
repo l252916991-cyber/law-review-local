@@ -25,7 +25,6 @@ from typing import Any
 
 from .db import now, transaction
 
-
 IN_PROGRESS = "in_progress"
 COMMITTED = "committed"
 FAILED = "failed"

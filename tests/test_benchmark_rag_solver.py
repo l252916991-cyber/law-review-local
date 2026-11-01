@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from app.benchmark_rag_solver import solve
 
-
 CONFIG = {"model": "test-model", "url": "http://localhost:8000/v1", "strategy": "statutory_rag",
           "corpus_directories": ["/test-corpus"], "reference": "GOLD_CANARY"}
 CALL = {"prediction": "final", "error": None, "finish_reason": "stop", "usage": {"completion_tokens": 1}}

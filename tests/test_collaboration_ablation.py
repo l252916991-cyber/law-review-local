@@ -12,8 +12,17 @@ import pytest
 from app import collaboration_ablation as ablation
 from app import services
 from app.collaboration_ablation import (
-    GROUPS, Generation, build_prompt, group_note, load_batch_dataset, load_prepared,
-    prepare_batch, rotation, run_batch, summarise_attempts, verify_prepared_integrity,
+    GROUPS,
+    Generation,
+    build_prompt,
+    group_note,
+    load_batch_dataset,
+    load_prepared,
+    prepare_batch,
+    rotation,
+    run_batch,
+    summarise_attempts,
+    verify_prepared_integrity,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,7 +44,7 @@ class _FakeResponse:
     def close(self) -> None:
         pass
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
     def __exit__(self, *exc_info: object) -> bool:

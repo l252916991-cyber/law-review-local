@@ -63,8 +63,25 @@ line-length = 120
 include = ["app/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
 
 [tool.ruff.lint]
-# Fatal syntax/name errors are enforced across maintained code. Style migration is separate.
-select = ["E9", "F63", "F7", "F82"]
+# Fatal syntax errors plus the full Pyflakes set (unused/undefined names, dead
+# assignments, redefinitions). Further style families are enabled one at a time.
+select = ["E9", "F", "I", "UP", "B"]
+ignore = [
+  # zip() truncation is relied on in existing scoring/report code; making every
+  # call strict needs a per-site review and is tracked separately.
+  "B905",
+  # Reviewed 2026-11-01: every flagged closure is called within the same loop
+  # iteration (row parsers, per-round worker threads joined before the next round).
+  "B023",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Body", "fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Header", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest fixtures are imported from sibling test modules and injected by name;
+# the parameter that receives them is reported as a redefinition.
+"tests/**" = ["F811"]
 
 [tool.mypy]
 python_version = "3.11"

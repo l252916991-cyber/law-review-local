@@ -1,7 +1,7 @@
 """Ledger reliability analysis keeps independent units, missing usage and failures visible."""
-from copy import deepcopy
 import hashlib
 import json
+from copy import deepcopy
 
 import pytest
 

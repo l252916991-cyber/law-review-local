@@ -12,15 +12,31 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Callable
 from contextlib import closing
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
-from typing import Annotated, Any, Callable, TypedDict
+from typing import Annotated, Any, TypedDict
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
+from .agents import (
+    ContradictionAgent,
+    CriticAgent,
+    EvidenceAgent,
+    FactAgent,
+    GapDetectionAgent,
+    PlannerAgent,
+    RetrievalAgent,
+    StatutoryConflictAgent,
+    SubAgentSpec,
+    _citation,
+    failure_diagnostic,
+    run_specialist,
+    validate_specialist_output,
+)
 from .context import (
     TurnContext,
     context_result,
@@ -30,25 +46,8 @@ from .context import (
     source_pages_exist,
     validate_resume_identity,
 )
-from .agents import (
-    CriticAgent,
-    EvidenceAgent,
-    FactAgent,
-    GapDetectionAgent,
-    PlannerAgent,
-    RetrievalAgent,
-    ContradictionAgent,
-    StatutoryConflictAgent,
-    SubAgentSpec,
-    _citation,
-    answer_contract,
-    failure_diagnostic,
-    run_specialist,
-    validate_specialist_output,
-)
 from .db import connect, db_scope, get_db_path, now, transaction
 from .rag import recall_memories, remember
-
 
 logger = logging.getLogger(__name__)
 

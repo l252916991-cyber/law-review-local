@@ -5,17 +5,16 @@
 import os
 import sqlite3
 import tempfile
-import threading
-import time
 import unittest
-from contextlib import closing
-from tests.support import IsolatedDatabaseTestCase
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
+
+from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-db-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, transaction, sync_fts_index, now  # noqa: E402
+from app.db import connect, init_db, now, sync_fts_index, transaction  # noqa: E402
 
 
 def insert_case(conn, title, case_no):
@@ -90,8 +89,9 @@ class OrderedMigrationTest(unittest.TestCase):
                 self.assertIsNone(conn.execute("SELECT name FROM sqlite_master WHERE name='cases'").fetchone())
 
     def test_migration_failure_rolls_back_ddl_and_version(self):
-        from app import db
         from unittest.mock import patch
+
+        from app import db
         def fail(conn):
             conn.execute("CREATE TABLE partial_change(id INTEGER)")
             raise RuntimeError("injected failure")
@@ -104,8 +104,9 @@ class OrderedMigrationTest(unittest.TestCase):
             db.init_db(seed=False)
 
     def test_v13_child_index_migration_is_ordered_and_atomic(self):
-        from app import db
         from unittest.mock import patch
+
+        from app import db
 
         with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
             with patch.object(db, "SCHEMA_VERSION", 12):

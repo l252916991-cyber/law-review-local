@@ -1,9 +1,9 @@
 """Authorized synthetic host data and a real installed framework subprocess."""
 from __future__ import annotations
 
-import os
 import hashlib
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -15,7 +15,8 @@ from unittest.mock import patch
 from app.db import connect, get_db_path, init_db, now, transaction
 from app.forge_bridge import SidecarProtocolError, framework_binding, run_framework
 from app.forge_readonly import CitationIntegrityError, ReadonlyCaseSession, SnapshotChangedError, exact_quote
-from app.legal_corpus import LegalCorpus, SCHEMA_VERSION as CORPUS_SCHEMA, split_articles
+from app.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA
+from app.legal_corpus import LegalCorpus, split_articles
 from app.runtime_adapter import current_actor_identity
 from app.runtime_ports import AccessDeniedError, ActorIdentity, ModelConfig, RunRequest, RunScope, new_request_id
 from app.security import Principal, _principal

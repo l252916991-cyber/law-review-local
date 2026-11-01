@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.rag_benchmark_dataset import (
     LONG_PAGE_V2_VERSION,
     LONG_PAGE_VERSION,
@@ -15,7 +17,6 @@ from rag_project_benchmark import (
     score_query,
     summarize,
 )
-import pytest
 
 
 def item(expected):

@@ -9,7 +9,6 @@ import sqlite3
 import subprocess
 import sys
 
-
 PACKAGES = (
     "fastapi", "uvicorn", "python-multipart", "python-docx", "arq", "redis",
     "langgraph", "langgraph-checkpoint-sqlite", "jieba", "cn2an",

@@ -18,7 +18,15 @@ from app.benchmark_reporting import atomic_json
 from app.benchmark_retrieval import corpus_fingerprint
 from app.benchmark_solver import _configuration
 from app.lawbench import TASK_NAMES
-from scripts.benchmark_campaign import digest, probe_model, read_rows, report, service_may_still_be_busy, validate_campaign, write_rows
+from scripts.benchmark_campaign import (
+    digest,
+    probe_model,
+    read_rows,
+    report,
+    service_may_still_be_busy,
+    validate_campaign,
+    write_rows,
+)
 
 SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "app/benchmark_solver.py",
            "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py", "app/benchmark_postprocess.py",

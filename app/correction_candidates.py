@@ -5,8 +5,8 @@ import json
 import re
 from typing import Any
 
-from app.benchmark_solver import _call, _configuration, solve
 from app.benchmark_postprocess import preserve_correction_surface
+from app.benchmark_solver import _call, _configuration, solve
 
 MODES = ("baseline", "minimal", "phonetic", "patch", "detect", "review", "ensemble")
 MINIMAL = "只修正确定的错别字、漏字、多字，优先最少字符修改。保留姓名、金额、日期、标点和排版，不润色，不扩写同义词。只返回完整修正句。"

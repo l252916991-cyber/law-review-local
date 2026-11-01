@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 
-
 EVENT_LABEL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("支付/给付", r"支付|给付|送给|转交给|交给|给予|分红|转账给|上交|捐赠|赠与|发放|交纳|缴纳|汇给|打给|给.{0,8}(?:元|万元|钱|现金)"),
     ("欺骗", r"骗取|诈骗|欺骗|谎称|骗得"),

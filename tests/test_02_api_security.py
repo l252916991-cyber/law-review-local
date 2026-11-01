@@ -2,21 +2,19 @@
 扩展API层测试 - 边界测试、错误处理、验证
 """
 
-import io
 import os
 import tempfile
 import unittest
 from contextlib import closing
+
 from tests.support import IsolatedDatabaseTestCase
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-api-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import connect, init_db, now  # noqa: E402
+from app.db import connect, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -39,7 +37,9 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
     def test_request_correlation_id_echoed_generated_and_logged(self):
         import json as json_module
         import logging
-        from app.logger import StructuredFormatter, request_id as request_id_var
+
+        from app.logger import StructuredFormatter
+        from app.logger import request_id as request_id_var
         echoed = self.client.get("/api/health", headers={"X-Request-ID": "req-fixed-123456"})
         self.assertEqual(echoed.headers["x-request-id"], "req-fixed-123456")
         generated = self.client.get("/api/health")

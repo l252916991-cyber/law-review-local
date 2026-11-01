@@ -14,19 +14,42 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.forge_sources import verify_statutes  # noqa: E402
-
 import forgeharness
 from forgeharness.applications.legal.lexvault import BundleCitationVerifier, CaseBundle
-from pydantic import BaseModel, ConfigDict
-from forgeharness.tools.base import ToolErrorCode, ToolFailure
-from forgeharness.sdk import (
-    Actor, BusinessReceipt, Capability, DurableGraph, DurableNode, DurableOrchestrator, Harness,
-    NoopVerifier, PolicyDecision, PolicyDecisionType, ReconciledNode, ResourceScope,
-    RiskLevel, RunBudget, RunContext, ToolCall, ToolEffectClass, ToolOutput, ToolSpec, Usage,
-    Message, MessageRole, ModelResult, ModelUsage, VerificationResult, compose_application, verify_trace,
-)
 from forgeharness.models.base import ModelProtocolError
+from forgeharness.sdk import (
+    Actor,
+    BusinessReceipt,
+    Capability,
+    DurableGraph,
+    DurableNode,
+    DurableOrchestrator,
+    Harness,
+    Message,
+    MessageRole,
+    ModelResult,
+    ModelUsage,
+    NoopVerifier,
+    PolicyDecision,
+    PolicyDecisionType,
+    ReconciledNode,
+    ResourceScope,
+    RiskLevel,
+    RunBudget,
+    RunContext,
+    ToolCall,
+    ToolEffectClass,
+    ToolOutput,
+    ToolSpec,
+    Usage,
+    VerificationResult,
+    compose_application,
+    verify_trace,
+)
+from forgeharness.tools.base import ToolErrorCode, ToolFailure
+from pydantic import BaseModel, ConfigDict
+
+from app.forge_sources import verify_statutes  # noqa: E402
 
 WIRE_VERSION = 2
 MAX_BYTES = 2_000_000

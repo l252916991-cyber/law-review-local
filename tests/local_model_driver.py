@@ -7,8 +7,8 @@ import signal
 import sys
 from pathlib import Path
 
-from app.db import db_scope
 from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from app.db import db_scope
 from app.local_backends import LocalModels
 from app.model_domain import LocalModelDomainIntegration
 from app.runtime_ports import ModelConfig

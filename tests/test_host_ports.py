@@ -19,8 +19,6 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-host-ports-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from tests.support import IsolatedDatabaseTestCase  # noqa: E402
-
 from app.agent_tools import _search as legacy_search  # noqa: E402
 from app.db import connect, init_db, now, transaction  # noqa: E402
 from app.host_ports import (  # noqa: E402
@@ -34,17 +32,21 @@ from app.host_ports import (  # noqa: E402
 from app.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA  # noqa: E402
 from app.legal_corpus import LegalCorpus, split_articles  # noqa: E402
 from app.rag import hashed_embedding  # noqa: E402
-from app.runtime_ports import (  # noqa: E402
+from app.runtime_ports import (  # noqa: E402  # noqa: E402
     CATALOG_LIMIT_MAX,
-    ContractValidationError,
     MAX_QUERY_CHARS,
     SEARCH_LIMIT_MAX,
     AccessDeniedError,
+    ContractValidationError,
+    DocumentRef,
+    EvidenceRef,
+    GapRecord,
+    MemoryRecord,
     RunScope,
     UnsupportedCapabilityError,
 )
-from app.runtime_ports import DocumentRef, EvidenceRef, GapRecord, MemoryRecord  # noqa: E402
 from app.security import Principal, _principal  # noqa: E402
+from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 QUERY = "固定回报审批"
 

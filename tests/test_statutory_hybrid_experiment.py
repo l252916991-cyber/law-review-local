@@ -13,7 +13,7 @@ from scripts.statutory_hybrid_experiment import build_dataset, build_validity
 
 def write_corpus(tmp_path: Path, docs: list[dict]) -> LegalCorpus:
     entries = []
-    for index, doc in enumerate(docs):
+    for doc in docs:
         document_id = doc["document_id"]
         payload = {"schema_version": SCHEMA_VERSION, "document_id": document_id,
                    "law_name": doc["law_name"], "aliases": doc.get("aliases", [doc["law_name"]]),

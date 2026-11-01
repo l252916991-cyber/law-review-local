@@ -129,7 +129,6 @@ def test_embedding_failure_falls_back_to_lexical(corpus, tmp_path, monkeypatch):
 def test_index_corpus_mismatch_falls_back(corpus, tmp_path, monkeypatch):
     # Saved for a different corpus snapshot: load() must reject it via fingerprint.
     path = save_index(corpus, tmp_path / "index.json", {"劳动报酬": [1.0, 0.0]})
-    tampered = json.loads((tmp_path / "tampered-corpus.json").read_text()) if False else None
     # Re-save the corpus with one article changed so the fingerprint no longer matches.
     doc_path = tmp_path / "labor-2020.json"
     doc = json.loads(doc_path.read_text())

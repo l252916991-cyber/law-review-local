@@ -7,7 +7,6 @@ record.
 """
 import json
 import os
-import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,14 +20,14 @@ from app.model_ports import (
     EnvProvider,
     MissingEndpointError,
     ModelPortError,
-    ModelSpec,
     Models,
+    ModelSpec,
     ProviderAuth,
     ScriptedProvider,
     ScriptedQueueEmpty,
     ScriptedReply,
-    UnsupportedModelApiError,
     UnknownModelError,
+    UnsupportedModelApiError,
     auth_headers,
     build_chat_request,
     configured_api,

@@ -9,14 +9,20 @@ from unittest.mock import patch
 import pytest
 
 from app.agents import (
-    ContradictionAgent, CriticAgent, EvidenceAgent, FactAgent,
-    create_coordinator, get_run_trace, run_specialist, specialist_specs, validate_specialist_output,
+    ContradictionAgent,
+    CriticAgent,
+    EvidenceAgent,
+    FactAgent,
+    create_coordinator,
+    get_run_trace,
+    run_specialist,
+    specialist_specs,
+    validate_specialist_output,
 )
 from app.db import connect, init_db, transaction
 from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
 from app.review_collaboration import build_collaboration, source_reference
 from tests.support import IsolatedDatabaseTestCase
-
 
 CONTEXTS = [
     {"document_id": 1, "page_no": 1, "name": "陈述.txt", "doc_type": "询问笔录",

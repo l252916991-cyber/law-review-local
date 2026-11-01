@@ -1,9 +1,9 @@
 """Transfer bundles preserve the sample, hide machine labels, and refuse drift."""
 import hashlib
 import json
-from pathlib import Path
 import tempfile
 import zipfile
+from pathlib import Path
 
 import pytest
 

@@ -32,8 +32,8 @@ from app.runtime_ports import (  # noqa: E402
     RunEvent,
     RunRequest,
     RunResult,
-    RuntimeContractError,
     RunScope,
+    RuntimeContractError,
     compute_request_digest,
     compute_trace_revision,
     new_request_id,
@@ -60,7 +60,7 @@ class ContractBoundaryTest(unittest.TestCase):
     def test_runtime_ports_imports_standard_library_only(self):
         roots = _imported_roots(APP_ROOT / "app" / "runtime_ports.py")
         self.assertTrue(roots, "expected at least one import to analyze")
-        allowed = {"__future__", "re", "uuid", "json", "hashlib", "dataclasses", "enum", "typing"}
+        allowed = {"__future__", "re", "uuid", "json", "hashlib", "dataclasses", "enum", "typing", "collections"}
         self.assertEqual(roots - allowed, set(), f"contract module leaked imports: {roots - allowed}")
 
     def test_contract_modules_never_import_forgeharness(self):
@@ -75,7 +75,7 @@ class ContractBoundaryTest(unittest.TestCase):
         # The adapter is host code and may import app modules plus fastapi for
         # the existing HTTPException-based authorization errors; nothing else.
         roots = _imported_roots(APP_ROOT / "app" / "runtime_adapter.py")
-        allowed = {"__future__", "json", "logging", "contextlib", "functools", "typing", "fastapi", "app"}
+        allowed = {"__future__", "collections", "json", "logging", "contextlib", "functools", "typing", "fastapi", "app"}
         self.assertEqual(roots - allowed, set(), f"adapter leaked imports: {roots - allowed}")
         # And the dependency direction is one-way: ports must not import adapter.
         self.assertNotIn("app", _imported_roots(APP_ROOT / "app" / "runtime_ports.py"))

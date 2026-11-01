@@ -12,11 +12,11 @@ import sqlite3
 import tempfile
 import threading
 import time
-import uuid
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -25,7 +25,38 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Str
 from pydantic import BaseModel, Field, field_validator
 from starlette.formparsers import MultiPartException
 
+from .agent_tools import execute_readonly_tool
+from .audit_trail import record_field_changes
+from .case_reports import router as case_report_router
+from .chat_idempotency import (
+    CANCELLED as CHAT_REQUEST_CANCELLED,
+)
+from .chat_idempotency import (
+    COMMITTED as CHAT_REQUEST_COMMITTED,
+)
+from .chat_idempotency import (
+    FAILED as CHAT_REQUEST_FAILED,
+)
+from .chat_idempotency import (
+    REQUEST_ID_PATTERN,
+    ChatCancelled,
+    RequestInProgress,
+)
+from .chat_idempotency import (
+    begin as begin_chat_request,
+)
+from .chat_idempotency import (
+    finish as finish_chat_request,
+)
 from .config import LLMConfig, clear_model_override, config, load_model_override, save_model_override
+from .context import (
+    ArchivedConversationError,
+    ConversationNotFoundError,
+    agent_clarification_result,
+    prepare_turn,
+    record_agent_turn,
+    run_context_identity,
+)
 from .db import (
     CONVERSATION_ARCHIVE_RETENTION_SECONDS,
     connect,
@@ -38,61 +69,47 @@ from .db import (
     sync_fts_index,
     transaction,
 )
-from .logger import request_id as logger_request_id
+from .human_tasks import router as human_task_router
 from .llm_usage import token_counts
-from .chat_idempotency import (
-    CANCELLED as CHAT_REQUEST_CANCELLED,
-    COMMITTED as CHAT_REQUEST_COMMITTED,
-    FAILED as CHAT_REQUEST_FAILED,
-    REQUEST_ID_PATTERN,
-    ChatCancelled,
-    RequestInProgress,
-    begin as begin_chat_request,
-    finish as finish_chat_request,
+from .logger import request_id as logger_request_id
+from .members import router as member_router
+from .review_jobs import router as review_job_router
+from .review_jobs import shutdown_review_executor, start_review_executor
+from .security import (
+    AccessMiddleware,
+    actor_name,
+    allowed_case_ids,
+    apply_security_headers,
+    identity,
+    require_case_access,
+    require_permission,
 )
-from .context import (
-    agent_clarification_result,
-    prepare_turn,
-    record_agent_turn,
-    run_context_identity,
-)
+from .security import router as access_router
 from .services import (
-    ArchivedConversationError,
-    ConversationNotFoundError,
     assert_model_endpoint_allowed,
     auto_analyze_case,
-    build_export,
-    build_export_package,
     bank_transaction_graph,
+    build_export_package,
     chat,
     contained_path,
-    get_export_template,
     get_document,
+    get_export_template,
     index_upload,
     list_bank_transactions,
     local_llm_available,
+    parse_spreadsheet,
     persist_bank_transactions,
     persist_parsed_bank_rows,
+    preview_gap_analysis,
     rowdict,
     safe_filename,
-    parse_spreadsheet,
-    preview_gap_analysis,
-    search_pages,
     save_gap_analysis,
+    search_pages,
     summarize_bank_transactions,
     upload_error_message,
 )
-from .security import actor_name, allowed_case_ids, require_case_access, require_permission
-from .security import AccessMiddleware, apply_security_headers, identity, router as access_router
-from .audit_trail import record_field_changes
 from .statutory_retrieval import corpus_status
-from .agent_tools import execute_readonly_tool
-from .review_jobs import router as review_job_router, shutdown_review_executor, start_review_executor
-from .members import router as member_router
-from .human_tasks import router as human_task_router
-from .case_reports import router as case_report_router
 from .tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import, get_redis_pool, reconcile_batch_dispatches
-
 
 access_logger = logging.getLogger("law_review.access")
 
@@ -1019,7 +1036,7 @@ def document_file(document_id: int, request: Request):
         try:
             stored = contained_path(stored, config.data_dir)
         except ValueError:
-            raise HTTPException(404, "文件不存在")
+            raise HTTPException(404, "文件不存在") from None
         record_security_event("document_download", "success", actor=actor_name(),
                               case_id=document["case_id"], detail=f"document:{document_id}",
                               request_path=request.url.path)
@@ -1721,7 +1738,7 @@ async def case_chat_stream(case_id: int, payload: ChatRequest, request: Request)
                 media_type="text/event-stream", headers=headers,
             )
 
-    events: "queue.Queue[tuple[str, Any]]" = queue.Queue()
+    events: queue.Queue[tuple[str, Any]] = queue.Queue()
     cancelled = threading.Event()
     timing: dict[str, int | None] = {"ttft_ms": None}
 
@@ -1954,8 +1971,8 @@ def compare_agent_runtimes(case_id: int, payload: AgentChatRequest):
     try:
         from .agents import create_coordinator
         from .langgraph_agents import create_langgraph_coordinator
-        from .runtime_comparison import compare_runtime_results
         from .rag import recall_memories
+        from .runtime_comparison import compare_runtime_results
 
         memory_snapshot = recall_memories(case_id, payload.question, 3, payload.use_remote_embeddings)
         native = create_coordinator(case_id, payload.use_remote_embeddings).process_query(
@@ -2080,7 +2097,7 @@ async def import_bank_transactions(case_id: int, file: UploadFile = File(...)):
     except (ValueError, OSError) as exc:
         raise HTTPException(400, upload_error_message(exc)) from exc
     record_security_event("bank_import", "success", actor=actor_name(), case_id=case_id,
-                          detail=f"document:{result['id']} rows:{persisted['rows']}", request_path="/api/cases/%s/bank-transactions/import" % case_id)
+                          detail=f"document:{result['id']} rows:{persisted['rows']}", request_path=f"/api/cases/{case_id}/bank-transactions/import")
     return {"document": result, "transactions": persisted}
 
 

@@ -17,9 +17,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app import lawbench
 from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item
 from app.benchmark_reporting import atomic_json, metrics
-from app import lawbench
 from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task
 
 

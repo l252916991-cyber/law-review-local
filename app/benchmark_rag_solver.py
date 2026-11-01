@@ -4,11 +4,19 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.benchmark_retrieval import retrieve
 from app.benchmark_postprocess import postprocess
+from app.benchmark_retrieval import retrieve
 from app.benchmark_solver import (
-    DIRECT_SYSTEM, GUIDED_SYSTEM_SUFFIX, SOLVER_VERSION, TASK_GUIDANCE,
-    _call, _configuration, solve as base_solve, task_guidance,
+    DIRECT_SYSTEM,
+    GUIDED_SYSTEM_SUFFIX,
+    SOLVER_VERSION,
+    TASK_GUIDANCE,
+    _call,
+    _configuration,
+    task_guidance,
+)
+from app.benchmark_solver import (
+    solve as base_solve,
 )
 
 

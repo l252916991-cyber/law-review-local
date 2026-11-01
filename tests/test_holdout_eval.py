@@ -1,16 +1,20 @@
 """Six-case holdout: authored cases stay independent, frozen, and seeder-verifiable."""
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import shutil
+from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
 from app.collaboration_ablation import (
-    Generation, load_batch_dataset, load_prepared, prepare_batch, run_batch,
+    Generation,
+    load_batch_dataset,
+    load_prepared,
+    prepare_batch,
+    run_batch,
 )
 from scripts.build_holdout_eval import build, load_cases, main, validate_cross_case
 

@@ -27,7 +27,6 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-
 EMBEDDING_DIMENSIONS = 384
 VALID_ANSWER = "根据卷宗第1页的记录，张某批准了年化12%的固定回报宣传[资料1]。请律师复核原文与上述结论。"
 INVALID_ANSWER = "张某已经批准了该宣传，材料可以支持这个结论。"
@@ -60,7 +59,7 @@ class StubModel:
         self._thread: threading.Thread | None = None
 
     # -- lifecycle ---------------------------------------------------------
-    def __enter__(self) -> "StubModel":
+    def __enter__(self) -> StubModel:
         model = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -156,7 +155,7 @@ class StubModel:
         handler.end_headers()
 
         def frame(data: dict[str, Any]) -> None:
-            handler.wfile.write(f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8"))
+            handler.wfile.write(f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode())
             handler.wfile.flush()
 
         for chunk in chunks:

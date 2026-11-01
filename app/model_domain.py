@@ -7,10 +7,10 @@ from copy import deepcopy
 from .agents import validate_review_answer
 from .domain_integration import DomainSession, IsolatedDomainIntegration
 from .host_ports import memory_record_context, search_hit_context
+from .host_writes import digest
 from .local_backends import BackendGate, GovernedRetrievalLedger
 from .runtime_ports import ContractValidationError, RequestConflictError, UnsupportedCapabilityError
 from .services import CHAT_SYSTEM_PROMPT, PROMPT_VERSION, strip_reasoning
-from .host_writes import digest
 
 MODEL_NODE = "critic-model"
 LOCAL_PROMPT_VERSION = "domain-local-v1-bounded-citations"
@@ -143,6 +143,7 @@ class LocalModelDomainIntegration(IsolatedDomainIntegration):
         # Legacy retrieval may catch a backend exception and offer a fallback.
         # It cannot erase this candidate's durable unknown usage/reservation.
         from contextlib import closing
+
         from .db import connect
         from .local_backends import BackendUnknown
         with closing(connect()) as conn:
@@ -174,6 +175,7 @@ class LocalModelDomainIntegration(IsolatedDomainIntegration):
             raise ContractValidationError("unregistered model invocation")
         gate = self._gate(row)
         from contextlib import closing
+
         from .db import connect
         with closing(connect()) as conn:
             conn.execute("BEGIN")
@@ -199,6 +201,7 @@ class LocalModelDomainIntegration(IsolatedDomainIntegration):
         reply = super()._receipt_reply(receipt, action)
         if receipt is not None:
             from contextlib import closing
+
             from .db import connect
             with closing(connect()) as conn:
                 saved = json.loads(conn.execute("SELECT output_json FROM agent_steps WHERE id=?",

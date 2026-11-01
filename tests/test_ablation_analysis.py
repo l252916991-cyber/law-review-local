@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
 from app.ablation_analysis import (
-    analyse, case_bootstrap, load_attempts, mcnemar_exact, pair_attempts, repeat_variation,
+    analyse,
+    case_bootstrap,
+    load_attempts,
+    mcnemar_exact,
+    pair_attempts,
+    repeat_variation,
 )
 from scripts.analyse_collaboration_ablation import main
 

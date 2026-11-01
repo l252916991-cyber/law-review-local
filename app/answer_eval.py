@@ -13,12 +13,12 @@ is a regression fixture, not lawyer-annotated ground truth.
 """
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 REFUSAL_MARKERS = ("资料不足", "无法核验", "未检索到", "材料中没有", "不足以", "无法判断", "需要补充")
 _NORMALISE = re.compile(r"[\s,，、；;：:％%]+")

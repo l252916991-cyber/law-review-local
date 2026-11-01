@@ -16,8 +16,14 @@ from app.chat_idempotency import (
     CANCELLED,
     FAILED,
     ChatCancelled,
+)
+from app.chat_idempotency import (
     begin as begin_chat_request,
+)
+from app.chat_idempotency import (
     finish as finish_chat_request,
+)
+from app.chat_idempotency import (
     lookup as lookup_chat_request,
 )
 from app.db import connect, db_scope, init_db

@@ -7,11 +7,10 @@ import logging
 import re
 import sys
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TextIO
 
-
-_context: ContextVar[dict[str, Any]] = ContextVar("lexvault_log_context", default={})
+_context: ContextVar[dict[str, Any]] = ContextVar("lexvault_log_context", default={})  # noqa: B039 - never mutated; set() stores a new dict
 request_id: ContextVar[str] = ContextVar("lexvault_request_id", default="")
 _FIELDS = {"case_id", "run_id", "job_id", "user_name", "duration_ms", "tool_name", "error_type", "runtime", "status"}
 _HANDLER_NAME = "lexvault_structured"
@@ -31,7 +30,7 @@ class StructuredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         data: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": _safe_message(record.getMessage()),

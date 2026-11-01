@@ -1,7 +1,6 @@
 """M03: deterministic follow-up resolution, re-retrieval and non-factual replies."""
 import json
 import unittest
-from contextlib import closing
 from unittest.mock import patch
 
 from tests.multiturn_fixtures import DOCUMENTS, SCENARIOS
@@ -383,8 +382,8 @@ class ModelInputTest(IsolatedDatabaseTestCase):
             self.assertEqual(signature.parameters[name].kind, inspect.Parameter.KEYWORD_ONLY)
 
     def test_clarification_contract_cannot_be_relaxed_into_a_fact_answer(self):
-        from app.context import validate_context_notice
         from app.agents import validate_review_answer
+        from app.context import validate_context_notice
 
         self.assertTrue(validate_context_notice("请确认你指的是哪份材料。", "clarification")["valid"])
         self.assertFalse(validate_context_notice("请确认；但付款期限是60日[资料1]。", "clarification")["valid"])

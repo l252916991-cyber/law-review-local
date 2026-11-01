@@ -8,7 +8,7 @@ import pytest
 
 from app.corpus_audit import audit
 from app.corpus_canonical import REASON, build, select, source_tier
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
+from app.legal_corpus import SCHEMA_VERSION, LegalCorpus
 from scripts.build_canonical_corpus import main as build_main
 
 

@@ -9,21 +9,21 @@ from __future__ import annotations
 
 import json
 import logging
-from copy import deepcopy
 import os
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import copy_context
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from .context import (
     TurnContext,
     context_policy,
     context_result,
     limit_contexts,
-    memory_meta,
     prepare_memory_clues,
 )
 from .db import connect, now, transaction
@@ -38,7 +38,6 @@ from .review_collaboration import (
 )
 from .services import _account_llm_call, call_local_llm, concise, detect_route, rowdict
 from .statutory_retrieval import retrieve_statutory
-
 
 logger = logging.getLogger(__name__)
 

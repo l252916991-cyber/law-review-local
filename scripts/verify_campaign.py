@@ -184,8 +184,9 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
                 issues.append(f"Question prompt mismatch: {key}")
             weak = manifest["config"]["strategy"] == "weak_tasks"
             if weak:
-                from app.benchmark_weak_tasks import solve as weak_solve
                 from unittest.mock import patch
+
+                from app.benchmark_weak_tasks import solve as weak_solve
                 with patch("app.benchmark_rag_solver._call", return_value=call) as rc, patch("app.benchmark_solver._call", return_value=call) as bc:
                     reconstructed = weak_solve(original["task"], original["instruction"], original["question"], manifest["config"])
                 invoked = [args for mock in (rc, bc) for args in mock.call_args_list]

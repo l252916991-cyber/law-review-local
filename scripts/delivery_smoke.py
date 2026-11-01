@@ -18,7 +18,6 @@ import uuid
 import zipfile
 from typing import Any
 
-
 SYNTHETIC_TEXT = (
     "合成卷宗第一页：双方于2026年9月1日签订测试合同，本页不记载付款金额。"
     "\f合成卷宗第二页：事项编号 ZXQ-914，乙方应于2026年9月9日向甲方支付1200元。"

@@ -17,7 +17,6 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-
 SCHEMA_VERSION = "lexvault-public-laws-v1"
 ARTICLE_RE = re.compile(r"^第([零〇一二三四五六七八九十百千万两0-9]+)条(?:之([一二三四五六七八九十0-9]+))?(?:\s|[【〔（(]|$)")
 HEADING_RE = re.compile(r"^(?:第[零〇一二三四五六七八九十百千万0-9]+[编章节](?:\s|$)|附\s*则$)")

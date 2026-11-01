@@ -11,7 +11,6 @@ import os
 import subprocess
 import sys
 import urllib.error
-from pathlib import Path
 
 import pytest
 

@@ -17,8 +17,8 @@ from typing import Protocol
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_solver import GUIDED_SYSTEM_SUFFIX, TASK_GUIDANCE  # noqa: E402
 from app.benchmark_reporting import SYSTEM_PROMPT  # noqa: E402
+from app.benchmark_solver import GUIDED_SYSTEM_SUFFIX, TASK_GUIDANCE  # noqa: E402
 
 POOL_PATH = ROOT / "benchmarks/fewshot/2-2_sft_pool.jsonl"
 PINNED_PATH = ROOT / "benchmarks/lawbench/zero_shot/2-2.json"

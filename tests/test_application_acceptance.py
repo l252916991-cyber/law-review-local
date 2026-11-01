@@ -1,8 +1,8 @@
 """The acceptance probe is isolated and never calls models without --live."""
 import json
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest

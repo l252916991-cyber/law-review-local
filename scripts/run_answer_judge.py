@@ -8,12 +8,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import re
 import sys
 import tempfile
-from typing import Any
 import zipfile
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -220,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     dataset = load_dataset(args.dataset)
     if dataset.get("version") != 2:
         raise ValueError("此闭环只接受带独立来源冻结的 v2 数据集")
-    endpoint = loopback_endpoint(args.endpoint)
+    loopback_endpoint(args.endpoint)  # reject a non-loopback endpoint before reading any answers
     envelope = read_json(args.answers) if args.answers else {}
     answers = collect_rules(dataset) if args.collect_rules else envelope.get("answers", envelope)
     mode = "rules_no_model" if args.collect_rules else envelope.get("collection_mode", "user_supplied_unverified")

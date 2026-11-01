@@ -8,7 +8,6 @@ import logging
 import mimetypes
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import time
@@ -16,17 +15,36 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from contextvars import ContextVar
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from contextlib import closing
-from datetime import datetime
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 from docx import Document as DocxDocument
 
-from .db import BUILTIN_EXPORT_TEMPLATES, SCHEMA_VERSION, connect, get_db_path, now, transaction
+from .bank_transactions import PARSER_VERSION, parse_csv, parse_spreadsheet
 from .config import LLMConfig
+from .context import (
+    build_clarification,
+    build_insufficient,
+    case_documents,
+    context_policy,
+    limit_contexts,
+    load_history,
+    memory_meta,
+    object_note,
+    prepare_memory_clues,
+    record_turn_with_id,
+    render_history,
+    resolve_question,
+    unsupported_clause_topic,
+    validate_context_notice,
+    validate_conversation,
+)
+from .db import BUILTIN_EXPORT_TEMPLATES, connect, get_db_path, now, transaction
+from .forge_governance import governed_backend
 from .model_ports import (
     MODEL_API_OPENAI_COMPLETIONS,
     ResolvedModel,
@@ -38,29 +56,6 @@ from .model_ports import (
     parse_stream_frame,
     request_path,
 )
-from .context import (
-    ArchivedConversationError,
-    ConversationNotFoundError,
-    build_clarification,
-    build_insufficient,
-    case_documents,
-    context_policy,
-    limit_contexts,
-    load_history,
-    memory_meta,
-    object_note,
-    prepare_memory_clues,
-    record_turn,
-    record_turn_with_id,
-    render_history,
-    resolve_question,
-    unsupported_clause_topic,
-    validate_context_notice,
-    validate_conversation,
-)
-from .forge_governance import governed_backend
-from .bank_transactions import PARSER_VERSION, parse_csv, parse_spreadsheet
-
 
 LOCAL_LLM_URL = LLMConfig.from_env().base_url
 LOCAL_LLM_MODEL = LLMConfig.from_env().model
@@ -502,7 +497,6 @@ def concise(text: str, limit: int = 180) -> str:
 
 
 def index_upload(case_id: int, original_name: str, payload: bytes, content_type: str | None, *, import_key: str | None = None) -> dict[str, Any]:
-    from .db import get_db_path
     content_hash = hashlib.sha256(payload).hexdigest()
     if import_key:
         with closing(connect()) as conn:
@@ -781,8 +775,8 @@ def read_sse_with_deadline(
     *,
     deadline: float | None = None,
     max_bytes: int = 8 * 1024 * 1024,
-    on_event: "Callable[[dict[str, Any]], None] | None" = None,
-    parse_frame: "Callable[[dict[str, Any]], tuple[str | None, dict[str, Any] | None]] | None" = None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+    parse_frame: Callable[[dict[str, Any]], tuple[str | None, dict[str, Any] | None]] | None = None,
     end_frame_types: frozenset[str] = frozenset(),
 ) -> tuple[str, dict[str, Any] | None]:
     """Consume an SSE stream under the same guards as JSON reads.

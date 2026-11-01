@@ -17,11 +17,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.lawbench import load_task  # noqa: E402
 from app.benchmark_retrieval import RETRIEVAL_VERSION, matched_law_names  # noqa: E402
+from app.lawbench import load_task  # noqa: E402
 from app.legal_corpus import LegalCorpus  # noqa: E402
 from app.rag import EmbeddingClient, RerankClient  # noqa: E402
-from app.statutory_benchmark import METRICS, evaluate  # noqa: E402
+from app.statutory_benchmark import evaluate  # noqa: E402
 from app.statutory_gold import gold_citations  # noqa: E402
 from app.statutory_hybrid import MODES, StatutoryHybrid  # noqa: E402
 from app.statutory_index import IndexSpec, StatutoryIndex, build_validity  # noqa: E402

@@ -20,7 +20,6 @@ from typing import Any
 from .legal_corpus import LegalCorpus, VersionAmbiguityError
 from .statutory_gold import citations
 
-
 LAW_CORPUS_ENV = "LAW_REVIEW_LEGAL_CORPUS_DIR"
 CITATION_FIELDS = ("law_name", "version_date", "effective_date", "version_status",
                    "source_url", "document_id", "article_number", "subarticle_number",
@@ -119,7 +118,7 @@ def verify_citation(
     article_number: int,
     version_date: str | None = None,
     *,
-    corpus: "LegalCorpus | None" = None,
+    corpus: LegalCorpus | None = None,
 ) -> dict[str, Any]:
     """Structured exact lookup for a tool call.
 

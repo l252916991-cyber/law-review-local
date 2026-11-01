@@ -13,15 +13,14 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.legal_corpus import LegalCorpus, SCHEMA_VERSION, html_to_text, split_articles  # noqa: E402
-
+from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, html_to_text, split_articles  # noqa: E402
 
 SOURCES: list[dict[str, Any]] = [
     {
@@ -568,7 +567,7 @@ def build(output: Path, source_ids: set[str] | None = None) -> dict[str, Any]:
     documents: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
     for source in selected:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         raw: bytes | None = None
         try:
             host = urlparse(source["source_url"]).hostname or ""
@@ -604,7 +603,7 @@ def build(output: Path, source_ids: set[str] | None = None) -> dict[str, Any]:
                              "attempted_at": now, "error": f"{type(error).__name__}: {error}",
                              "raw_sha256": _sha(raw) if raw is not None else "",
                              "raw_file": f"{source['document_id']}.html" if raw is not None else ""})
-    manifest = {"schema_version": SCHEMA_VERSION, "created_at": datetime.now(timezone.utc).isoformat(),
+    manifest = {"schema_version": SCHEMA_VERSION, "created_at": datetime.now(UTC).isoformat(),
                 "source_policy": "complete_official_publications; independent_of_benchmark_labels",
                 "version_policy": "explicit_versions; no_implicit_current_law_claim", "documents": documents,
                 "failures": failures}
@@ -638,7 +637,7 @@ def verify(directory: Path) -> dict[str, Any]:
         verified_articles += len(document["articles"])
     return {"schema_version": SCHEMA_VERSION, "valid": not errors, "errors": errors,
             "document_count": len(corpus.documents), "verified_articles": verified_articles,
-            "checked_at": datetime.now(timezone.utc).isoformat()}
+            "checked_at": datetime.now(UTC).isoformat()}
 
 
 def main() -> None:

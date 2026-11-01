@@ -9,11 +9,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from tests.support import IsolatedDatabaseTestCase
-
 from app import agents, tool_loop
 from app.agents import CriticAgent
 from app.db import connect, init_db
+from tests.support import IsolatedDatabaseTestCase
 
 CONTEXTS = [
     {

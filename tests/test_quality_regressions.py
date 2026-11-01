@@ -16,15 +16,23 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.agents import (
-    CriticAgent, EvidenceAgent, FactAgent, GapDetectionAgent, LawReviewCoordinator,
+    CriticAgent,
+    EvidenceAgent,
+    FactAgent,
+    GapDetectionAgent,
+    LawReviewCoordinator,
     get_run_trace,
 )
 from app.db import connect, db_scope, init_db, now, transaction
 from app.evaluation import evaluate_case, platform_metrics
 from app.langgraph_agents import LangGraphCoordinator, LangGraphRunError
 from app.rag import (
-    EmbeddingClient, HybridRetriever, embedding_identity, hashed_embedding,
-    recall_memories, remember,
+    EmbeddingClient,
+    HybridRetriever,
+    embedding_identity,
+    hashed_embedding,
+    recall_memories,
+    remember,
 )
 from app.runtime_comparison import compare_runtime_results
 from app.services import call_local_llm, chat, read_json_with_deadline

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import re
 
-
 TARGET_CHARACTERS = 120
 MAX_SENTENCES = 4
 _LEADING_BOILERPLATE = re.compile(

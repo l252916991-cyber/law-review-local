@@ -1,5 +1,4 @@
 """Answer-level evaluation: dataset grounding, deterministic scoring, judge parsing."""
-import json
 import tempfile
 import unittest
 from pathlib import Path

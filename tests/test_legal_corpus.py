@@ -6,8 +6,15 @@ import json
 
 import pytest
 
-from app.legal_corpus import LegalCorpus, SCHEMA_VERSION, VersionAmbiguityError, article_number, html_to_text, split_articles
 import scripts.build_legal_corpus as corpus_builder
+from app.legal_corpus import (
+    SCHEMA_VERSION,
+    LegalCorpus,
+    VersionAmbiguityError,
+    article_number,
+    html_to_text,
+    split_articles,
+)
 from scripts.build_legal_corpus import build_document
 
 

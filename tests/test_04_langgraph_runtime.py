@@ -5,10 +5,10 @@ import threading
 import time
 import unittest
 from contextlib import closing
-from tests.support import IsolatedDatabaseTestCase
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-langgraph-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
@@ -16,11 +16,10 @@ os.environ["LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB"] = str(Path(TEST_DATA) / "checkp
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.agents import EvidenceAgent, FactAgent, create_coordinator, get_run_trace  # noqa: E402
+from app.agents import EvidenceAgent, FactAgent, answer_contract, create_coordinator, get_run_trace  # noqa: E402
 from app.db import SCHEMA, connect, init_db, transaction  # noqa: E402
 from app.langgraph_agents import (  # noqa: E402
     LangGraphRunError,
-    answer_contract,
     create_langgraph_coordinator,
 )
 from app.main import app  # noqa: E402

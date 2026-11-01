@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 
 from app.db import connect
-from app.model_comparison import compare_local_models
 from app.local_backends import BackendUnknown
+from app.model_comparison import compare_local_models
 from app.runtime_ports import AccessDeniedError, ContractValidationError
 from app.security import Principal, _principal
 from tests.test_domain_writes import domain  # noqa: F401
@@ -39,7 +39,7 @@ def test_native_baseline_identifies_reviewed_snapshot_without_claiming_an_old_co
 
     identity = native_baseline_identity()
     assert identity["schema_version"] == 2
-    assert identity["revision"] == "specialist-review-v4"
+    assert identity["revision"] == "specialist-review-v5"
     # A re-registered baseline must carry its review note, not just new hashes.
     assert "PROMPT_VERSION" in identity["review_note"]
     assert identity["source_commit"] == "31a811c92acae30caf82c9c5109ce812bd99bb04"

@@ -16,8 +16,9 @@ import math
 import random
 import statistics
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 GROUPS = ("A", "B", "C")
 REQUIRED_FIELDS = ("item", "group", "outcome", "passed")

@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Iterable
 from time import perf_counter
-from typing import Any, Iterable, Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from .legal_corpus import _terms
 from .statutory_index import StatutoryIndex

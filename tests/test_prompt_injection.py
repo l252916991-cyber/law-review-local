@@ -9,11 +9,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from app import agent_tools
 from app.agent_tools import TOOL_DATA_NOTICE, execute_readonly_tool
 from app.context import HistoryTurn, render_history
 from app.db import db_scope, init_db, now, sync_fts_index, transaction

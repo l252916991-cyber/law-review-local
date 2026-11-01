@@ -151,8 +151,8 @@ def run_branch(
     run_path: Path, base: dict[str, Any], followup: dict[str, Any],
     branch: str, session: dict[str, Any], fixtures: Any, use_llm: bool,
 ) -> dict[str, Any]:
-    from app.db import db_scope
     from app.context import context_policy
+    from app.db import db_scope
     from app.services import chat
 
     case_id = base["case_id"]
@@ -273,7 +273,7 @@ def summarize(records: list[dict[str, Any]], followups_by_id: dict[str, dict[str
         )
         category["runs"] += 1
         category["all_checks_pass"] += int(all(record["checks"].values()))
-    for branch, entry in summary["branches"].items():
+    for entry in summary["branches"].values():
         latencies = sorted(entry.pop("latency_ms"))
         entry["latency_p50_ms"] = latencies[len(latencies) // 2] if latencies else 0
         entry["latency_p95_ms"] = latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))] if latencies else 0

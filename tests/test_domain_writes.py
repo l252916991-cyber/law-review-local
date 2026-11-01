@@ -10,8 +10,8 @@ from app.db import connect, now, transaction
 from app.domain_writes import DomainHostWritePort
 from app.host_writes import LocalHostWritePort
 from app.runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError, RunScope, WriteAction
-from tests.test_host_writes import isolated, request, run  # noqa: F401
 from tests.test_forge_readonly import write_corpus
+from tests.test_host_writes import isolated, request, run  # noqa: F401
 
 
 @pytest.fixture

@@ -10,7 +10,6 @@ from typing import Any
 from .db import connect, now, transaction
 from .rag_chunks import CHUNK_PROFILES, CHUNK_VERSION, DEFAULT_CHUNK_PROFILE, page_chunks
 
-
 MAX_CHILDREN = 10_000
 EMBED_BATCH_SIZE = 32
 

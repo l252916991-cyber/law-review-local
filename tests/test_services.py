@@ -5,9 +5,10 @@ import tempfile
 import unittest
 import zipfile
 from contextlib import closing
-from tests.support import IsolatedDatabaseTestCase
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+from tests.support import IsolatedDatabaseTestCase
 
 
 class LawReviewServicesTest(IsolatedDatabaseTestCase):
@@ -281,6 +282,7 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
     def _assert_export_csv_safety(self):
         import csv
         import zipfile
+
         from app.db import transaction
         from app.services import build_export
         with transaction() as conn:
@@ -332,7 +334,7 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
                                    ("哈希去重案件", now(), now())).lastrowid
             other_case = conn.execute("INSERT INTO cases(title,created_at,updated_at) VALUES (?,?,?)",
                                       ("哈希跨案件", now(), now())).lastrowid
-        payload = "重复上传内容检测 test dedup payload".encode("utf-8")
+        payload = "重复上传内容检测 test dedup payload".encode()
         first = index_upload(case_id, "重复件.txt", payload, "text/plain")
         self.assertNotIn("duplicate", first)
         second = index_upload(case_id, "重复件-副本.txt", payload, "text/plain")
@@ -356,6 +358,7 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
 
     def test_docx_tables_are_extracted_in_document_order(self):
         import docx as docx_module
+
         from app.services import extract_docx_pages
         with tempfile.TemporaryDirectory(prefix="lexvault-docx-") as directory:
             path = Path(directory) / "含表格.docx"

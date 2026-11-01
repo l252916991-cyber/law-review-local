@@ -17,8 +17,14 @@ from .host_ports import LocalHostReadPort, capture_case_rows, case_identity
 from .host_writes import ISOLATED_RUNTIME, canonical, digest
 from .runtime_adapter import current_actor_identity
 from .runtime_ports import (
-    AccessDeniedError, ContractValidationError, ModelConfig, RequestConflictError,
-    RunRequest, RunScope, WriteAction, WriteRequest,
+    AccessDeniedError,
+    ContractValidationError,
+    ModelConfig,
+    RequestConflictError,
+    RunRequest,
+    RunScope,
+    WriteAction,
+    WriteRequest,
 )
 
 

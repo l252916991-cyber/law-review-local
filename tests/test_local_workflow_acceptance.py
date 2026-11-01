@@ -4,10 +4,10 @@ import hashlib
 import io
 import json
 import tempfile
-from pathlib import Path
-from unittest.mock import patch
 import unittest
 import zipfile
+from pathlib import Path
+from unittest.mock import patch
 
 from scripts.local_workflow_acceptance import Session, check_package, local_url, run, write_json
 

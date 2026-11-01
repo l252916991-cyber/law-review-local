@@ -15,7 +15,8 @@ import hashlib
 import json
 import random
 from collections import defaultdict
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from .answer_eval import score_answer_v2
 

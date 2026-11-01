@@ -29,8 +29,8 @@ from fastapi import HTTPException
 
 from . import agents
 from .db import connect, db_scope, get_db_path, init_db
-from .forge_sources import statute_source, verify_statutes
 from .forge_governance import BackendLedger
+from .forge_sources import statute_source, verify_statutes
 from .host_ports import (
     LocalHostReadPort,
     SnapshotChangedError,
@@ -42,12 +42,8 @@ from .host_ports import (
 )
 from .legal_corpus import LegalCorpus
 from .runtime_adapter import current_actor_identity
-from .runtime_ports import AccessDeniedError, DEFAULT_TENANT_ID, RunRequest
+from .runtime_ports import DEFAULT_TENANT_ID, AccessDeniedError, RunRequest
 from .security import require_case_access, require_permission
-
-
-class CitationIntegrityError(ValueError):
-    """A retrieved display quote cannot be mapped onto the exact source page."""
 
 
 class CitationIntegrityError(ValueError):

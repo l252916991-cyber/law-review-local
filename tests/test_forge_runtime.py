@@ -18,8 +18,6 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-forge-runtime-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from tests.support import IsolatedDatabaseTestCase  # noqa: E402
-
 from app.db import connect, init_db, now, transaction  # noqa: E402
 from app.forge_runtime import (  # noqa: E402
     FRAMEWORK_READONLY_CAPABILITIES,
@@ -43,6 +41,7 @@ from app.runtime_ports import (  # noqa: E402
     new_request_id,
 )
 from app.security import Principal, _principal  # noqa: E402
+from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 FRAMEWORK_PYTHON = os.getenv("LAW_REVIEW_FORGE_PYTHON", "")
 

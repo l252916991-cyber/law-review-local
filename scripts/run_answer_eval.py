@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.answer_eval import (  # noqa: E402
     cohen_kappa,
     evaluate_answers,
-    judge_answer,
     load_dataset,
 )
 

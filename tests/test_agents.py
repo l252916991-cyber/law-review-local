@@ -1,9 +1,9 @@
 import os
 import tempfile
 import unittest
-from tests.support import IsolatedDatabaseTestCase
 from unittest.mock import patch
 
+from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-agent-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA

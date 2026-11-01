@@ -13,8 +13,9 @@ import json
 import platform
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -82,12 +83,12 @@ def dataset_identity(root: Path) -> dict[str, Any]:
 
 
 def build_report(root: Path) -> dict[str, Any]:
+    import app.main as main_module
+    from app.answer_eval import JUDGE_PROMPT_VERSION
+    from app.answerability import POLICY_VERSION, policy_identity
     from app.collaboration_ablation import precheck
     from app.model_domain import LOCAL_PROMPT_VERSION
-    from app.answerability import POLICY_VERSION, policy_identity
-    from app.answer_eval import JUDGE_PROMPT_VERSION
     from app.services import PROMPT_VERSION
-    import app.main as main_module
 
     probe = precheck(None, None)
     return {

@@ -15,15 +15,22 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.collaboration_ablation import (  # noqa: E402
-    GROUPS, MAX_PROMPT_CHARS, live_generator, load_batch_dataset, load_prepared,
-    precheck, prepare_batch, run_batch,
+    GROUPS,
+    MAX_PROMPT_CHARS,
+    live_generator,
+    load_batch_dataset,
+    load_prepared,
+    precheck,
+    prepare_batch,
+    run_batch,
 )
 
 EXIT_PROTOCOL = 2

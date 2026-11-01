@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-import signal
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -20,8 +20,13 @@ from app.host_integration import IsolatedHostIntegration, worker_slot
 from app.host_writes import ISOLATED_RUNTIME
 from app.runtime_adapter import current_actor_identity
 from app.runtime_ports import (
-    ContractValidationError, ModelConfig, RequestConflictError, RequestInProgressError, RunRequest,
-    RunScope, UnsupportedCapabilityError,
+    ContractValidationError,
+    ModelConfig,
+    RequestConflictError,
+    RequestInProgressError,
+    RunRequest,
+    RunScope,
+    UnsupportedCapabilityError,
 )
 from tests.test_host_writes import isolated  # noqa: F401
 

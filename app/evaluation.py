@@ -8,10 +8,9 @@ import uuid
 from typing import Any
 
 from .db import connect, now, transaction
-from .rag import HybridRetriever
 from .llm_usage import usage_summary
+from .rag import HybridRetriever
 from .services import rowdict
-
 
 DEMO_GROUND_TRUTH = [
     {

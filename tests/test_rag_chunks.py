@@ -515,27 +515,6 @@ def test_exceeded_child_budget_keeps_named_valueerror_contract(tmp_path, monkeyp
             )
 
 
-def test_exceeded_child_budget_keeps_named_valueerror_contract(tmp_path, monkeypatch):
-    """Existing guards that catch ValueError still see the budget failure."""
-    database = tmp_path / "budget-type.sqlite"
-    case_id, _, _ = _create_case(database, ["甲乙丙丁"])
-    monkeypatch.setattr(rag_child_index, "MAX_CHILDREN", 1)
-    monkeypatch.setattr(rag_child_index, "page_chunks", lambda _text, *_args: [
-        {"char_start": 0, "char_end": 2, "text": "甲乙"},
-        {"char_start": 2, "char_end": 4, "text": "丙丁"},
-    ])
-    with db_scope(database):
-        client = FakeEmbeddingClient()
-        with pytest.raises(ValueError, match="exceeds 1 chunks"):
-            rag_child_index.load_or_build_child_index(
-                case_id,
-                backend=client.backend,
-                dimensions=client.dimensions,
-                model_identity=embedding_identity(client.model, client.backend),
-                embed=client.embed,
-            )
-
-
 def test_invalid_child_query_or_limit_never_calls_embedding(tmp_path):
     database = tmp_path / "invalid.sqlite"
     case_id, _, _ = _create_case(database, ["参数校验。"])

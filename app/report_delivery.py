@@ -26,7 +26,7 @@ import zipfile
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from .db import SCHEMA_VERSION, connect, get_db_path, now, transaction
 from .services import (

@@ -1,8 +1,8 @@
 """Two local-model comparisons on disposable copies; never write the source DB."""
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 import sqlite3
 import time
@@ -11,6 +11,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from . import agents
+from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
 from .candidate_domain import CandidateDeployment, CandidateDomainIntegration
 from .db import connect, db_scope
 from .domain_integration import DomainSession
@@ -20,12 +21,11 @@ from .model_domain import LOCAL_PROMPT_VERSION, LocalModelDomainIntegration, loc
 from .runtime_adapter import current_actor_identity
 from .runtime_ports import ContractValidationError, ModelConfig, RunRequest, RunScope
 from .services import PROMPT_VERSION
-from .answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
 
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v4"
+NATIVE_BASELINE_REVISION = "specialist-review-v5"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -44,15 +44,19 @@ NATIVE_BASELINE_REVIEW = (
     "CHAT_SYSTEM_PROMPT、PROMPT_VERSION、检索、回答契约、校验与工具循环行为均未改动："
     "默认协议仍是 openai-completions，请求体与响应解析结果与改动前逐字段一致（test_chat_stream.py 覆盖）。"
     "agents.py 仅把回退目标自带的协议透传给 call_local_llm，专家发现顺序与提示模板未变。"
+    "2026-11-01（specialist-review-v5）：启用 ruff Pyflakes/isort/pyupgrade/bugbear 规则后的机械修改——"
+    "删除未使用的导入与局部重复导入、导入排序、typing.Callable 改为 collections.abc.Callable、"
+    "去掉无占位符 f-string 的前缀；rag.py 的重排失败异常补上 from exc 以保留原因链。提示模板、检索、回答契约、专家规则、校验与模型调用路径均未改动，"
+    "test_chat_stream.py 与专家/审校回归逐字段覆盖；v4 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "53cdd159704eddd8152fb39a1b2cbdb129b2a241cde3e810a7cd060f083e37da",
-    "review_collaboration.py": "512c03d6719bddfd98d422c7cb65e46c26331b8aab7ab56b40e651a4a07d632a",
-    "agent_tools.py": "2af80bdaa3e1277de96a4127e2fd9bbabbb906b1213a94e6beb43a54d28dfb34",
-    "rag.py": "a79cd859fc639c409d043f18379e0ea45a286f077c9b633f40d6a06fbad949cc",
-    "services.py": "08228d5e90fa86a1d26495761967d159f5a756ad622f666bc36f1711bb086d11",
-    "model_domain.py": "f1e69e1d56d0fc73a15e51888b2b31e4bda6ce6e1f3a57bccad39f2f9dce5cbc",
-    "statutory_retrieval.py": "d9d2f60c01ac03f405ca4e1da593ff049a32cd6e072d3fa4bcb98f8be4b9fbe8",
+    "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
+    "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
+    "agent_tools.py": "f7fcfb59188bdae1e8f6a33ced57af696519cc8eaa2e2c673124943988cf4b15",
+    "rag.py": "a9ea01c8ca3e792b29cdff348e2f987d6e31a9e5e039b19b34255a2a5e2ae2db",
+    "services.py": "c0cedb44ba1414365277f4197ae1551a97e1b5316d8b6e1d2787f90ca2b40247",
+    "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
+    "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a",
 }
 
 

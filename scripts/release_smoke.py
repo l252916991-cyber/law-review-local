@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         _fail(f"分配案件角色失败：{status} {_text(body)}")
     steps["case"] = f"案件 #{case_id}，复核成员 #{reviewer_id}"
 
-    upload = _multipart("files", "借条.txt", "借条：今借到人民币十万元。".encode("utf-8"), "text/plain")
+    upload = _multipart("files", "借条.txt", "借条：今借到人民币十万元。".encode(), "text/plain")
     status, body, _ = _request(admin, "POST", f"{base}/api/cases/{case_id}/documents", raw=upload)
     if status != 201:
         _fail(f"上传材料失败：{status} {_text(body)}")

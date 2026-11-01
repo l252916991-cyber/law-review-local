@@ -16,9 +16,10 @@ import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
+from collections.abc import Callable, Sequence
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any
 
 from .legal_corpus import LegalCorpus
 

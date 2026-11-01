@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from unittest.mock import patch
+
 from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-rag-tests-")

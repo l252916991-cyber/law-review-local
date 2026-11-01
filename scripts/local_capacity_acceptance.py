@@ -20,11 +20,12 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -93,7 +94,7 @@ def hardware(path: Path) -> dict[str, Any]:
     }
 
 
-def seed_data(directory: Path, profile: Profile = Profile()) -> dict[str, int]:
+def seed_data(directory: Path, profile: Profile = Profile()) -> dict[str, int]:  # noqa: B008 - frozen dataclass
     if directory.exists():
         raise ValueError("Synthetic data directory must be new")
     from app.db import db_scope, init_db, now, transaction
