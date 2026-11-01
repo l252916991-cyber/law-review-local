@@ -1146,6 +1146,207 @@ def _request_payload(result: dict[str, Any]) -> Callable[[int, int | None], dict
     return build
 
 
+def _record_notice_turn(
+    *,
+    case_id: int,
+    conversation_id: int | None,
+    question: str,
+    answer: str,
+    answer_status: str,
+    notice: dict[str, Any],
+    route: str,
+    provenance: dict[str, Any],
+    validation: dict[str, Any],
+    retrieval_metrics: dict[str, Any],
+    context_meta: dict[str, Any],
+    user_name: str,
+    audit: tuple[str, str],
+    should_cancel: Callable[[], bool] | None,
+    request_key: tuple[int, str] | None,
+) -> dict[str, Any]:
+    """Persist a clarification or insufficient-evidence turn; no model was called."""
+    result = {
+        "conversation_id": conversation_id,
+        "answer": answer,
+        "answer_status": answer_status,
+        "clarification": notice,
+        "route": route,
+        "semantic_expansion": expand_semantics(question),
+        "citations": [],
+        "llm_used": False,
+        "provenance": provenance,
+        "validation": validation,
+        "citation_check": "not_applicable",
+        "rejected_llm_validation": None,
+        "fallback_reason": None,
+        "failure_diagnostic": None,
+        "retrieval_metrics": retrieval_metrics,
+        "context": context_meta,
+    }
+    turn = record_turn_with_id(
+        case_id, conversation_id, question=question, answer=answer, citations=[],
+        route=route, provenance=provenance, user_name=user_name or "本机律师",
+        kind=answer_status, audit=audit, should_cancel=should_cancel,
+        request_key=request_key,
+        request_result=_request_payload(result) if request_key is not None else None,
+    )
+    result["conversation_id"] = turn.conversation_id
+    result["message_id"] = turn.message_id
+    return result
+
+
+def _statistics_turn(case_id: int, question: str) -> tuple[str, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """Deterministic catalogue statistics: (answer, contexts, validation, retrieval_metrics)."""
+    answer, contexts = statistics_answer(case_id, question)
+    answer += "\n\n以上为当前数据库目录统计，请律师核对材料是否完整。"
+    validation = {
+        "valid": True, "scope": "database_metadata_counts",
+        "checks": {"metadata_query_succeeded": True}, "issues": [],
+        "semantic_entailment_checked": False, "amount_calculations_checked": False,
+        "lawyer_review_required": True,
+    }
+    retrieval_metrics = {
+        "retrieval_mode": "database_statistics",
+        "strategy": "deterministic_metadata_query",
+        "source_count": len(contexts),
+        "degraded": False,
+    }
+    return answer, contexts, validation, retrieval_metrics
+
+
+def _generate_model_answer(
+    *,
+    case_id: int,
+    question: str,
+    route: str,
+    contexts: list[dict[str, Any]],
+    conversation_id: int | None,
+    use_remote_embeddings: bool,
+    history_text: str,
+    memory_text: str,
+    note: str,
+    context_meta: dict[str, Any],
+    on_token: Callable[[str], None] | None,
+    phase: Callable[[str], None],
+) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
+    """Model answer that must pass the citation contract: (answer, provenance, rejected_validation).
+
+    Tries the optional tool loop (non-streaming only), then a single-shot call, and
+    at most one fallback model whose answer must pass the very same contract.
+    Raises RuntimeError when no candidate passes; the caller does not save a turn.
+    """
+    # Local import avoids the services -> agents -> services import cycle.
+    from .agents import failure_diagnostic, validate_review_answer
+
+    rejected_validation = None
+    llm_started = time.perf_counter()
+    tool_loop_used = False
+    try:
+        # The streaming path is single-shot: tokens arrive before the tool
+        # loop could run, so combining them would publish unretractable text.
+        if on_token is None and tool_loop_enabled():
+            from .tool_loop import ToolsUnsupportedError, run_tool_loop
+
+            try:
+                loop_result = run_tool_loop(
+                    case_id=case_id,
+                    question=question,
+                    route=route,
+                    contexts=contexts,
+                    conversation_id=conversation_id,
+                    use_remote_embeddings=use_remote_embeddings,
+                    history=history_text,
+                    memory=memory_text,
+                    object_note=note,
+                )
+            except ToolsUnsupportedError:
+                logger.info("Endpoint rejected tools; using single-shot answer")
+                loop_result = None
+            if loop_result is not None:
+                tool_loop_used = True
+                answer = loop_result["answer"]
+                context_meta["tools"] = {
+                    "rounds": loop_result["rounds"],
+                    "tool_calls": loop_result["tool_calls"],
+                    "trace": loop_result["tool_trace"],
+                    "model": loop_result["model"],
+                }
+        if not tool_loop_used:
+            answer = call_local_llm(
+                question, route, contexts, history=history_text,
+                memory=memory_text, object_note=note, on_token=on_token,
+            )
+        phase("validating")
+        candidate_validation = validate_review_answer(answer, contexts)
+        route_note = None
+        if not candidate_validation["valid"]:
+            # One bounded fallback attempt. The replacement answer must
+            # pass the very same contract; a fallback is not an exemption.
+            from .model_router import fallback_target
+
+            target = fallback_target()
+            if target is not None:
+                fallback_started = time.perf_counter()
+                # Never name this ``fallback_answer``: that is the
+                # module-level rule-summary function used by the caller.
+                retry_answer = call_local_llm(
+                    question, route, contexts, history=history_text,
+                    memory=memory_text, object_note=note,
+                    model_override=target.model, base_url_override=target.base_url,
+                    api_override=target.api,
+                )
+                fallback_validation = validate_review_answer(retry_answer, contexts)
+                if fallback_validation["valid"]:
+                    _account_llm_call(
+                        case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
+                    )
+                    _account_llm_call(
+                        case_id, "chat_fallback", fallback_started, "ok",
+                        conversation_id=conversation_id,
+                    )
+                    rejected_validation = candidate_validation
+                    answer, candidate_validation = retry_answer, fallback_validation
+                    route_note = {
+                        "fallback": True,
+                        "reason": "primary_failed_validation",
+                        "model": target.model,
+                    }
+        if not candidate_validation["valid"]:
+            logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
+            raise RuntimeError("model_output_failed_validation")
+        provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
+        if route_note:
+            provenance["route"] = route_note
+        if not tool_loop_used and not route_note:
+            _account_llm_call(
+                case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
+            )
+        return answer, provenance, rejected_validation
+    except (RuntimeError, OSError, ValueError, TypeError) as exc:
+        if not tool_loop_used:
+            _account_llm_call(
+                case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
+            )
+        failure_diagnostic(exc, "chat_llm")
+        logger.warning("Chat model failed error_type=%s", type(exc).__name__)
+        raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
+
+
+def _citation_cards(contexts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Clickable citation cards, one-to-one with the first six prompt contexts."""
+    return [
+        {
+            "index": i,
+            "document_id": item["document_id"],
+            "document_name": item["name"],
+            "page": item["page_no"],
+            "quote": item["quote"],
+            "url": f"/api/documents/{item['document_id']}/file#page={item['page_no']}",
+        }
+        for i, item in enumerate(contexts[:6], 1)
+    ]
+
+
 def chat(
     case_id: int,
     question: str,
@@ -1159,7 +1360,7 @@ def chat(
     request_key: tuple[int, str] | None = None,
 ) -> dict[str, Any]:
     # Local import avoids the services -> agents -> services import cycle.
-    from .agents import failure_diagnostic, validate_review_answer
+    from .agents import validate_review_answer
 
     def phase(name: str) -> None:
         if on_phase is not None:
@@ -1201,46 +1402,28 @@ def chat(
         "memory": memory_meta(policy, reason="not_started"),
     }
     audit = ("AI阅卷问答", f"{user_name or '本机律师'}：{concise(question, 60)}")
+    notice_turn = {
+        "case_id": case_id, "conversation_id": conversation_id, "question": question,
+        "context_meta": context_meta, "user_name": user_name, "audit": audit,
+        "should_cancel": should_cancel, "request_key": request_key,
+    }
 
     if resolution.status == "needs_clarification":
         context_meta["memory"] = memory_meta(policy, reason="clarification_required")
         answer, clarification = build_clarification(question, resolution, documents_by_id)
-        validation = validate_context_notice(answer, "clarification")
-        provenance = {
-            "mode": "clarification-request",
-            "llm_attempted": False,
-            "context_policy": policy.version,
-            "resolution": resolution_meta,
-            "clarification": clarification,
-        }
-        result = {
-            "conversation_id": conversation_id,
-            "answer": answer,
-            "answer_status": "clarification",
-            "clarification": clarification,
-            "route": "需要澄清",
-            "semantic_expansion": expand_semantics(question),
-            "citations": [],
-            "llm_used": False,
-            "provenance": provenance,
-            "validation": validation,
-            "citation_check": "not_applicable",
-            "rejected_llm_validation": None,
-            "fallback_reason": None,
-            "failure_diagnostic": None,
-            "retrieval_metrics": {"retrieval_mode": "not_started", "source_count": 0},
-            "context": context_meta,
-        }
-        turn = record_turn_with_id(
-            case_id, conversation_id, question=question, answer=answer, citations=[],
-            route="需要澄清", provenance=provenance, user_name=user_name or "本机律师",
-            kind="clarification", audit=audit, should_cancel=should_cancel,
-            request_key=request_key,
-            request_result=_request_payload(result) if request_key is not None else None,
+        return _record_notice_turn(
+            **notice_turn, answer=answer, answer_status="clarification", notice=clarification,
+            route="需要澄清",
+            provenance={
+                "mode": "clarification-request",
+                "llm_attempted": False,
+                "context_policy": policy.version,
+                "resolution": resolution_meta,
+                "clarification": clarification,
+            },
+            validation=validate_context_notice(answer, "clarification"),
+            retrieval_metrics={"retrieval_mode": "not_started", "source_count": 0},
         )
-        result["conversation_id"] = turn.conversation_id
-        result["message_id"] = turn.message_id
-        return result
 
     route = detect_route(resolution.retrieval_query)
     fallback_reason, diagnostic, rejected_validation = None, None, None
@@ -1249,27 +1432,12 @@ def chat(
         if resolution.status == "resolved" and history.enabled and history.turns
         else ""
     )
-    answer_status = "answered"
-    clarification = None
     if route == "目录统计":
         context_meta["memory"] = memory_meta(policy, reason="route_not_model")
-        answer, contexts = statistics_answer(case_id, question)
-        answer += "\n\n以上为当前数据库目录统计，请律师核对材料是否完整。"
+        answer, contexts, validation, retrieval_metrics = _statistics_turn(case_id, question)
         llm_used = False
         provenance = {"mode": "database-statistics"}
-        validation = {
-            "valid": True, "scope": "database_metadata_counts",
-            "checks": {"metadata_query_succeeded": True}, "issues": [],
-            "semantic_entailment_checked": False, "amount_calculations_checked": False,
-            "lawyer_review_required": True,
-        }
         citation_check = "not_applicable"
-        retrieval_metrics = {
-            "retrieval_mode": "database_statistics",
-            "strategy": "deterministic_metadata_query",
-            "source_count": len(contexts),
-            "degraded": False,
-        }
     else:
         # Keep the prompt context and the clickable citation cards one-to-one.
         from .rag import HybridRetriever
@@ -1285,43 +1453,20 @@ def chat(
                 question, resolution, documents_by_id,
                 reason="asked_topic_not_in_current_sources" if missing_topic else "no_current_supporting_source",
             )
-            validation = validate_context_notice(answer, "insufficient_evidence")
-            provenance = {
-                "mode": "insufficient-evidence",
-                "llm_attempted": False,
-                "context_policy": policy.version,
-                "resolution": resolution_meta,
-                "clarification": insufficient,
-            }
             context_meta["history"] = history.as_dict(used=False)
-            result = {
-                "conversation_id": conversation_id,
-                "answer": answer,
-                "answer_status": "insufficient_evidence",
-                "clarification": insufficient,
-                "route": "资料不足",
-                "semantic_expansion": expand_semantics(question),
-                "citations": [],
-                "llm_used": False,
-                "provenance": provenance,
-                "validation": validation,
-                "citation_check": "not_applicable",
-                "rejected_llm_validation": None,
-                "fallback_reason": None,
-                "failure_diagnostic": None,
-                "retrieval_metrics": retrieval_metrics,
-                "context": context_meta,
-            }
-            turn = record_turn_with_id(
-                case_id, conversation_id, question=question, answer=answer, citations=[],
-                route="资料不足", provenance=provenance, user_name=user_name or "本机律师",
-                kind="insufficient_evidence", audit=audit, should_cancel=should_cancel,
-                request_key=request_key,
-                request_result=_request_payload(result) if request_key is not None else None,
+            return _record_notice_turn(
+                **notice_turn, answer=answer, answer_status="insufficient_evidence", notice=insufficient,
+                route="资料不足",
+                provenance={
+                    "mode": "insufficient-evidence",
+                    "llm_attempted": False,
+                    "context_policy": policy.version,
+                    "resolution": resolution_meta,
+                    "clarification": insufficient,
+                },
+                validation=validate_context_notice(answer, "insufficient_evidence"),
+                retrieval_metrics=retrieval_metrics,
             )
-            result["conversation_id"] = turn.conversation_id
-            result["message_id"] = turn.message_id
-            return result
         note = object_note(resolution, documents_by_id)
         scope_label = "、".join(
             f"《{documents_by_id[document_id]['name']}》"
@@ -1338,100 +1483,13 @@ def chat(
             # call already in flight is never interrupted, only the commit is.
             check_cancelled()
             phase("generating")
-            llm_started = time.perf_counter()
-            tool_loop_used = False
-            try:
-                # The streaming path is single-shot: tokens arrive before the tool
-                # loop could run, so combining them would publish unretractable text.
-                if on_token is None and tool_loop_enabled():
-                    from .tool_loop import ToolsUnsupportedError, run_tool_loop
-
-                    try:
-                        loop_result = run_tool_loop(
-                            case_id=case_id,
-                            question=question,
-                            route=route,
-                            contexts=contexts,
-                            conversation_id=conversation_id,
-                            use_remote_embeddings=use_remote_embeddings,
-                            history=history_text,
-                            memory=memory_clues["text"],
-                            object_note=note,
-                        )
-                    except ToolsUnsupportedError:
-                        logger.info("Endpoint rejected tools; using single-shot answer")
-                        loop_result = None
-                    if loop_result is not None:
-                        tool_loop_used = True
-                        answer = loop_result["answer"]
-                        context_meta["tools"] = {
-                            "rounds": loop_result["rounds"],
-                            "tool_calls": loop_result["tool_calls"],
-                            "trace": loop_result["tool_trace"],
-                            "model": loop_result["model"],
-                        }
-                if not tool_loop_used:
-                    answer = call_local_llm(
-                        question, route, contexts, history=history_text,
-                        memory=memory_clues["text"], object_note=note, on_token=on_token,
-                    )
-                phase("validating")
-                candidate_validation = validate_review_answer(answer, contexts)
-                route_note = None
-                if not candidate_validation["valid"]:
-                    # One bounded fallback attempt. The replacement answer must
-                    # pass the very same contract; a fallback is not an exemption.
-                    from .model_router import fallback_target
-
-                    target = fallback_target()
-                    if target is not None:
-                        fallback_started = time.perf_counter()
-                        # Never name this ``fallback_answer``: that is the
-                        # module-level rule-summary function used below.
-                        retry_answer = call_local_llm(
-                            question, route, contexts, history=history_text,
-                            memory=memory_clues["text"], object_note=note,
-                            model_override=target.model, base_url_override=target.base_url,
-                            api_override=target.api,
-                        )
-                        fallback_validation = validate_review_answer(retry_answer, contexts)
-                        if fallback_validation["valid"]:
-                            _account_llm_call(
-                                case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
-                            )
-                            _account_llm_call(
-                                case_id, "chat_fallback", fallback_started, "ok",
-                                conversation_id=conversation_id,
-                            )
-                            rejected_validation = candidate_validation
-                            answer, candidate_validation = retry_answer, fallback_validation
-                            route_note = {
-                                "fallback": True,
-                                "reason": "primary_failed_validation",
-                                "model": target.model,
-                            }
-                if candidate_validation["valid"]:
-                    llm_used = True
-                    provenance = dict(_last_llm_provenance.get() or llm_provenance(route, LLMConfig.load().model))
-                    if route_note:
-                        provenance["route"] = route_note
-                    if not tool_loop_used and not route_note:
-                        _account_llm_call(
-                            case_id, "chat", llm_started, "ok", conversation_id=conversation_id,
-                        )
-                else:
-                    rejected_validation = candidate_validation
-                    diagnostic = {"phase": "chat_validation", "code": "invalid_answer_contract"}
-                    logger.warning("Chat validation failed issues=%s", ",".join(candidate_validation["issues"]))
-                    raise RuntimeError("model_output_failed_validation")
-            except (RuntimeError, OSError, ValueError, TypeError) as exc:
-                if not tool_loop_used:
-                    _account_llm_call(
-                        case_id, "chat", llm_started, "failed", conversation_id=conversation_id,
-                    )
-                diagnostic = failure_diagnostic(exc, "chat_llm")
-                logger.warning("Chat model failed error_type=%s", type(exc).__name__)
-                raise RuntimeError(f"model_unavailable_or_invalid:{type(exc).__name__}") from exc
+            answer, provenance, rejected_validation = _generate_model_answer(
+                case_id=case_id, question=question, route=route, contexts=contexts,
+                conversation_id=conversation_id, use_remote_embeddings=use_remote_embeddings,
+                history_text=history_text, memory_text=memory_clues["text"], note=note,
+                context_meta=context_meta, on_token=on_token, phase=phase,
+            )
+            llm_used = True
         else:
             context_meta["memory"] = memory_meta(policy, reason="llm_disabled")
             answer = fallback_answer(question, route, contexts, scope_label)
@@ -1452,22 +1510,12 @@ def chat(
         },
     }
     context_meta["history"] = history.as_dict(used=bool(history_text))
-    citations = [
-        {
-            "index": i,
-            "document_id": item["document_id"],
-            "document_name": item["name"],
-            "page": item["page_no"],
-            "quote": item["quote"],
-            "url": f"/api/documents/{item['document_id']}/file#page={item['page_no']}",
-        }
-        for i, item in enumerate(contexts[:6], 1)
-    ]
+    citations = _citation_cards(contexts)
     result = {
         "conversation_id": conversation_id,
         "answer": answer,
-        "answer_status": answer_status,
-        "clarification": clarification,
+        "answer_status": "answered",
+        "clarification": None,
         "route": route,
         "semantic_expansion": expand_semantics(question),
         "citations": citations,
@@ -1498,7 +1546,6 @@ def chat(
     result["conversation_id"] = turn.conversation_id
     result["message_id"] = turn.message_id
     return result
-
 
 MAX_GAP_ANALYSIS_PAGES = 2000
 

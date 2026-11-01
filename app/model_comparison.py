@@ -25,7 +25,7 @@ from .services import PROMPT_VERSION
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v5"
+NATIVE_BASELINE_REVISION = "specialist-review-v6"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -48,13 +48,16 @@ NATIVE_BASELINE_REVIEW = (
     "删除未使用的导入与局部重复导入、导入排序、typing.Callable 改为 collections.abc.Callable、"
     "去掉无占位符 f-string 的前缀；rag.py 的重排失败异常补上 from exc 以保留原因链。提示模板、检索、回答契约、专家规则、校验与模型调用路径均未改动，"
     "test_chat_stream.py 与专家/审校回归逐字段覆盖；v4 结果保留且不被覆盖。"
+    "2026-11-01（specialist-review-v6）：services.chat 拆为 _record_notice_turn、_statistics_turn、"
+    "_generate_model_answer、_citation_cards 四个内部函数，调用顺序、提示参数、回退与计量、"
+    "落库内容及返回字段不变；CHAT_SYSTEM_PROMPT、PROMPT_VERSION、检索与回答契约未改动。"
 )
 NATIVE_ALGORITHM_HASHES = {
     "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
     "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
     "agent_tools.py": "f7fcfb59188bdae1e8f6a33ced57af696519cc8eaa2e2c673124943988cf4b15",
     "rag.py": "a9ea01c8ca3e792b29cdff348e2f987d6e31a9e5e039b19b34255a2a5e2ae2db",
-    "services.py": "c0cedb44ba1414365277f4197ae1551a97e1b5316d8b6e1d2787f90ca2b40247",
+    "services.py": "37bdd87272588b524b14fe82b387f57602814b50b541903b8d0a014b2a15ce70",
     "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
     "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a",
 }
