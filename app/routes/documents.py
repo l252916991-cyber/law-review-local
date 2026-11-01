@@ -64,6 +64,16 @@ async def _index_staged_upload(case_id: int, item: dict[str, Any]) -> dict[str, 
             raise
 
 
+def public_document(document: dict[str, Any]) -> dict[str, Any]:
+    """A document as the API returns it, without its server-side storage path.
+
+    ``stored_path`` is an absolute path inside the data directory. Clients fetch
+    the original through ``GET /api/documents/{id}/file``, so the path would only
+    disclose the server layout. Internal callers keep reading it from the row.
+    """
+    return {key: value for key, value in document.items() if key != "stored_path"}
+
+
 class DirectoryUpdate(BaseModel):
     doc_type: str | None = Field(default=None, max_length=40)
     people: str | None = Field(default=None, max_length=200)
@@ -85,7 +95,7 @@ def list_documents(case_id: int):
     conn = connect()
     try:
         return [
-            rowdict(x)
+            public_document(rowdict(x))
             for x in conn.execute("SELECT * FROM documents WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()
         ]
     finally:
@@ -112,7 +122,7 @@ async def upload_documents(case_id: int, files: list[UploadFile] = File(...)):
                               "stored_path": str(path), "mime_type": upload.content_type})
             for item in items:
                 try:
-                    results.append(await _index_staged_upload(case_id, item))
+                    results.append(public_document(await _index_staged_upload(case_id, item)))
                 except Exception as exc:
                     failures.append({"name": item["filename"], "error": upload_error_message(exc)})
     finally:
@@ -252,7 +262,7 @@ def update_directory(document_id: int, payload: DirectoryUpdate):
     allowed = {"doc_type", "people", "date_range", "summary", "status"}
     values = {key: value for key, value in payload.model_dump(exclude_none=True).items() if key in allowed}
     if not values:
-        return document
+        return public_document(document)
     if payload.expected_version is not None and payload.expected_version != document["version"]:
         raise HTTPException(409, f"材料目录已被他人修改（当前版本 {document['version']}），请刷新后重试")
     with transaction() as conn:
@@ -269,7 +279,7 @@ def update_directory(document_id: int, payload: DirectoryUpdate):
             versions=(document["version"], document["version"] + 1),
         )
     sync_fts_index()
-    return get_document(document_id)
+    return public_document(get_document(document_id))
 
 
 def _text_fingerprint(value: str) -> str:

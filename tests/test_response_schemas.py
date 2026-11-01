@@ -60,8 +60,9 @@ class ResponseSchemaTests(IsolatedDatabaseTestCase):
         with closing(connect()) as conn:
             columns = [row["name"] for row in conn.execute("PRAGMA table_info(documents)")]
         self.assertTrue(documents)
+        # Every column except the server-side storage path, which stays private.
         for document in documents:
-            self.assertEqual(set(document), set(columns))
+            self.assertEqual(set(document), set(columns) - {"stored_path"})
 
     def test_undeclared_keys_survive_the_response_model(self):
         case_id = self.client.get("/api/cases").json()[0]["id"]

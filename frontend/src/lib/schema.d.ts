@@ -1753,7 +1753,10 @@ export interface components {
             /** Expected Version */
             expected_version?: number | null;
         };
-        /** DocumentSummary */
+        /**
+         * DocumentSummary
+         * @description A ``documents`` row minus ``stored_path``, which stays on the server.
+         */
         DocumentSummary: {
             /** Id */
             id: number;
@@ -1761,8 +1764,6 @@ export interface components {
             case_id: number;
             /** Name */
             name: string;
-            /** Stored Path */
-            stored_path: string;
             /** Import Key */
             import_key: string | null;
             /** Mime Type */

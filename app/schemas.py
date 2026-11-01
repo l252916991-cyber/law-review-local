@@ -60,10 +60,11 @@ class CaseDetail(CaseRow):
 # --- documents and pages ---------------------------------------------------------
 
 class DocumentSummary(ApiModel):
+    """A ``documents`` row minus ``stored_path``, which stays on the server."""
+
     id: int
     case_id: int
     name: str
-    stored_path: str
     import_key: str | None
     mime_type: str
     pages: int

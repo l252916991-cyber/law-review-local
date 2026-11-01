@@ -38,6 +38,7 @@
 | 日志泄露 | 把卷宗正文或令牌写入日志 | 结构化日志只记录类型与计数；安全事件不含请求体 | `app/logger.py`、`app/security.py` |
 | 供应链 | 依赖投毒、密钥入库 | 锁定带哈希、`pip-audit`、`gitleaks`、发布白名单 | `.github/workflows/security.yml` |
 | 路径逃逸 | 符号链接、`..` | `contained_path` 限制在受管数据目录内 | `tests/test_02_api_security.py` |
+| 存储布局泄露 | 接口返回原件在服务器上的绝对路径 | 材料列表、上传、目录校准响应剔除 `stored_path`；原件只经 `/api/documents/{id}/file` 下载，导出包只记 `has_file` | `tests/test_document_path_privacy.py` |
 
 ## 4. 已覆盖与未覆盖
 

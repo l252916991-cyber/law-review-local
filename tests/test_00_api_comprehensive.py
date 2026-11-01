@@ -143,7 +143,10 @@ class APIContractTest(IsolatedDatabaseTestCase):
         self.assertEqual(response.status_code, 201)
         document = response.json()["documents"][0]
         self.assertEqual(document["name"], "恶意合同.txt")
-        self.assertNotIn("..", Path(document["stored_path"]).name)
+        self.assertNotIn("stored_path", document)
+        with closing(connect()) as conn:
+            stored = conn.execute("SELECT stored_path FROM documents WHERE id=?", (document["id"],)).fetchone()[0]
+        self.assertNotIn("..", Path(stored).name)
 
     def test_upload_unsupported_file_is_reported_without_orphan(self):
         response = self.client.post(
