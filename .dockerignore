@@ -1,6 +1,15 @@
 # Deny everything private or local-only before any broad COPY can pick it up.
 .git
 .venv
+.venv-*/
+.uv-cache/
+.coverage
+*.zip
+*.docx
+*.bundle
+tmp_eq/
+vendor/*.whl
+!vendor/forgeharness-0.8.3-py3-none-any.whl
 .env
 .env.*
 *.log
