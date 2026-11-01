@@ -7,6 +7,7 @@ way the driver scores them, so the judge sees the same citation set.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -22,9 +23,15 @@ EXIT_PROTOCOL = 2
 
 def export(batch: Path, group: str, *, repeat: int = 0) -> dict[str, Any]:
     manifest = json.loads((batch / "manifest.json").read_text(encoding="utf-8"))
-    ledger = [json.loads(line) for line in
-              (batch / "run" / "attempts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    rows = {(row["item"], int(row.get("repeat", 0)), row["group"]): row for row in ledger}
+    ledger_path = batch / "run" / "attempts.jsonl"
+    ledger_bytes = ledger_path.read_bytes()
+    ledger = [json.loads(line) for line in ledger_bytes.decode("utf-8").splitlines() if line.strip()]
+    rows = {}
+    for row in ledger:
+        key = (row["item"], int(row.get("repeat", 0)), row["group"])
+        if key in rows:
+            raise ValueError(f"重复的题目/轮次/分组记录：{key}")
+        rows[key] = row
     answers: dict[str, Any] = {}
     for entry in manifest["items"]:
         item_id = entry["id"]
@@ -37,9 +44,21 @@ def export(batch: Path, group: str, *, repeat: int = 0) -> dict[str, Any]:
             "answer": text,
             "citations": answer_citations(text, prepared["contexts"]),
             "answer_status": "insufficient_evidence" if row.get("score", {}).get("refused") else "answered",
+            # Preserve the recorded outcome separately from the historical
+            # answer-status contract: empty/failed attempts are not successes.
+            "outcome": row.get("outcome"),
+            "executed": row.get("executed"),
+            "passed": row.get("passed"),
+            "repeat": row.get("repeat"),
+            "input_tokens": row.get("input_tokens"),
+            "output_tokens": row.get("output_tokens"),
+            "latency_ms": row.get("latency_ms"),
+            "elapsed_seconds": row.get("elapsed_seconds"),
+            "usage_known": row.get("usage_known"),
         }
     return {"collection_mode": f"real_model_ablation_{group}", "group": group, "repeat": repeat,
-            "scoring_version": 2, "dataset": manifest["dataset"]["name"], "answers": answers}
+            "scoring_version": 2, "dataset": manifest["dataset"]["name"],
+            "attempts_sha256": hashlib.sha256(ledger_bytes).hexdigest(), "answers": answers}
 
 
 def main(argv: Sequence[str] | None = None) -> int:

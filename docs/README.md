@@ -2,6 +2,9 @@
 
 以代码、测试产物与以下维护文档为准；根目录早期报告保留为历史证据，不作为“全部完成”的实时声明。
 
+- [2026-10-29—30 律所评测缺漏与标注交接](migration/lexvault-evaluation-completion-20261029.md)：48题/8案新封存草稿、双人盲标注包、两题各五次真实生成、40次实际故障注入、成本导出与统计边界；人工标注和总体效力尚未完成。
+- [律所评测样本分母审计](benchmarks/lexvault-evaluation-sample-audit-20261029.md)：区分问题/案件/claim和重复采样，纠正小类别、不同分母差值及旧导出缺usage的结论。
+
 - [系统架构](architecture/system.md)：运行时、数据边界与降级。
 - [威胁模型](security/threat-model.md)：资产、信任边界、提示注入与工具越权的缓解及未覆盖项。
 - [2026-10-27 求职展示版计划书](migration/agent-portfolio-plan-20261027.md)：面向 AI 应用 / Agent 工程求职，推进多专家真实模型对照、可复现演示和简历证据；与正式交付验收分别记录。
