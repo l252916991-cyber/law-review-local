@@ -1,14 +1,17 @@
 """Human review tasks: assignment, transitions, returns and due dates."""
 import json
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db import db_scope, init_db, now, transaction
+from app.db import connect, db_scope, init_db, now, transaction
 from app.main import app
 
 ADMIN_TOKEN = "b" * 40
@@ -85,6 +88,160 @@ class TaskWorkflowTest(unittest.TestCase):
         return self.client.patch(
             f"/api/tasks/{task_id}", headers=self.headers(token), json={"action": action, **extra}
         )
+
+    def current_task(self, task_id):
+        response = self.client.get(f"/api/cases/{self.case_a}/tasks", headers=self.admin)
+        self.assertEqual(response.status_code, 200, response.text)
+        return next(row for row in response.json()["tasks"] if row["id"] == task_id)
+
+    def audit_count(self):
+        with closing(connect()) as conn:
+            return conn.execute("SELECT COUNT(*) FROM audit_log WHERE action='任务流转'").fetchone()[0]
+
+    def test_stale_interface_rejects_every_action_without_audit_or_events(self):
+        task = self.create_task()
+        started = self.act(task["id"], self.assistant_token, "start", expected_version=task["version"])
+        self.assertEqual(started.status_code, 200, started.text)
+        current = self.current_task(task["id"])
+        self.assertEqual(current["version"], 2)
+        before_audit = self.audit_count()
+        for action in ("start", "submit", "return", "complete", "cancel", "assign", "due"):
+            with self.subTest(action=action):
+                rejected = self.act(task["id"], ADMIN_TOKEN, action, expected_version=1, note="陈旧界面",
+                                    assignee_member_id=self.owner["id"], due_at="2026-12-31")
+                self.assertEqual(rejected.status_code, 409, rejected.text)
+                self.assertIn("其他人修改", rejected.json()["detail"])
+                self.assertEqual(self.current_task(task["id"]), current)
+                self.assertEqual(self.audit_count(), before_audit)
+
+    def race_actions(self, task, first, second):
+        """Force two real HTTP requests to read the same SQLite row before either writes."""
+        from app import human_tasks
+
+        barrier = threading.Barrier(2)
+        load = human_tasks._load_task
+
+        def simultaneous_load(conn, task_id):
+            row = load(conn, task_id)
+            barrier.wait(timeout=10)
+            return row
+
+        def request(payload):
+            with db_scope(self.root / "law_review.db"):
+                # No lifespan: each request gets its own client/connection and
+                # inherits only this synthetic database scope, with no Redis.
+                client = TestClient(app)
+                try:
+                    return client.patch(f"/api/tasks/{task['id']}", headers=self.admin, json=payload)
+                finally:
+                    client.close()
+
+        before_audit = self.audit_count()
+        with patch("app.human_tasks._load_task", side_effect=simultaneous_load), ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(request, payload) for payload in (first, second)]
+            responses = [future.result(timeout=15) for future in futures]
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409],
+                         [response.text for response in responses])
+        winner = next(response.json()["task"] for response in responses if response.status_code == 200)
+        current = self.current_task(task["id"])
+        self.assertEqual(current, winner)
+        self.assertEqual(current["version"], task["version"] + 1)
+        self.assertEqual(len(current["events"]), len(task["events"]) + 1)
+        self.assertEqual(self.audit_count(), before_audit + 1)
+        return current
+
+    def test_concurrent_legacy_start_requests_only_append_one_transition(self):
+        task = self.create_task()
+        current = self.race_actions(task, {"action": "start"}, {"action": "start"})
+        self.assertEqual(current["status"], "进行中")
+        self.assertEqual([event["action"] for event in current["events"]], ["create", "start"])
+
+    def test_concurrent_review_decisions_cannot_overwrite_each_other(self):
+        task = self.create_task()
+        self.assertEqual(self.act(task["id"], self.assistant_token, "start").status_code, 200)
+        submitted = self.act(task["id"], self.assistant_token, "submit")
+        self.assertEqual(submitted.status_code, 200, submitted.text)
+        task = submitted.json()["task"]
+        current = self.race_actions(task, {"action": "complete", "expected_version": task["version"]},
+                                    {"action": "return", "note": "缺少签字页", "expected_version": task["version"]})
+        self.assertIn(current["status"], {"已完成", "待处理"})
+        self.assertEqual(current["events"][-1]["to"], current["status"])
+        self.assertEqual(bool(current["closed_at"]), current["status"] == "已完成")
+
+    def test_concurrent_assignment_and_due_edit_share_the_task_version(self):
+        task = self.create_task()
+        current = self.race_actions(task, {"action": "assign", "assignee_member_id": self.owner["id"]},
+                                    {"action": "due", "due_at": "2026-12-31"})
+        if current["events"][-1]["action"] == "assign":
+            self.assertEqual(current["assignee_member_id"], self.owner["id"])
+            self.assertEqual(current["due_at"], task["due_at"])
+        else:
+            self.assertEqual(current["due_at"], "2026-12-31")
+            self.assertEqual(current["assignee_member_id"], task["assignee_member_id"])
+
+    def test_assignees_need_active_case_access_and_effective_edit_rights(self):
+        invalid = []
+        for name, role, cases, permissions in (
+            ("未分案", "assistant", [], ["view", "edit"]),
+            ("仅在其他案", "assistant", [self.case_b], ["view", "edit"]),
+            ("只读角色", "viewer", [self.case_a], ["view", "edit"]),
+            ("复核角色", "reviewer", [self.case_a], ["view", "edit", "approve"]),
+            ("已撤编辑", "assistant", [self.case_a], ["view"]),
+            ("无查看权", "assistant", [self.case_a], ["edit"]),
+            ("已停用", "assistant", [self.case_a], ["view", "edit"]),
+        ):
+            member, _ = self.member(name, role, cases, permissions)
+            if name == "已停用":
+                self.assertEqual(self.client.patch(f"/api/members/{member['id']}", headers=self.admin,
+                                                   json={"active": False}).status_code, 200)
+            invalid.append(member)
+        task = self.create_task()
+        before_audit = self.audit_count()
+        for member in invalid:
+            with self.subTest(member=member["name"]):
+                rejected = self.client.post(f"/api/cases/{self.case_a}/tasks", headers=self.admin,
+                                            json={"title": "不可处理的任务", "assignee_member_id": member["id"]})
+                self.assertEqual(rejected.status_code, 409, rejected.text)
+                rejected_assign = self.act(task["id"], ADMIN_TOKEN, "assign", assignee_member_id=member["id"])
+                self.assertEqual(rejected_assign.status_code, 409, rejected_assign.text)
+                self.assertEqual(self.current_task(task["id"]), task)
+        self.assertEqual(self.audit_count(), before_audit)
+        candidates = self.client.get(f"/api/cases/{self.case_a}/task-assignees", headers=self.admin)
+        self.assertEqual(candidates.status_code, 200, candidates.text)
+        self.assertEqual({row["member_id"] for row in candidates.json()["assignees"]},
+                         {self.owner["id"], self.assistant["id"]})
+        listed = self.client.get(f"/api/cases/{self.case_a}/tasks", headers=self.admin).json()["tasks"]
+        self.assertEqual([row["id"] for row in listed], [task["id"]])
+
+    def test_candidates_and_assignment_recheck_permissions_after_page_load(self):
+        candidates = self.client.get(f"/api/cases/{self.case_a}/task-assignees", headers=self.admin).json()
+        self.assertIn(self.assistant["id"], [row["member_id"] for row in candidates["assignees"]])
+        self.assertEqual(self.client.patch(f"/api/members/{self.assistant['id']}", headers=self.admin,
+                                           json={"permissions": ["view"]}).status_code, 200)
+        rejected = self.client.post(f"/api/cases/{self.case_a}/tasks", headers=self.admin,
+                                    json={"title": "撤权后分派", "assignee_member_id": self.assistant["id"]})
+        self.assertEqual(rejected.status_code, 409, rejected.text)
+        refreshed = self.client.get(f"/api/cases/{self.case_a}/task-assignees", headers=self.admin).json()
+        self.assertNotIn(self.assistant["id"], [row["member_id"] for row in refreshed["assignees"]])
+
+    def test_directory_admin_may_work_any_case_without_assignment(self):
+        created = self.client.post("/api/members", headers=self.admin, json={"name": "目录管理员", "admin": True})
+        self.assertEqual(created.status_code, 201, created.text)
+        member, token = created.json()["member"], created.json()["token"]
+        task = self.create_task(assignee_member_id=member["id"])
+        candidates = self.client.get(f"/api/cases/{self.case_a}/task-assignees", headers=self.admin).json()
+        self.assertIn(member["id"], [row["member_id"] for row in candidates["assignees"]])
+        mine = self.client.get("/api/tasks/mine", headers=self.headers(token))
+        self.assertEqual([row["id"] for row in mine.json()["tasks"]], [task["id"]])
+        started = self.act(task["id"], token, "start", expected_version=task["version"])
+        self.assertEqual(started.status_code, 200, started.text)
+
+    def test_only_case_managers_can_list_assignees(self):
+        self.assertEqual(self.client.get(f"/api/cases/{self.case_a}/task-assignees",
+                                         headers=self.headers(self.assistant_token)).status_code, 403)
+        self.assertEqual(self.client.get(f"/api/cases/{self.case_b}/task-assignees",
+                                         headers=self.headers(self.owner_token)).status_code, 404)
+        self.assertEqual(self.client.get("/api/cases/999999/task-assignees", headers=self.admin).status_code, 404)
 
     def test_full_flow_with_a_returned_task(self):
         task = self.create_task()

@@ -191,6 +191,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cases/{case_id}/task-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Assignees
+         * @description Task candidates must be able to read and work this case; assignment grants no access.
+         */
+        get: operations["task_assignees_api_cases__case_id__task_assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases/{case_id}/tasks": {
         parameters: {
             query?: never;
@@ -1694,6 +1714,8 @@ export interface components {
             assignee_member_id?: number | null;
             /** Due At */
             due_at?: string | null;
+            /** Expected Version */
+            expected_version?: number | null;
         };
         /** TaskCreate */
         TaskCreate: {
@@ -2156,6 +2178,37 @@ export interface operations {
             path: {
                 case_id: number;
                 member_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_assignees_api_cases__case_id__task_assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
             };
             cookie?: never;
         };

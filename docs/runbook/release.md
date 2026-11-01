@@ -42,7 +42,7 @@ checkpoint 不在默认数据目录时，备份必须显式提供 `--checkpoint-
 
 工具使用 SQLite backup API，以只读连接读取原数据库，验证完整性、SHA-256 与文件清单；拒绝活动 run/batch/job、符号链接、缺失文档及已存在的恢复目标。复制期间用 SQLite `data_version` 和文件清单检查变化，但这不是在线跨库原子快照，`--quiescent` 是必须遵守的停写前提。SQLite 只读连接可能更新 WAL 的共享内存读标记，不改业务记录。
 
-恢复仅重写 `documents.stored_path` 与 `batch_import_files.stored_path` 到新目录，保留已清理 staging 文件的历史引用、checkpoint 与审计内容。Redis 队列、系统密钥和 `.env` 不在备份中；需要单独按密钥管理策略备份。校验 hash 是防损坏，不是抵御恶意修改的数字签名，只从可信私有备份恢复。
+恢复仅重写 `documents.stored_path` 与 `batch_import_files.stored_path` 到新目录，保留已清理 staging 文件的历史引用、checkpoint 与审计内容。管理员页面保存的 `model_settings.json` 也纳入明确文件清单与摘要，保留文件权限；仅允许 `base_url`/`model` 两个有效字段，拒绝符号链接、额外字段、URL 凭证及查询参数。旧 v1 快照仍可恢复；缺少此文件时 `RESTORE_REPORT.json` 的 `model_settings` 明确标记 `absent_verify_deployment_defaults`，必须重新核对实际模型与地址。Redis 队列、系统密钥和 `.env` 不在备份中；需要单独按密钥管理策略备份。校验 hash 是防损坏，不是抵御恶意修改的数字签名，只从可信私有备份恢复。
 
 中途失败会保留带 `INCOMPLETE`/`RESTORE_INCOMPLETE` 标识的目录供排查，不能启动该副本，也不会自动删除或覆盖它。新一次尝试须使用新的目标目录。
 

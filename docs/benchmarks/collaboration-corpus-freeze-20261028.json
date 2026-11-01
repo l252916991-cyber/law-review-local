@@ -1,0 +1,56 @@
+{
+  "format_version": 1,
+  "asset_id": "official-corpus-recovery-20261028",
+  "status": "historical_research_snapshot; current_law_not_asserted",
+  "historical_result": "The previous 71/19/1 input combination was not recovered. This is a distinct frozen input set.",
+  "sources": [
+    {
+      "path": "legal_corpus",
+      "manifest_sha256": "0b488786701179d29126381e39d19b60d994346ba823258224d29a8361b82bae",
+      "document_count": 32
+    },
+    {
+      "path": "legal_corpus_recovered_constitution-amendment-2018",
+      "manifest_sha256": "d7ee74cdc4c8f40817776546b65bab9a11872b30396e62bef1f6ec84f32e7e3d",
+      "document_count": 1
+    },
+    {
+      "path": "legal_corpus_recovered_labor-dispute-arbitration-2007",
+      "manifest_sha256": "994f33d9c53ee86c14cb7e376595d611f6f1157ff2e783ce81eb9fe67f2ddeb4",
+      "document_count": 1
+    },
+    {
+      "path": "legal_corpus_recovered_military-insurance-2012",
+      "manifest_sha256": "b7f827ddc0f60cf7fe1b6abbb923c51831470606a3cb6d08aac6a2bf4ad9668c",
+      "document_count": 1
+    },
+    {
+      "path": "legal_corpus_recovered_rural-land-dispute-arbitration-2009",
+      "manifest_sha256": "3a073a61e7792caf13385b8f774ccbabffed7ab6844f634aba891f783f07d78b",
+      "document_count": 1
+    },
+    {
+      "path": "legal_corpus_recovered_securities-investment-fund-2012",
+      "manifest_sha256": "f821689b8ec81eeecd6d199c2b4aeb91e744a7b1453cb50af0cf5119a38132aa",
+      "document_count": 1
+    },
+    {
+      "path": "legal_corpus_supplement_npc_v10",
+      "manifest_sha256": "533d8a4f0790ea50f71c2edc7dc41f213d06b04c9ad52e609a24843ca1da603d",
+      "document_count": 34
+    }
+  ],
+  "expected": {
+    "publication_count": 71,
+    "article_count": 7921,
+    "duplicate_keys_merged": 0,
+    "classification_counts": {
+      "exact_duplicate": 0,
+      "cosmetic_duplicate": 0,
+      "boundary_difference": 0,
+      "substantive_conflict": 0
+    },
+    "document_set_sha256": "6ac7e6e4fa7c5863dc59dd4aaebc5d89c211057a07ab222f28248bfe5cee93bc",
+    "source_as_of": "2023-12-29"
+  }
+}

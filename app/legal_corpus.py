@@ -78,7 +78,8 @@ def article_number(value: str) -> int:
     return total + current
 
 
-def split_articles(text: str, expected_max: int | None = None) -> list[dict[str, Any]]:
+def split_articles(text: str, expected_max: int | None = None, *,
+                   embedded_articles: dict[str, list[int]] | None = None) -> list[dict[str, Any]]:
     """Split paragraph-aligned statutory text; preserve paragraphs and subarticles.
 
     References inside a sentence are not new article headings. Chapter headings
@@ -89,6 +90,9 @@ def split_articles(text: str, expected_max: int | None = None) -> list[dict[str,
     paragraphs: list[str] = []
     current: dict[str, Any] | None = None
     headings: list[str] = []
+    for bounds in (embedded_articles or {}).values():
+        if len(bounds) != 2 or bounds[0] < 1 or bounds[0] > bounds[1]:
+            raise ValueError("Invalid embedded article range")
 
     def flush() -> None:
         if current is not None:
@@ -100,7 +104,10 @@ def split_articles(text: str, expected_max: int | None = None) -> list[dict[str,
         line = re.sub(r"[\s\u3000]+", " ", raw).strip()
         if not line:
             continue
+        embedded = (embedded_articles or {}).get(current["article_id"]) if current else None
         match = ARTICLE_RE.match(line)
+        if match and embedded and embedded[0] <= article_number(match.group(1)) <= embedded[1]:
+            match = None
         if match:
             flush()
             number = article_number(match.group(1))
@@ -113,7 +120,7 @@ def split_articles(text: str, expected_max: int | None = None) -> list[dict[str,
                 "section_heading": headings[-1] if headings else None,
             }
             paragraphs = [line]
-        elif HEADING_RE.match(line):
+        elif not embedded and HEADING_RE.match(line):
             flush()
             current = None
             paragraphs = []
@@ -124,6 +131,14 @@ def split_articles(text: str, expected_max: int | None = None) -> list[dict[str,
     ids = [item["article_id"] for item in articles]
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate article headings: source selection is ambiguous")
+    for clause, bounds in (embedded_articles or {}).items():
+        containers = [article for article in articles if article["article_id"] == clause]
+        if len(containers) != 1 or len(bounds) != 2 or bounds[0] > bounds[1]:
+            raise ValueError("Invalid embedded article range")
+        nested = [article_number(match.group(1)) for line in containers[0]["text"].splitlines()[1:]
+                  if (match := ARTICLE_RE.match(line))]
+        if nested != list(range(bounds[0], bounds[1] + 1)):
+            raise ValueError("Incomplete embedded article sequence")
     if expected_max is not None:
         actual = {item["article_number"] for item in articles if item["subarticle_number"] is None}
         expected = set(range(1, expected_max + 1))

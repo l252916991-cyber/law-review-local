@@ -36,7 +36,7 @@ sha256sum docker-compose.yml
 2. 只重启 Web：`docker compose restart web`；复用 cookie，确认会话仍有效。确认 `auth_sessions` 的哈希行未保存原始 cookie。
 3. `docker compose down` 后再 `up -d`，确认命名 `web-data` 卷仍保留案件、原件哈希、模板和会话。
 4. 按 `docs/runbook/release.md` 执行停写快照；恢复到新目录，执行 SQLite integrity/FK 检查与附件哈希检查，再确认案件、证据、审批和模板可读。
-5. 清空 Redis 后重启 worker，确认批量导入 outbox 自动重派；记录实际恢复时间。
+5. 在一次性环境中登记并确认入队一批合成文件，暂停 worker 消费后清空该测试 Redis，重启 worker，确认原 batch ID 自动重派并完成；另测处理过程中 Redis 丢库时原生写入线程不被并行重放、已提交文件不重复创建。记录实际恢复时间，不对业务 Redis 做故障注入。启动与 worker 每 15 秒巡检均会核对 queued/processing 批次，活跃执行标记和本地批次锁会阻止重放。
 
 ## 3. TLS 代理边界
 

@@ -101,17 +101,21 @@ def test_classify_is_pure_on_prepared_publications():
     assert classify(a, b)["dedup_sha256_a"] == classify(a, b)["dedup_sha256_b"]
 
 
-def test_real_frozen_corpus_is_classified_cleanly(tmp_path):
+def test_real_frozen_corpus_is_classified_cleanly(tmp_path, frozen_corpus_regression):
     """The checked-in corpus is our regression input when present; skip offline."""
     root = Path(__file__).resolve().parents[1] / "output/score85"
-    directories = sorted(str(path) for path in root.glob("legal_corpus*") if (path / "manifest.json").exists())
+    directories = (frozen_corpus_regression["directories"] if frozen_corpus_regression else
+                   sorted(str(path) for path in root.glob("legal_corpus*") if (path / "manifest.json").exists()))
     if len(directories) < 2:
         import pytest
 
         pytest.skip("frozen statute corpus not checked out")
     report = audit(directories)
     assert report["classification_counts"]["substantive_conflict"] == 0
-    assert report["classification_counts"]["boundary_difference"] == 1  # 民法典 附则 leak
+    if frozen_corpus_regression:
+        assert report["classification_counts"] == frozen_corpus_regression["expected"]["classification_counts"]
+    else:
+        assert report["classification_counts"]["boundary_difference"] == 1  # legacy 民法典 附则 leak
     for record in report["conflicts"]:
         assert record["recommended_action"]
     out = tmp_path / "report.json"

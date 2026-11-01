@@ -111,6 +111,30 @@ class APIContractTest(IsolatedDatabaseTestCase):
         self.assertEqual(response.json()["detail"]["code"], "embedding_model_unavailable")
         self.assertNotIn("SECRET_TOKEN", response.text)
 
+    def test_chat_generation_failure_is_retryable_and_does_not_save_an_answer(self):
+        with closing(connect()) as conn:
+            before = conn.execute(
+                "SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.case_id=1"
+            ).fetchone()[0]
+        with patch(
+            "app.services.call_local_llm",
+            side_effect=RuntimeError("provider memory limit:SECRET_TOKEN"),
+        ):
+            response = self.client.post(
+                "/api/cases/1/chat",
+                json={"question": "张某是否批准了年化12%的固定回报宣传？",
+                      "use_llm": True, "use_remote_embeddings": False},
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "model_unavailable_or_invalid")
+        self.assertIn("重试", response.json()["detail"]["message"])
+        self.assertNotIn("SECRET_TOKEN", response.text)
+        with closing(connect()) as conn:
+            after = conn.execute(
+                "SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.case_id=1"
+            ).fetchone()[0]
+        self.assertEqual(after, before)
+
     def test_upload_text_and_sanitize_filename(self):
         response = self.client.post(
             "/api/cases/1/documents",

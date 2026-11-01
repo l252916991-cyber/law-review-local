@@ -25,7 +25,13 @@
 - [求职展示版 P3 演示状态](migration/portfolio-p3-demo-status-20261027.md)：恢复片段证据、录制前身份核对报告（`scripts/demo_identity_report.py`）与主演示的阻塞条件。
 - [2026-10-27 多人协作首版改进计划书](migration/collaboration-first-release-plan-20261027.md)：成员分工、人工任务、并发保护、报告签发与部署验收的工作包、阶段与验收用例。
 - [2026-10-27 多人协作首版交付前收尾计划书](migration/collaboration-release-readiness-plan-20261027.md)：权限交集、冻结签发内容及 R1–R3 实施记录，保留完整检查和验收用例。
-- [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：正式交付执行入口；关闭语料资产、Python 矩阵、gitleaks、容器路径门禁，再执行 M1 副本迁移及 U1 律所验收。
+- [2026-10-27 G1 放行与律所验收续行计划书](migration/collaboration-g1-to-acceptance-plan-20261027.md)：G1、M1、U1 原计划及状态入口；本机五人实际执行结果见下方 2026-10-29 记录。
+- [2026-10-28 G1 续行执行证据](migration/collaboration-g1-execution-evidence-20261028.md)：新冻结法条、双版本完整检查、gitleaks、指定基础镜像容器、真实队列/OCR 及含前端候选包。
+- [2026-10-28 M1 源库登记与执行单](migration/collaboration-m1-preparation-20261028.md)：历史准备记录、候选路径和停写后副本演练步骤；本机旧库副本实测见 2026-10-29 记录，源库未正式升级。
+- [求职展示：合成迁移与恢复](runbook/migration-demo.md)：复现命令、工程取舍与五分钟讲解顺序；[2026-10-28 实测记录](migration/collaboration-m1-synthetic-demo-20261028.md)覆盖 schema 16→26、checkpoint、双身份签发及二次恢复交付。
+- [2026-10-28—29 落地缺陷修补记录](migration/collaboration-production-fixes-20261028.md)：七项已确认缺陷的六个修复提交、双版本完整离线矩阵、28 项页面回归、真实 Redis 恢复及新候选包；真实律所接收条件继续保留。
+- [2026-10-29 本机五人技术试点验收](migration/local-five-user-acceptance-20261029.md)：旧库 v13→26 副本迁移及旧程序回退、五身份流程、容量/OCR/真实模型固定事实检查和双版本工程门禁；保留模型失败、法律措辞及值守接收边界。
+- [2026-10-28 法条恢复与冻结输入](benchmarks/collaboration-corpus-recovery-20261028.md)：五份官方历史文本、71 份独立资产契约及旧基准未复现的边界。
 - [多人协作部署与运行验收](runbook/collaboration-acceptance.md)：验收脚本、备份恢复演练、五个身份的人工验收、离职撤权与监控建议。
 - [AI 应用升级计划](migration/ai-application-upgrade-plan-20261024.md)：A01–A13 工作包、验收口径与未实施原因。
 - [AI 应用升级实施记录](migration/ai-application-upgrade-execution-20261024.md)：提交清单、验证结果、关键设计与发现的问题。

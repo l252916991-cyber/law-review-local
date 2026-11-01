@@ -9,6 +9,7 @@ States: 待处理 → 进行中 → 待复核 → 已完成；待处理/待复�
 """
 from __future__ import annotations
 
+import json
 from contextlib import closing
 from datetime import date
 from typing import Any, Literal
@@ -20,6 +21,7 @@ from .db import connect, now, record_security_event, transaction
 from .security import (
     MANAGER_ROLES,
     REVIEW_ROLES,
+    ROLE_PERMISSIONS,
     current_principal,
     has_case_role,
     require_case_access,
@@ -73,14 +75,32 @@ def _is_assignee(task: Any) -> bool:
     return bool(task["assignee_name"]) and task["assignee_name"] == principal.name
 
 
-def _member_name(conn, member_id: int | None) -> str:
+def _can_assign(row) -> bool:
+    if row["is_admin"]:
+        return True
+    needed = {"view", "edit"}
+    return (needed <= set(json.loads(row["permissions_json"] or "[]"))
+            and needed <= ROLE_PERMISSIONS.get(row["role"], frozenset()))
+
+
+def _assignee_rows(conn, case_id: int):
+    return conn.execute(
+        "SELECT m.id, m.name, m.active, m.is_admin, m.permissions_json, cm.role "
+        "FROM members m LEFT JOIN case_members cm ON cm.member_id=m.id AND cm.case_id=? "
+        "ORDER BY m.name, m.id", (case_id,),
+    ).fetchall()
+
+
+def _member_name(conn, member_id: int | None, case_id: int) -> str:
     if member_id is None:
         return ""
-    row = conn.execute("SELECT name, active FROM members WHERE id = ?", (member_id,)).fetchone()
+    row = next((item for item in _assignee_rows(conn, case_id) if item["id"] == member_id), None)
     if not row:
         raise HTTPException(404, "指派成员不存在")
     if not row["active"]:
         raise HTTPException(409, "指派成员已停用")
+    if not _can_assign(row):
+        raise HTTPException(409, "任务负责人必须有本案查看和编辑权限，请先完成案件分工与授权")
     return row["name"]
 
 
@@ -140,10 +160,13 @@ def _load_task(conn, task_id: int):
 
 def _transition(conn, row, *, to_status: str, action: str, actor: str, note: str = "") -> None:
     ts = now()
-    conn.execute(
-        "UPDATE review_tasks SET status = ?, updated_at = ?, closed_at = ?, version = version + 1 WHERE id = ?",
-        (to_status, ts, ts if to_status in {"已完成", "已取消"} else None, row["id"]),
+    changed = conn.execute(
+        "UPDATE review_tasks SET status = ?, updated_at = ?, closed_at = ?, version = version + 1 "
+        "WHERE id = ? AND version = ? AND status = ?",
+        (to_status, ts, ts if to_status in {"已完成", "已取消"} else None, row["id"], row["version"], row["status"]),
     )
+    if changed.rowcount != 1:
+        raise HTTPException(409, "任务已被其他人修改，请刷新后重试")
     conn.execute(
         "INSERT INTO review_task_events(task_id, from_status, to_status, action, actor, note, created_at) "
         "VALUES (?,?,?,?,?,?,?)",
@@ -165,6 +188,19 @@ class TaskAction(BaseModel):
     note: str = Field(default="", max_length=500)
     assignee_member_id: int | None = Field(default=None, ge=1)
     due_at: str | None = None
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+@router.get("/cases/{case_id}/task-assignees")
+def task_assignees(case_id: int):
+    """Task candidates must be able to read and work this case; assignment grants no access."""
+    if not _is_manager(case_id):
+        raise HTTPException(403, "需要编辑权限及案件负责人角色")
+    with closing(connect()) as conn:
+        if not conn.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
+            raise HTTPException(404, "案件不存在")
+        return {"assignees": [{"member_id": row["id"], "name": row["name"]}
+                              for row in _assignee_rows(conn, case_id) if row["active"] and _can_assign(row)]}
 
 
 @router.get("/cases/{case_id}/tasks")
@@ -209,7 +245,7 @@ def create_task(case_id: int, payload: TaskCreate):
         case = conn.execute("SELECT id FROM cases WHERE id = ?", (case_id,)).fetchone()
         if not case:
             raise HTTPException(404, "案件不存在")
-        assignee = _member_name(conn, payload.assignee_member_id)
+        assignee = _member_name(conn, payload.assignee_member_id, case_id)
         if payload.evidence_id is not None:
             evidence = conn.execute("SELECT case_id FROM evidence WHERE id = ?", (payload.evidence_id,)).fetchone()
             if not evidence or evidence["case_id"] != case_id:
@@ -271,6 +307,9 @@ def act_on_task(task_id: int, payload: TaskAction):
         if action in {"start", "submit"} and not _can_work(case_id, row):
             raise HTTPException(403, "需要编辑权限且为任务负责人或案件负责人")
 
+        if payload.expected_version is not None and payload.expected_version != row["version"]:
+            raise HTTPException(409, "任务已被其他人修改，请刷新后重试")
+
         if row["status"] in {"已完成", "已取消"}:
             raise HTTPException(409, "任务已结束，不能再操作")
 
@@ -300,12 +339,14 @@ def act_on_task(task_id: int, payload: TaskAction):
         elif action == "assign":
             if payload.assignee_member_id is None:
                 raise HTTPException(400, "请选择要指派的成员")
-            name = _member_name(conn, payload.assignee_member_id)
-            conn.execute(
+            name = _member_name(conn, payload.assignee_member_id, case_id)
+            changed = conn.execute(
                 "UPDATE review_tasks SET assignee_member_id = ?, assignee_name = ?, updated_at = ?, "
-                "version = version + 1 WHERE id = ?",
-                (payload.assignee_member_id, name, now(), task_id),
+                "version = version + 1 WHERE id = ? AND version = ? AND status = ?",
+                (payload.assignee_member_id, name, now(), task_id, row["version"], row["status"]),
             )
+            if changed.rowcount != 1:
+                raise HTTPException(409, "任务已被其他人修改，请刷新后重试")
             conn.execute(
                 "INSERT INTO review_task_events(task_id, from_status, to_status, action, actor, note, created_at) "
                 "VALUES (?,?,?,?,?,?,?)",
@@ -313,10 +354,13 @@ def act_on_task(task_id: int, payload: TaskAction):
             )
         else:  # due
             due = _parse_due(payload.due_at)
-            conn.execute(
-                "UPDATE review_tasks SET due_at = ?, updated_at = ?, version = version + 1 WHERE id = ?",
-                (due, now(), task_id),
+            changed = conn.execute(
+                "UPDATE review_tasks SET due_at = ?, updated_at = ?, version = version + 1 "
+                "WHERE id = ? AND version = ? AND status = ?",
+                (due, now(), task_id, row["version"], row["status"]),
             )
+            if changed.rowcount != 1:
+                raise HTTPException(409, "任务已被其他人修改，请刷新后重试")
             conn.execute(
                 "INSERT INTO review_task_events(task_id, from_status, to_status, action, actor, note, created_at) "
                 "VALUES (?,?,?,?,?,?,?)",

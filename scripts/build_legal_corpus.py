@@ -87,12 +87,12 @@ SOURCES: list[dict[str, Any]] = [
     {
         "document_id": "labor-dispute-arbitration-2007", "law_name": "中华人民共和国劳动争议调解仲裁法",
         "aliases": ["中华人民共和国劳动争议调解仲裁法", "劳动争议调解仲裁法"],
-        "source_url": "https://www.jxxf.gov.cn/xfxxxgk/c100760/200712/8c70792bfdd64472899f07f8b63ef37f.shtml",
-        "publisher": "信丰县人民政府", "version_date": "2007-12-29", "effective_date": "2008-05-01",
+        "source_url": "https://www.beijing.gov.cn/zhengce/zhengcefagui/qtwj/201912/t20191219_1307906.html",
+        "publisher": "北京市人民政府", "version_date": "2007-12-29", "effective_date": "2008-05-01",
         "version_status": "dated_original_publication; currentness_not_asserted", "expected_max": 54,
         "version_evidence": "2007年12月29日第十届全国人民代表大会常务委员会第三十一次会议通过",
-        "last_sentence": "本法自2008年5月1日起施行",
-        "note": "2007年通过全文，54条；页面末句无句号，按原文登记。",
+        "last_sentence": "本法自2008年5月1日起施行。",
+        "note": "2007年通过全文，54条；2026-10-27 重新核对北京市政府完整公布文本。",
     },
     {
         "document_id": "civil-procedure-2021", "law_name": "中华人民共和国民事诉讼法",
@@ -107,12 +107,12 @@ SOURCES: list[dict[str, Any]] = [
     {
         "document_id": "military-insurance-2012", "law_name": "中华人民共和国军人保险法",
         "aliases": ["中华人民共和国军人保险法", "军人保险法"],
-        "source_url": "http://www.jingchuan.gov.cn/bmxzxxgk/bmxxgk/tyjrswj/fdzdgknr/lzyj/zcfg/art/2024/art_c157a9c2828e4463a2e293411e7e7483.html",
-        "publisher": "泾川县退役军人事务局", "version_date": "2012-04-27", "effective_date": "2012-07-01",
+        "source_url": "https://www.nhsa.gov.cn/art/2012/4/27/art_53_1182.html",
+        "publisher": "国家医疗保障局", "version_date": "2012-04-27", "effective_date": "2012-07-01",
         "version_status": "dated_original_publication; currentness_not_asserted", "expected_max": 51,
-        "version_evidence": "第十一届全国人民代表大会常务委员会第二十六次会议通过",
+        "version_evidence": "第十一届全国人民代表大会常务委员会第二十六次会议于2012年4月27日通过",
         "last_sentence": "本法自2012年7月1日起施行。",
-        "note": "2012年通过全文，51条；页面成文时间字段残缺，采用届次会议通过表述作为版本证据。",
+        "note": "2012年通过全文，51条；2026-10-27 核对国家医保局页面的届次会议及通过日期。",
     },
     {
         "document_id": "constitution-amendment-1993", "law_name": "中华人民共和国宪法修正案（1993年）",
@@ -128,12 +128,13 @@ SOURCES: list[dict[str, Any]] = [
     {
         "document_id": "constitution-amendment-2018", "law_name": "中华人民共和国宪法修正案（2018年）",
         "aliases": ["中华人民共和国宪法修正案（2018年）", "宪法修正案2018年", "宪法修正案（2018年）"],
-        "source_url": "http://gongbao.court.gov.cn/Details/2fbb4e2567b11c1fe5b618ebac2014.html",
-        "publisher": "最高人民法院公报网", "version_date": "2018-03-11", "effective_date": "2018-03-11",
+        "source_url": "https://www.cac.gov.cn/2018-03/11/c_1122521245.htm",
+        "publisher": "中央网信办", "version_date": "2018-03-11", "effective_date": "2018-03-11",
         "version_status": "historical_amendment; not_consolidated_constitution",
         "expected_min": 32, "expected_max": 52,
+        "embedded_articles": {"52": [123, 127]},
         "version_evidence": "2018年3月11日第十三届全国人民代表大会第一次会议通过",
-        "last_sentence": "第七节相应改为第八节,第一百二十三条至第一百三十八条相应改为第一百二十八条至第一百四十三条。",
+        "last_sentence": "第七节相应改为第八节，第一百二十三条至第一百三十八条相应改为第一百二十八条至第一百四十三条。",
         "note": "2018年修正案第三十二条至第五十二条，共21条；末条为条文序号调整说明。",
     },
     {
@@ -257,8 +258,8 @@ SOURCES: list[dict[str, Any]] = [
     {
         "document_id": "securities-investment-fund-2012", "law_name": "中华人民共和国证券投资基金法",
         "aliases": ["中华人民共和国证券投资基金法", "证券投资基金法"],
-        "source_url": "https://www.csrc.gov.cn/csrc/c101939/c1045353/content.shtml",
-        "publisher": "中国证券监督管理委员会", "version_date": "2012-12-28", "effective_date": "2013-06-01",
+        "source_url": "https://www.mofcom.gov.cn/zcfb/zgdwjjmywg/art/2013/art_5100a2f92cc142af911a85a2c94a758b.html",
+        "publisher": "商务部", "version_date": "2012-12-28", "effective_date": "2013-06-01",
         "version_status": "dated_revised_publication; currentness_not_asserted", "expected_max": 155,
         "version_evidence": "2012年12月28日", "last_sentence": "施行。",
         "note": "2012年修订全文；后续修法适用性另行核对。",
@@ -293,8 +294,8 @@ SOURCES: list[dict[str, Any]] = [
     {
         "document_id": "rural-land-dispute-arbitration-2009", "law_name": "中华人民共和国农村土地承包经营纠纷调解仲裁法",
         "aliases": ["中华人民共和国农村土地承包经营纠纷调解仲裁法", "农村土地承包经营纠纷调解仲裁法"],
-        "source_url": "https://www.npc.gov.cn/c2/c12435/c12488/201905/t20190522_61926.html",
-        "publisher": "中国人大网", "version_date": "2009-06-27", "effective_date": "2010-01-01",
+        "source_url": "https://www.lanshan.gov.cn/lsxnyncj/0400/202111/d90750f9cfad4b2d945335c9bea11dcc.shtml",
+        "publisher": "蓝山县农业农村局", "version_date": "2009-06-27", "effective_date": "2010-01-01",
         "version_status": "dated_original_publication; currentness_not_asserted", "expected_max": 53,
         "version_evidence": "2009年6月27日", "last_sentence": "施行。",
         "note": "2009年通过全文；法名中的调解仲裁与农村土地承包法区分。",
@@ -503,11 +504,29 @@ def build_document(source: dict[str, Any], raw: bytes, downloaded_at: str,
     # Validate article sequence first, then trim the final article at its explicit
     # statutory closing sentence. This excludes navigation, copyright and annexes.
     first_number = source.get("expected_min", 1)
-    articles = split_articles(text, source["expected_max"] if first_number == 1 else None)
-    if first_number != 1:
-        actual = {item["article_number"] for item in articles if item["subarticle_number"] is None}
-        if actual != set(range(first_number, source["expected_max"] + 1)):
-            raise ValueError("Incomplete amendment article sequence")
+    def split(value: str) -> list[dict[str, Any]]:
+        articles = split_articles(value, source["expected_max"] if first_number == 1 else None,
+                                  embedded_articles=source.get("embedded_articles"))
+        if first_number != 1:
+            actual = {item["article_number"] for item in articles if item["subarticle_number"] is None}
+            if actual != set(range(first_number, source["expected_max"] + 1)):
+                raise ValueError("Incomplete amendment article sequence")
+        return articles
+
+    layout_repair = None
+    try:
+        articles = split(text)
+    except ValueError:
+        # Some official HTML paragraphs omit the separator after an article
+        # heading. Only add that separator; the full sequence must still match.
+        repaired = re.sub(
+            r"^(第[零〇一二三四五六七八九十百千万两0-9]+条(?:之[一二三四五六七八九十0-9]+)?)(?=[^\s【〔（(])",
+            r"\1 ", text, flags=re.M,
+        )
+        if repaired == text:
+            raise
+        articles = split(repaired)
+        layout_repair = "merged_heading_separator_v1"
     final = articles[-1]
     boundary = final["text"].find(source["last_sentence"])
     if boundary < 0:
@@ -522,7 +541,7 @@ def build_document(source: dict[str, Any], raw: bytes, downloaded_at: str,
         appendix = remainder[:appendix_end + len(source["appendix_last_text"])].strip()
     final["text"] = final["text"][:final_end]
     final["text_sha256"] = _sha(final["text"].encode())
-    return {
+    document = {
         "schema_version": SCHEMA_VERSION,
         **{key: value for key, value in source.items() if key not in {"last_sentence", "expected_max", "appendix_last_text"}},
         "document_year": int(source["version_date"][:4]) if source.get("version_date") else None,
@@ -533,6 +552,9 @@ def build_document(source: dict[str, Any], raw: bytes, downloaded_at: str,
         "provenance_policy": "complete_official_publication_only; no_benchmark_answers_or_predictions",
         "articles": articles, "appendix_text": appendix,
     }
+    if layout_repair:
+        document["layout_repair"] = layout_repair
+    return document
 
 
 def build(output: Path, source_ids: set[str] | None = None) -> dict[str, Any]:

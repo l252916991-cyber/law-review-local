@@ -317,9 +317,10 @@ def missing_required_blocks(source: dict[str, Any]) -> list[str]:
             if block["required"] and not block_has_data(block, source)]
 
 
-def transaction_sheet(case_id: int) -> dict[str, Any]:
+def transaction_sheet(case_id: int, *, include_text: bool = True) -> dict[str, Any]:
     """Stream the whole sheet so a case with more rows than one page still freezes."""
     hasher = hashlib.sha256()
+    hasher.update("\ufeff".encode("utf-8"))
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["日期", "账号", "方向", "金额（分）", "币种", "对方", "摘要", "来源行", "状态"])
@@ -335,21 +336,26 @@ def transaction_sheet(case_id: int) -> dict[str, Any]:
             if currency not in currencies:
                 currencies.append(currency)
             if buffer.tell() and count % 500 == 0:
-                chunks.append(buffer.getvalue())
+                chunk = buffer.getvalue()
+                hasher.update(chunk.encode("utf-8"))
+                if include_text:
+                    chunks.append(chunk)
                 buffer.seek(0)
                 buffer.truncate(0)
     finally:
         rows.close()
-    chunks.append(buffer.getvalue())
-    text = "\ufeff" + "".join(chunks)
-    hasher.update(text.encode("utf-8"))
-    return {
+    chunk = buffer.getvalue()
+    hasher.update(chunk.encode("utf-8"))
+    result = {
         "archive_name": TRANSACTION_SHEET,
         "count": count,
         "currencies": currencies,
         "sha256": hasher.hexdigest(),
-        "text": text,
     }
+    if include_text:
+        chunks.append(chunk)
+        result["text"] = "\ufeff" + "".join(chunks)
+    return result
 
 
 def stored_paths(case_id: int) -> dict[int, str]:
@@ -662,7 +668,7 @@ def build_frozen_package(case_id: int, report_row, *, actor: str = "") -> tuple[
 def _register_delivery(case_id: int, report_id: int, version, path: Path, package_sha: str, actor: str) -> None:
     """Re-check state and permissions, then record the delivery.
 
-    A report voided, superseded or re-versioned while the ZIP was assembled, or
+    A report voided, superseded, re-versioned or made stale while the ZIP was assembled, or
     an operator whose export right was withdrawn, must not be registered as a
     completed delivery. The bytes already produced are not claimed as recalled.
     """
@@ -678,6 +684,15 @@ def _register_delivery(case_id: int, report_id: int, version, path: Path, packag
             raise ValueError("案件授权在导出期间变化，已拒绝本次交付")
         if not principal.has_for_case("export", case_id):
             raise ValueError("导出权限在导出期间变化，已拒绝本次交付")
+        # Packaging can take time, especially with attachments. Lock only this
+        # final database check and registration, not ZIP assembly or file reads.
+        # BEGIN IMMEDIATE keeps concurrent writers out between these checks and
+        # the delivery event; ordinary WAL readers can continue. A page edit is
+        # represented by its document version in the source snapshot.
+        if current_source_digest(conn, case_id, version["template_id"]) != version["source_hash"]:
+            raise ValueError("报告依据在导出期间已变化，已拒绝本次交付，请重新复核并批准")
+        if sheet_stale(case_id, load_body(version)):
+            raise ValueError("报告资金流水在导出期间已变化，已拒绝本次交付，请重新复核并批准")
         conn.execute(
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '导出结案包', ?, ?)",
             (case_id, path.name, now()),
@@ -731,7 +746,7 @@ def sheet_stale(case_id: int, body: dict[str, Any]) -> bool:
     currency.
     """
     frozen = body.get("transactions") or {}
-    current = transaction_sheet(case_id)
+    current = transaction_sheet(case_id, include_text=False)
     return (current["sha256"] != frozen.get("sha256")
             or current["count"] != frozen.get("count"))
 

@@ -1,7 +1,9 @@
 import json
 import os
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
@@ -237,6 +239,44 @@ class MaterialCorrectionTest(CollaborationTestCase):
         self.assertEqual(stale.status_code, 409, stale.text)
         page = self.client.get(f"/api/documents/{document['id']}/pages/1").json()
         self.assertIn("今借到人民币十万元整", page["text"])
+
+    def test_simultaneous_page_corrections_have_one_winner_and_one_conflict(self):
+        from app import main
+
+        case = self.create_case()
+        document = self.upload_text(case["id"])
+        evidence = self.create_evidence(
+            case["id"], source_document_id=document["id"], quote="今借到人民币十万元整", status="已确认",
+        )
+        get_document = main.get_document
+        barrier = threading.Barrier(2)
+        local = threading.local()
+
+        def read_together(identifier):
+            result = get_document(identifier)
+            if not getattr(local, "initial_read", False):
+                local.initial_read = True
+                barrier.wait(timeout=10)
+            return result
+
+        def save(value):
+            return self.client.patch(
+                f"/api/documents/{document['id']}/pages/1",
+                json={"text": value, "expected_version": document["version"]},
+            )
+
+        with patch.object(main, "get_document", side_effect=read_together), ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(save, ["合成原文修改甲", "合成原文修改乙"]))
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
+        winner = next(response.json() for response in responses if response.status_code == 200)
+        with closing(connect()) as conn:
+            self.assertEqual(conn.execute("SELECT version FROM documents WHERE id=?", (document["id"],)).fetchone()[0], 2)
+            self.assertEqual(conn.execute("SELECT text FROM pages WHERE document_id=?", (document["id"],)).fetchone()[0],
+                             winner["page"]["text"])
+            row = conn.execute("SELECT status,version FROM evidence WHERE id=?", (evidence["id"],)).fetchone()
+            self.assertEqual(tuple(row), ("待复核", 2))
+        self.assertEqual(len(self.audit_rows(case["id"], "纠错原文")), 1)
+        self.assertEqual(len(self.audit_rows(case["id"], "审批失效")), 1)
 
     def test_missing_page_is_reported(self):
         case = self.create_case()
