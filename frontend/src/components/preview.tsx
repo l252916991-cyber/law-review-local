@@ -1,7 +1,8 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { ApiError, api, jsonBody } from "@/lib/api";
-import { message, object, text } from "@/lib/data";
+import { message, object } from "@/lib/data";
+import { objectOf, type PageView } from "@/lib/types";
 import { ErrorBox, useData } from "./ui";
 
 export type PageTarget = { document: number; page: number };
@@ -17,7 +18,7 @@ export function Preview({
   const { data, error, reload } = useData(
     `/api/documents/${target.document}/pages/${target.page}`,
   );
-  const page = data ? object(data) : {};
+  const page = data ? objectOf<PageView>(data) : null;
   const [editing, setEditing] = useState(false),
     [failure, setFailure] = useState(""),
     [notice, setNotice] = useState("");
@@ -25,7 +26,7 @@ export function Preview({
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const expected = Number(page.document_version);
+    const expected = page ? page.document_version : NaN;
     try {
       const result = object(
         await api(
@@ -68,7 +69,7 @@ export function Preview({
       <header>
         <div>
           <span className="eyebrow">原页溯源</span>
-          <h2>{text(page.name) || "卷宗原文"}</h2>
+          <h2>{page?.name || "卷宗原文"}</h2>
         </div>
         <button onClick={close} aria-label="关闭原文">
           ×
@@ -98,7 +99,7 @@ export function Preview({
             <textarea
               name="text"
               required
-              defaultValue={text(page.text)}
+              defaultValue={page?.text ?? ""}
               rows={16}
             />
           </label>
@@ -113,7 +114,7 @@ export function Preview({
           <button className="primary">保存原文</button>
         </form>
       ) : (
-        <pre>{data ? text(page.text) : error ? "" : "正在加载原文…"}</pre>
+        <pre>{page ? page.text : error ? "" : "正在加载原文…"}</pre>
       )}
       <a
         href={`/api/documents/${target.document}/file`}

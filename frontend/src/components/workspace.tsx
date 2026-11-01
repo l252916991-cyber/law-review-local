@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, jsonBody } from "@/lib/api";
 import { id, message, object, text, type Row } from "@/lib/data";
+import { objectOf, rowsOf, type CaseDetail, type CaseRow, type CaseSummary } from "@/lib/types";
 import { Auth } from "./auth";
 import { Chat } from "./chat";
 import { Documents } from "./documents";
@@ -42,7 +43,7 @@ function Shell({
     [create, setCreate] = useState(false),
     [storage, setStorage] = useState<"archived" | "trash" | null>(null),
     [error, setError] = useState("");
-  const allCases = list(cases.data),
+  const allCases = rowsOf<CaseSummary>(cases.data),
     current = allCases.find((row) => row.id === selected) || allCases[0];
   return (
     <div className="workspace">
@@ -67,17 +68,16 @@ function Shell({
         />
         <nav aria-label="案件列表">
           {allCases
-            .filter((row) => text(row.title).includes(search))
+            .filter((row) => row.title.includes(search))
             .map((row) => (
               <button
-                key={id(row.id)}
+                key={row.id}
                 className={row.id === current?.id ? "selected" : ""}
-                onClick={() => select(id(row.id))}
+                onClick={() => select(row.id)}
               >
-                <strong>{text(row.title)}</strong>
+                <strong>{row.title}</strong>
                 <small>
-                  {text(row.case_no) || "未填写案号"} ·{" "}
-                  {text(row.document_count)} 份卷宗
+                  {row.case_no || "未填写案号"} · {row.document_count} 份卷宗
                 </small>
               </button>
             ))}
@@ -175,20 +175,21 @@ function Storage({
   restored: () => void;
 }) {
   const data = useData(`/api/cases/lifecycle/${status}`);
+  const cases = rowsOf<CaseRow>(data.data);
   const [error, setError] = useState("");
   return (
     <Modal title={status === "trash" ? "回收站" : "已归档案卷"} close={close}>
       <ErrorBox error={error || data.error} />
-      {list(data.data).map((row) => (
-        <article className="row" key={id(row.id)}>
+      {cases.map((row) => (
+        <article className="row" key={row.id}>
           <span>
-            {text(row.title)}
-            <small>{text(row.purge_after)}</small>
+            {row.title}
+            <small>{row.purge_after}</small>
           </span>
           <button
             onClick={async () => {
               try {
-                await api(`/api/cases/${id(row.id)}/restore`, jsonBody({}));
+                await api(`/api/cases/${row.id}/restore`, jsonBody({}));
                 restored();
               } catch (e) {
                 setError(message(e));
@@ -199,7 +200,7 @@ function Storage({
           </button>
         </article>
       ))}
-      {!list(data.data).length && <Empty />}
+      {!cases.length && <Empty />}
     </Modal>
   );
 }
@@ -208,11 +209,11 @@ function CaseWorkspace({
   identity,
   refresh,
 }: {
-  caseRow: Row;
+  caseRow: CaseSummary;
   identity: Row;
   refresh: () => void;
 }) {
-  const caseId = id(caseRow.id),
+  const caseId = caseRow.id,
     detail = useData(`/api/cases/${caseId}`),
     audit = useData(`/api/cases/${caseId}/audit`);
   const [view, setView] = useState(() => {
@@ -272,8 +273,8 @@ function CaseWorkspace({
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
   }, []);
-  const record = detail.data ? object(detail.data) : caseRow,
-    metrics = record.metrics ? object(record.metrics) : {};  const roles = identity.roles ? object(identity.roles) : {};
+  const record: CaseDetail | CaseSummary = detail.data ? objectOf<CaseDetail>(detail.data) : caseRow,
+    metrics = "metrics" in record ? record.metrics : null;  const roles = identity.roles ? object(identity.roles) : {};
   const canManageMembers = Boolean(identity.admin) || text(roles[String(caseId)]) === "owner";
   const views: Record<string, string> = {
     overview: "案件总览",
@@ -293,12 +294,12 @@ function CaseWorkspace({
       <header className="topbar">
         <div>
           <span className="eyebrow">
-            {text(record.case_no) || "案件工作空间"}
+            {record.case_no || "案件工作空间"}
           </span>
-          <h1>{text(record.title)}</h1>
+          <h1>{record.title}</h1>
         </div>
         <div>
-          <span className="badge">{text(record.status) || "阅卷中"}</span>
+          <span className="badge">{record.status || "阅卷中"}</span>
           <button onClick={() => setEditing(true)}>修改案件信息</button>
           <button
             aria-label="切换主题"
@@ -342,7 +343,7 @@ function CaseWorkspace({
               <span className="eyebrow">本案阅卷</span>
               <h2>从材料出发，让判断有据可查。</h2>
               <p>
-                {text(record.description) ||
+                {record.description ||
                   "导入卷宗、梳理证据，带着问题回到原文。"}
               </p>
               <button className="primary" onClick={() => setView("chat")}>
@@ -351,15 +352,17 @@ function CaseWorkspace({
               <button onClick={() => setView("documents")}>添加案件材料</button>
             </section>
             <div className="metrics">
-              {Object.entries({
-                documents: "卷宗文件",
-                pages: "卷宗页数",
-                evidence: "证据事项",
-                confirmed: "已确认证据",
-              }).map(([key, label]) => (
+              {(
+                [
+                  ["documents", "卷宗文件"],
+                  ["pages", "卷宗页数"],
+                  ["evidence", "证据事项"],
+                  ["confirmed", "已确认证据"],
+                ] as const
+              ).map(([key, label]) => (
                 <article className="card" key={key}>
                   <span>{label}</span>
-                  <strong>{text(metrics[key]) || "—"}</strong>
+                  <strong>{metrics ? String(metrics[key]) : "—"}</strong>
                 </article>
               ))}
             </div>
@@ -443,7 +446,7 @@ function CaseWorkspace({
                   jsonBody(
                     {
                       ...values(e.currentTarget),
-                      expected_version: Number(record.version),
+                      expected_version: record.version,
                     },
                     "PATCH",
                   ),
@@ -464,7 +467,7 @@ function CaseWorkspace({
                 required
                 minLength={2}
                 maxLength={120}
-                defaultValue={text(record.title)}
+                defaultValue={record.title}
               />
             </label>
             <Fields

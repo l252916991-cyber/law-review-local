@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, jsonBody } from "@/lib/api";
 import { id, object, text, message, type Row } from "@/lib/data";
+import { rowsOf, type DocumentSummary } from "@/lib/types";
 import { ErrorBox, Fields, Modal, Empty, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
 
@@ -22,14 +23,13 @@ export function Documents({
 }) {
   const { data, error, reload } = useData(`/api/cases/${caseId}/documents`);
   const [query, setQuery] = useState(""),
-    [edit, setEdit] = useState<Row | null>(null),
+    [edit, setEdit] = useState<DocumentSummary | null>(null),
     [failure, setFailure] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
-  const documents = list(data).filter((row) =>
-    ["name", "people", "date_range", "doc_type", "summary"].some((key) =>
-      text(row[key]).includes(query),
-    ),
+  const searchable = ["name", "people", "date_range", "doc_type", "summary"] as const;
+  const documents = rowsOf<DocumentSummary>(data).filter((row) =>
+    searchable.some((key) => row[key].includes(query)),
   );
   return (
     <section>
@@ -101,24 +101,24 @@ export function Documents({
           </thead>
           <tbody>
             {documents.map((row) => (
-              <tr key={id(row.id)}>
+              <tr key={row.id}>
                 <td>
                   <button
                     className="text-button"
-                    onClick={() => preview({ document: id(row.id), page: 1 })}
+                    onClick={() => preview({ document: row.id, page: 1 })}
                   >
-                    {text(row.name)}
+                    {row.name}
                   </button>
-                  <small>{text(row.summary)}</small>
+                  <small>{row.summary}</small>
                 </td>
-                <td>{text(row.doc_type)}</td>
+                <td>{row.doc_type}</td>
                 <td>
-                  {text(row.people)}
-                  <small>{text(row.date_range)}</small>
+                  {row.people}
+                  <small>{row.date_range}</small>
                 </td>
-                <td>{text(row.pages)}</td>
+                <td>{row.pages}</td>
                 <td>
-                  <span className="badge">{text(row.status)}</span>
+                  <span className="badge">{row.status}</span>
                 </td>
                 <td>
                   <button onClick={() => setEdit(row)}>校准目录</button>
@@ -142,14 +142,9 @@ export function Documents({
               try {
                 const changes = values(e.currentTarget);
                 await api(
-                  `/api/documents/${id(edit.id)}/directory`,
+                  `/api/documents/${edit.id}/directory`,
                   jsonBody(
-                    {
-                      ...changes,
-                      ...(edit.version
-                        ? { expected_version: Number(edit.version) }
-                        : {}),
-                    },
+                    { ...changes, expected_version: edit.version },
                     "PATCH",
                   ),
                 );

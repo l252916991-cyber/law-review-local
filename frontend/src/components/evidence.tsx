@@ -2,6 +2,14 @@
 import { useState } from "react";
 import { ApiError, api, jsonBody } from "@/lib/api";
 import { id, message, object, text, type Row } from "@/lib/data";
+import {
+  objectOf,
+  rowsOf,
+  type DocumentSummary,
+  type EvidenceItem,
+  type EvidenceList,
+  type EvidenceRelation,
+} from "@/lib/types";
 import { Empty, ErrorBox, Modal, list, useData, values } from "./ui";
 import type { PageTarget } from "./preview";
 import { materialTimeline } from "@/lib/timeline";
@@ -59,9 +67,10 @@ export function Evidence({
     [filter, setFilter] = useState(""),
     [busy, setBusy] = useState(false),
     [highlight, setHighlight] = useState<number | null>(null);
-  const result = data.data ? object(data.data) : {},
-    items = list(result.evidence),
-    relations = list(result.relations),
+  const result = data.data ? objectOf<EvidenceList>(data.data) : null,
+    items = rowsOf<EvidenceItem>(result?.evidence),
+    relations = rowsOf<EvidenceRelation>(result?.relations),
+    documentRows = rowsOf<DocumentSummary>(documents.data),
     gapData = gaps.data ? object(gaps.data) : {};
   async function perform(path: string, method = "POST") {
     setBusy(true);
@@ -255,7 +264,7 @@ export function Evidence({
         <p>
           按来源卷宗所载日期排列，保留时间范围精度；未记录日期的不推断为事实发生时间。
         </p>
-        {materialTimeline(items, list(documents.data)).map((item) => (
+        {materialTimeline(items, documentRows).map((item) => (
           <div className="row" key={id(item.evidence.id)}>
             <time>{item.dateRange || "未记录日期"}</time>
             <span>
@@ -378,7 +387,7 @@ export function Evidence({
                   defaultValue={text(edit.source_document_id)}
                 >
                   <option value="">无来源卷宗</option>
-                  {list(documents.data).map((row) => (
+                  {documentRows.map((row) => (
                     <option value={id(row.id)} key={id(row.id)}>
                       {text(row.name)}
                     </option>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, jsonBody } from "@/lib/api";
 import { id, message, object, text, type Row } from "@/lib/data";
+import { objectOf, rowsOf, type AgentRunTrace, type AgentStep } from "@/lib/types";
 import { Citations } from "./chat";
 import { Usage } from "./metrics";
 import { ErrorBox, Empty, list, useData } from "./ui";
@@ -9,26 +10,26 @@ import type { PageTarget } from "./preview";
 
 export function Trace({ runId }: { runId: number }) {
   const data = useData(`/api/agent-runs/${runId}`);
-  const run = data.data ? object(data.data) : {};
+  const run = data.data ? objectOf<AgentRunTrace>(data.data) : null;
   return (
     <section className="card" aria-label="执行轨迹">
       <header>
         <h2>任务 #{runId} 执行轨迹</h2>
-        <span className="badge">{text(run.status)}</span>
+        <span className="badge">{run?.status}</span>
       </header>
       <ErrorBox error={data.error} />
       <p>仅展示节点结果、调用信息和失败原因，不展示隐藏思维链。</p>
-      {list(run.steps).map((step, index) => {
-        const output = step.output ? object(step.output) : {},
-          input = step.input ? object(step.input) : {};
+      {rowsOf<AgentStep>(run?.steps).map((step, index) => {
+        const output = object(step.output),
+          input = object(step.input);
         const tools = output.tools ? object(output.tools) : {},
           route = output.model_route ? object(output.model_route) : {};
         return (
           <details className="trace-step" key={index}>
             <summary>
               <span className="badge">{index + 1}</span>{" "}
-              {text(step.role || step.agent_role || step.node_name)} ·{" "}
-              {text(step.latency_ms)}ms · {text(step.status)}
+              {step.agent_role || step.node_name} · {step.latency_ms}ms ·{" "}
+              {step.status}
             </summary>
             <p>{text(output.summary)}</p>
             <dl>
@@ -40,7 +41,7 @@ export function Trace({ runId }: { runId: number }) {
               </dd>
               <dt>失败 / 校验</dt>
               <dd>
-                {text(step.error || output.error) ||
+                {text(output.error) ||
                   (output.diagnostic
                     ? text(object(output.diagnostic).code)
                     : "") ||
@@ -68,7 +69,7 @@ export function Trace({ runId }: { runId: number }) {
           </details>
         );
       })}
-      {run.usage ? <Usage summary={object(run.usage)} /> : null}
+      {run?.usage ? <Usage summary={run.usage} /> : null}
     </section>
   );
 }

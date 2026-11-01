@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError, jsonBody, type ChatRequest } from "@/lib/api";
 import { consumeStream } from "@/lib/stream";
 import { id, text, rows, message, type Row } from "@/lib/data";
+import { rowsOf, type ConversationSummary } from "@/lib/types";
 import { ErrorBox, Empty, list, useData } from "./ui";
 import type { PageTarget } from "./preview";
 
@@ -60,13 +61,13 @@ export function Chat({
           ＋ 新建问答
         </button>
         <ErrorBox error={conversations.error || error} />
-        {list(conversations.data).map((row) => (
-          <div key={id(row.id)}>
+        {rowsOf<ConversationSummary>(conversations.data).map((row) => (
+          <div key={row.id}>
             <button
               className={conversation === row.id ? "selected" : ""}
-              onClick={() => setConversation(id(row.id))}
+              onClick={() => setConversation(row.id)}
             >
-              {text(row.title) || `会话 ${row.id}`}
+              {row.title || `会话 ${row.id}`}
               {row.archived ? " · 已归档" : ""}
             </button>
             {!row.archived && (
@@ -75,7 +76,7 @@ export function Chat({
                 onClick={async () => {
                   try {
                     await api(
-                      `/api/conversations/${id(row.id)}/archive`,
+                      `/api/conversations/${row.id}/archive`,
                       jsonBody({}),
                     );
                     conversations.reload();

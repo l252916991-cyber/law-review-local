@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { id, text } from "@/lib/data";
-import { Empty, ErrorBox, list, useData } from "./ui";
+import { rowsOf, type SearchHit } from "@/lib/types";
+import { Empty, ErrorBox, useData } from "./ui";
 import type { PageTarget } from "./preview";
 
 export function Search({
@@ -18,6 +18,7 @@ export function Search({
       ? `/api/cases/${caseId}/search?q=${encodeURIComponent(submitted)}`
       : null,
   );
+  const hits = rowsOf<SearchHit>(data.data);
   return (
     <section>
       <header>
@@ -43,26 +44,22 @@ export function Search({
         <button className="primary">搜索卷宗原文</button>
       </form>
       <ErrorBox error={data.error} />
-      {list(data.data).map((row, index) => (
-        <article className="card" key={index}>
+      {hits.map((hit) => (
+        <article className="card" key={hit.page_id}>
           <h3>
-            {text(row.name || row.document_name)} · 第{" "}
-            {text(row.page_no || row.page)} 页
+            {hit.name} · 第 {hit.page_no} 页
           </h3>
-          <p className="answer">{text(row.text || row.quote)}</p>
+          <p className="answer">{hit.text}</p>
           <button
             onClick={() =>
-              preview({
-                document: id(row.document_id),
-                page: id(row.page_no || row.page),
-              })
+              preview({ document: hit.document_id, page: hit.page_no })
             }
           >
             查看原页
           </button>
         </article>
       ))}
-      {submitted && !list(data.data).length && (
+      {submitted && !hits.length && (
         <Empty>{data.data ? "没有找到匹配材料" : "正在检索…"}</Empty>
       )}
     </section>
