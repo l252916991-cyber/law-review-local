@@ -29,6 +29,10 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
 - 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`。旧版 `app/static/` 前端已于 2026-11-01 删除，不再有对应门禁。详见[前端运行手册](frontend.md)。
 
+## 已知偶发失败
+
+`tests/test_eval_transport_faults.py::test_all_four_real_faults_fail_closed_on_both_client_paths` 用 0.35 秒的评测任务截止模拟超时。机器负载高（例如同时跑另一套测试或浏览器用例）时，子进程偶尔来不及到达注入点，`injection_reached_generation` 为假导致失败；单独重跑通过。它验证的是评测器的故障分类，不涉及产品请求路径。出现时先在空闲机器上单独重跑，不要放宽断言或延长截止时间来掩盖。
+
 ## 真实页面流程验证
 
 2026-10-25 起，`scripts/page_flow_check.py` 是当前 Playwright 验收的兼容入口：启动隔离 FastAPI、合成数据与模型测试替身，加载当前静态构建。保留 flow 名称，计数与历史 CDP 步骤数不可互换；`--data-dir` 不再复用数据。先安装锁定前端依赖并 `pnpm --dir frontend build:static`，浏览器通过 `--browser`、`LEXVAULT_BROWSER_PATH` 或 Playwright Chromium 指定。历史 CDP 驱动保留为工具源码，正式 UI 不使用旧 DOM 流程。

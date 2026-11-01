@@ -36,7 +36,7 @@
 | 编排 | 原生 DAG + LangGraph（SQLite checkpoint），共享 `SubAgentSpec` |
 | 检索 | 关键词 BM25 类打分 + 本地 embedding + RRF 融合，结果带 `page_text_sha256` |
 | 生成 | OpenAI 兼容本地端点（`/v1/chat/completions`），仅回环端点，禁重定向 |
-| 前端 | Next.js 静态构建，由 FastAPI 托管，Playwright 端到端 |
+| 前端 | Next.js 静态构建，由 FastAPI 托管，Playwright 端到端；核心实体类型由后端 OpenAPI 生成 |
 | 质量 | pytest + 覆盖率门禁、ruff、mypy（脚本）、离线可复算的评分与盲审包 |
 | 实验 | 三组 A/B/C 隔离驱动（`app/collaboration_ablation.py`），逐题冻结提示与账本 |
 
@@ -75,17 +75,21 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-01，提交 `639fee8`；v0.4.0 相对该提交只改了文档）
+## 4.1 质量基线（2026-11-02，提交 `0d3eb77`；之后只改了文档）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1618 passed / 0 failed / 8 skipped，综合覆盖率 86.68%（分支 79.21%）；Python 3.14.6：1618 passed / 0 failed / 8 skipped，86.79%（分支 79.36%）；跳过项为私有 LawBench 数据 7 项与 Apple 专用 `mlx_lm` 1 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1659 passed / 0 failed / 8 skipped，综合覆盖率 87.50%（分支 79.83%）；Python 3.14.6：1659 passed / 0 failed / 8 skipped，87.61%（分支 79.98%）；跳过项为私有 LawBench 数据 7 项与 Apple 专用 `mlx_lm` 1 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
-| 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 11 项、`build`/`build:static` 通过；e2e 见下方说明 |
+| 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 13 项、`build`/`build:static` 通过；e2e 见下方说明 |
+| 接口类型 | 11 个核心读接口声明 Pydantic 响应模型，改动前后在演示库上的响应逐字段相同；前端核心组件改用生成的 TypeScript 类型 |
+| 重点模块 | 法条核验 `statutory_retrieval.py` 行与分支覆盖率 100%；会话接口 `routes/chat.py` 85% |
 | 容器交付 | 2026-10-28 在本机用指定基础镜像构建并通过真实 HTTP 验收；CI 的 delivery 工作流每次提交从发布包构建镜像并跑离线冒烟 |
 | 本机五人技术试点 | 旧库 v13→26 副本迁移与旧程序回退、五身份 140 次 API 与 5 个浏览器上下文 111 次请求、固定容量门槛、合成扫描件 OCR、真实模型固定事实检查（2026-10-29） |
 
-e2e 说明：2026-11-01 在云端 Linux 用系统 Chrome for Testing 153 运行时 28 项通过、1 项（桌面与手机两个项目）失败，失败点是导出下载的建议文件名为 `download` 而非 `*.zip`；同一测试在本次改动之前的代码上同样失败，属于浏览器与运行环境差异，以 GitHub Actions 的 Playwright Chromium 结果为准。
+e2e 说明：GitHub Actions（Playwright Chromium）上全部通过。云端 Linux 用系统 Chrome for Testing 153 运行时，导出下载的建议文件名是 `download` 而非 `*.zip`，这一项在改动前后都失败，属于浏览器环境差异，其余 28 项通过。
+
+已知偶发失败：`tests/test_eval_transport_faults.py` 用 0.35 秒的任务截止模拟超时，机器负载高时偶尔来不及到达注入点而失败，单独重跑通过；它测的是评测器的故障分类，不涉及产品路径。
 
 ## 4.2 三组对照实测（Qwen3.8-27B）
 
