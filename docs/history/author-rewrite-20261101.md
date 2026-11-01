@@ -4,6 +4,7 @@
 - 范围：本地 Git 基线（2026-10-23）之后、合并进 `main` 的全部 176 个提交。
 - 改动：作者与提交者 `Codex <codex@local.invalid>` 统一改为 `刘勇 <311464897+l252916991-cyber@users.noreply.github.com>`；文件内容、提交时间与提交说明不变。
 - 工具：`git filter-repo --mailmap`，映射只有一行，不触及其他身份。
+- 同日在 Claude 协助下完成的整理提交（合并、lint、拆分、文档等）作者同样记为维护者，每条提交说明末尾保留 `Co-Authored-By: Claude` 署名。
 
 ## 为什么改
 

@@ -75,11 +75,11 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（截至 2026-11-01，提交 `{{COMMIT}}`）
+## 4.1 质量基线（2026-11-01，提交 `639fee8`；v0.4.0 相对该提交只改了文档）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11：{{T311}}；Python 3.14：{{T314}}；门槛 70% |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1618 passed / 0 failed / 8 skipped，综合覆盖率 86.68%（分支 79.21%）；Python 3.14.6：1618 passed / 0 failed / 8 skipped，86.79%（分支 79.36%）；跳过项为私有 LawBench 数据 7 项与 Apple 专用 `mlx_lm` 1 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 11 项、`build`/`build:static` 通过；e2e 见下方说明 |
 | 容器交付 | 2026-10-28 在本机用指定基础镜像构建并通过真实 HTTP 验收；CI 的 delivery 工作流每次提交从发布包构建镜像并跑离线冒烟 |
