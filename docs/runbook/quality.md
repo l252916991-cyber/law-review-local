@@ -22,6 +22,10 @@ M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --lo
 
 输出真实 `junit.xml`、pytest 日志、覆盖率 XML/JSON/HTML；任何测试失败或分支覆盖率低于 70 都阻止通过，失败报告也上传。未在托管环境实际运行前，不能把本地验证表述为远程 CI 已通过。
 
+## PostgreSQL 与答案质量门禁
+
+CI 的 `postgres` 任务用 PostgreSQL 16 + pgvector 再跑一遍同一套离线测试（每个测试一个新库，测 SQLite 文件本身的用例标 `sqlite_only`），并在 PostgreSQL 上运行答案质量门禁；`test` 任务在 SQLite 上运行门禁。门禁口径见[答案质量门禁](eval-gate.md)，后端差异见 [PostgreSQL 后端](postgresql.md)。
+
 ## 渐进质量范围
 
 - Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行 `E9`（语法）、`F`（Pyflakes：未使用/未定义名、重复定义、无用赋值）、`I`（导入排序）、`UP`（按 Python 3.11 升级语法）与 `B`（bugbear）；测试目录对 `F811` 例外，因为从兄弟模块导入的 pytest fixture 会以同名参数注入。`B905`（zip 未指定 strict）与 `B023`（循环内闭包）暂不启用：前者需要逐处评估截断语义，后者经 2026-11-01 逐处核对均在同一轮迭代内调用。FastAPI 的 `File()`/`Body()` 等默认参数登记为不可变调用。

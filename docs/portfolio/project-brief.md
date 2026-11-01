@@ -32,7 +32,7 @@
 
 | 层 | 选型 |
 |---|---|
-| 服务 | FastAPI + Uvicorn，SQLite（WAL），单实例本地/受控内网 |
+| 服务 | FastAPI + Uvicorn，SQLite（WAL，默认）或 PostgreSQL 16 + pgvector，单实例本地/受控内网 |
 | 编排 | 原生 DAG + LangGraph（SQLite checkpoint），共享 `SubAgentSpec` |
 | 检索 | 关键词 BM25 类打分 + 本地 embedding + RRF 融合，结果带 `page_text_sha256` |
 | 生成 | OpenAI 兼容本地端点（`/v1/chat/completions`），仅回环端点，禁重定向 |
@@ -75,11 +75,13 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-02，提交 `a25792a`；之后只改了文档）
+## 4.1 质量基线（2026-11-02，提交 `178eff3`；之后只改了文档）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1663 passed / 0 failed / 8 skipped，综合覆盖率 87.69%（分支 79.92%）；Python 3.14.6：1663 passed / 0 failed / 8 skipped，87.80%（分支 80.07%）；跳过项为私有 LawBench 数据 7 项与 Apple 专用 `mlx_lm` 1 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1691 passed / 0 failed / 18 skipped，综合覆盖率 86.77%（分支 78.84%）；Python 3.14.6：1691 passed / 0 failed / 18 skipped，86.87%（分支 78.98%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 10 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1701 passed / 0 failed / 8 skipped，覆盖率 87.76%（分支 79.98%）；每个测试一个新库，约 300 个测试在测试体内实际连到 PostgreSQL；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 答案质量门禁 | 60 题冻结评测集，规则模式 44/60 通过；SQLite 与 PostgreSQL 逐题结果一致（59 题回答与引用逐字相同，1 题两条引用先后不同）；CI 每次推送运行，退化即阻断 |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 13 项、`build`/`build:static` 通过；e2e 见下方说明 |
 | 接口类型 | 11 个核心读接口声明 Pydantic 响应模型，改动前后在演示库上的响应逐字段相同；前端核心组件改用生成的 TypeScript 类型；材料接口不返回服务器存储路径，由遍历全部 GET 接口与导出包的测试守住 |
