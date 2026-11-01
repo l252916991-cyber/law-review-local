@@ -736,7 +736,7 @@ class AccessControlTests(unittest.TestCase):
         opener = MagicMock()
         opener.open.return_value = response
         with patch.dict(os.environ, {"LAW_REVIEW_MODEL_LOOPBACK_HOST": "host.docker.internal"}), patch(
-            "app.main.urllib.request.build_opener", return_value=opener
+            "app.routes.system.urllib.request.build_opener", return_value=opener
         ):
             result = self.client.post(
                 "/api/model-config/test",
@@ -750,7 +750,7 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(request.full_url, "http://host.docker.internal:8000/v1/models")
 
     def test_model_detection_rejects_loopback_prefix_hostname(self):
-        with patch("app.main.urllib.request.build_opener") as build_opener:
+        with patch("app.routes.system.urllib.request.build_opener") as build_opener:
             result = self.client.post(
                 "/api/model-config/test",
                 headers={"Authorization": f"Bearer {self.admin_token}"},

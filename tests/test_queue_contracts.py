@@ -36,7 +36,7 @@ class QueueContractTests(unittest.TestCase):
         self.db_context.__enter__()
         self.addCleanup(self.db_context.__exit__, None, None, None)
         self.pool = SimpleNamespace(ping=AsyncMock(return_value=True), aclose=AsyncMock())
-        self.pool_patch = patch("app.main.get_redis_pool", AsyncMock(return_value=self.pool))
+        self.pool_patch = patch("app.routes.common.get_redis_pool", AsyncMock(return_value=self.pool))
         self.pool_patch.start()
         self.addCleanup(self.pool_patch.stop)
         self.queue_server = FakeServer()
@@ -54,7 +54,7 @@ class QueueContractTests(unittest.TestCase):
 
     def _stage_batch(self, count=2):
         queued = AsyncMock(return_value="test-job")
-        with patch("app.main.enqueue_batch_import", queued):
+        with patch("app.routes.documents.enqueue_batch_import", queued):
             response = self.client.post(
                 f"/api/cases/{self.case_id}/batch-import",
                 files=[("files", (f"file-{i}.txt", f"文件 {i} 内容", "text/plain")) for i in range(count)],
@@ -75,7 +75,7 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(self.pool.aclose.await_count, 4)
 
     def test_readiness_database_failure_and_not_started(self):
-        with patch('app.main.sqlite3.connect', side_effect=RuntimeError('private database path')):
+        with patch('app.routes.system.sqlite3.connect', side_effect=RuntimeError('private database path')):
             response = self.client.get('/api/system/health')
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()['database'], 'unavailable')
@@ -86,7 +86,7 @@ class QueueContractTests(unittest.TestCase):
 
     def test_readiness_does_not_create_missing_database(self):
         missing = Path(self.directory.name) / 'missing.db'
-        with patch('app.main.get_db_path', return_value=missing):
+        with patch('app.routes.system.get_db_path', return_value=missing):
             self.assertEqual(self.client.get('/api/system/health').status_code, 503)
         self.assertFalse(missing.exists())
 
@@ -126,7 +126,7 @@ class QueueContractTests(unittest.TestCase):
         async def run():
             for error in [TimeoutError(), asyncio.CancelledError()]:
                 pool = SimpleNamespace(ping=AsyncMock(side_effect=error), aclose=AsyncMock())
-                with patch('app.main.get_redis_pool', AsyncMock(return_value=pool)):
+                with patch('app.routes.common.get_redis_pool', AsyncMock(return_value=pool)):
                     if isinstance(error, asyncio.CancelledError):
                         with self.assertRaises(asyncio.CancelledError):
                             await probe_redis()
@@ -160,7 +160,7 @@ class QueueContractTests(unittest.TestCase):
         asyncio.run(run())
 
     def test_unconfirmed_enqueue_keeps_dispatch_pending_and_redispatches(self):
-        with patch("app.main.enqueue_batch_import", AsyncMock(side_effect=ConnectionError("offline"))):
+        with patch("app.routes.documents.enqueue_batch_import", AsyncMock(side_effect=ConnectionError("offline"))):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import",
                                         files=[("files", ("test.txt", "内容", "text/plain"))])
         self.assertEqual(response.status_code, 202, response.text)
@@ -300,7 +300,7 @@ class QueueContractTests(unittest.TestCase):
                 conn.execute("UPDATE batch_imports SET status='processing' WHERE id=?", (batch_id,))
             raise ConnectionError("acknowledgment lost")
 
-        with patch("app.main.enqueue_batch_import", accepted_but_lost_ack):
+        with patch("app.routes.documents.enqueue_batch_import", accepted_but_lost_ack):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import",
                                         files=[("files", ("test.txt", "内容", "text/plain"))])
         self.assertEqual(response.status_code, 202)
@@ -309,7 +309,7 @@ class QueueContractTests(unittest.TestCase):
 
     def test_batch_aggregate_oversize_cleans_all_staging(self):
         queued = AsyncMock()
-        with patch.object(config, "max_upload_total_size", 5), patch("app.main.enqueue_batch_import", queued):
+        with patch.object(config, "max_upload_total_size", 5), patch("app.routes.documents.enqueue_batch_import", queued):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import", files=[
                 ("files", ("a.txt", b"123", "text/plain")), ("files", ("b.txt", b"456", "text/plain")),
             ])

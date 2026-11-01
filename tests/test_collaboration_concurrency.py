@@ -241,14 +241,14 @@ class MaterialCorrectionTest(CollaborationTestCase):
         self.assertIn("今借到人民币十万元整", page["text"])
 
     def test_simultaneous_page_corrections_have_one_winner_and_one_conflict(self):
-        from app import main
+        from app.routes import documents as document_routes
 
         case = self.create_case()
         document = self.upload_text(case["id"])
         evidence = self.create_evidence(
             case["id"], source_document_id=document["id"], quote="今借到人民币十万元整", status="已确认",
         )
-        get_document = main.get_document
+        get_document = document_routes.get_document
         barrier = threading.Barrier(2)
         local = threading.local()
 
@@ -265,7 +265,7 @@ class MaterialCorrectionTest(CollaborationTestCase):
                 json={"text": value, "expected_version": document["version"]},
             )
 
-        with patch.object(main, "get_document", side_effect=read_together), ThreadPoolExecutor(max_workers=2) as pool:
+        with patch.object(document_routes, "get_document", side_effect=read_together), ThreadPoolExecutor(max_workers=2) as pool:
             responses = list(pool.map(save, ["合成原文修改甲", "合成原文修改乙"]))
         self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
         winner = next(response.json() for response in responses if response.status_code == 200)

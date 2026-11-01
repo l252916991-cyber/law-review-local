@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app import main as main_module
 from app import services
 from app.chat_idempotency import (
     CANCELLED,
@@ -28,6 +27,7 @@ from app.chat_idempotency import (
 )
 from app.db import connect, db_scope, init_db
 from app.main import app
+from app.routes import chat as chat_routes
 from app.services import read_sse_with_deadline
 
 
@@ -345,7 +345,7 @@ class ChatStreamEndpointTests(unittest.TestCase):
                 "citation_check": "passed",
             }
 
-        with patch.object(main_module, "chat", side_effect=fake_chat):
+        with patch.object(chat_routes, "chat", side_effect=fake_chat):
             events = self._stream({"question": "测试流式", "use_llm": True, "use_remote_embeddings": False})
         kinds = [kind for kind, _ in events]
         self.assertEqual(
@@ -367,7 +367,7 @@ class ChatStreamEndpointTests(unittest.TestCase):
             kwargs["on_token"]("SECRET-DRAFT")
             raise RuntimeError("model_output_failed_validation")
 
-        with patch.object(main_module, "chat", side_effect=failing_chat):
+        with patch.object(chat_routes, "chat", side_effect=failing_chat):
             events = self._stream({"question": "测试撤回", "use_llm": True, "use_remote_embeddings": False})
         kinds = [kind for kind, _ in events]
         self.assertEqual(kinds, ["status", "token", "retract", "done"])
@@ -570,9 +570,9 @@ class ChatCancellationTests(unittest.TestCase):
         before = self._counts()
 
         async def drain() -> list:
-            response = await main_module.case_chat_stream(
+            response = await chat_routes.case_chat_stream(
                 1,
-                main_module.ChatRequest(
+                chat_routes.ChatRequest(
                     question="异步取消验证", use_llm=True, use_remote_embeddings=False,
                     request_id=request_id,
                 ),
@@ -580,7 +580,7 @@ class ChatCancellationTests(unittest.TestCase):
             )
             return [chunk async for chunk in response.body_iterator]
 
-        with patch.object(main_module, "chat", side_effect=blocked_chat):
+        with patch.object(chat_routes, "chat", side_effect=blocked_chat):
             asyncio.run(drain())
 
         deadline = time.monotonic() + 10

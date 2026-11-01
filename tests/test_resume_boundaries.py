@@ -93,7 +93,7 @@ class ResumeBoundaryTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             self.assertIn("案件摘要.md", archive.namelist())
             self.assertNotIn("其他案件秘密", archive.read("案件摘要.md").decode())
-        with patch("app.main.build_export_package", side_effect=AssertionError("must not export another case")):
+        with patch("app.routes.exports.build_export_package", side_effect=AssertionError("must not export another case")):
             denied = self.client.get(f"/api/cases/{self.other_case}/export", headers=self.headers)
         self.assertEqual(denied.status_code, 404)
 

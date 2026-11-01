@@ -163,7 +163,7 @@ class APIContractTest(IsolatedDatabaseTestCase):
         queued = AsyncMock(return_value="job-1")
         # This tests filename staging, not a real Redis connection. The full
         # offline suite intentionally blocks Redis during application startup.
-        with patch("app.main.enqueue_batch_import", queued), patch.object(app.state, "redis_available", True):
+        with patch("app.routes.documents.enqueue_batch_import", queued), patch.object(app.state, "redis_available", True):
             response = self.client.post(
                 "/api/cases/1/batch-import",
                 files=[("files", ("../../逃逸.txt", "批量内容", "text/plain"))],
