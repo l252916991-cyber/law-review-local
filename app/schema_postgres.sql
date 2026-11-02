@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS lexvault_schema_meta (
 
 -- SQLite functions that application SQL calls directly.
 CREATE OR REPLACE FUNCTION datetime(value TEXT, modifier TEXT) RETURNS TEXT
-    LANGUAGE sql STABLE AS $$
+    LANGUAGE sql STABLE PARALLEL SAFE AS $$
     SELECT to_char(CASE WHEN modifier = 'localtime' THEN localtimestamp ELSE now() AT TIME ZONE 'UTC' END,
                    'YYYY-MM-DD HH24:MI:SS')
     WHERE value = 'now'
@@ -694,146 +694,150 @@ ALTER TABLE embedding_cache ADD COLUMN IF NOT EXISTS embedding vector
     GENERATED ALWAYS AS (CASE WHEN vector_json IN ('', '[]') THEN NULL ELSE vector_json::vector END) STORED;
 
 
-CREATE OR REPLACE FUNCTION lexvault_case_visible(target BIGINT) RETURNS boolean
-    LANGUAGE sql STABLE AS $$
-    SELECT coalesce(current_setting('lexvault.system', true), '') = 'on'
-        OR NOT EXISTS (SELECT 1 FROM case_walls w WHERE w.case_id = target)
-        OR EXISTS (SELECT 1 FROM case_wall_insiders i
-                   WHERE i.case_id = target AND i.principal_name = current_setting('lexvault.actor', true))
-        OR EXISTS (SELECT 1 FROM case_wall_grants g
-                   WHERE g.case_id = target AND g.principal_name = current_setting('lexvault.actor', true)
-                     AND g.expires_at > extract(epoch FROM now()))
+-- Walled cases hidden from the current connection's identity. Policies wrap the
+-- call in a scalar subquery, so it runs once per statement, not once per row.
+CREATE OR REPLACE FUNCTION lexvault_hidden_cases() RETURNS bigint[]
+    LANGUAGE sql STABLE PARALLEL SAFE AS $$
+    SELECT CASE WHEN coalesce(current_setting('lexvault.system', true), '') = 'on' THEN '{}'::bigint[]
+           ELSE coalesce(array_agg(w.case_id), '{}'::bigint[]) END
+    FROM case_walls w
+    WHERE NOT EXISTS (SELECT 1 FROM case_wall_insiders i
+                      WHERE i.case_id = w.case_id AND i.principal_name = current_setting('lexvault.actor', true))
+      AND NOT EXISTS (SELECT 1 FROM case_wall_grants g
+                      WHERE g.case_id = w.case_id AND g.principal_name = current_setting('lexvault.actor', true)
+                        AND g.expires_at > extract(epoch FROM now()))
 $$;
+DROP FUNCTION IF EXISTS lexvault_case_visible(BIGINT);
 
 ALTER TABLE agent_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_runs FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON agent_runs;
-CREATE POLICY lexvault_wall ON agent_runs USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON agent_runs USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE agent_steps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_steps FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON agent_steps;
-CREATE POLICY lexvault_wall ON agent_steps USING (run_id IS NULL OR EXISTS (SELECT 1 FROM agent_runs p WHERE p.id = agent_steps.run_id));
+CREATE POLICY lexvault_wall ON agent_steps USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR run_id IS NULL OR EXISTS (SELECT 1 FROM agent_runs p WHERE p.id = agent_steps.run_id));
 ALTER TABLE bank_transaction_relations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bank_transaction_relations FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON bank_transaction_relations;
-CREATE POLICY lexvault_wall ON bank_transaction_relations USING (evidence_id IS NULL OR EXISTS (SELECT 1 FROM evidence p WHERE p.id = bank_transaction_relations.evidence_id));
+CREATE POLICY lexvault_wall ON bank_transaction_relations USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR evidence_id IS NULL OR EXISTS (SELECT 1 FROM evidence p WHERE p.id = bank_transaction_relations.evidence_id));
 ALTER TABLE bank_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bank_transactions FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON bank_transactions;
-CREATE POLICY lexvault_wall ON bank_transactions USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON bank_transactions USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE batch_dispatch ENABLE ROW LEVEL SECURITY;
 ALTER TABLE batch_dispatch FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON batch_dispatch;
-CREATE POLICY lexvault_wall ON batch_dispatch USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON batch_dispatch USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE batch_import_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE batch_import_files FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON batch_import_files;
-CREATE POLICY lexvault_wall ON batch_import_files USING (batch_id IS NULL OR EXISTS (SELECT 1 FROM batch_imports p WHERE p.id = batch_import_files.batch_id));
+CREATE POLICY lexvault_wall ON batch_import_files USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR batch_id IS NULL OR EXISTS (SELECT 1 FROM batch_imports p WHERE p.id = batch_import_files.batch_id));
 ALTER TABLE batch_imports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE batch_imports FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON batch_imports;
-CREATE POLICY lexvault_wall ON batch_imports USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON batch_imports USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE case_report_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_report_events FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON case_report_events;
-CREATE POLICY lexvault_wall ON case_report_events USING (report_id IS NULL OR EXISTS (SELECT 1 FROM case_reports p WHERE p.id = case_report_events.report_id));
+CREATE POLICY lexvault_wall ON case_report_events USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR report_id IS NULL OR EXISTS (SELECT 1 FROM case_reports p WHERE p.id = case_report_events.report_id));
 ALTER TABLE case_report_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_report_versions FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON case_report_versions;
-CREATE POLICY lexvault_wall ON case_report_versions USING (report_id IS NULL OR EXISTS (SELECT 1 FROM case_reports p WHERE p.id = case_report_versions.report_id));
+CREATE POLICY lexvault_wall ON case_report_versions USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR report_id IS NULL OR EXISTS (SELECT 1 FROM case_reports p WHERE p.id = case_report_versions.report_id));
 ALTER TABLE case_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_reports FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON case_reports;
-CREATE POLICY lexvault_wall ON case_reports USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON case_reports USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE cases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cases FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON cases;
-CREATE POLICY lexvault_wall ON cases USING (lexvault_case_visible(id));
+CREATE POLICY lexvault_wall ON cases USING (NOT (id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE chat_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_requests FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON chat_requests;
-CREATE POLICY lexvault_wall ON chat_requests USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON chat_requests USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON conversations;
-CREATE POLICY lexvault_wall ON conversations USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON conversations USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON documents;
-CREATE POLICY lexvault_wall ON documents USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON documents USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE embedding_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE embedding_cache FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON embedding_cache;
-CREATE POLICY lexvault_wall ON embedding_cache USING (page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = embedding_cache.page_id));
+CREATE POLICY lexvault_wall ON embedding_cache USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = embedding_cache.page_id));
 ALTER TABLE evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON evidence;
-CREATE POLICY lexvault_wall ON evidence USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON evidence USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE evidence_annotations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_annotations FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON evidence_annotations;
-CREATE POLICY lexvault_wall ON evidence_annotations USING (evidence_id IS NULL OR EXISTS (SELECT 1 FROM evidence p WHERE p.id = evidence_annotations.evidence_id));
+CREATE POLICY lexvault_wall ON evidence_annotations USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR evidence_id IS NULL OR EXISTS (SELECT 1 FROM evidence p WHERE p.id = evidence_annotations.evidence_id));
 ALTER TABLE evidence_relations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_relations FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON evidence_relations;
-CREATE POLICY lexvault_wall ON evidence_relations USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON evidence_relations USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE gap_detections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gap_detections FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON gap_detections;
-CREATE POLICY lexvault_wall ON gap_detections USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON gap_detections USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE host_runtime_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE host_runtime_links FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON host_runtime_links;
-CREATE POLICY lexvault_wall ON host_runtime_links USING (conversation_id IS NULL OR EXISTS (SELECT 1 FROM conversations p WHERE p.id = host_runtime_links.conversation_id));
+CREATE POLICY lexvault_wall ON host_runtime_links USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR conversation_id IS NULL OR EXISTS (SELECT 1 FROM conversations p WHERE p.id = host_runtime_links.conversation_id));
 ALTER TABLE host_write_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE host_write_receipts FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON host_write_receipts;
-CREATE POLICY lexvault_wall ON host_write_receipts USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON host_write_receipts USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE llm_calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE llm_calls FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON llm_calls;
-CREATE POLICY lexvault_wall ON llm_calls USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON llm_calls USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON memories;
-CREATE POLICY lexvault_wall ON memories USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON memories USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON messages;
-CREATE POLICY lexvault_wall ON messages USING (conversation_id IS NULL OR EXISTS (SELECT 1 FROM conversations p WHERE p.id = messages.conversation_id));
+CREATE POLICY lexvault_wall ON messages USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR conversation_id IS NULL OR EXISTS (SELECT 1 FROM conversations p WHERE p.id = messages.conversation_id));
 ALTER TABLE page_child_chunks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE page_child_chunks FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON page_child_chunks;
-CREATE POLICY lexvault_wall ON page_child_chunks USING (page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = page_child_chunks.page_id));
+CREATE POLICY lexvault_wall ON page_child_chunks USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = page_child_chunks.page_id));
 ALTER TABLE page_child_index_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE page_child_index_state FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON page_child_index_state;
-CREATE POLICY lexvault_wall ON page_child_index_state USING (page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = page_child_index_state.page_id));
+CREATE POLICY lexvault_wall ON page_child_index_state USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = page_child_index_state.page_id));
 ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pages FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON pages;
-CREATE POLICY lexvault_wall ON pages USING (document_id IS NULL OR EXISTS (SELECT 1 FROM documents p WHERE p.id = pages.document_id));
+CREATE POLICY lexvault_wall ON pages USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR document_id IS NULL OR EXISTS (SELECT 1 FROM documents p WHERE p.id = pages.document_id));
 ALTER TABLE pages_fts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pages_fts FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON pages_fts;
-CREATE POLICY lexvault_wall ON pages_fts USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON pages_fts USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE rag_evaluations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rag_evaluations FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON rag_evaluations;
-CREATE POLICY lexvault_wall ON rag_evaluations USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON rag_evaluations USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE review_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE review_jobs FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON review_jobs;
-CREATE POLICY lexvault_wall ON review_jobs USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON review_jobs USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE review_task_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE review_task_events FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON review_task_events;
-CREATE POLICY lexvault_wall ON review_task_events USING (task_id IS NULL OR EXISTS (SELECT 1 FROM review_tasks p WHERE p.id = review_task_events.task_id));
+CREATE POLICY lexvault_wall ON review_task_events USING (cardinality((SELECT lexvault_hidden_cases())::bigint[]) = 0 OR task_id IS NULL OR EXISTS (SELECT 1 FROM review_tasks p WHERE p.id = review_task_events.task_id));
 ALTER TABLE review_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE review_tasks FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON review_tasks;
-CREATE POLICY lexvault_wall ON review_tasks USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON review_tasks USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));
 ALTER TABLE runtime_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE runtime_requests FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS lexvault_wall ON runtime_requests;
-CREATE POLICY lexvault_wall ON runtime_requests USING (lexvault_case_visible(case_id));
+CREATE POLICY lexvault_wall ON runtime_requests USING (case_id IS NULL OR NOT (case_id = ANY ((SELECT lexvault_hidden_cases())::bigint[])));

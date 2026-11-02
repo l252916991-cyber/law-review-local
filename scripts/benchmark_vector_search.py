@@ -9,7 +9,7 @@ against the exact answer.
 
     uv run --locked python scripts/benchmark_vector_search.py \\
         --postgres "host=127.0.0.1 port=5432 user=postgres dbname=postgres" \\
-        --pages 10000 --cases 5 --output output/benchmarks/vector-search.json
+        --pages 10000 --cases 5 --rls --output output/benchmarks/vector-search.json
 
 Synthetic text and hashed vectors measure the storage and scoring path only;
 they say nothing about retrieval quality with a real embedding model.
@@ -155,6 +155,55 @@ def hnsw_experiment(conn: Any, vectors: list[list[float]], *, limit: int, ef_val
     return report
 
 
+def rls_experiment(admin_url: str, rows: list[tuple[int, int, int, str, list[float]]], vectors: list[list[float]],
+                   *, limit: int, baseline: list[list[int]]) -> dict[str, Any]:
+    """The same search as a non-superuser application role, with an outsider identity and walls in place."""
+    from app.db import connect, init_db, now, postgres_scope, system_access, transaction
+    from app.db_postgres import PgConnection, _with_database, create_database, drop_database, ensure_role
+    from app.security import Principal, _principal  # importing security registers the identity provider
+
+    role = "lexvault_app"
+    ensure_role(admin_url, role)
+    name = f"lexvault_bench_rls_{os.getpid()}_{uuid.uuid4().hex[:8]}"
+    url = create_database(admin_url, name, owner=role)
+    try:
+        with postgres_scope(url):
+            init_db(seed=False)
+            # COPY is refused under row-level security; bulk loading is an
+            # administrator's job, searching is the application's.
+            with closing(PgConnection(_with_database(admin_url, name))) as admin:
+                load(admin, rows, postgres=True)
+            stamp = now()
+            with system_access(), transaction() as conn:
+                walled = sorted({row[0] for row in rows})[1:]
+                if not walled:
+                    walled = [conn.execute("INSERT INTO cases(title, created_at, updated_at) VALUES ('设墙案件', ?, ?)",
+                                           (stamp, stamp)).lastrowid]
+                for case_id in walled:
+                    conn.execute("INSERT INTO case_walls(case_id, reason, created_by, created_at, updated_at) "
+                                 "VALUES (?, '基准', 'benchmark', ?, ?)", (case_id, stamp, stamp))
+                    conn.execute("INSERT INTO case_wall_insiders(case_id, principal_name, added_by, added_at) "
+                                 "VALUES (?, '其他律师', 'benchmark', ?)", (case_id, stamp))
+            measured = {}
+            # An outsider has every other case hidden; an insider has nothing
+            # hidden, which is what most requests look like.
+            for label, who in (("outsider", "基准律师"), ("insider", "其他律师")):
+                token = _principal.set(Principal(who, False, (1,)))
+                try:
+                    with closing(connect()) as conn:
+                        time_search(conn, vectors[:3], limit=limit)
+                        measured[label] = time_search(conn, vectors, limit=limit)
+                finally:
+                    _principal.reset(token)
+        return {"walled_cases": len(walled),
+                "postgresql_pgvector_exact_with_rls": summary(measured["outsider"][0]),
+                "postgresql_pgvector_exact_with_rls_nothing_hidden": summary(measured["insider"][0]),
+                "identical_to_superuser": {label: sum(a == b for a, b in zip(results, baseline, strict=True))
+                                           for label, (_, results) in measured.items()}}
+    finally:
+        drop_database(admin_url, name)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--postgres", required=True, metavar="ADMIN_URL")
@@ -163,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--queries", type=int, default=30)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--seed", type=int, default=20261102)
+    parser.add_argument("--rls", action="store_true",
+                        help="also run as a non-superuser role with an outsider identity and walls in place")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
@@ -205,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
                     report["postgresql"] = dict(zip(report["postgresql"].keys(), report["postgresql"], strict=True))
         finally:
             drop_database(args.postgres, name)
+        if args.rls:
+            report["row_level_security"] = rls_experiment(args.postgres, rows, vectors, limit=args.limit, baseline=pg)
     report["sqlite"] = sqlite3.sqlite_version
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print(text)

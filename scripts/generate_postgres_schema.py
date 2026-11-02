@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS lexvault_schema_meta (
 
 -- SQLite functions that application SQL calls directly.
 CREATE OR REPLACE FUNCTION datetime(value TEXT, modifier TEXT) RETURNS TEXT
-    LANGUAGE sql STABLE AS $$
+    LANGUAGE sql STABLE PARALLEL SAFE AS $$
     SELECT to_char(CASE WHEN modifier = 'localtime' THEN localtimestamp ELSE now() AT TIME ZONE 'UTC' END,
                    'YYYY-MM-DD HH24:MI:SS')
     WHERE value = 'now'
@@ -116,16 +116,20 @@ ALTER TABLE embedding_cache ADD COLUMN IF NOT EXISTS embedding vector
 #: system connections (startup, workers, index rebuilds). Administrators are not
 #: exempt. The same policy shape keyed on a tenant id is multi-tenant isolation.
 WALL_FUNCTION = """
-CREATE OR REPLACE FUNCTION lexvault_case_visible(target BIGINT) RETURNS boolean
-    LANGUAGE sql STABLE AS $$
-    SELECT coalesce(current_setting('lexvault.system', true), '') = 'on'
-        OR NOT EXISTS (SELECT 1 FROM case_walls w WHERE w.case_id = target)
-        OR EXISTS (SELECT 1 FROM case_wall_insiders i
-                   WHERE i.case_id = target AND i.principal_name = current_setting('lexvault.actor', true))
-        OR EXISTS (SELECT 1 FROM case_wall_grants g
-                   WHERE g.case_id = target AND g.principal_name = current_setting('lexvault.actor', true)
-                     AND g.expires_at > extract(epoch FROM now()))
+-- Walled cases hidden from the current connection's identity. Policies wrap the
+-- call in a scalar subquery, so it runs once per statement, not once per row.
+CREATE OR REPLACE FUNCTION lexvault_hidden_cases() RETURNS bigint[]
+    LANGUAGE sql STABLE PARALLEL SAFE AS $$
+    SELECT CASE WHEN coalesce(current_setting('lexvault.system', true), '') = 'on' THEN '{}'::bigint[]
+           ELSE coalesce(array_agg(w.case_id), '{}'::bigint[]) END
+    FROM case_walls w
+    WHERE NOT EXISTS (SELECT 1 FROM case_wall_insiders i
+                      WHERE i.case_id = w.case_id AND i.principal_name = current_setting('lexvault.actor', true))
+      AND NOT EXISTS (SELECT 1 FROM case_wall_grants g
+                      WHERE g.case_id = w.case_id AND g.principal_name = current_setting('lexvault.actor', true)
+                        AND g.expires_at > extract(epoch FROM now()))
 $$;
+DROP FUNCTION IF EXISTS lexvault_case_visible(BIGINT);
 """
 #: Tables that hold case material directly (their own ``case_id``).
 WALLED_DIRECT = (
@@ -167,10 +171,16 @@ def wall_policies(columns: dict[str, list[str]]) -> str:
         and name not in WALLED_DIRECT and name not in WALLED_VIA and name not in WALL_EXEMPT)
     if unclassified:
         raise SystemExit(f"case-linked tables without a wall rule: {', '.join(unclassified)}")
-    rules = {"cases": "lexvault_case_visible(id)"}
-    rules.update({name: "lexvault_case_visible(case_id)" for name in WALLED_DIRECT})
+    # The cast makes ANY take the array, not treat the subquery as a row set.
+    hidden = "(SELECT lexvault_hidden_cases())::bigint[]"
+    rules = {"cases": f"NOT (id = ANY ({hidden}))"}
+    rules.update({name: f"case_id IS NULL OR NOT (case_id = ANY ({hidden}))" for name in WALLED_DIRECT})
     for name, (column, parent) in WALLED_VIA.items():
-        rules[name] = f"{column} IS NULL OR EXISTS (SELECT 1 FROM {parent} p WHERE p.id = {name}.{column})"
+        # Nothing hidden: true without touching the parent. Otherwise a
+        # primary-key probe of the parent row, whose own policy applies; the
+        # cost follows the rows a query touches, not the size of the parent.
+        rules[name] = (f"cardinality({hidden}) = 0 OR {column} IS NULL "
+                       f"OR EXISTS (SELECT 1 FROM {parent} p WHERE p.id = {name}.{column})")
     parts = [WALL_FUNCTION]
     for name in sorted(rules):
         parts.append(
