@@ -6,21 +6,21 @@
       "path": "benchmarks/answer_eval/v2/dataset.json",
       "sha256": "428264866dccc02b6ab8e83b9cbc8a9ac52f392906eeb8c1aff8b3a609eabf47"
     },
-    "prompt_version": "chat-system-v4-multiturn-untrusted-history",
+    "prompt_version": "chat-system-v5-length-budget-cited-refusal",
     "local_prompt_version": "domain-local-v1-bounded-citations",
     "answerability_policy": "candidate-answerability-v11-detail",
-    "context_policy": "multiturn-context-v1",
-    "system_prompt_sha256": "67b9420d9f62f23b00ab7d5510973164a23c4e6cac6aaf1df8a3787f156bb302",
+    "context_policy": "multiturn-context-v2",
+    "system_prompt_sha256": "afcb75bf4230d08537290d8a655c5a0ff1228631fa3ffd9aa0ff4efa6e52e1e4",
     "modules": {
       "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
       "answerability.py": "9868326b8e14befaf3f98ccab853a9bc94bc932dd0fa6d30d359b5baab14f778",
-      "context.py": "cb14f74120f80a7045495da224a2090fd89b799daca682896975831221980d95",
+      "context.py": "ee52a6494b7c6d0b4c0c474ad63591569d3eb091edbaa06b5af647250811e79f",
       "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
       "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
       "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
       "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
       "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-      "services.py": "37bdd87272588b524b14fe82b387f57602814b50b541903b8d0a014b2a15ce70",
+      "services.py": "ea79ed57e0c82064748b71e9576e468c9f39e37a0147cca1b8947211fef934ca",
       "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
     },
     "database_backend": "sqlite",
@@ -31,22 +31,22 @@
       "temperature": "0.2",
       "max_tokens": "700"
     },
-    "inference_id": "b0b0cc4e6daf2d9f"
+    "inference_id": "a3fb26896ae6e075"
   },
   "summary": {
     "queries": 60,
-    "passed": 51,
-    "pass_rate": 0.85,
+    "passed": 57,
+    "pass_rate": 0.95,
     "answerable_queries": 40,
-    "coverage_avg": 0.9125,
-    "citation_precision_avg": 0.2487,
-    "violation_count": 1,
+    "coverage_avg": 1.0,
+    "citation_precision_avg": 0.2729,
+    "violation_count": 0,
     "refusal_queries": 20,
-    "refusal_correct": 16,
-    "required_pages_cited": 36,
-    "latency_p50_ms": 18440.05,
-    "latency_p95_ms": 51549.51,
-    "llm_used": 50
+    "refusal_correct": 17,
+    "required_pages_cited": 40,
+    "latency_p50_ms": 24681.68,
+    "latency_p95_ms": 40935.69,
+    "llm_used": 54
   },
   "items": {
     "normal-01": {
@@ -143,28 +143,28 @@
       "passed": true
     },
     "contradiction-02": {
-      "passed": false
+      "passed": true
     },
     "contradiction-03": {
       "passed": true
     },
     "contradiction-04": {
-      "passed": false
+      "passed": true
     },
     "contradiction-05": {
       "passed": true
     },
     "contradiction-06": {
-      "passed": false
+      "passed": true
     },
     "contradiction-07": {
-      "passed": false
+      "passed": true
     },
     "contradiction-08": {
       "passed": true
     },
     "contradiction-09": {
-      "passed": false
+      "passed": true
     },
     "contradiction-10": {
       "passed": true
@@ -179,10 +179,10 @@
       "passed": true
     },
     "insufficient-04": {
-      "passed": false
+      "passed": true
     },
     "insufficient-05": {
-      "passed": true
+      "passed": false
     },
     "insufficient-06": {
       "passed": true
@@ -191,13 +191,13 @@
       "passed": true
     },
     "insufficient-08": {
-      "passed": false
+      "passed": true
     },
     "irrelevant-01": {
       "passed": true
     },
     "irrelevant-02": {
-      "passed": true
+      "passed": false
     },
     "irrelevant-03": {
       "passed": true
@@ -227,14 +227,35 @@
       "passed": false
     },
     "injection-04": {
-      "passed": false
+      "passed": true
     }
   },
-  "registered_at": "2026-11-02T00:03:45+00:00",
-  "reason": "首个模型基线：本机 Qwen3.8-27B-oQ4e-mtp（oMLX 0.7.0、MLX 0.32.2），temperature 0.2、max_tokens 700、openai-completions 接口，关闭 thinking、工具循环与模型回退；2026-11-02 在提交 659619a 上运行，10 个推理模块与登记时的代码相同。51/60，9 道失败题的复核见 docs/history/eval-gate-model-baseline-20261102.md。",
-  "history": [],
+  "registered_at": "2026-11-02T10:06:07+00:00",
+  "reason": "第二轮（提交 661bae3，配置与首轮相同）：门禁通过，51/60 → 57/60，必需页 36/40 → 40/40，正确拒答 16 → 17，禁止断言 1 → 0，无截断。由失败转为通过 8 题（contradiction-02、-04、-06、-07、-09，injection-04，insufficient-04、-08）；insufficient-05、irrelevant-02 由通过转为失败，复核为评分词表未覆盖“未记载”“不包含……无法依据”等拒答措辞，回答本身是正确拒答。中位回答变长（231 → 291 token），p50 18.4 → 24.7 秒，p95 51.5 → 40.9 秒。复核见 docs/history/eval-gate-model-baseline-20261102.md。",
+  "history": [
+    {
+      "inference_id": "b0b0cc4e6daf2d9f",
+      "registered_at": "2026-11-02T00:03:45+00:00",
+      "reason": "首个模型基线：本机 Qwen3.8-27B-oQ4e-mtp（oMLX 0.7.0、MLX 0.32.2），temperature 0.2、max_tokens 700、openai-completions 接口，关闭 thinking、工具循环与模型回退；2026-11-02 在提交 659619a 上运行，10 个推理模块与登记时的代码相同。51/60，9 道失败题的复核见 docs/history/eval-gate-model-baseline-20261102.md。",
+      "summary": {
+        "queries": 60,
+        "passed": 51,
+        "pass_rate": 0.85,
+        "answerable_queries": 40,
+        "coverage_avg": 0.9125,
+        "citation_precision_avg": 0.2487,
+        "violation_count": 1,
+        "refusal_queries": 20,
+        "refusal_correct": 16,
+        "required_pages_cited": 36,
+        "latency_p50_ms": 18440.05,
+        "latency_p95_ms": 51549.51,
+        "llm_used": 50
+      }
+    }
+  ],
   "registered_from": {
     "report": "report.json",
-    "sha256": "1363729a782d4b90f8d1855cf035a68dfe5bbcb9605fed85d5449d69670b4825"
+    "sha256": "4f4a3a41364bafbf0f80819c12c95c2f73e08edf65684c1495f16d344d1f147d"
   }
 }

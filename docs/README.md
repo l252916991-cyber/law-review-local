@@ -20,7 +20,7 @@
 - **部署与交付**：[交付指南](runbook/delivery.md)、[发布手册](runbook/release.md)、[部署验收](runbook/deployment-acceptance.md)、[多人协作验收](runbook/collaboration-acceptance.md)、[合成迁移演示](runbook/migration-demo.md)
 - **开发与质量**：[质量门禁](runbook/quality.md)、[前端运行手册](runbook/frontend.md)、[组件许可](runbook/licenses.md)、[开发与提交规则](../AGENTS.md)
 - **模型与接入**：[模型配置](runbook/models.md)、[MCP 接入](runbook/mcp.md)、[企业登录（OIDC）](enterprise-login.md)
-- **评测**：[答案质量门禁](runbook/eval-gate.md)、[PostgreSQL 页向量检索基准](benchmarks/postgres-vector-search-20261102.md)、[行级安全开销基准](benchmarks/postgres-rls-overhead-20261102.md)、[答案级评测手册](runbook/answer-evaluation.md)、[答案评测口径](benchmarks/answer-eval.md)、[法条语料](benchmarks/legal-corpus.md)、[样本分母审计](benchmarks/lexvault-evaluation-sample-audit-20261029.md)、[法条冻结资产恢复](benchmarks/collaboration-corpus-recovery-20261028.md)
+- **评测**：[答案质量门禁](runbook/eval-gate.md)、[模型门禁两轮记录](history/eval-gate-model-baseline-20261102.md)、[PostgreSQL 页向量检索基准](benchmarks/postgres-vector-search-20261102.md)、[行级安全开销基准](benchmarks/postgres-rls-overhead-20261102.md)、[答案级评测手册](runbook/answer-evaluation.md)、[答案评测口径](benchmarks/answer-eval.md)、[法条语料](benchmarks/legal-corpus.md)、[样本分母审计](benchmarks/lexvault-evaluation-sample-audit-20261029.md)、[法条冻结资产恢复](benchmarks/collaboration-corpus-recovery-20261028.md)
 - **演示**：[录屏手册](runbook/demo-recording.md)
 - **简历**：[简历条目](portfolio/resume-bullets.md)
 

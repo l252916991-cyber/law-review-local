@@ -25,7 +25,7 @@ uv run --locked python scripts/eval_gate.py --mode model \
 uv run --locked python scripts/eval_gate.py --update-baseline --reason "说明改了什么、为什么可以接受"
 ```
 
-模型模式的基线已登记（2026-11-02，Qwen3.8-27B 4-bit，51/60，[运行与失败复核](../history/eval-gate-model-baseline-20261102.md)）。要和它比较，端点、模型名、`LAW_REVIEW_LLM_TEMPERATURE=0.2`、`LAW_REVIEW_LLM_MAX_TOKENS=700` 需与登记时一致，否则比较的是另一套推理配置。如果没有任何一题实际调用到模型（端点不通、模型名错误），门禁报配置错误，不会把规则回答当成模型结果。单题模型调用失败记为该题失败，不跳过。
+模型模式的基线已登记：本机 Qwen3.8-27B 4-bit，首轮 51/60，按失败题修复后第二轮 57/60（2026-11-02，[两轮记录与复核](../history/eval-gate-model-baseline-20261102.md)）。要和它比较，端点、模型名、`LAW_REVIEW_LLM_TEMPERATURE=0.2`、`LAW_REVIEW_LLM_MAX_TOKENS=700` 需与登记时一致，否则比较的是另一套推理配置。如果没有任何一题实际调用到模型（端点不通、模型名错误），门禁报配置错误，不会把规则回答当成模型结果。单题模型调用失败记为该题失败，不跳过。
 
 模型模式一轮要二十多分钟。已经跑完并复核过的报告可以直接登记，不必重跑：
 
