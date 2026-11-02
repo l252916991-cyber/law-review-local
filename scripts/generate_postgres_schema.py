@@ -133,7 +133,8 @@ DROP FUNCTION IF EXISTS lexvault_case_visible(BIGINT);
 """
 #: Tables that hold case material directly (their own ``case_id``).
 WALLED_DIRECT = (
-    "agent_runs", "bank_transactions", "batch_dispatch", "batch_imports", "case_reports", "chat_requests",
+    "agent_runs", "bank_transactions", "batch_dispatch", "batch_imports", "case_parties", "case_reports",
+    "chat_requests", "conflict_checks",
     "conversations", "documents", "evidence", "evidence_relations", "gap_detections", "host_write_receipts",
     "llm_calls", "memories", "pages_fts", "rag_evaluations", "review_jobs", "review_tasks", "runtime_requests",
 )
@@ -311,16 +312,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     text = render()
     missing = missing_migrations()
-    if missing:
-        print("缺少 PostgreSQL 迁移：" + "、".join(missing) + "（见 app/postgres_migrations/）", file=sys.stderr)
-        return 1
     if args.check:
         if not TARGET.exists() or TARGET.read_text(encoding="utf-8") != text:
             print("app/schema_postgres.sql 与当前 SQLite 结构不一致；运行 scripts/generate_postgres_schema.py", file=sys.stderr)
             return 1
-        return 0
-    TARGET.write_text(text, encoding="utf-8")
-    print(f"wrote {TARGET.relative_to(ROOT)}")
+    else:
+        TARGET.write_text(text, encoding="utf-8")
+        print(f"wrote {TARGET.relative_to(ROOT)}")
+    if missing:
+        print("缺少 PostgreSQL 迁移：" + "、".join(missing) + "（每个新版本都要有升级步骤，见 docs/runbook/postgresql.md）",
+              file=sys.stderr)
+        return 1
     return 0
 
 

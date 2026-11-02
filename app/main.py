@@ -15,6 +15,7 @@ from starlette.formparsers import MultiPartException
 from .case_reports import router as case_report_router
 from .case_walls import router as case_wall_router
 from .config import config
+from .conflicts import router as conflict_router
 from .db import init_db, process_ownership
 from .human_tasks import router as human_task_router
 from .logger import request_id as logger_request_id
@@ -80,6 +81,7 @@ app = FastAPI(
 app.add_middleware(AccessMiddleware)
 app.include_router(access_router)
 app.include_router(case_wall_router)
+app.include_router(conflict_router)
 app.include_router(review_job_router)
 app.include_router(member_router)
 app.include_router(human_task_router)

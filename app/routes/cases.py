@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..audit_trail import record_field_changes
 from ..case_walls import exclusion_clause, hidden_case_ids
+from ..conflicts import PartyIn, replace_parties, run_check
 from ..db import connect, now, record_security_event, transaction
 from ..schemas import CaseDetail, CaseRow, CaseSummary
 from ..security import actor_name, allowed_case_ids, identity, require_permission
@@ -24,6 +25,8 @@ class CaseCreate(BaseModel):
     case_type: str = "刑事"
     client_name: str = ""
     description: str = ""
+    # Parties given at creation are checked for conflicts of interest at once.
+    parties: list[PartyIn] = Field(default_factory=list, max_length=50)
 
 
 class CaseUpdate(BaseModel):
@@ -79,7 +82,12 @@ def create_case(payload: CaseCreate):
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '创建案件', ?, ?)",
             (case_id, payload.title, ts),
         )
-    return require_case(case_id)
+        if payload.parties:
+            replace_parties(conn, case_id, payload.parties, actor_name())
+    case = require_case(case_id)
+    if payload.parties:
+        case["conflict"] = run_check(case_id, actor_name())
+    return case
 
 
 @router.patch("/api/cases/{case_id}")

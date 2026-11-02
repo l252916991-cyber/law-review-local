@@ -31,7 +31,7 @@ GET    /api/case-walls
 
 **应用层（两种数据库都有）**：所有带案件编号的请求都经过 `require_case_access`，墙外直接返回 404；所有跨案件列出数据的地方（案件列表、归档列表、仪表盘、成员名单、我的任务）都会排除这些案件。
 
-**数据库层（PostgreSQL）**：每个连接建立时写入当前身份（`lexvault.actor`，系统任务为 `lexvault.system=on`），并立即提交，防止后续回滚把身份清空。33 张表启用 `FORCE ROW LEVEL SECURITY`：
+**数据库层（PostgreSQL）**：每个连接建立时写入当前身份（`lexvault.actor`，系统任务为 `lexvault.system=on`），并立即提交，防止后续回滚把身份清空。35 张表启用 `FORCE ROW LEVEL SECURITY`：
 
 - 当前身份看不到的案件编号由 `lexvault_hidden_cases()` 算出，每条语句只算一次；
 - 有 `case_id` 的表直接排除这些案件；

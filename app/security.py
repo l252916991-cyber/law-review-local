@@ -465,6 +465,9 @@ class AccessMiddleware(BaseHTTPMiddleware):
                     needed = _required_case_permission(request.method, request.url.path)
                     if not principal.has_for_case(needed, case_id):
                         raise HTTPException(403, f"需要{PERMISSION_LABELS[needed]}权限")
+                    from .conflicts import enforce_clearance
+
+                    enforce_clearance(case_id, request.method, request.url.path)
                 if not principal.has("manage"):
                     if request.url.path == "/api/cases" and request.method != "GET":
                         raise HTTPException(403, "仅管理员可以创建案件")

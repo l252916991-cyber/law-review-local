@@ -13,6 +13,7 @@
 | [评测协议](benchmarks/README.md) | 模型 / 检索 / 法条 / 答案四层指标的口径与不可互相替代的原因 |
 | [运维手册](runbook/operations.md) | 配置、鉴权、健康检查、故障排查 |
 | [信息隔离墙](runbook/case-walls.md) | 设墙后谁能看到什么、破窗访问、应用层与 PostgreSQL 行级安全两层执行、证据与边界 |
+| [利益冲突检查](runbook/conflict-check.md) | 登记当事人、什么算冲突、合伙人放行与双人原则、命中隔离案件时的显示规则 |
 | [PostgreSQL 后端](runbook/postgresql.md) | 切换数据库、与 SQLite 的差异、仍只在 SQLite 上的功能、在 PostgreSQL 上跑测试 |
 
 ## 按任务查

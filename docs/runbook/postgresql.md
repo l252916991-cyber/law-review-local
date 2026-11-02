@@ -11,7 +11,7 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 
 - 数据库需要 pgvector 扩展。应用启动时会执行 `CREATE EXTENSION IF NOT EXISTS vector`，没有权限时请 DBA 预先在该库里创建。
 - 应用必须用**非超级用户**角色连接，最好让它拥有业务表：信息隔离墙依靠行级安全（RLS），超级用户和 `BYPASSRLS` 角色会绕过它。每个连接建立时写入当前身份，见[信息隔离墙](case-walls.md)。
-- 第一次启动按 `app/schema_postgres.sql` 建出最新结构（当前 schema 27），版本记在 `lexvault_schema_meta`。
+- 第一次启动按 `app/schema_postgres.sql` 建出最新结构（当前 schema 28），版本记在 `lexvault_schema_meta`。
 - 已有库的版本比代码旧时，启动时按版本逐步升级：`app/postgres_migrations/NNNN.sql` 把库从 NNNN−1 升到 NNNN，每一步与版本号更新在同一个事务里，失败整步回滚；多个实例同时启动时用 advisory 锁排队。升完再执行一遍完整结构，重建函数、触发器与行级策略。缺少某一步、库比代码新（不降级）、或库早于 v27（第一个可原地升级的版本），启动都会拒绝。
 - 改表结构时，SQLite 迁移与 PostgreSQL 迁移要一起写。`scripts/generate_postgres_schema.py --check` 要求每个新版本都有迁移文件；`tests/test_postgres_migrations.py` 从冻结的 v27 结构（`baseline_v27.sql`）出发，只执行迁移文件，再与新建库逐项比对列、约束、索引、触发器、函数、行级策略，漏写一项就失败。另有一条对照测试故意删掉一列、一条策略和一个索引，确认比对能发现。
 - URL 写法同 libpq，`postgresql://user:pass@host:5432/db?sslmode=require` 也可以。

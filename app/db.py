@@ -499,7 +499,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -1211,6 +1211,45 @@ CREATE INDEX IF NOT EXISTS idx_case_wall_grants_lookup ON case_wall_grants(case_
 """)
 
 
+def _migrate_v28(conn: sqlite3.Connection) -> None:
+    """Conflict-of-interest checks: a case's parties and every check run on them.
+
+    A check that finds the firm on the other side of a party (client here,
+    opposing party in another matter, or the reverse) stays pending until a
+    partner with the manage permission approves or rejects it; until then the
+    case cannot be worked on. The latest check row is the case's status.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS case_parties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('client', 'opposing', 'related')),
+    name TEXT NOT NULL,
+    match_key TEXT NOT NULL,
+    former_names TEXT NOT NULL DEFAULT '[]',
+    credit_code TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_case_parties_case ON case_parties(case_id);
+CREATE INDEX IF NOT EXISTS idx_case_parties_match ON case_parties(match_key);
+CREATE INDEX IF NOT EXISTS idx_case_parties_credit ON case_parties(credit_code);
+CREATE TABLE IF NOT EXISTS conflict_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('clear', 'pending', 'approved', 'rejected')),
+    hits TEXT NOT NULL DEFAULT '[]',
+    parties_digest TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    requested_at TEXT NOT NULL,
+    decided_by TEXT,
+    decided_at TEXT,
+    decision_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_conflict_checks_case ON conflict_checks(case_id, id);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -1246,7 +1285,7 @@ def _migrate_sqlite() -> None:
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
             _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24, _migrate_v25, _migrate_v26,
-            _migrate_v27,
+            _migrate_v27, _migrate_v28,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
