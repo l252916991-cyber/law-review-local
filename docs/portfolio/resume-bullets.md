@@ -34,6 +34,31 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 - 证据：[local-five-user-acceptance-20261029.md](../history/migration/local-five-user-acceptance-20261029.md)
 - 边界：这是技术试点，不是律所业务签收；模型额外的法律表述仍需律师删改。
 
+**6. 建立答案质量门禁，让提示词、检索与模型改动可回归**
+60 题冻结评测集走真实对话路径逐题评分，与已登记基线比较：规则模式结果确定，任何一道原本通过的题失败即阻断；模型模式按预先登记的阈值容忍采样噪声并约束 p95 时延。`inference_id` 由提示词、检索相关模块摘要、数据库后端与模型设置共同决定，配置相同而结果不同时按"不确定性"阻断。CI 每次推送运行。
+
+- 证据：`app/eval_gate.py`、[eval-gate.md](../runbook/eval-gate.md)、`benchmarks/eval_gate/baseline-rules.json`
+- 实测：故意让检索只保留第 1 页，门禁拦下并列出退化题号；当前规则模式 44/60。
+- 边界：评测集未经律师标注；门禁回答"有没有变差"，不是法律准确率。模型模式基线尚未登记。
+
+**7. 业务库支持 SQLite 与 PostgreSQL + pgvector 双后端，同一套代码**
+保留 sqlite3 形态的数据访问接口，在 PostgreSQL 一侧做占位符与方言翻译、逐语句 savepoint、写锁、错误类型映射；表结构由 SQLite 迁移自动生成（含全文检索触发器与向量列），CI 校验两边一致。案件内向量检索改在库内精确排序。
+
+- 证据：`app/db_postgres.py`、`scripts/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
+- 实测：全量测试在两种数据库上都通过；门禁 60 题两库逐题结果一致；10,000 页单案向量检索 p50 1.29 s → 48 ms，前 20 页及顺序完全相同。
+- 边界：PostgreSQL 的逐版本迁移尚未实现；多实例部署还需要把任务队列和 checkpoint 移出进程。
+
+**8. 实现信息隔离墙：应用层检查 + PostgreSQL 行级安全双层执行**
+设墙案件只有墙内名单上的人可见，管理员也不例外，墙外返回与案件不存在相同的 404；破窗访问限 30 分钟、须写理由并审计。数据库层 33 张表启用 `FORCE ROW LEVEL SECURITY`，每个连接写入当前身份，子表按主键回查父表；生成器发现未归类的案件关联表直接失败，新表不会绕过隔离墙。
+
+- 证据：`app/case_walls.py`、`scripts/generate_postgres_schema.py`、`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)、[开销基准](../benchmarks/postgres-rls-overhead-20261102.md)
+- 实测：以墙外管理员和墙外律师身份遍历全部 GET 接口，墙内标记一次都没出现；在 PostgreSQL 上关掉应用层检查重做一遍依旧干净，同样操作在 SQLite 上有 10 个接口泄露（对照测试）。10,000 页检索 p50：对照 56 ms，没被挡的用户 68 ms，五分之四材料被隐藏的用户 120 ms，结果相同；子表策略从"在父表可见行里"改为主键回查后，这两类用户分别从 1,520 ms、373 ms 降下来（同机依次测三版写法）。
+- 边界：SQLite 部署只有应用层一道防线；目前没有管理界面；本项目是单律所实例，多租户是同一机制的迁移方向，未实现。
+
+可用表述：
+
+> 为本地法律 RAG 系统实现信息隔离墙，应用层统一检查之外用 PostgreSQL 行级安全在 33 张表上兜底；关掉应用层检查后遍历全部 GET 接口仍无泄露（SQLite 对照有 10 个接口泄露）；把子表策略从集合包含改为主键回查，普通用户的检索时间从 1.5 秒降到 68 ms（不受限对照 56 ms）。
+
 ## 已有实测（Qwen3.8-27B，2026-10-27/28）
 
 > 在 **Qwen3.8-27B-oQ4e-mtp（4-bit，oMLX 0.7.0，单机 Apple Silicon）** 上，对基础 RAG、结构化交接与交叉审校做同题配对评测：

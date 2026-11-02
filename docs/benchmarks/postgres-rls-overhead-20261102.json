@@ -1,75 +1,231 @@
 {
-  "pages_per_case": 10000,
-  "cases": 5,
-  "dimensions": 384,
-  "queries": 30,
-  "limit": 20,
-  "embedding": "hashed-local (synthetic)",
-  "within_case": {
-    "sqlite_python_scan": {
-      "p50_ms": 1258.14,
-      "p95_ms": 1398.41,
-      "max_ms": 1646.25
-    },
-    "postgresql_pgvector_exact": {
-      "p50_ms": 51.23,
-      "p95_ms": 64.93,
-      "max_ms": 66.78
-    },
-    "top_k_overlap": 1.0,
-    "identical_order": 29
-  },
-  "cross_case": {
-    "index_build_seconds": 21.3,
-    "exact_cross_case": {
-      "p50_ms": 37.47,
-      "p95_ms": 42.9,
-      "max_ms": 49.61
-    },
-    "hnsw": [
-      {
-        "ef_search": 40,
-        "p50_ms": 3.14,
-        "p95_ms": 3.5,
-        "max_ms": 3.6,
-        "recall_at_k": 0.4933
+  "note": "Same machine, run back to back; only app/schema_postgres.sql differs between versions. v1 = schema at commit 9f7650b, v2 = intermediate draft (child policies 'col IN (SELECT id FROM parent)'), v3 = current (EXISTS primary-key probe).",
+  "command": "scripts/benchmark_vector_search.py --pages 10000 --cases 5 --queries 30 --rls",
+  "policy_versions": {
+    "v1": {
+      "pages_per_case": 10000,
+      "cases": 5,
+      "dimensions": 384,
+      "queries": 30,
+      "limit": 20,
+      "embedding": "hashed-local (synthetic)",
+      "within_case": {
+        "sqlite_python_scan": {
+          "p50_ms": 1383.51,
+          "p95_ms": 1870.01,
+          "max_ms": 2323.84
+        },
+        "postgresql_pgvector_exact": {
+          "p50_ms": 67.76,
+          "p95_ms": 74.95,
+          "max_ms": 82.59
+        },
+        "top_k_overlap": 1.0,
+        "identical_order": 29
       },
-      {
-        "ef_search": 100,
-        "p50_ms": 2.99,
-        "p95_ms": 3.46,
-        "max_ms": 3.8,
-        "recall_at_k": 0.7
+      "cross_case": {
+        "index_build_seconds": 23.1,
+        "exact_cross_case": {
+          "p50_ms": 45.68,
+          "p95_ms": 51.93,
+          "max_ms": 52.95
+        },
+        "hnsw": [
+          {
+            "ef_search": 40,
+            "p50_ms": 2.9,
+            "p95_ms": 3.52,
+            "max_ms": 3.8,
+            "recall_at_k": 0.49
+          },
+          {
+            "ef_search": 100,
+            "p50_ms": 3.45,
+            "p95_ms": 4.25,
+            "max_ms": 4.6,
+            "recall_at_k": 0.68
+          },
+          {
+            "ef_search": 200,
+            "p50_ms": 6.55,
+            "p95_ms": 6.92,
+            "max_ms": 7.08,
+            "recall_at_k": 0.8333
+          }
+        ]
       },
-      {
-        "ef_search": 200,
-        "p50_ms": 4.59,
-        "p95_ms": 6.58,
-        "max_ms": 6.66,
-        "recall_at_k": 0.8433
-      }
-    ]
-  },
-  "postgresql": {
-    "server": "16.15",
-    "pgvector": "0.6.0"
-  },
-  "row_level_security": {
-    "walled_cases": 4,
-    "postgresql_pgvector_exact_with_rls": {
-      "p50_ms": 104.08,
-      "p95_ms": 124.43,
-      "max_ms": 152.15
+      "postgresql": {
+        "server": "16.15",
+        "pgvector": "0.6.0"
+      },
+      "row_level_security": {
+        "walled_cases": 4,
+        "postgresql_pgvector_exact_with_rls": {
+          "p50_ms": 222.05,
+          "p95_ms": 306.26,
+          "max_ms": 309.66
+        },
+        "postgresql_pgvector_exact_with_rls_nothing_hidden": {
+          "p50_ms": 282.71,
+          "p95_ms": 305.33,
+          "max_ms": 317.84
+        },
+        "identical_to_superuser": {
+          "outsider": 30,
+          "insider": 30
+        }
+      },
+      "sqlite": "3.53.1"
     },
-    "postgresql_pgvector_exact_with_rls_nothing_hidden": {
-      "p50_ms": 67.09,
-      "p95_ms": 81.55,
-      "max_ms": 88.76
+    "v2": {
+      "pages_per_case": 10000,
+      "cases": 5,
+      "dimensions": 384,
+      "queries": 30,
+      "limit": 20,
+      "embedding": "hashed-local (synthetic)",
+      "within_case": {
+        "sqlite_python_scan": {
+          "p50_ms": 1289.11,
+          "p95_ms": 1474.88,
+          "max_ms": 2053.9
+        },
+        "postgresql_pgvector_exact": {
+          "p50_ms": 52.36,
+          "p95_ms": 65.14,
+          "max_ms": 75.36
+        },
+        "top_k_overlap": 1.0,
+        "identical_order": 29
+      },
+      "cross_case": {
+        "index_build_seconds": 22.3,
+        "exact_cross_case": {
+          "p50_ms": 47.56,
+          "p95_ms": 54.82,
+          "max_ms": 65.52
+        },
+        "hnsw": [
+          {
+            "ef_search": 40,
+            "p50_ms": 3.28,
+            "p95_ms": 4.17,
+            "max_ms": 4.83,
+            "recall_at_k": 0.4567
+          },
+          {
+            "ef_search": 100,
+            "p50_ms": 3.92,
+            "p95_ms": 4.43,
+            "max_ms": 4.6,
+            "recall_at_k": 0.6933
+          },
+          {
+            "ef_search": 200,
+            "p50_ms": 4.8,
+            "p95_ms": 5.52,
+            "max_ms": 5.6,
+            "recall_at_k": 0.8567
+          }
+        ]
+      },
+      "postgresql": {
+        "server": "16.15",
+        "pgvector": "0.6.0"
+      },
+      "row_level_security": {
+        "walled_cases": 4,
+        "postgresql_pgvector_exact_with_rls": {
+          "p50_ms": 372.65,
+          "p95_ms": 468.41,
+          "max_ms": 507.0
+        },
+        "postgresql_pgvector_exact_with_rls_nothing_hidden": {
+          "p50_ms": 1520.23,
+          "p95_ms": 1785.07,
+          "max_ms": 2196.88
+        },
+        "identical_to_superuser": {
+          "outsider": 30,
+          "insider": 30
+        }
+      },
+      "sqlite": "3.53.1"
     },
-    "identical_to_superuser": {
-      "outsider": 30,
-      "insider": 30
+    "v3": {
+      "pages_per_case": 10000,
+      "cases": 5,
+      "dimensions": 384,
+      "queries": 30,
+      "limit": 20,
+      "embedding": "hashed-local (synthetic)",
+      "within_case": {
+        "sqlite_python_scan": {
+          "p50_ms": 1353.99,
+          "p95_ms": 1551.79,
+          "max_ms": 1771.35
+        },
+        "postgresql_pgvector_exact": {
+          "p50_ms": 56.22,
+          "p95_ms": 67.08,
+          "max_ms": 67.9
+        },
+        "top_k_overlap": 1.0,
+        "identical_order": 29
+      },
+      "cross_case": {
+        "index_build_seconds": 22.4,
+        "exact_cross_case": {
+          "p50_ms": 44.41,
+          "p95_ms": 51.03,
+          "max_ms": 52.79
+        },
+        "hnsw": [
+          {
+            "ef_search": 40,
+            "p50_ms": 3.29,
+            "p95_ms": 3.84,
+            "max_ms": 4.09,
+            "recall_at_k": 0.46
+          },
+          {
+            "ef_search": 100,
+            "p50_ms": 4.22,
+            "p95_ms": 4.76,
+            "max_ms": 5.15,
+            "recall_at_k": 0.6867
+          },
+          {
+            "ef_search": 200,
+            "p50_ms": 6.57,
+            "p95_ms": 7.03,
+            "max_ms": 7.64,
+            "recall_at_k": 0.8367
+          }
+        ]
+      },
+      "postgresql": {
+        "server": "16.15",
+        "pgvector": "0.6.0"
+      },
+      "row_level_security": {
+        "walled_cases": 4,
+        "postgresql_pgvector_exact_with_rls": {
+          "p50_ms": 120.16,
+          "p95_ms": 156.26,
+          "max_ms": 160.32
+        },
+        "postgresql_pgvector_exact_with_rls_nothing_hidden": {
+          "p50_ms": 68.03,
+          "p95_ms": 106.15,
+          "max_ms": 118.03
+        },
+        "identical_to_superuser": {
+          "outsider": 30,
+          "insider": 30
+        }
+      },
+      "sqlite": "3.53.1"
     }
-  },
-  "sqlite": "3.53.1"
+  }
 }

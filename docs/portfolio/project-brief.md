@@ -27,6 +27,7 @@
 - **两条运行时**：原生 DAG 与 LangGraph；共享同一份专家规格与交接路径，结果需一致。
 - **恢复校验**：checkpoint 记录每页 `page_text_sha256`；来源页改动后拒绝复用旧分析，不消耗重试次数。
 - **受控检索**：模型拿到的只是本轮 6 页以内的片段，法条走独立命名空间，不进案件事实提示。
+- **信息隔离墙**：设墙案件只有墙内名单可见，管理员也不例外；应用层统一检查，PostgreSQL 上再由 33 张表的强制行级安全兜底（[手册](../runbook/case-walls.md)）。
 
 ## 3. 技术栈
 
@@ -75,12 +76,13 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-02，提交 `178eff3`；之后只改了文档）
+## 4.1 质量基线（2026-11-02，提交 `2d992da`；之后只改了文档）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1691 passed / 0 failed / 18 skipped，综合覆盖率 86.77%（分支 78.84%）；Python 3.14.6：1691 passed / 0 failed / 18 skipped，86.87%（分支 78.98%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 10 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
-| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1701 passed / 0 failed / 8 skipped，覆盖率 87.76%（分支 79.98%）；每个测试一个新库，约 300 个测试在测试体内实际连到 PostgreSQL；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1701 passed / 0 failed / 20 skipped，综合覆盖率 86.73%（分支 78.74%）；Python 3.14.6：1701 passed / 0 failed / 20 skipped，86.83%（分支 78.88%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 12 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1712 passed / 0 failed / 9 skipped，覆盖率 87.87%（分支 80.11%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；313 个测试在测试体内实际连到 PostgreSQL；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 信息隔离墙 | 以墙外管理员、仍被分配到该案的墙外律师遍历全部 GET 接口，墙内标记 0 次出现；PostgreSQL 上关掉应用层检查重做仍为 0，SQLite 对照为 10 个接口泄露；33 张表强制行级安全，生成器拒绝未归类的案件关联表 |
 | 答案质量门禁 | 60 题冻结评测集，规则模式 44/60 通过；SQLite 与 PostgreSQL 逐题结果一致（59 题回答与引用逐字相同，1 题两条引用先后不同）；CI 每次推送运行，退化即阻断 |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 13 项、`build`/`build:static` 通过；e2e 见下方说明 |
@@ -122,6 +124,9 @@ Judge 交叉检查（同模型、开发集 60 题 × 3 组）：开发集三组�
 | 本机五人技术试点验收 | [local-five-user-acceptance-20261029.md](../history/migration/local-five-user-acceptance-20261029.md) |
 | 法条冻结资产恢复 | [collaboration-corpus-recovery-20261028.md](../benchmarks/collaboration-corpus-recovery-20261028.md) |
 | 架构与威胁模型 | [system.md](../architecture/system.md)、[threat-model.md](../security/threat-model.md) |
+| 答案质量门禁 | [eval-gate.md](../runbook/eval-gate.md) |
+| PostgreSQL 双后端与向量检索基准 | [postgresql.md](../runbook/postgresql.md)、[postgres-vector-search-20261102.md](../benchmarks/postgres-vector-search-20261102.md) |
+| 信息隔离墙与行级安全开销 | [case-walls.md](../runbook/case-walls.md)、[postgres-rls-overhead-20261102.md](../benchmarks/postgres-rls-overhead-20261102.md) |
 
 ## 6. 明确未覆盖
 
