@@ -96,9 +96,49 @@ def inference_manifest(mode: str, *, dataset_path: Path, model: str | None = Non
             "temperature": os.getenv("LAW_REVIEW_LLM_TEMPERATURE", ""),
             "max_tokens": os.getenv("LAW_REVIEW_LLM_MAX_TOKENS", "700"),
         }
-    identity = {key: value for key, value in manifest.items() if key != "gate_version"}
-    manifest["inference_id"] = _sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False).encode())[:16]
+    manifest["inference_id"] = _inference_id(manifest)
     return manifest
+
+
+def _inference_id(manifest: dict[str, Any]) -> str:
+    identity = {key: value for key, value in manifest.items() if key not in ("gate_version", "inference_id")}
+    return _sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False).encode())[:16]
+
+
+def check_report_matches_code(report: dict[str, Any], *, dataset_path: Path = DEFAULT_DATASET) -> None:
+    """Refuse to register a saved report unless the current code would have produced it.
+
+    The run's model settings (name, endpoint, sampling) are taken from the
+    report; everything the code decides must match the current checkout.
+    """
+    missing = [key for key in ("summary", "items", "manifest", "generated_at") if key not in report]
+    if missing:
+        raise GateConfigurationError("报告缺少字段：" + "、".join(missing))
+    manifest = report["manifest"]
+    if manifest.get("gate_version") != GATE_VERSION:
+        raise GateConfigurationError(f"报告由门禁 {manifest.get('gate_version')} 生成，当前为 {GATE_VERSION}，"
+                                     "评分口径可能不同，需要重新运行")
+    if manifest.get("inference_id") != _inference_id(manifest):
+        raise GateConfigurationError("报告的推理版本与报告内容不符")
+    mode = manifest.get("mode")
+    if mode not in DEFAULT_BASELINES:
+        raise GateConfigurationError(f"未知的门禁模式：{mode}")
+    run_model = manifest.get("model") or {}
+    if mode == "model" and not (run_model.get("name") and run_model.get("endpoint")):
+        raise GateConfigurationError("模型模式的报告缺少模型名或端点")
+    current = inference_manifest(mode, dataset_path=dataset_path, model=run_model.get("name"),
+                                 endpoint=run_model.get("endpoint"),
+                                 backend=manifest.get("database_backend", "sqlite"))
+    if mode == "model":
+        current["model"] = run_model
+    differing = sorted(f"modules/{name}" for name, digest in current["modules"].items()
+                       if manifest.get("modules", {}).get(name) != digest)
+    differing += sorted(key for key in current
+                        if key not in ("modules", "inference_id", "gate_version") and current[key] != manifest.get(key))
+    if differing:
+        raise GateConfigurationError("报告与当前代码的推理配置不同（" + "、".join(differing) + "），需要用当前代码重新运行")
+    if len(report["items"]) != report["summary"].get("queries"):
+        raise GateConfigurationError("报告的逐题结果与汇总题数不一致")
 
 
 @contextmanager
@@ -264,7 +304,9 @@ def run(mode: str = "rules", *, dataset_path: Path = DEFAULT_DATASET, workdir: P
     return report
 
 
-def baseline_from(report: dict[str, Any], *, reason: str, previous: dict[str, Any] | None) -> dict[str, Any]:
+def baseline_from(report: dict[str, Any], *, reason: str, previous: dict[str, Any] | None,
+                  source: dict[str, Any] | None = None) -> dict[str, Any]:
+    """``source``: where a baseline registered from a saved report came from."""
     if not reason.strip():
         raise GateConfigurationError("登记新基线必须写明原因")
     history = list((previous or {}).get("history", []))
@@ -272,17 +314,27 @@ def baseline_from(report: dict[str, Any], *, reason: str, previous: dict[str, An
         history.append({"inference_id": previous["manifest"]["inference_id"],
                         "registered_at": previous.get("registered_at"),
                         "reason": previous.get("reason"), "summary": previous["summary"]})
-    return {
+    baseline = {
         "manifest": report["manifest"], "summary": report["summary"],
         "items": {key: {"passed": row["passed"]} for key, row in report["items"].items()},
         "registered_at": report["generated_at"], "reason": reason.strip(), "history": history,
     }
+    if source:
+        baseline["registered_from"] = source
+    return baseline
 
 
-def render_markdown(report: dict[str, Any], verdict: dict[str, Any] | None, baseline: dict[str, Any] | None) -> str:
+def render_markdown(report: dict[str, Any], verdict: dict[str, Any] | None, baseline: dict[str, Any] | None,
+                    *, registered: bool = False) -> str:
     summary = report["summary"]
     manifest = report["manifest"]
-    lines = [f"## 评测门禁（{manifest['mode']}）：" + ("通过" if verdict is None or verdict["passed"] else "未通过"), ""]
+    if registered:
+        status = "已登记为基线"
+    elif verdict is None:
+        status = "未比较（没有基线）"  # never "passed": nothing was compared
+    else:
+        status = "通过" if verdict["passed"] else "未通过"
+    lines = [f"## 评测门禁（{manifest['mode']}）：{status}", ""]
     lines.append(f"推理版本 `{manifest['inference_id']}`，数据库 {manifest['database_backend']}，"
                  f"评测集 {summary['queries']} 题。")
     lines += ["", "| 指标 | 本次 | 基线 |", "| --- | --- | --- |"]

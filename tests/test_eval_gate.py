@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
 
 import pytest
 
@@ -160,3 +161,42 @@ def test_model_mode_that_never_reached_a_model_is_refused(tmp_path):
     # Nothing listens on port 1: every answer falls back to rules.
     with pytest.raises(GateConfigurationError):
         run("model", workdir=tmp_path, endpoint="http://127.0.0.1:1/v1", model="absent")
+
+
+def test_without_a_baseline_the_summary_never_says_passed(current):
+    assert "未比较（没有基线）" in render_markdown(current, None, None)
+    assert "：通过" not in render_markdown(current, None, None)
+    assert "已登记为基线" in render_markdown(current, None, BASELINE, registered=True)
+
+
+def test_a_saved_report_is_registered_only_when_the_current_code_would_produce_it(current, tmp_path, capsys):
+    from scripts.eval_gate import main
+
+    def register(report: dict) -> tuple[int, Path]:
+        source = tmp_path / f"report-{len(list(tmp_path.iterdir()))}.json"
+        source.write_text(json.dumps(report, ensure_ascii=False), encoding="utf-8")
+        target = tmp_path / f"baseline-{source.stem}.json"
+        code = main(["--update-baseline", "--from-report", str(source), "--baseline", str(target),
+                     "--reason", "登记已复核的报告"])
+        return code, target
+
+    code, target = register(current)
+    assert code == 0
+    registered = json.loads(target.read_text(encoding="utf-8"))
+    assert registered["manifest"]["inference_id"] == current["manifest"]["inference_id"]
+    assert len(registered["registered_from"]["sha256"]) == 64
+
+    changed_code = copy.deepcopy(current)
+    changed_code["manifest"]["modules"]["rag.py"] = "0" * 64
+    changed_code["manifest"]["inference_id"] = eval_gate._inference_id(changed_code["manifest"])
+    edited_id = copy.deepcopy(current)
+    edited_id["manifest"]["prompt_version"] = "other"  # contents no longer match the recorded id
+    other_scoring = copy.deepcopy(current)
+    other_scoring["manifest"]["gate_version"] = "eval-gate-v0"
+    for report in (changed_code, edited_id, other_scoring, {"manifest": {}}):
+        code, target = register(report)
+        assert code == 2 and not target.exists()
+    assert "modules/rag.py" in capsys.readouterr().err
+
+    with pytest.raises(SystemExit):
+        main(["--from-report", str(tmp_path / "report-0.json")])

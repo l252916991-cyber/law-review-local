@@ -13,11 +13,17 @@ Register a new baseline after an intended change (the reason is stored)::
 
     uv run --locked python scripts/eval_gate.py --update-baseline --reason "..."
 
+Register a saved, reviewed report instead of running again (model runs take
+minutes); refused unless the current code would produce the same inference id::
+
+    uv run --locked python scripts/eval_gate.py --update-baseline --from-report report.json --reason "..."
+
 Exit codes: 0 passed, 1 blocked by a regression, 2 configuration error.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import tempfile
@@ -31,6 +37,7 @@ from app.eval_gate import (  # noqa: E402
     DEFAULT_DATASET,
     GateConfigurationError,
     baseline_from,
+    check_report_matches_code,
     compare,
     render_markdown,
     run,
@@ -39,7 +46,7 @@ from app.eval_gate import (  # noqa: E402
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--mode", choices=("rules", "model"), default="rules")
+    parser.add_argument("--mode", choices=("rules", "model"), help="default: rules")
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--endpoint", help="model mode: loopback OpenAI-compatible base URL")
@@ -50,20 +57,38 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--markdown", type=Path, help="append a Markdown summary here (e.g. $GITHUB_STEP_SUMMARY)")
     parser.add_argument("--update-baseline", action="store_true")
     parser.add_argument("--reason", default="")
+    parser.add_argument("--from-report", type=Path, metavar="REPORT",
+                        help="with --update-baseline: register this saved report instead of running")
     args = parser.parse_args(argv)
 
-    if args.mode == "model" and not (args.endpoint and args.model):
+    source = None
+    if args.from_report:
+        if not args.update_baseline:
+            parser.error("--from-report 只能与 --update-baseline 一起使用")
+        raw = args.from_report.read_bytes()
+        saved = json.loads(raw)
+        saved_mode = saved.get("manifest", {}).get("mode")
+        if args.mode and args.mode != saved_mode:
+            parser.error(f"报告的模式是 {saved_mode}，与 --mode {args.mode} 不符")
+        args.mode = saved_mode
+        source = {"report": args.from_report.name, "sha256": hashlib.sha256(raw).hexdigest()}
+    args.mode = args.mode or "rules"
+    if args.mode == "model" and not args.from_report and not (args.endpoint and args.model):
         parser.error("--mode model 需要 --endpoint 与 --model")
     baseline_path = args.baseline or DEFAULT_BASELINES[args.mode]
     baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path.exists() else None
 
     try:
-        with tempfile.TemporaryDirectory(prefix="lexvault-eval-gate-") as directory:
-            report = run(args.mode, dataset_path=args.dataset.resolve(), workdir=Path(directory),
-                         endpoint=args.endpoint, model=args.model, postgres_admin_url=args.postgres)
+        if args.from_report:
+            report = saved
+            check_report_matches_code(report, dataset_path=args.dataset.resolve())
+        else:
+            with tempfile.TemporaryDirectory(prefix="lexvault-eval-gate-") as directory:
+                report = run(args.mode, dataset_path=args.dataset.resolve(), workdir=Path(directory),
+                             endpoint=args.endpoint, model=args.model, postgres_admin_url=args.postgres)
         verdict = compare(report, baseline) if baseline and not args.update_baseline else None
         if args.update_baseline:
-            new = baseline_from(report, reason=args.reason, previous=baseline)
+            new = baseline_from(report, reason=args.reason, previous=baseline, source=source)
             baseline_path.parent.mkdir(parents=True, exist_ok=True)
             baseline_path.write_text(json.dumps(new, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     except GateConfigurationError as exc:
@@ -75,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    markdown = render_markdown(report, verdict, baseline)
+    markdown = render_markdown(report, verdict, baseline, registered=args.update_baseline)
     if args.markdown:
         with args.markdown.open("a", encoding="utf-8") as stream:
             stream.write(markdown)

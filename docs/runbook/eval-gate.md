@@ -25,7 +25,17 @@ uv run --locked python scripts/eval_gate.py --mode model \
 uv run --locked python scripts/eval_gate.py --update-baseline --reason "说明改了什么、为什么可以接受"
 ```
 
-模型模式还没有基线：第一次在本机跑通后，用 `--mode model --update-baseline --reason ...` 登记到 `benchmarks/eval_gate/baseline-model.json`。如果没有任何一题实际调用到模型（端点不通、模型名错误），门禁报配置错误，不会把规则回答当成模型结果。单题模型调用失败记为该题失败，不跳过。
+模型模式的基线已登记（2026-11-02，Qwen3.8-27B 4-bit，51/60，[运行与失败复核](../history/eval-gate-model-baseline-20261102.md)）。要和它比较，端点、模型名、`LAW_REVIEW_LLM_TEMPERATURE=0.2`、`LAW_REVIEW_LLM_MAX_TOKENS=700` 需与登记时一致，否则比较的是另一套推理配置。如果没有任何一题实际调用到模型（端点不通、模型名错误），门禁报配置错误，不会把规则回答当成模型结果。单题模型调用失败记为该题失败，不跳过。
+
+模型模式一轮要二十多分钟。已经跑完并复核过的报告可以直接登记，不必重跑：
+
+```sh
+uv run --locked python scripts/eval_gate.py --update-baseline --from-report output/.../report.json --reason "..."
+```
+
+门禁会用当前代码重新算推理清单：门禁版本、提示词、推理模块摘要、评测集、数据库后端任何一项与报告不同都拒绝登记，并列出不同的项；模型名、端点与采样参数取自报告。基线里记下报告文件的 SHA-256。
+
+没有基线时，摘要标题写“未比较（没有基线）”，退出码 2；不会写“通过”。
 
 ## 报告里有什么
 

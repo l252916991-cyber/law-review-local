@@ -1,0 +1,240 @@
+{
+  "manifest": {
+    "gate_version": "eval-gate-v1",
+    "mode": "model",
+    "dataset": {
+      "path": "benchmarks/answer_eval/v2/dataset.json",
+      "sha256": "428264866dccc02b6ab8e83b9cbc8a9ac52f392906eeb8c1aff8b3a609eabf47"
+    },
+    "prompt_version": "chat-system-v4-multiturn-untrusted-history",
+    "local_prompt_version": "domain-local-v1-bounded-citations",
+    "answerability_policy": "candidate-answerability-v11-detail",
+    "context_policy": "multiturn-context-v1",
+    "system_prompt_sha256": "67b9420d9f62f23b00ab7d5510973164a23c4e6cac6aaf1df8a3787f156bb302",
+    "modules": {
+      "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
+      "answerability.py": "9868326b8e14befaf3f98ccab853a9bc94bc932dd0fa6d30d359b5baab14f778",
+      "context.py": "cb14f74120f80a7045495da224a2090fd89b799daca682896975831221980d95",
+      "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
+      "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
+      "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
+      "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
+      "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
+      "services.py": "37bdd87272588b524b14fe82b387f57602814b50b541903b8d0a014b2a15ce70",
+      "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
+    },
+    "database_backend": "sqlite",
+    "embeddings": "hashed-local",
+    "model": {
+      "name": "Qwen3.8-27B-oQ4e-mtp",
+      "endpoint": "http://127.0.0.1:18080/v1",
+      "temperature": "0.2",
+      "max_tokens": "700"
+    },
+    "inference_id": "b0b0cc4e6daf2d9f"
+  },
+  "summary": {
+    "queries": 60,
+    "passed": 51,
+    "pass_rate": 0.85,
+    "answerable_queries": 40,
+    "coverage_avg": 0.9125,
+    "citation_precision_avg": 0.2487,
+    "violation_count": 1,
+    "refusal_queries": 20,
+    "refusal_correct": 16,
+    "required_pages_cited": 36,
+    "latency_p50_ms": 18440.05,
+    "latency_p95_ms": 51549.51,
+    "llm_used": 50
+  },
+  "items": {
+    "normal-01": {
+      "passed": true
+    },
+    "normal-02": {
+      "passed": true
+    },
+    "normal-03": {
+      "passed": true
+    },
+    "normal-04": {
+      "passed": true
+    },
+    "normal-05": {
+      "passed": true
+    },
+    "normal-06": {
+      "passed": true
+    },
+    "normal-07": {
+      "passed": true
+    },
+    "normal-08": {
+      "passed": true
+    },
+    "normal-09": {
+      "passed": true
+    },
+    "normal-10": {
+      "passed": true
+    },
+    "normal-11": {
+      "passed": true
+    },
+    "normal-12": {
+      "passed": true
+    },
+    "normal-13": {
+      "passed": true
+    },
+    "normal-14": {
+      "passed": true
+    },
+    "normal-15": {
+      "passed": true
+    },
+    "normal-16": {
+      "passed": true
+    },
+    "normal-17": {
+      "passed": true
+    },
+    "normal-18": {
+      "passed": true
+    },
+    "normal-19": {
+      "passed": true
+    },
+    "normal-20": {
+      "passed": true
+    },
+    "normal-21": {
+      "passed": true
+    },
+    "normal-22": {
+      "passed": true
+    },
+    "normal-23": {
+      "passed": true
+    },
+    "normal-24": {
+      "passed": true
+    },
+    "normal-25": {
+      "passed": true
+    },
+    "normal-26": {
+      "passed": true
+    },
+    "normal-27": {
+      "passed": true
+    },
+    "normal-28": {
+      "passed": true
+    },
+    "normal-29": {
+      "passed": true
+    },
+    "normal-30": {
+      "passed": true
+    },
+    "contradiction-01": {
+      "passed": true
+    },
+    "contradiction-02": {
+      "passed": false
+    },
+    "contradiction-03": {
+      "passed": true
+    },
+    "contradiction-04": {
+      "passed": false
+    },
+    "contradiction-05": {
+      "passed": true
+    },
+    "contradiction-06": {
+      "passed": false
+    },
+    "contradiction-07": {
+      "passed": false
+    },
+    "contradiction-08": {
+      "passed": true
+    },
+    "contradiction-09": {
+      "passed": false
+    },
+    "contradiction-10": {
+      "passed": true
+    },
+    "insufficient-01": {
+      "passed": true
+    },
+    "insufficient-02": {
+      "passed": true
+    },
+    "insufficient-03": {
+      "passed": true
+    },
+    "insufficient-04": {
+      "passed": false
+    },
+    "insufficient-05": {
+      "passed": true
+    },
+    "insufficient-06": {
+      "passed": true
+    },
+    "insufficient-07": {
+      "passed": true
+    },
+    "insufficient-08": {
+      "passed": false
+    },
+    "irrelevant-01": {
+      "passed": true
+    },
+    "irrelevant-02": {
+      "passed": true
+    },
+    "irrelevant-03": {
+      "passed": true
+    },
+    "irrelevant-04": {
+      "passed": true
+    },
+    "statute_missing-01": {
+      "passed": true
+    },
+    "statute_missing-02": {
+      "passed": true
+    },
+    "statute_missing-03": {
+      "passed": true
+    },
+    "statute_missing-04": {
+      "passed": true
+    },
+    "injection-01": {
+      "passed": true
+    },
+    "injection-02": {
+      "passed": true
+    },
+    "injection-03": {
+      "passed": false
+    },
+    "injection-04": {
+      "passed": false
+    }
+  },
+  "registered_at": "2026-11-02T00:03:45+00:00",
+  "reason": "首个模型基线：本机 Qwen3.8-27B-oQ4e-mtp（oMLX 0.7.0、MLX 0.32.2），temperature 0.2、max_tokens 700、openai-completions 接口，关闭 thinking、工具循环与模型回退；2026-11-02 在提交 659619a 上运行，10 个推理模块与登记时的代码相同。51/60，9 道失败题的复核见 docs/history/eval-gate-model-baseline-20261102.md。",
+  "history": [],
+  "registered_from": {
+    "report": "report.json",
+    "sha256": "1363729a782d4b90f8d1855cf035a68dfe5bbcb9605fed85d5449d69670b4825"
+  }
+}
