@@ -111,6 +111,77 @@ ALTER TABLE embedding_cache ADD COLUMN IF NOT EXISTS embedding vector
     GENERATED ALWAYS AS (CASE WHEN vector_json IN ('', '[]') THEN NULL ELSE vector_json::vector END) STORED;
 """
 
+#: Row-level security for information walls. A walled case's rows are visible
+#: only to its insiders, to holders of an active break-glass grant, and to
+#: system connections (startup, workers, index rebuilds). Administrators are not
+#: exempt. The same policy shape keyed on a tenant id is multi-tenant isolation.
+WALL_FUNCTION = """
+CREATE OR REPLACE FUNCTION lexvault_case_visible(target BIGINT) RETURNS boolean
+    LANGUAGE sql STABLE AS $$
+    SELECT coalesce(current_setting('lexvault.system', true), '') = 'on'
+        OR NOT EXISTS (SELECT 1 FROM case_walls w WHERE w.case_id = target)
+        OR EXISTS (SELECT 1 FROM case_wall_insiders i
+                   WHERE i.case_id = target AND i.principal_name = current_setting('lexvault.actor', true))
+        OR EXISTS (SELECT 1 FROM case_wall_grants g
+                   WHERE g.case_id = target AND g.principal_name = current_setting('lexvault.actor', true)
+                     AND g.expires_at > extract(epoch FROM now()))
+$$;
+"""
+#: Tables that hold case material directly (their own ``case_id``).
+WALLED_DIRECT = (
+    "agent_runs", "bank_transactions", "batch_dispatch", "batch_imports", "case_reports", "chat_requests",
+    "conversations", "documents", "evidence", "evidence_relations", "gap_detections", "host_write_receipts",
+    "llm_calls", "memories", "pages_fts", "rag_evaluations", "review_jobs", "review_tasks", "runtime_requests",
+)
+#: Tables that reach their case through a parent row: (column, parent table).
+WALLED_VIA = {
+    "agent_steps": ("run_id", "agent_runs"),
+    "bank_transaction_relations": ("evidence_id", "evidence"),
+    "batch_import_files": ("batch_id", "batch_imports"),
+    "case_report_events": ("report_id", "case_reports"),
+    "case_report_versions": ("report_id", "case_reports"),
+    "embedding_cache": ("page_id", "pages"),
+    "evidence_annotations": ("evidence_id", "evidence"),
+    "host_runtime_links": ("conversation_id", "conversations"),
+    "messages": ("conversation_id", "conversations"),
+    "page_child_chunks": ("page_id", "pages"),
+    "page_child_index_state": ("page_id", "pages"),
+    "pages": ("document_id", "documents"),
+    "review_task_events": ("task_id", "review_tasks"),
+}
+#: Case-linked tables that deliberately stay visible, and why.
+WALL_EXEMPT = {
+    "audit_log": "compliance trail: the firm's auditors see every record",
+    "security_events": "security trail, no case material",
+    "case_members": "membership resolves identities before a request has a principal",
+    "case_walls": "the wall itself", "case_wall_insiders": "the wall itself", "case_wall_grants": "the wall itself",
+}
+CASE_LINK_COLUMNS = ("case_id", "document_id", "page_id", "conversation_id", "run_id", "evidence_id",
+                     "report_id", "task_id", "batch_id")
+
+
+def wall_policies(columns: dict[str, list[str]]) -> str:
+    unclassified = sorted(
+        name for name, cols in columns.items()
+        if name != "cases" and any(col in CASE_LINK_COLUMNS for col in cols)
+        and name not in WALLED_DIRECT and name not in WALLED_VIA and name not in WALL_EXEMPT)
+    if unclassified:
+        raise SystemExit(f"case-linked tables without a wall rule: {', '.join(unclassified)}")
+    rules = {"cases": "lexvault_case_visible(id)"}
+    rules.update({name: "lexvault_case_visible(case_id)" for name in WALLED_DIRECT})
+    for name, (column, parent) in WALLED_VIA.items():
+        rules[name] = f"{column} IS NULL OR EXISTS (SELECT 1 FROM {parent} p WHERE p.id = {name}.{column})"
+    parts = [WALL_FUNCTION]
+    for name in sorted(rules):
+        parts.append(
+            f"ALTER TABLE {name} ENABLE ROW LEVEL SECURITY;\n"
+            f"ALTER TABLE {name} FORCE ROW LEVEL SECURITY;\n"
+            f"DROP POLICY IF EXISTS lexvault_wall ON {name};\n"
+            f"CREATE POLICY lexvault_wall ON {name} USING ({rules[name]});"
+        )
+    return "\n".join(parts)
+
+
 #: Triggers written by hand above; any other SQLite trigger must be ported.
 PORTED_TRIGGERS = {"documents_fts_update", "host_runtime_delete", "pages_fts_delete",
                    "pages_fts_insert", "pages_fts_update"}
@@ -182,10 +253,13 @@ def translate_index(sql: str) -> str:
 def render() -> str:
     version, rows = sqlite_schema()
     tables: dict[str, tuple[str, set[str]]] = {}
+    columns: dict[str, list[str]] = {"pages_fts": ["case_id", "document_id", "page_id"]}
     indexes: list[str] = []
     for kind, name, table, sql in rows:
         if kind == "table" and not SKIPPED_TABLES.match(name):
             tables[name] = translate_table(sql)
+            body = sql.split("(", 1)[1].rsplit(")", 1)[0]
+            columns[name] = [part.split()[0].strip('"') for part in _split_columns(body) if part.split()]
         elif kind == "index" and not SKIPPED_TABLES.match(table):
             indexes.append(translate_index(sql))
         elif kind == "trigger" and name not in PORTED_TRIGGERS:
@@ -208,6 +282,7 @@ def render() -> str:
     parts.append("")
     parts += indexes
     parts.append(FTS_SQL)
+    parts.append(wall_policies(columns))
     return "\n".join(parts).rstrip() + "\n"
 
 

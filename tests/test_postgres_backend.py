@@ -97,10 +97,12 @@ def test_generated_postgres_schema_matches_the_current_sqlite_schema():
 
 @pytest.fixture
 def pg_url():
-    from app.db_postgres import create_database, drop_database
+    from app.db_postgres import create_database, drop_database, ensure_role
+    from tests.support import POSTGRES_APP_ROLE
 
+    ensure_role(ADMIN_URL, POSTGRES_APP_ROLE)
     name = f"lexvault_pg_{os.getpid()}_{uuid.uuid4().hex[:12]}"
-    url = create_database(ADMIN_URL, name)
+    url = create_database(ADMIN_URL, name, owner=POSTGRES_APP_ROLE)
     try:
         yield url
     finally:

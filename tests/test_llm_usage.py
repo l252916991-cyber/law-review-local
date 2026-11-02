@@ -57,8 +57,8 @@ class AccountingTests(unittest.TestCase):
         # The latest migration number is asserted on purpose: a schema bump must
         # update this test rather than silently passing on an old database.
         # v22 adds concurrency versions, v23 members, v24 review tasks,
-        # v25 report signing, v26 frozen delivery bodies.
-        self.assertEqual(version, 26)
+        # v25 report signing, v26 frozen delivery bodies, v27 information walls.
+        self.assertEqual(version, 27)
         self.assertTrue({"case_id", "run_id", "input_tokens", "ttft_ms", "kind"} <= columns)
 
     def test_explicit_price_column_is_stored_verbatim(self):

@@ -6,6 +6,8 @@ import unittest
 import uuid
 from unittest.mock import patch
 
+POSTGRES_APP_ROLE = "lexvault_app"
+
 
 class IsolatedDatabaseTestCase(unittest.TestCase):
     def __init_subclass__(cls, **kwargs):
@@ -30,10 +32,13 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
             if sqlite_only:
                 values["LAW_REVIEW_DATABASE_URL"] = ""  # an empty URL means the SQLite file
             elif admin_url:
-                from app.db_postgres import create_database, drop_database
+                from app.db_postgres import create_database, drop_database, ensure_role
 
+                # The application role owns the database and is not a superuser,
+                # so row-level security (information walls) is in force.
+                ensure_role(admin_url, POSTGRES_APP_ROLE)
                 name = f"lexvault_t_{os.getpid()}_{uuid.uuid4().hex[:12]}"
-                values["LAW_REVIEW_DATABASE_URL"] = create_database(admin_url, name)
+                values["LAW_REVIEW_DATABASE_URL"] = create_database(admin_url, name, owner=POSTGRES_APP_ROLE)
                 current.addClassCleanup(drop_database, admin_url, name)
             environment = patch.dict(os.environ, values)
             environment.start()

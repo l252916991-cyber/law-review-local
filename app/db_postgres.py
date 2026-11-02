@@ -339,6 +339,16 @@ class PgConnection:
             return Cursor(rows=[])
         raise NotImplementedError(f"PRAGMA {name} has no PostgreSQL equivalent here")
 
+    def identify(self, actor: str, system: bool) -> None:
+        """Name who is asking, for the row-level security policies.
+
+        Committed at once: a later rollback must not silently reset the
+        connection to an anonymous session.
+        """
+        self._run("SELECT set_config('lexvault.actor', %s, false), set_config('lexvault.system', %s, false)",
+                  (actor, "on" if system else "off"), consume=True)
+        self._conn.commit()
+
     # -- transaction and lifetime -----------------------------------------
     @property
     def in_transaction(self) -> bool:
@@ -385,13 +395,35 @@ def apply_schema(url: str, version: int) -> None:
                      "ON CONFLICT (singleton) DO UPDATE SET version = excluded.version", (version,))
 
 
-def create_database(admin_url: str, name: str) -> str:
-    """Create an empty database next to ``admin_url`` and return its URL."""
+def ensure_role(admin_url: str, role: str) -> None:
+    """A login role without superuser or BYPASSRLS: row-level security applies to it."""
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", role):
+        raise ValueError("role name must be a lowercase identifier")
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        if conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone() is None:
+            try:
+                conn.execute(f'CREATE ROLE "{role}" LOGIN NOSUPERUSER NOBYPASSRLS')
+            except psycopg.errors.DuplicateObject:
+                pass  # created concurrently
+
+
+def create_database(admin_url: str, name: str, *, owner: str | None = None) -> str:
+    """Create an empty database next to ``admin_url`` and return its URL.
+
+    With ``owner`` the database belongs to that role, pgvector is installed by
+    the administrator, and the returned URL logs in as the owner -- the way the
+    application should run, since a superuser bypasses row-level security.
+    """
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", name):
         raise ValueError("database name must be a lowercase identifier")
     with psycopg.connect(admin_url, autocommit=True) as conn:
-        conn.execute(f'CREATE DATABASE "{name}"')
-    return _with_database(admin_url, name)
+        conn.execute(f'CREATE DATABASE "{name}"' + (f' OWNER "{owner}"' if owner else ""))
+    url = _with_database(admin_url, name)
+    if owner is None:
+        return url
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    return _with_database(url, name, user=owner)
 
 
 def drop_database(admin_url: str, name: str) -> None:
@@ -399,9 +431,12 @@ def drop_database(admin_url: str, name: str) -> None:
         conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
-def _with_database(url: str, name: str) -> str:
+def _with_database(url: str, name: str, *, user: str | None = None) -> str:
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
     parts = {key: str(value) for key, value in conninfo_to_dict(url).items() if value is not None}
     parts["dbname"] = name
+    if user is not None:
+        parts["user"] = user
+        parts.pop("password", None)
     return make_conninfo("", **parts)

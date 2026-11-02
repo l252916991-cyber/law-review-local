@@ -99,10 +99,12 @@ def postgres_database_per_test(request):
         return
     import uuid
 
-    from app.db_postgres import create_database, drop_database
+    from app.db_postgres import create_database, drop_database, ensure_role
+    from tests.support import POSTGRES_APP_ROLE
 
+    ensure_role(admin_url, POSTGRES_APP_ROLE)
     name = f"lexvault_f_{os.getpid()}_{uuid.uuid4().hex[:12]}"
-    url = create_database(admin_url, name)
+    url = create_database(admin_url, name, owner=POSTGRES_APP_ROLE)
     try:
         with patch.dict(os.environ, {"LAW_REVIEW_DATABASE_URL": url}):
             yield

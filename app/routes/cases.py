@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from ..audit_trail import record_field_changes
+from ..case_walls import exclusion_clause, hidden_case_ids
 from ..db import connect, now, record_security_event, transaction
 from ..schemas import CaseDetail, CaseRow, CaseSummary
 from ..security import actor_name, allowed_case_ids, identity, require_permission
@@ -47,6 +48,7 @@ def list_cases():
                 return []
             where = " WHERE c.id IN (" + ",".join("?" for _ in permitted) + ")"
             parameters = tuple(permitted)
+        walled, walled_parameters = exclusion_clause("c.id", hidden_case_ids())
         rows = conn.execute(
             """
             SELECT c.*,
@@ -54,7 +56,8 @@ def list_cases():
                    (SELECT COALESCE(SUM(pages), 0) FROM documents d WHERE d.case_id = c.id) AS page_count,
                    (SELECT COUNT(*) FROM evidence e WHERE e.case_id = c.id) AS evidence_count
             FROM cases c
-            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (" AND " + where[7:] if where else "")) + " ORDER BY c.updated_at DESC, c.id DESC", parameters,
+            """ + (" WHERE c.lifecycle_status = 'active' AND c.lifecycle_status IS NOT NULL" + (" AND " + where[7:] if where else ""))
+            + walled + " ORDER BY c.updated_at DESC, c.id DESC", parameters + walled_parameters,
         ).fetchall()
         return [rowdict(x) for x in rows]
     finally:
@@ -170,6 +173,9 @@ def lifecycle_cases(lifecycle_status: Literal["archived", "trash"]):
         if permitted is not None:
             clause = " AND id IN (" + ",".join("?" for _ in permitted) + ")"
             parameters += tuple(permitted)
+        walled, walled_parameters = exclusion_clause("id", hidden_case_ids())
+        clause += walled
+        parameters += walled_parameters
         return [rowdict(r) for r in conn.execute(
             "SELECT * FROM cases WHERE lifecycle_status=?" + clause + " ORDER BY updated_at DESC", parameters
         ).fetchall()]

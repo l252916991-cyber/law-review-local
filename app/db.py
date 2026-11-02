@@ -5,6 +5,7 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -113,6 +114,43 @@ def backend_name() -> str:
     return "postgresql" if database_url() else "sqlite"
 
 
+# -- who is asking: PostgreSQL row-level security reads this per connection ------
+_system_access: ContextVar[bool] = ContextVar("lexvault_system_access", default=False)
+_identity_provider: Callable[[], str | None] | None = None
+
+
+def register_identity_provider(provider: Callable[[], str | None]) -> None:
+    """Install the function naming the current principal (``None`` = no request).
+
+    ``app.security`` registers it; the database layer cannot import security.
+    """
+    global _identity_provider
+    _identity_provider = provider
+
+
+@contextmanager
+def system_access():
+    """Maintenance that must see every case (index rebuilds, wall management)."""
+    token = _system_access.set(True)
+    try:
+        yield
+    finally:
+        _system_access.reset(token)
+
+
+def session_identity() -> tuple[str, bool]:
+    """``(actor, system)`` for the next connection.
+
+    Outside a request (startup, workers, scripts) there is no principal and the
+    connection acts for the system. Inside a request it acts for the principal,
+    and walled cases the principal is not inside are invisible to it.
+    """
+    if _system_access.get():
+        return "", True
+    name = _identity_provider() if _identity_provider is not None else None
+    return (name or "", name is None)
+
+
 def now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -131,7 +169,9 @@ def connect() -> sqlite3.Connection:
         from .db_postgres import PgConnection
 
         # PgConnection implements the sqlite3.Connection surface the app uses.
-        return cast(sqlite3.Connection, PgConnection(url))
+        pg = PgConnection(url)
+        pg.identify(*session_identity())
+        return cast(sqlite3.Connection, pg)
     conn = sqlite3.connect(get_db_path(), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -459,7 +499,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_evidence ON evidence_annotations(evid
 """
 
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
@@ -1136,6 +1176,41 @@ CREATE INDEX IF NOT EXISTS idx_case_report_versions_report ON case_report_versio
 """)
 
 
+
+def _migrate_v27(conn: sqlite3.Connection) -> None:
+    """Information walls: a walled case is visible only to its listed insiders.
+
+    Administrators are not exempt. A compliance officer outside the wall gets a
+    time-limited, audited break-glass grant instead; removing the wall removes
+    its insiders and grants.
+    """
+    _execute_script(conn, """
+CREATE TABLE IF NOT EXISTS case_walls (
+    case_id INTEGER PRIMARY KEY REFERENCES cases(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS case_wall_insiders (
+    case_id INTEGER NOT NULL REFERENCES case_walls(case_id) ON DELETE CASCADE,
+    principal_name TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    added_at TEXT NOT NULL,
+    PRIMARY KEY (case_id, principal_name)
+);
+CREATE TABLE IF NOT EXISTS case_wall_grants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES case_walls(case_id) ON DELETE CASCADE,
+    principal_name TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    granted_at TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_case_wall_grants_lookup ON case_wall_grants(case_id, principal_name, expires_at);
+""")
+
+
 CONVERSATION_ARCHIVE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -1171,6 +1246,7 @@ def _migrate_sqlite() -> None:
             _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10, _migrate_v11, _migrate_v12,
             _migrate_v13, _migrate_v14, _migrate_v15, _migrate_v16, _migrate_v17,
             _migrate_v18, _migrate_v19, _migrate_v20, _migrate_v21, _migrate_v22, _migrate_v23, _migrate_v24, _migrate_v25, _migrate_v26,
+            _migrate_v27,
         )
         for target in range(version + 1, SCHEMA_VERSION + 1):
             migrations[target - 1](conn)
@@ -1220,7 +1296,7 @@ END;
 
 def sync_fts_index() -> int:
     """Rebuild the small local FTS index so migrations and manual edits stay consistent."""
-    with transaction() as conn:
+    with system_access(), transaction() as conn:
         conn.execute("DELETE FROM pages_fts")
         conn.execute(
             """

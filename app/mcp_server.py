@@ -161,6 +161,17 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         case_id = int(raw)
 
+    from contextlib import closing
+
+    from .db import connect, system_access
+
+    with system_access(), closing(connect()) as conn:
+        walled = conn.execute("SELECT 1 FROM case_walls WHERE case_id = ?", (case_id,)).fetchone() is not None
+    if walled:
+        # The stdio client has no identity, so it can never be inside a wall.
+        print("该案件设有信息隔离墙，MCP 无法确认调用者身份，拒绝启动", file=sys.stderr)
+        return 2
+
     server = McpServer(case_id, use_remote_embeddings=args.allow_remote_embeddings)
     serve(server, sys.stdin, sys.stdout)
     return 0

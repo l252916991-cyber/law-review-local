@@ -282,7 +282,11 @@ def my_tasks():
             "ORDER BY due_at IS NULL, due_at, id",
             (principal.member_id,),
         ).fetchall()
-        visible = [row for row in rows if allowed is None or row["case_id"] in allowed]
+        from .case_walls import hidden_case_ids
+
+        hidden = hidden_case_ids()
+        visible = [row for row in rows if (allowed is None or row["case_id"] in allowed)
+                   and row["case_id"] not in hidden]
         tasks = [_task_payload(conn, row, today=today) for row in visible]
     counts = {key: 0 for key in STATUS_LABELS}
     for task in tasks:

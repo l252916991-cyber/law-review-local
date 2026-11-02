@@ -128,10 +128,13 @@ def _configured_members() -> list[dict[str, Any]]:
 
 
 def _member_payload(conn, row) -> dict[str, Any]:
+    from .case_walls import exclusion_clause, hidden_case_ids
+
+    clause, parameters = exclusion_clause("cm.case_id", hidden_case_ids())
     assignments = conn.execute(
         """SELECT cm.case_id, cm.role, c.title FROM case_members cm
-           JOIN cases c ON c.id = cm.case_id WHERE cm.member_id = ? ORDER BY cm.case_id""",
-        (row["id"],),
+           JOIN cases c ON c.id = cm.case_id WHERE cm.member_id = ?""" + clause + " ORDER BY cm.case_id",
+        (row["id"], *parameters),
     ).fetchall()
     active_tokens = conn.execute(
         "SELECT COUNT(*) FROM member_tokens WHERE member_id = ? AND revoked_at IS NULL", (row["id"],)

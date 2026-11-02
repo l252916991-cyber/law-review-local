@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from .db import connect, now, record_security_event, transaction
+from .db import connect, now, record_security_event, register_identity_provider, transaction
 from .services import egress_opener
 
 SESSION_TTL = 8 * 3600
@@ -201,6 +201,15 @@ class Principal:
 
 
 _principal: ContextVar[Principal | None] = ContextVar("lexvault_principal", default=None)
+
+
+def _current_principal_name() -> str | None:
+    principal = _principal.get()
+    return None if principal is None else principal.name
+
+
+# PostgreSQL connections carry this name so row-level security can apply walls.
+register_identity_provider(_current_principal_name)
 router = APIRouter(prefix="/api/auth", tags=["access"])
 
 
@@ -285,6 +294,11 @@ def allowed_case_ids() -> tuple[int, ...] | None:
 def require_case_access(case_id: int) -> None:
     ids = allowed_case_ids()
     if ids is not None and case_id not in ids:
+        raise HTTPException(404, "案件不存在或无访问权限")
+    from .case_walls import hidden_case_ids
+
+    # Same answer as a missing case: an outsider cannot even learn a wall exists.
+    if case_id in hidden_case_ids():
         raise HTTPException(404, "案件不存在或无访问权限")
 
 

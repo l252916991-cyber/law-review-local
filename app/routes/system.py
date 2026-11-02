@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from ..case_walls import exclusion_clause, hidden_case_ids
 from ..config import LLMConfig, clear_model_override, load_model_override, save_model_override
 from ..db import connect, database_url, get_db_path, record_security_event
 from ..security import actor_name, identity, require_permission
@@ -136,19 +137,27 @@ def lawbench_dataset(
 
 @router.get("/api/dashboard")
 def dashboard():
+    hidden = hidden_case_ids()
     conn = connect()
     try:
+        def count(sql: str, column: str) -> int:
+            clause, parameters = exclusion_clause(column, hidden)
+            return conn.execute(sql + " WHERE 1=1" + clause, parameters).fetchone()[0]
+
         totals = {
-            "cases": conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0],
-            "documents": conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0],
-            "pages": conn.execute("SELECT COALESCE(SUM(pages), 0) FROM documents").fetchone()[0],
-            "evidence": conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0],
-            "conversations": conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0],
+            "cases": count("SELECT COUNT(*) FROM cases", "id"),
+            "documents": count("SELECT COUNT(*) FROM documents", "case_id"),
+            "pages": count("SELECT COALESCE(SUM(pages), 0) FROM documents", "case_id"),
+            "evidence": count("SELECT COUNT(*) FROM evidence", "case_id"),
+            "conversations": count("SELECT COUNT(*) FROM conversations", "case_id"),
         }
+        # The audit log stays complete for compliance, but this feed shows
+        # nothing from walls its reader is outside of.
+        clause, parameters = exclusion_clause("case_id", hidden)
         recent = [
             rowdict(x)
             for x in conn.execute(
-                "SELECT * FROM audit_log ORDER BY id DESC LIMIT 8"
+                "SELECT * FROM audit_log WHERE 1=1" + clause + " ORDER BY id DESC LIMIT 8", parameters
             ).fetchall()
         ]
         return {"totals": totals, "recent": recent}
