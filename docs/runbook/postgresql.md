@@ -10,7 +10,8 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 ```
 
 - 数据库需要 pgvector 扩展。应用启动时会执行 `CREATE EXTENSION IF NOT EXISTS vector`，没有权限时请 DBA 预先在该库里创建。
-- 第一次启动按 `app/schema_postgres.sql` 建出最新结构（当前 schema 26），版本记在 `lexvault_schema_meta`。
+- 应用必须用**非超级用户**角色连接，最好让它拥有业务表：信息隔离墙依靠行级安全（RLS），超级用户和 `BYPASSRLS` 角色会绕过它。每个连接建立时写入当前身份，见[信息隔离墙](case-walls.md)。
+- 第一次启动按 `app/schema_postgres.sql` 建出最新结构（当前 schema 27），版本记在 `lexvault_schema_meta`。
 - 已有库的版本比代码新，启动会拒绝（不降级）；比代码旧，也会拒绝并提示需要迁移，不会只建新表而让旧表缺列。PostgreSQL 的逐版本迁移还没有实现，下一次表结构变更时需要一并补上。
 - URL 写法同 libpq，`postgresql://user:pass@host:5432/db?sslmode=require` 也可以。
 
@@ -64,9 +65,9 @@ uv run --locked pytest tests -p pytest_socket --disable-socket --allow-unix-sock
 uv run --locked python scripts/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL"
 ```
 
-- 设置后，每个测试函数拿到一个新建的空库，每个 `IsolatedDatabaseTestCase` 测试类共用一个库；结束即删除。该账号需要建库权限。
+- 设置后，每个测试函数拿到一个新建的空库，每个 `IsolatedDatabaseTestCase` 测试类共用一个库；结束即删除。该账号需要建库和建角色的权限：测试库归非超级用户角色 `lexvault_app` 所有，应用以它的身份连接，所以行级安全对全部用例生效。
 - 测 SQLite 文件本身的用例标了 `@pytest.mark.sqlite_only(...)`、类属性 `sqlite_only` 或模块级 `SQLITE_ONLY`，在这种模式下仍跑 SQLite，并写明原因。
 - 结束时会打印有多少个测试在执行过程中真的打开过 PostgreSQL 连接；设 `LAW_REVIEW_TEST_POSTGRES_REPORT=<文件>` 可输出明细。
 - `tests/test_postgres_backend.py` 专测这一层：SQL 翻译、savepoint 语义、写锁串行、全文索引触发器、向量结果两库一致、旧版本库拒绝启动、门禁在 PostgreSQL 上通过。
 
-CI 的 `postgres` 任务用 Ubuntu 软件源里的 PostgreSQL 16 和 pgvector 0.6.0 跑同一套测试和门禁。向量检索的性能数据见 [PostgreSQL 页向量检索基准](../benchmarks/postgres-vector-search-20261102.md)。
+CI 的 `postgres` 任务用 Ubuntu 软件源里的 PostgreSQL 16 和 pgvector 0.6.0 跑同一套测试和门禁。向量检索的性能数据见 [PostgreSQL 页向量检索基准](../benchmarks/postgres-vector-search-20261102.md)。行级安全的开销见[行级安全开销基准](../benchmarks/postgres-rls-overhead-20261102.md)。

@@ -21,7 +21,7 @@
   → 业务层（权限、审批、审计）
   → 模型端点（本机回环，可显式放行远端）
   → 工具层（只读白名单）
-  → SQLite（单机文件）
+  → SQLite（单机文件）或 PostgreSQL（行级安全执行信息隔离墙）
 ```
 
 跨边界的数据一律按不可信处理：卷宗文本、文件名、OCR 结果、历史对话、草稿线索、工具返回值、模型输出。
@@ -38,6 +38,7 @@
 | 日志泄露 | 把卷宗正文或令牌写入日志 | 结构化日志只记录类型与计数；安全事件不含请求体 | `app/logger.py`、`app/security.py` |
 | 供应链 | 依赖投毒、密钥入库 | 锁定带哈希、`pip-audit`、`gitleaks`、发布白名单 | `.github/workflows/security.yml` |
 | 路径逃逸 | 符号链接、`..` | `contained_path` 限制在受管数据目录内 | `tests/test_02_api_security.py` |
+| 隔离墙内信息外泄 | 墙外管理员或仍被分配的律师读取设墙案件；新接口忘记做检查 | 应用层统一检查并过滤跨案件列表；PostgreSQL 上 33 张表启用强制行级安全，连接携带身份；破窗访问限时、需书面理由并留痕 | `tests/test_case_walls.py` |
 | 存储布局泄露 | 接口返回原件在服务器上的绝对路径 | 材料列表、上传、目录校准响应剔除 `stored_path`；原件只经 `/api/documents/{id}/file` 下载，导出包只记 `has_file` | `tests/test_document_path_privacy.py` |
 
 ## 4. 已覆盖与未覆盖

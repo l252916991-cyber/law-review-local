@@ -88,13 +88,8 @@ class CaseWallTests(IsolatedDatabaseTestCase):
         cls.client.close()
 
     # -- helpers ------------------------------------------------------------------
-    def sweep(self, client: TestClient, headers: dict, *, refused: bool = True) -> list[tuple[str, int]]:
-        """GET every API path with the walled case's ids; return what each answered.
-
-        ``refused``: case paths must also answer with an error. With only the
-        database layer active a list may legitimately come back empty instead.
-        """
-        answered = []
+    def responses(self, client: TestClient, headers: dict):
+        """GET every API path with the walled case's ids: (path, url, status, body)."""
         for path, operations in self.app.openapi()["paths"].items():
             if "get" not in operations or not path.startswith("/api"):
                 continue
@@ -104,8 +99,18 @@ class CaseWallTests(IsolatedDatabaseTestCase):
             if response.headers.get("content-type", "").startswith("application/zip"):
                 with zipfile.ZipFile(io.BytesIO(body)) as archive:
                     body = b"".join(archive.read(member) for member in archive.namelist())
+            yield path, url, response, body.decode("utf-8", "replace")
+
+    def sweep(self, client: TestClient, headers: dict, *, refused: bool = True) -> list[tuple[str, int]]:
+        """GET every API path with the walled case's ids; return what each answered.
+
+        ``refused``: case paths must also answer with an error. With only the
+        database layer active a list may legitimately come back empty instead.
+        """
+        answered = []
+        for path, url, response, body in self.responses(client, headers):
             with self.subTest(path=path):
-                self.assertNotIn(MARKER, body.decode("utf-8", "replace"), f"{url} leaked walled content")
+                self.assertNotIn(MARKER, body, f"{url} leaked walled content")
                 if refused and ("{case_id}" in path or any(f"{{{key}}}" in path for key in (
                         "document_id", "evidence_id", "conversation_id"))):
                     self.assertGreaterEqual(response.status_code, 400, url)
@@ -231,6 +236,26 @@ class CaseWallTests(IsolatedDatabaseTestCase):
                 TestClient(self.app, raise_server_exceptions=False) as client:
             self.sweep(client, self.admin, refused=False)
             self.sweep(client, self.screened, refused=False)
+
+    def test_the_sweep_finds_leaks_when_no_layer_enforces_the_wall(self):
+        """Negative control: without the application check, SQLite has no second layer.
+
+        The sweep above only proves something if it can see a leak; here it must.
+        """
+        from app.db import backend_name
+
+        if backend_name() == "postgresql":
+            self.skipTest("on PostgreSQL row-level security still holds; see the test above")
+        with patch("app.case_walls.hidden_case_ids", lambda: frozenset()), \
+                patch("app.routes.cases.hidden_case_ids", lambda: frozenset()), \
+                patch("app.routes.system.hidden_case_ids", lambda: frozenset()), \
+                TestClient(self.app, raise_server_exceptions=False) as client:
+            leaked = sorted({path for headers in (self.admin, self.screened)
+                             for path, _, _, body in self.responses(client, headers) if MARKER in body})
+        print(f"\nwithout any wall layer, {len(leaked)} GET endpoints leak walled content")
+        self.assertGreaterEqual(len(leaked), 5, leaked)
+        for path in ("/api/cases/{case_id}", "/api/documents/{document_id}/pages/{page_no}"):
+            self.assertIn(path, leaked)
 
     def test_database_rows_follow_the_wall(self):
         from app.db import backend_name, connect, now
