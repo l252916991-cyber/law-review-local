@@ -51,7 +51,7 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 
 - 证据：`app/db_postgres.py`、`scripts/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
 - 实测：全量测试在两种数据库上都通过；门禁 60 题两库逐题结果一致；10,000 页单案向量检索 p50 1.29 s → 48 ms，前 20 页及顺序完全相同。
-- 边界：PostgreSQL 的逐版本迁移尚未实现；多实例部署还需要把任务队列和 checkpoint 移出进程。
+- 边界：多实例部署还需要把任务队列和 checkpoint 移出进程。PostgreSQL 逐版本迁移已有：只执行迁移文件得到的结构须与新建库逐项一致。
 
 **8. 实现信息隔离墙：应用层检查 + PostgreSQL 行级安全双层执行**
 设墙案件只有墙内名单上的人可见，管理员也不例外，墙外返回与案件不存在相同的 404；破窗访问限 30 分钟、须写理由并审计。数据库层 33 张表启用 `FORCE ROW LEVEL SECURITY`，每个连接写入当前身份，子表按主键回查父表；生成器发现未归类的案件关联表直接失败，新表不会绕过隔离墙。

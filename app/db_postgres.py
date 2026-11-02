@@ -378,21 +378,82 @@ class PgConnection:
 
 # -- database lifecycle -------------------------------------------------------
 
+#: The oldest PostgreSQL schema that can be upgraded in place. Version 27 is the
+#: first released PostgreSQL schema with row-level security; older databases
+#: are test or pilot data and are rebuilt rather than migrated.
+MIGRATION_BASELINE = 27
+MIGRATIONS_DIR = Path(__file__).with_name("postgres_migrations")
+
+
+def migration_file(version: int) -> Path:
+    """SQL that takes a PostgreSQL database from ``version - 1`` to ``version``."""
+    return MIGRATIONS_DIR / f"{version:04d}.sql"
+
+
 def apply_schema(url: str, version: int) -> None:
-    """Create every table, index, trigger and helper; record the schema version."""
+    """Create or upgrade the schema, then (re)apply every idempotent definition.
+
+    A database at an older version is upgraded one version at a time, each step
+    in its own transaction together with the version bump; a missing step, a
+    database older than :data:`MIGRATION_BASELINE` or a newer one is refused.
+    Concurrent starts serialise on an advisory lock.
+    """
     with psycopg.connect(url, autocommit=True) as conn:
-        found = conn.execute("SELECT to_regclass('lexvault_schema_meta') IS NOT NULL").fetchone()
-        exists = bool(found and found[0])
-        current = conn.execute("SELECT version FROM lexvault_schema_meta WHERE singleton = 1").fetchone() if exists else None
-        if current and current[0] > version:
-            raise RuntimeError(f"Database schema {current[0]} is newer than supported {version}; refusing downgrade")
-        if current and current[0] < version:
-            # CREATE ... IF NOT EXISTS would leave old tables without new columns.
-            raise RuntimeError(f"PostgreSQL schema {current[0]} needs migration to {version}; "
-                               "PostgreSQL migrations are not implemented yet")
-        conn.execute(SCHEMA_FILE.read_text(encoding="utf-8"))
-        conn.execute("INSERT INTO lexvault_schema_meta(singleton, version) VALUES (1, %s) "
-                     "ON CONFLICT (singleton) DO UPDATE SET version = excluded.version", (version,))
+        conn.execute("SELECT pg_advisory_lock(hashtext('lexvault_schema'))")
+        try:
+            found = conn.execute("SELECT to_regclass('lexvault_schema_meta') IS NOT NULL").fetchone()
+            exists = bool(found and found[0])
+            row = conn.execute("SELECT version FROM lexvault_schema_meta WHERE singleton = 1").fetchone() if exists else None
+            current = int(row[0]) if row else None
+            if current is not None and current > version:
+                raise RuntimeError(f"Database schema {current} is newer than supported {version}; refusing downgrade")
+            if current is not None and current < version:
+                if current < MIGRATION_BASELINE:
+                    raise RuntimeError(f"PostgreSQL schema {current} predates the first migratable version "
+                                       f"{MIGRATION_BASELINE}; export the data and rebuild the database")
+                steps = [migration_file(step) for step in range(current + 1, version + 1)]
+                missing = [path.name for path in steps if not path.exists()]
+                if missing:
+                    raise RuntimeError(f"PostgreSQL migration missing: {', '.join(missing)}")
+                for step, path in zip(range(current + 1, version + 1), steps, strict=True):
+                    with conn.transaction():
+                        conn.execute(path.read_text(encoding="utf-8"))
+                        conn.execute("UPDATE lexvault_schema_meta SET version = %s WHERE singleton = 1", (step,))
+            conn.execute(SCHEMA_FILE.read_text(encoding="utf-8"))
+            conn.execute("INSERT INTO lexvault_schema_meta(singleton, version) VALUES (1, %s) "
+                         "ON CONFLICT (singleton) DO UPDATE SET version = excluded.version", (version,))
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(hashtext('lexvault_schema'))")
+
+
+def schema_fingerprint(url: str) -> dict[str, list[tuple[str, ...]]]:
+    """Everything a migration has to reproduce, comparable across two databases.
+
+    Column order and generated object names are left out: an upgraded table
+    gains columns at the end, and that is not a difference that matters.
+    """
+    queries = {
+        "columns": """SELECT table_name, column_name, data_type, udt_name, is_nullable,
+                             coalesce(column_default, '') FROM information_schema.columns
+                      WHERE table_schema = 'public'""",
+        "constraints": """SELECT c.conrelid::regclass::text, c.contype::text, pg_get_constraintdef(c.oid)
+                          FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
+                          WHERE n.nspname = 'public'""",
+        "indexes": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = 'public'",
+        "triggers": """SELECT t.tgrelid::regclass::text, t.tgname, pg_get_triggerdef(t.oid)
+                       FROM pg_trigger t WHERE NOT t.tgisinternal""",
+        "functions": """SELECT p.proname, pg_get_function_identity_arguments(p.oid), md5(p.prosrc)
+                        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                        WHERE n.nspname = 'public' AND p.prokind = 'f'
+                          AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')""",
+        "policies": """SELECT tablename, policyname, coalesce(qual, ''), coalesce(with_check, '')
+                       FROM pg_policies WHERE schemaname = 'public'""",
+        "row_security": """SELECT relname, relrowsecurity::text, relforcerowsecurity::text FROM pg_class
+                           WHERE relnamespace = 'public'::regnamespace AND relkind = 'r'""",
+    }
+    with psycopg.connect(url) as conn:
+        return {name: sorted(tuple(str(value) for value in row) for row in conn.execute(sql).fetchall())
+                for name, sql in queries.items()}
 
 
 def ensure_role(admin_url: str, role: str) -> None:

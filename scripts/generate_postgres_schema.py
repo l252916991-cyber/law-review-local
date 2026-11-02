@@ -296,11 +296,24 @@ def render() -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
+def missing_migrations() -> list[str]:
+    """Every schema version after the migration baseline needs its upgrade step."""
+    from app.db import SCHEMA_VERSION
+    from app.db_postgres import MIGRATION_BASELINE, migration_file
+
+    return [migration_file(version).relative_to(ROOT).as_posix()
+            for version in range(MIGRATION_BASELINE + 1, SCHEMA_VERSION + 1) if not migration_file(version).exists()]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="fail if the committed file is stale")
     args = parser.parse_args(argv)
     text = render()
+    missing = missing_migrations()
+    if missing:
+        print("缺少 PostgreSQL 迁移：" + "、".join(missing) + "（见 app/postgres_migrations/）", file=sys.stderr)
+        return 1
     if args.check:
         if not TARGET.exists() or TARGET.read_text(encoding="utf-8") != text:
             print("app/schema_postgres.sql 与当前 SQLite 结构不一致；运行 scripts/generate_postgres_schema.py", file=sys.stderr)
