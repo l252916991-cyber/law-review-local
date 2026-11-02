@@ -18,6 +18,13 @@ minutes); refused unless the current code would produce the same inference id::
 
     uv run --locked python scripts/eval_gate.py --update-baseline --from-report report.json --reason "..."
 
+A report scored by an older gate version is re-scored from its saved answers
+(kept in the report since eval-gate-v2, or given as a runner log with
+--answers); the answers must first reproduce the original scores::
+
+    uv run --locked python scripts/eval_gate.py --update-baseline --from-report report.json \
+        --answers answers.jsonl --reason "..."
+
 Exit codes: 0 passed, 1 blocked by a regression, 2 configuration error.
 """
 from __future__ import annotations
@@ -35,11 +42,14 @@ sys.path.insert(0, str(ROOT))
 from app.eval_gate import (  # noqa: E402
     DEFAULT_BASELINES,
     DEFAULT_DATASET,
+    GATE_VERSION,
     GateConfigurationError,
+    answers_from_runner_log,
     baseline_from,
     check_report_matches_code,
     compare,
     render_markdown,
+    rescore,
     run,
 )
 
@@ -59,12 +69,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reason", default="")
     parser.add_argument("--from-report", type=Path, metavar="REPORT",
                         help="with --update-baseline: register this saved report instead of running")
+    parser.add_argument("--answers", type=Path, metavar="ANSWERS_JSONL",
+                        help="with --from-report: the run's answers captured by a runner, to re-score the report")
     args = parser.parse_args(argv)
 
     source = None
     if args.from_report:
         if not args.update_baseline:
             parser.error("--from-report 只能与 --update-baseline 一起使用")
+        if args.answers and not args.answers.exists():
+            parser.error(f"找不到 {args.answers}")
         raw = args.from_report.read_bytes()
         saved = json.loads(raw)
         saved_mode = saved.get("manifest", {}).get("mode")
@@ -72,6 +86,10 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"报告的模式是 {saved_mode}，与 --mode {args.mode} 不符")
         args.mode = saved_mode
         source = {"report": args.from_report.name, "sha256": hashlib.sha256(raw).hexdigest()}
+        if args.answers:
+            source["answers_sha256"] = hashlib.sha256(args.answers.read_bytes()).hexdigest()
+    elif args.answers:
+        parser.error("--answers 只能与 --from-report 一起使用")
     args.mode = args.mode or "rules"
     if args.mode == "model" and not args.from_report and not (args.endpoint and args.model):
         parser.error("--mode model 需要 --endpoint 与 --model")
@@ -81,6 +99,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.from_report:
             report = saved
+            if args.answers or report.get("manifest", {}).get("gate_version") != GATE_VERSION:
+                answers = (answers_from_runner_log(args.answers.read_text(encoding="utf-8").splitlines())
+                           if args.answers else report.get("answers"))
+                if not answers:
+                    raise GateConfigurationError("报告由旧的评分口径生成，又没有保存回答；用 --answers 提供这一轮的回答")
+                report = rescore(report, answers, dataset_path=args.dataset.resolve())
+                if source is not None:
+                    source["rescored"] = report["rescored"]
             check_report_matches_code(report, dataset_path=args.dataset.resolve())
         else:
             with tempfile.TemporaryDirectory(prefix="lexvault-eval-gate-") as directory:

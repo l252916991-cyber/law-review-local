@@ -200,3 +200,58 @@ def test_a_saved_report_is_registered_only_when_the_current_code_would_produce_i
 
     with pytest.raises(SystemExit):
         main(["--from-report", str(tmp_path / "report-0.json")])
+
+
+def test_a_baseline_scored_by_another_gate_version_is_not_comparable(current):
+    older = copy.deepcopy(current)
+    older["manifest"]["gate_version"] = "eval-gate-v1"
+    with pytest.raises(GateConfigurationError, match="评分口径不同"):
+        compare(current, older)
+
+
+def test_reports_keep_their_answers_for_rescoring(current):
+    assert set(current["answers"]) == set(current["items"])
+    assert {"answer", "citations", "answer_status", "llm_used", "latency_ms"} <= set(current["answers"]["normal-01"])
+
+
+def test_an_older_report_is_rescored_only_if_its_answers_reproduce_it(current, tmp_path, capsys):
+    from app.answer_eval import load_dataset, score_answer_v2
+    from scripts.eval_gate import main
+
+    # A report as eval-gate-v1 wrote it: v2 scores, no saved answers.
+    dataset = load_dataset(eval_gate.DEFAULT_DATASET)
+    old = eval_gate.evaluate(dataset, current["answers"], scorer=score_answer_v2)
+    old["manifest"] = {**current["manifest"], "gate_version": "eval-gate-v1"}
+    old["generated_at"] = current["generated_at"]
+    report = tmp_path / "old-report.json"
+    report.write_text(json.dumps(old, ensure_ascii=False), encoding="utf-8")
+
+    def runner_log(answers: dict) -> Path:
+        path = tmp_path / f"answers-{len(list(tmp_path.iterdir()))}.jsonl"
+        path.write_text("\n".join(json.dumps({"id": key, "result": value}, ensure_ascii=False)
+                                  for key, value in answers.items()), encoding="utf-8")
+        return path
+
+    def register(answers_path: Path | None) -> tuple[int, Path]:
+        target = tmp_path / f"baseline-{len(list(tmp_path.iterdir()))}.json"
+        extra = ["--answers", str(answers_path)] if answers_path else []
+        return main(["--update-baseline", "--from-report", str(report), *extra, "--baseline", str(target),
+                     "--reason", "按新评分重新登记"]), target
+
+    code, target = register(None)  # nothing to re-score from
+    assert code == 2 and not target.exists()
+
+    code, target = register(runner_log(current["answers"]))
+    assert code == 0
+    registered = json.loads(target.read_text(encoding="utf-8"))
+    assert registered["manifest"]["gate_version"] == eval_gate.GATE_VERSION
+    assert registered["registered_from"]["rescored"]["from_gate_version"] == "eval-gate-v1"
+    assert len(registered["registered_from"]["answers_sha256"]) == 64
+
+    # Answers that are not this run's: one refusal turned into a confident answer.
+    altered = copy.deepcopy(current["answers"])
+    refusal = next(key for key, row in old["items"].items() if row["refusal_expected"] and row["passed"])
+    altered[refusal] = {**altered[refusal], "answer": "结案日期为2025年5月1日。", "answer_status": "answered"}
+    code, target = register(runner_log(altered))
+    assert code == 2 and not target.exists()
+    assert "复现不出" in capsys.readouterr().err

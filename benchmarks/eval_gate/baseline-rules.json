@@ -1,6 +1,6 @@
 {
   "manifest": {
-    "gate_version": "eval-gate-v1",
+    "gate_version": "eval-gate-v2",
     "mode": "rules",
     "dataset": {
       "path": "benchmarks/answer_eval/v2/dataset.json",
@@ -38,8 +38,8 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 14.91,
-    "latency_p95_ms": 21.03,
+    "latency_p50_ms": 13.63,
+    "latency_p95_ms": 18.38,
     "llm_used": 0
   },
   "items": {
@@ -224,8 +224,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-02T08:47:59+00:00",
-  "reason": "首轮模型门禁暴露的两处上下文问题已修：同句内跟在具名当事人之后的人称代词（如“不能替其定案”）不再被当作指向前文；“邮件”可指代电子邮件材料，类型词收窄检索范围时保留问题中点名的当事人自己的材料。contradiction-07、contradiction-09 由失败转为通过，无退化；提示词升为 v5（长度预算与带引用的拒答），规则模式不调用模型，不受影响。",
+  "registered_at": "2026-11-02T10:55:48+00:00",
+  "reason": "评分口径升为 eval-gate-v2（score_answer_v3：增加“未记载”“没有记载”“不包含”“拒绝执行”“无法执行”五个拒答措辞，引号内被否定的禁止断言不计）。规则模式回答在新旧口径下逐题结果相同，46/60。",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -244,6 +244,28 @@
         "required_pages_cited": 38,
         "latency_p50_ms": 18.72,
         "latency_p95_ms": 26.59,
+        "llm_used": 0
+      },
+      "gate_version": "eval-gate-v1"
+    },
+    {
+      "inference_id": "483c2e09a99d3428",
+      "gate_version": "eval-gate-v1",
+      "registered_at": "2026-11-02T08:47:59+00:00",
+      "reason": "首轮模型门禁暴露的两处上下文问题已修：同句内跟在具名当事人之后的人称代词（如“不能替其定案”）不再被当作指向前文；“邮件”可指代电子邮件材料，类型词收窄检索范围时保留问题中点名的当事人自己的材料。contradiction-07、contradiction-09 由失败转为通过，无退化；提示词升为 v5（长度预算与带引用的拒答），规则模式不调用模型，不受影响。",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 14.91,
+        "latency_p95_ms": 21.03,
         "llm_used": 0
       }
     }

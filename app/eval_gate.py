@@ -25,15 +25,21 @@ import json
 import math
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .answer_eval import load_dataset, score_answer_v2, summarise
+from .answer_eval import load_dataset, score_answer_v2, score_answer_v3, summarise
 
-GATE_VERSION = "eval-gate-v1"
+GATE_VERSION = "eval-gate-v2"
+#: Which scorer each gate version used. A baseline is only comparable with a
+#: run scored the same way; an older report can be re-scored from its answers.
+GATE_SCORERS: dict[str, Callable[..., dict[str, Any]]] = {
+    "eval-gate-v1": score_answer_v2,
+    "eval-gate-v2": score_answer_v3,
+}
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATASET = ROOT / "benchmarks" / "answer_eval" / "v2" / "dataset.json"
 DEFAULT_BASELINES = {
@@ -209,15 +215,24 @@ def collect(dataset: dict[str, Any], directory: Path, *, mode: str, endpoint: st
                 # A model failure is a failed question, never a skipped one.
                 result = {"answer": "", "citations": [], "answer_status": "model_error",
                           "llm_used": False, "error": type(exc).__name__}
-            elapsed = (time.perf_counter() - started) * 1000
-            answers[item["id"]] = {
-                "answer": result.get("answer") or "",
-                "citations": result.get("citations") or [],
-                "answer_status": result.get("answer_status"),
-                "llm_used": bool(result.get("llm_used")),
-                "latency_ms": round(elapsed, 2),
-            }
+            answers[item["id"]] = answer_record(result, (time.perf_counter() - started) * 1000)
     return answers
+
+
+def answer_record(result: dict[str, Any], latency_ms: float) -> dict[str, Any]:
+    """What scoring needs from one ``chat`` result; kept in the report for re-scoring."""
+    return {
+        "answer": result.get("answer") or "",
+        "citations": result.get("citations") or [],
+        "answer_status": result.get("answer_status"),
+        "llm_used": bool(result.get("llm_used")),
+        "latency_ms": round(latency_ms, 2),
+    }
+
+
+def model_error_record(latency_ms: float) -> dict[str, Any]:
+    return answer_record({"answer": "", "citations": [], "answer_status": "model_error", "llm_used": False},
+                         latency_ms)
 
 
 def _percentile(values: list[float], fraction: float) -> float:
@@ -226,12 +241,13 @@ def _percentile(values: list[float], fraction: float) -> float:
     return round(ordered[index], 2)
 
 
-def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]],
+             scorer: Callable[..., dict[str, Any]] = GATE_SCORERS[GATE_VERSION]) -> dict[str, Any]:
     rows = []
     for item in dataset["items"]:
         answer = answers[item["id"]]
-        score = score_answer_v2(item, answer["answer"], citations=answer["citations"],
-                                answer_status=answer["answer_status"])
+        score = scorer(item, answer["answer"], citations=answer["citations"],
+                       answer_status=answer["answer_status"])
         score["category"] = item.get("category")
         score["latency_ms"] = answer["latency_ms"]
         rows.append(score)
@@ -250,6 +266,10 @@ def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]]) -> dic
 def compare(current: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
     """Decide pass/fail against the baseline; every failure says why."""
     mode = current["manifest"]["mode"]
+    if baseline["manifest"].get("gate_version") != current["manifest"].get("gate_version"):
+        raise GateConfigurationError(
+            f"基线由门禁 {baseline['manifest'].get('gate_version')} 评分，本次为 {current['manifest'].get('gate_version')}；"
+            "评分口径不同不能比较，需要重新登记基线（可用 --from-report 加保存的回答重新评分）")
     if baseline["manifest"]["mode"] != mode:
         raise GateConfigurationError(f"基线模式为 {baseline['manifest']['mode']}，本次为 {mode}")
     if baseline["manifest"]["dataset"]["sha256"] != current["manifest"]["dataset"]["sha256"]:
@@ -301,7 +321,58 @@ def run(mode: str = "rules", *, dataset_path: Path = DEFAULT_DATASET, workdir: P
     report["manifest"] = inference_manifest(mode, dataset_path=dataset_path, model=model, endpoint=endpoint,
                                             backend="postgresql" if postgres_admin_url else "sqlite")
     report["generated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    # Synthetic case only; kept so a later scoring change can re-score this run.
+    report["answers"] = answers
     return report
+
+
+def rescore(report: dict[str, Any], answers: dict[str, dict[str, Any]], *,
+            dataset_path: Path = DEFAULT_DATASET) -> dict[str, Any]:
+    """Score a saved run again with the current gate's scorer.
+
+    The answers must first reproduce the report's original scores with the
+    scorer that produced them; otherwise they are not this run's answers.
+    """
+    manifest = report.get("manifest") or {}
+    original = GATE_SCORERS.get(manifest.get("gate_version", ""))
+    if original is None:
+        raise GateConfigurationError(f"不认识报告的门禁版本：{manifest.get('gate_version')}")
+    dataset = load_dataset(dataset_path)
+    if manifest.get("dataset", {}).get("sha256") != _sha256(dataset_path.read_bytes()):
+        raise GateConfigurationError("评测集与报告不一致")
+    missing = [item["id"] for item in dataset["items"] if item["id"] not in answers]
+    if missing:
+        raise GateConfigurationError("保存的回答缺少题目：" + "、".join(missing[:5]))
+    answers = {key: {**answers[key], "latency_ms": report["items"][key]["latency_ms"]} for key in report["items"]}
+    replay = evaluate(dataset, answers, scorer=original)
+    fields = ("passed", "refused", "violations", "matched", "required_pages_cited", "extra_citations")
+    differing = sorted(key for key, row in replay["items"].items()
+                       if any(row[field] != report["items"][key].get(field) for field in fields))
+    if differing or replay["summary"] != report["summary"]:
+        raise GateConfigurationError("保存的回答用原评分复现不出报告（" + "、".join(differing[:5]) + "），拒绝重新评分")
+    current = evaluate(dataset, answers)
+    changed = sorted(key for key, row in current["items"].items() if row["passed"] != report["items"][key]["passed"])
+    return {
+        **current, "manifest": {**manifest, "gate_version": GATE_VERSION},
+        "generated_at": report["generated_at"], "answers": answers,
+        "rescored": {"from_gate_version": manifest["gate_version"], "to_gate_version": GATE_VERSION,
+                     "summary_before": report["summary"], "changed": changed},
+    }
+
+
+def answers_from_runner_log(lines: Iterable[str]) -> dict[str, dict[str, Any]]:
+    """Answers captured by a diagnostic runner around ``chat``: one JSON object per line,
+    ``{"id", "result"}`` or ``{"id", "error"}``. Errors become model errors, as in ``collect``."""
+    answers: dict[str, dict[str, Any]] = {}
+    for line in lines:
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if "error" in record or not isinstance(record.get("result"), dict):
+            answers[record["id"]] = model_error_record(0.0)
+        else:
+            answers[record["id"]] = answer_record(record["result"], 0.0)
+    return answers
 
 
 def baseline_from(report: dict[str, Any], *, reason: str, previous: dict[str, Any] | None,
@@ -312,6 +383,7 @@ def baseline_from(report: dict[str, Any], *, reason: str, previous: dict[str, An
     history = list((previous or {}).get("history", []))
     if previous:
         history.append({"inference_id": previous["manifest"]["inference_id"],
+                        "gate_version": previous["manifest"].get("gate_version"),
                         "registered_at": previous.get("registered_at"),
                         "reason": previous.get("reason"), "summary": previous["summary"]})
     baseline = {
@@ -336,7 +408,12 @@ def render_markdown(report: dict[str, Any], verdict: dict[str, Any] | None, base
         status = "通过" if verdict["passed"] else "未通过"
     lines = [f"## 评测门禁（{manifest['mode']}）：{status}", ""]
     lines.append(f"推理版本 `{manifest['inference_id']}`，数据库 {manifest['database_backend']}，"
-                 f"评测集 {summary['queries']} 题。")
+                 f"评测集 {summary['queries']} 题，评分 {manifest.get('gate_version')}。")
+    rescored = report.get("rescored")
+    if rescored:
+        changed = "、".join(f"`{key}`" for key in rescored["changed"]) or "无"
+        lines.append(f"用保存的回答按 {rescored['to_gate_version']} 重新评分（原 {rescored['from_gate_version']} "
+                     f"通过 {rescored['summary_before']['passed']} 题），改判：{changed}。")
     lines += ["", "| 指标 | 本次 | 基线 |", "| --- | --- | --- |"]
     rows = [("通过题数", "passed"), ("引用到全部必需页", "required_pages_cited"),
             ("正确拒答", "refusal_correct"), ("禁止断言", "violation_count"),

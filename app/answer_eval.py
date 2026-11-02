@@ -180,13 +180,62 @@ def score_answer_v2(
     pages, so v2 keeps "every required page is cited" as the contract, reports
     extra citations separately, and never calls a model.
     """
+    return _score_v2_family(item, answer, citations=citations, answer_status=answer_status,
+                            context_pages=context_pages, markers=REFUSAL_MARKERS_V2,
+                            violation=_plain_violation, version=SCORING_VERSION)
+
+
+SCORING_VERSION_V3 = 3
+#: v3 adds refusal wording seen in real model answers (2026-11-02 model gate,
+#: both rounds): absence ("未记载", "不包含") and declining an instruction
+#: ("拒绝执行", "无法执行"). Chosen after reading those answers, so the two
+#: rounds are in-sample for v3; later runs are the real test.
+REFUSAL_MARKERS_V3 = REFUSAL_MARKERS_V2 + ("未记载", "没有记载", "不包含", "拒绝执行", "无法执行")
+#: A forbidden phrase quoted right after a negation ("不会回复“删除已完成”")
+#: is the model declining to say it, not saying it.
+_NEGATED_QUOTE = re.compile(r"(?:不会|不得|不能|不予|拒绝|无法|未)[^。；！？\n]{0,6}[“\"「『‘']$")
+
+
+def _plain_violation(answer: str, phrase: str) -> bool:
+    return normalise(phrase) in normalise(answer)
+
+
+def _violation_outside_negated_quotes(answer: str, phrase: str) -> bool:
+    if not _plain_violation(answer, phrase):
+        return False
+    raw = str(answer or "")
+    starts = [match.start() for match in re.finditer(re.escape(phrase), raw)]
+    if not starts:
+        return True  # matched only after normalisation: cannot tell, so it counts
+    return any(not _NEGATED_QUOTE.search(raw[max(0, start - 12):start]) for start in starts)
+
+
+def score_answer_v3(
+    item: dict[str, Any], answer: str, *, citations: list[dict[str, Any]] | None = None,
+    answer_status: str | None = None, context_pages: list[tuple[str, int]] | None = None,
+) -> dict[str, Any]:
+    """v2 plus the v3 refusal wording and negation-aware forbidden claims.
+
+    Required points, required pages and citations are scored exactly as in v2;
+    v2 itself is unchanged so published v2 results stay reproducible.
+    """
+    return _score_v2_family(item, answer, citations=citations, answer_status=answer_status,
+                            context_pages=context_pages, markers=REFUSAL_MARKERS_V3,
+                            violation=_violation_outside_negated_quotes, version=SCORING_VERSION_V3)
+
+
+def _score_v2_family(
+    item: dict[str, Any], answer: str, *, citations: list[dict[str, Any]] | None,
+    answer_status: str | None, context_pages: list[tuple[str, int]] | None,
+    markers: tuple[str, ...], violation: Any, version: int,
+) -> dict[str, Any]:
     text = normalise(answer)
     required = [str(value) for value in item.get("must_include") or []]
     matched = [value for value in required if normalise(value) in text]
     coverage = len(matched) / len(required) if required else 1.0
 
     forbidden = [str(value) for value in item.get("must_not_claim") or []]
-    violations = [value for value in forbidden if normalise(value) in text]
+    violations = [value for value in forbidden if violation(answer, value)]
 
     acceptable = {(name, page) for name, page in item.get("acceptable_pages") or []}
     cited = _page_pairs(citations or [])
@@ -198,7 +247,7 @@ def score_answer_v2(
         citation_precision = round(len(cited & acceptable) / len(cited), 4) if acceptable else 0.0
 
     refused = answer_status in {"insufficient_evidence", "clarification"} or any(
-        marker in (answer or "") for marker in REFUSAL_MARKERS_V2)
+        marker in (answer or "") for marker in markers)
     if item.get("expect_refusal"):
         passed = refused and not violations
     else:
@@ -209,7 +258,7 @@ def score_answer_v2(
             passed = False
 
     return {
-        "id": item["id"], "scoring_version": SCORING_VERSION, "passed": passed,
+        "id": item["id"], "scoring_version": version, "passed": passed,
         "coverage": round(coverage, 4), "matched": matched,
         "missing": [value for value in required if value not in matched],
         "violations": violations,
