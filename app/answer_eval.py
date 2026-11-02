@@ -270,6 +270,50 @@ def _score_v2_family(
     }
 
 
+#: Statements that decide for the lawyer: a person's state of mind, a defence
+#: refuted, conduct characterised in legal terms, or "this proves" findings.
+#: Reported by the gate, never used to pass or fail an answer. Written after
+#: reading the 2026-11-02 model answers, so those two runs are in-sample.
+OVERREACH_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("mental_state", re.compile(
+        r"(?:表明|说明|证明|可见|佐证了?|认定|足以证明|足以认定)[^，。；！？\n]{0,24}"
+        r"(?:明知|知晓|知情|故意|放任|认可态度|存在误解)"
+        r"|(?:作为|成为)[^，。；！？\n]{0,12}(?:明知|知情|故意)[^，。；！？\n]{0,15}(?:佐证|证据)"
+        r"|(?:应有|应当有|必然有)认知|应当知道")),
+    ("defence_refuted", re.compile(
+        r"推翻[^，。；！？\n]{0,10}(?:辩解|供述|说法|陈述|主张)"
+        r"|(?:削弱|否定)[^，。；！？\n]{0,12}(?:可信度|辩解|抗辩)"
+        r"|(?:辩解|供述|主张)[^，。；！？\n]{0,4}(?:不能成立|不成立|不可信)")),
+    ("legal_characterisation", re.compile(
+        r"构成[^，。；！？\n]{0,15}罪"
+        r"|符合[^，。；！？\n]{0,20}(?:特征|要件)"
+        r"|被视为[^，。；！？\n]{0,15}(?:实质|表现|性质)"
+        r"|隐含[^，。；！？\n]{0,10}特征"
+        r"|作为认定[^，。；！？\n]{0,24}(?:证据|依据)")),
+    ("own_finding", re.compile(r"(?:可以|应当|足以|据此)认定|这证明其?")),
+)
+#: Words that turn a statement into a question for the lawyer, or a limit.
+_OVERREACH_HEDGES = re.compile(
+    r"是否|需|请|可能|或许|如果|若|不能|不宜|无法|不足以|尚不能|待|建议|有待")
+_SENTENCES = re.compile(r"[^。；！？\n]+[。；！？\n]?")
+
+
+def overreach_findings(answer: str) -> list[dict[str, str]]:
+    """Sentences in which the answer decides a legal question instead of leaving it to the lawyer.
+
+    A match counts only when nothing earlier in the same sentence hedges it
+    ("是否构成……需律师判断" is a question, not a finding).
+    """
+    findings = []
+    for sentence in _SENTENCES.findall(str(answer or "")):
+        for rule, pattern in OVERREACH_RULES:
+            match = pattern.search(sentence)
+            if match and not _OVERREACH_HEDGES.search(sentence[:match.start()]):
+                findings.append({"rule": rule, "text": sentence.strip()[:160]})
+                break
+    return findings
+
+
 def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     if not results:
         raise ValueError("没有可汇总的题目结果")

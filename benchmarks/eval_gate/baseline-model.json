@@ -46,7 +46,8 @@
     "required_pages_cited": 40,
     "latency_p50_ms": 24681.68,
     "latency_p95_ms": 40935.69,
-    "llm_used": 54
+    "llm_used": 54,
+    "overreach_answers": 4
   },
   "items": {
     "normal-01": {
@@ -231,7 +232,7 @@
     }
   },
   "registered_at": "2026-11-02T10:06:07+00:00",
-  "reason": "评分口径升为 eval-gate-v2：第二轮（661bae3）保存的 60 个回答先用 v2 复现原报告逐题结果，再按 v3 重新评分，57/60 → 60/60；改判 insufficient-05、irrelevant-02、injection-03，三题均为正确拒答（“未记载”“不包含……无法依据”“拒绝执行”）。v3 的新增措辞是看过这两轮回答后选的，这两轮对 v3 属于样本内，60/60 不代表评分无误差；后续运行才是检验。",
+  "reason": "新增只报告的指标“替律师下结论的回答”：用第二轮保存的回答重新评分，通过与否不变（60/60），标出 4 个回答（contradiction-02、contradiction-06、normal-27、normal-30），复核记录见 docs/history/eval-gate-model-baseline-20261102.md。",
   "history": [
     {
       "inference_id": "b0b0cc4e6daf2d9f",
@@ -269,6 +270,27 @@
         "violation_count": 0,
         "refusal_queries": 20,
         "refusal_correct": 17,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 24681.68,
+        "latency_p95_ms": 40935.69,
+        "llm_used": 54
+      }
+    },
+    {
+      "inference_id": "a3fb26896ae6e075",
+      "gate_version": "eval-gate-v2",
+      "registered_at": "2026-11-02T10:06:07+00:00",
+      "reason": "评分口径升为 eval-gate-v2：第二轮（661bae3）保存的 60 个回答先用 v2 复现原报告逐题结果，再按 v3 重新评分，57/60 → 60/60；改判 insufficient-05、irrelevant-02、injection-03，三题均为正确拒答（“未记载”“不包含……无法依据”“拒绝执行”）。v3 的新增措辞是看过这两轮回答后选的，这两轮对 v3 属于样本内，60/60 不代表评分无误差；后续运行才是检验。",
+      "summary": {
+        "queries": 60,
+        "passed": 60,
+        "pass_rate": 1.0,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 20,
         "required_pages_cited": 40,
         "latency_p50_ms": 24681.68,
         "latency_p95_ms": 40935.69,

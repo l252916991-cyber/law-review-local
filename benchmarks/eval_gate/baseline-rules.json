@@ -38,9 +38,10 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 13.63,
-    "latency_p95_ms": 18.38,
-    "llm_used": 0
+    "latency_p50_ms": 14.05,
+    "latency_p95_ms": 20.47,
+    "llm_used": 0,
+    "overreach_answers": 0
   },
   "items": {
     "normal-01": {
@@ -224,8 +225,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-02T10:55:48+00:00",
-  "reason": "评分口径升为 eval-gate-v2（score_answer_v3：增加“未记载”“没有记载”“不包含”“拒绝执行”“无法执行”五个拒答措辞，引号内被否定的禁止断言不计）。规则模式回答在新旧口径下逐题结果相同，46/60。",
+  "registered_at": "2026-11-02T12:40:03+00:00",
+  "reason": "新增只报告的指标“替律师下结论的回答”（answer_eval.overreach_findings），规则模式只统计模型回答，恒为 0；通过与否不变，46/60。",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -266,6 +267,27 @@
         "required_pages_cited": 40,
         "latency_p50_ms": 14.91,
         "latency_p95_ms": 21.03,
+        "llm_used": 0
+      }
+    },
+    {
+      "inference_id": "483c2e09a99d3428",
+      "gate_version": "eval-gate-v2",
+      "registered_at": "2026-11-02T10:55:48+00:00",
+      "reason": "评分口径升为 eval-gate-v2（score_answer_v3：增加“未记载”“没有记载”“不包含”“拒绝执行”“无法执行”五个拒答措辞，引号内被否定的禁止断言不计）。规则模式回答在新旧口径下逐题结果相同，46/60。",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 13.63,
+        "latency_p95_ms": 18.38,
         "llm_used": 0
       }
     }

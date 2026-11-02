@@ -31,7 +31,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .answer_eval import load_dataset, score_answer_v2, score_answer_v3, summarise
+from .answer_eval import load_dataset, overreach_findings, score_answer_v2, score_answer_v3, summarise
 
 GATE_VERSION = "eval-gate-v2"
 #: Which scorer each gate version used. A baseline is only comparable with a
@@ -250,6 +250,8 @@ def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]],
                        answer_status=answer["answer_status"])
         score["category"] = item.get("category")
         score["latency_ms"] = answer["latency_ms"]
+        # Reported only: model answers that decide a legal question for the lawyer.
+        score["overreach"] = overreach_findings(answer["answer"]) if answer.get("llm_used") else []
         rows.append(score)
     summary = summarise(rows)
     answerable = [row for row in rows if not row["refusal_expected"]]
@@ -259,6 +261,7 @@ def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]],
         latency_p50_ms=_percentile(latencies, 0.5),
         latency_p95_ms=_percentile(latencies, 0.95),
         llm_used=sum(1 for answer in answers.values() if answer.get("llm_used")),
+        overreach_answers=sum(1 for row in rows if row["overreach"]),
     )
     return {"summary": summary, "items": {row["id"]: row for row in rows}}
 
@@ -348,7 +351,8 @@ def rescore(report: dict[str, Any], answers: dict[str, dict[str, Any]], *,
     fields = ("passed", "refused", "violations", "matched", "required_pages_cited", "extra_citations")
     differing = sorted(key for key, row in replay["items"].items()
                        if any(row[field] != report["items"][key].get(field) for field in fields))
-    if differing or replay["summary"] != report["summary"]:
+    # Metrics added after the report was written are not part of the replay.
+    if differing or any(replay["summary"].get(key) != value for key, value in report["summary"].items()):
         raise GateConfigurationError("保存的回答用原评分复现不出报告（" + "、".join(differing[:5]) + "），拒绝重新评分")
     current = evaluate(dataset, answers)
     changed = sorted(key for key, row in current["items"].items() if row["passed"] != report["items"][key]["passed"])
@@ -417,10 +421,14 @@ def render_markdown(report: dict[str, Any], verdict: dict[str, Any] | None, base
     lines += ["", "| 指标 | 本次 | 基线 |", "| --- | --- | --- |"]
     rows = [("通过题数", "passed"), ("引用到全部必需页", "required_pages_cited"),
             ("正确拒答", "refusal_correct"), ("禁止断言", "violation_count"),
+            ("替律师下结论的回答（只报告）", "overreach_answers"),
             ("p50 时延 ms", "latency_p50_ms"), ("p95 时延 ms", "latency_p95_ms")]
     for label, key in rows:
         before = baseline["summary"].get(key, "") if baseline else ""
-        lines.append(f"| {label} | {summary[key]} | {before} |")
+        lines.append(f"| {label} | {summary.get(key, '')} | {before} |")
+    flagged = sorted(key for key, row in report["items"].items() if row.get("overreach"))
+    if flagged:
+        lines += ["", "替律师下结论的回答（不影响通过与否，供复核）：" + "、".join(f"`{key}`" for key in flagged)]
     if verdict:
         if verdict["failures"]:
             lines += ["", "**阻断原因**", ""] + [f"- {text}" for text in verdict["failures"]]
