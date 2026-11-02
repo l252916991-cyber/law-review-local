@@ -79,6 +79,9 @@ class FaultEndpoint:
         self.mode = mode
         self.events: list[dict[str, Any]] = []
         self.release = threading.Event()
+        # Set when the generation request arrives: the task deadline is timed
+        # from the moment the model call is actually hanging.
+        self.generation_started = threading.Event()
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -114,6 +117,7 @@ class FaultEndpoint:
                 payload = json.loads(raw)
                 endpoint.events.append({"stage": "generation_received", "model": payload.get("model"),
                                         "stream": payload.get("stream"), "request_bytes": len(raw)})
+                endpoint.generation_started.set()
                 if endpoint.mode == "interface_5xx":
                     endpoint.events.append({"stage": "headers_sent", "http_status": 503})
                     self.reply(b'{"error":"injected_service_unavailable"}', 503)
@@ -248,8 +252,21 @@ def run_attempt(mode: str, path: str, *, timeout: int = 1, task_deadline: float 
                 started = time.monotonic()
                 limit = task_deadline if mode == "task_deadline" else timeout + 5
                 killed = False
+                handshake: str | None = "GO\n"
+                if mode == "task_deadline":
+                    # Retrieval and prompt assembly before the model call take a
+                    # variable fraction of a second on a loaded machine; timing the
+                    # 0.35 s budget from GO let it expire before the hang began.
+                    # The budget now covers the hung generation, which is the fault.
+                    assert process.stdin is not None
+                    process.stdin.write("GO\n")
+                    process.stdin.flush()
+                    handshake = None
+                    if not endpoint.generation_started.wait(timeout + 5):
+                        limit = 0.01  # never reached generation: fail below, do not wait
+                    started = time.monotonic()
                 try:
-                    raw, _ = process.communicate("GO\n", timeout=limit)
+                    raw, _ = process.communicate(handshake, timeout=limit)
                     require(process.returncode == 0, "Fault worker exited unexpectedly")
                     result = json.loads(raw.strip().splitlines()[-1])
                 except subprocess.TimeoutExpired:
@@ -304,6 +321,7 @@ def run(output: Path, *, allow_loopback_fault_server: bool, repeats: int = 5) ->
                 "post_ready_deadline_slack_seconds": 1.5, "real_model_quality_evidence": False,
                 "client_source_sha256": initial_sources,
                 "latency_scope": "GO handshake to result/termination; excludes imports and fixture setup",
+                "task_deadline_clock": "starts when the endpoint receives the generation request",
                 "independent_business_questions": 0,
                 "task_deadline_enforcer": "evaluator_subprocess_budget_not_product_cancellation"}
     write_new(output / "protocol.json", protocol)

@@ -93,7 +93,7 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 
 e2e 说明：GitHub Actions（Playwright Chromium）上全部通过。云端 Linux 用系统 Chrome for Testing 153 运行时，导出下载的建议文件名是 `download` 而非 `*.zip`，这一项在改动前后都失败，属于浏览器环境差异，其余 28 项通过。
 
-已知偶发失败：`tests/test_eval_transport_faults.py` 用 0.35 秒的任务截止模拟超时，机器负载高时偶尔来不及到达注入点而失败，空闲时也偶有发生（2026-11-02 单独连跑 3 次失败 1 次），单独重跑通过；它测的是评测器的故障分类，不涉及产品路径。
+曾经的偶发失败：`tests/test_eval_transport_faults.py` 的任务截止从发出开始信号起计时，机器稍慢时模型调用还没开始就到点，约三次失败一次；2026-11-02 改为从模型调用卡住时起计时（截止时长与断言不变），见[质量手册](../runbook/quality.md)。
 
 ## 4.2 三组对照实测（Qwen3.8-27B）
 

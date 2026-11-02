@@ -33,9 +33,11 @@ CI 的 `postgres` 任务用 PostgreSQL 16 + pgvector 再跑一遍同一套离线
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
 - 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`。旧版 `app/static/` 前端已于 2026-11-01 删除，不再有对应门禁。详见[前端运行手册](frontend.md)。
 
-## 已知偶发失败
+## 曾经的偶发失败（已修复）
 
-`tests/test_eval_transport_faults.py::test_all_four_real_faults_fail_closed_on_both_client_paths` 用 0.35 秒的评测任务截止模拟超时。机器负载高（例如同时跑另一套测试或浏览器用例）时，子进程偶尔来不及到达注入点，`injection_reached_generation` 为假导致失败；单独重跑通过。它验证的是评测器的故障分类，不涉及产品请求路径。出现时先在空闲机器上单独重跑，不要放宽断言或延长截止时间来掩盖。
+`tests/test_eval_transport_faults.py::test_all_four_real_faults_fail_closed_on_both_client_paths` 曾偶发失败，空闲时单独跑也约三次失败一次。根因：演练用 0.35 秒的评测任务截止模拟超时，但计时从发出开始信号算起，而子进程在调用模型之前还要检索、拼提示词，机器稍慢时截止先到，模型调用还没开始，`injection_reached_generation` 为假。
+
+2026-11-02 改为在测试端点收到生成请求、模型调用确实卡住之后才开始计时，截止时长和断言都没有放宽。修复后单独连跑 15 次、三路并行加 CPU 压力再跑 12 次，全部通过。演练协议里的 `task_deadline_clock` 字段记录了这一口径。
 
 ## 真实页面流程验证
 
