@@ -23,7 +23,7 @@ from .db import connect, now, transaction
 
 logger = logging.getLogger(__name__)
 
-CONTEXT_POLICY_VERSION = "multiturn-context-v1"
+CONTEXT_POLICY_VERSION = "multiturn-context-v2"
 HISTORY_SCOPE = "same_case_same_conversation"
 MAX_HISTORY_TURNS = 4
 MAX_HISTORY_CHARS = 4000
@@ -585,10 +585,15 @@ ANAPHORA_PATTERN = re.compile(
     r"|同一(?:份|个|笔|家|项|条)?"
     r"|其(?![他余中次实间它项]))"
 )
+#: A personal pronoun that follows a named party in the same question ("区分张某
+#:和李某的陈述，不能替其定案") refers back within the sentence, not to an
+#: earlier turn. Demonstratives (该/这份/上述) are never exempted.
+PERSONAL_PRONOUN = re.compile(r"[它他她](?:们)?|其")
+NAMED_PARTY = re.compile(r"[\u4e00-\u9fff]某{1,2}")
 CORRECTION_PATTERN = re.compile(r"(?:不是|并非|不对|改看|改为|换成|换一份|另一份|别看|更正为|重新看)")
 TYPE_WORDS = (
     "补充协议", "采购合同", "框架协议", "会议纪要", "起诉意见书", "银行流水", "对账单",
-    "合同", "协议", "备忘录", "确认书", "订单", "发票", "笔录", "电子邮件", "宣传材料",
+    "合同", "协议", "备忘录", "确认书", "订单", "发票", "笔录", "电子邮件", "邮件", "宣传材料",
     "报告", "说明", "清单", "凭证", "流水", "纪要",
 )
 # Closed set of specific clause words used only for a conservative "asked but
@@ -683,6 +688,16 @@ def _entity_tokens(documents: list[dict[str, Any]]) -> set[str]:
     return tokens
 
 
+def refers_to_earlier_turn(question: str) -> bool:
+    """Whether the question points at something only an earlier turn can name."""
+    party = NAMED_PARTY.search(question)
+    for match in ANAPHORA_PATTERN.finditer(question):
+        if party is not None and match.start() > party.start() and PERSONAL_PRONOUN.fullmatch(match.group()):
+            continue
+        return True
+    return False
+
+
 def _type_tokens(question: str) -> list[str]:
     chosen: list[str] = []
     for word in sorted(TYPE_WORDS, key=len, reverse=True):
@@ -719,6 +734,15 @@ def _explicit_matches(question: str, documents: list[dict[str, Any]]) -> list[tu
             )
             method = "explicit_entity_type" if question_entities else "explicit_document_type"
             matches[document["id"]] = (first_position, document, method)
+    if any(method == "explicit_document_type" for _, _, method in matches.values()):
+        # A type word narrows retrieval to matching documents. A party named in
+        # the same question ("张某否认……与邮件……") keeps that party's own
+        # material in scope, so narrowing never drops a document the question
+        # also points at.
+        for party in dict.fromkeys(match.group() for match in NAMED_PARTY.finditer(question)):
+            for document in documents:
+                if document["id"] not in matches and party in document["name"]:
+                    matches[document["id"]] = (question.find(party), document, "explicit_party")
     return sorted(matches.values(), key=lambda item: (item[0], item[1]["id"]))
 
 
@@ -804,7 +828,7 @@ def resolve_question(
     history = history or _empty_snapshot(case_id, None, policy)
     documents_by_id = {document["id"]: document for document in documents}
     question = question.strip()
-    anaphora = bool(ANAPHORA_PATTERN.search(question))
+    anaphora = refers_to_earlier_turn(question)
     correction = bool(CORRECTION_PATTERN.search(question))
 
     def result(**kwargs: Any) -> ResolvedQuestion:

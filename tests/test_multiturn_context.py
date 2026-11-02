@@ -187,7 +187,7 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         first = chat(1, "张某关于固定回报的陈述是否存在矛盾？", "测试律师", None, False, False)
         self.assertGreater(first["conversation_id"], 0)
         self.assertEqual(first["context"]["history"]["turns"], 0)
-        self.assertEqual(first["context"]["policy"]["version"], "multiturn-context-v1")
+        self.assertEqual(first["context"]["policy"]["version"], "multiturn-context-v2")
         second = chat(1, "固定回报是否存在", "测试律师", first["conversation_id"], False, False)
         history = second["context"]["history"]
         self.assertTrue(history["enabled"])

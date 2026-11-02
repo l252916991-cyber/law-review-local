@@ -25,7 +25,7 @@ from .services import PROMPT_VERSION
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v7"
+NATIVE_BASELINE_REVISION = "specialist-review-v8"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -55,6 +55,11 @@ NATIVE_BASELINE_REVIEW = (
     "新增的 app/search_backend.py（同时纳入本清单）。SQLite 下 FTS5 查询文本、bm25 权重、向量兼容性检查、"
     "哈希回退的词项过滤、余弦打分与排序原样保留：评测门禁 60 题逐题结果与改动前一致，向量通道逐页得分一致。"
     "PROMPT_VERSION、提示模板、可答性、回答契约与专家规则均未改动；v6 结果保留且不被覆盖。"
+    "2026-11-02（specialist-review-v8）：**提示模板有改动**。首轮模型门禁（Qwen3.8-27B，51/60）中两题因 700 token"
+    "截断丢失复核提醒、一题拒答未带引用而被回答契约拒绝，CHAT_SYSTEM_PROMPT 增加两条要求：资料不足时写明缺什么并"
+    "引用核对过的片段、不得推测金额日期编号；全文控制在 600 字以内、先结论后依据、不用宽表格。PROMPT_VERSION 升为"
+    "chat-system-v5-length-budget-cited-refusal。回答契约、检索、可答性与专家规则未改动。v8 与 v7 及以前的模型结果"
+    "不可直接比较；v7 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
     "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
@@ -62,7 +67,7 @@ NATIVE_ALGORITHM_HASHES = {
     "agent_tools.py": "f7fcfb59188bdae1e8f6a33ced57af696519cc8eaa2e2c673124943988cf4b15",
     "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
     "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-    "services.py": "37bdd87272588b524b14fe82b387f57602814b50b541903b8d0a014b2a15ce70",
+    "services.py": "ea79ed57e0c82064748b71e9576e468c9f39e37a0147cca1b8947211fef934ca",
     "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
     "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a",
 }

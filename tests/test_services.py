@@ -173,7 +173,7 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         from app.services import llm_provenance
         record = llm_provenance("事实检索", "test-model")
         self.assertEqual(record["model"], "test-model")
-        self.assertEqual(record["prompt_version"], "chat-system-v4-multiturn-untrusted-history")
+        self.assertEqual(record["prompt_version"], "chat-system-v5-length-budget-cited-refusal")
         self.assertTrue(record["prompt_sha256_16"])
         same = llm_provenance("事实检索", "test-model")
         self.assertEqual(record["prompt_sha256_16"], same["prompt_sha256_16"])
@@ -189,6 +189,17 @@ class LawReviewServicesTest(IsolatedDatabaseTestCase):
         self.assertIn("历史对话与草稿线索只用于理解用户指代", CHAT_SYSTEM_PROMPT)
         self.assertIn("引用编号只能来自本轮卷宗片段", CHAT_SYSTEM_PROMPT)
         self.assertIn("最后必须原样写出：请律师复核原文与上述结论。", CHAT_SYSTEM_PROMPT)
+
+    def test_system_prompt_bounds_length_and_requires_cited_refusals(self):
+        """First model gate: truncated answers lost the review reminder; a refusal had no citation."""
+        from app.services import CHAT_SYSTEM_PROMPT, PROMPT_VERSION
+
+        self.assertIn("全文控制在600字以内", CHAT_SYSTEM_PROMPT)
+        self.assertIn("并用[资料N]标注你核对过的相关片段", CHAT_SYSTEM_PROMPT)
+        self.assertIn("不得推测金额、日期或编号", CHAT_SYSTEM_PROMPT)
+        # The reminder stays the last instruction, after the length budget.
+        self.assertGreater(CHAT_SYSTEM_PROMPT.index("请律师复核原文"), CHAT_SYSTEM_PROMPT.index("600字"))
+        self.assertEqual(PROMPT_VERSION, "chat-system-v5-length-budget-cited-refusal")
 
     def test_llm_request_contains_required_review_sentence(self):
         from app.services import call_local_llm

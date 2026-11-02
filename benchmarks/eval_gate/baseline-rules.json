@@ -6,39 +6,40 @@
       "path": "benchmarks/answer_eval/v2/dataset.json",
       "sha256": "428264866dccc02b6ab8e83b9cbc8a9ac52f392906eeb8c1aff8b3a609eabf47"
     },
-    "prompt_version": "chat-system-v4-multiturn-untrusted-history",
+    "prompt_version": "chat-system-v5-length-budget-cited-refusal",
     "local_prompt_version": "domain-local-v1-bounded-citations",
     "answerability_policy": "candidate-answerability-v11-detail",
-    "context_policy": "multiturn-context-v1",
-    "system_prompt_sha256": "67b9420d9f62f23b00ab7d5510973164a23c4e6cac6aaf1df8a3787f156bb302",
+    "context_policy": "multiturn-context-v2",
+    "system_prompt_sha256": "afcb75bf4230d08537290d8a655c5a0ff1228631fa3ffd9aa0ff4efa6e52e1e4",
     "modules": {
       "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
       "answerability.py": "9868326b8e14befaf3f98ccab853a9bc94bc932dd0fa6d30d359b5baab14f778",
-      "context.py": "cb14f74120f80a7045495da224a2090fd89b799daca682896975831221980d95",
+      "context.py": "ee52a6494b7c6d0b4c0c474ad63591569d3eb091edbaa06b5af647250811e79f",
       "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
-      "rag.py": "a9ea01c8ca3e792b29cdff348e2f987d6e31a9e5e039b19b34255a2a5e2ae2db",
+      "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
       "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
       "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
-      "services.py": "37bdd87272588b524b14fe82b387f57602814b50b541903b8d0a014b2a15ce70",
+      "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
+      "services.py": "ea79ed57e0c82064748b71e9576e468c9f39e37a0147cca1b8947211fef934ca",
       "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
     },
     "database_backend": "sqlite",
     "embeddings": "hashed-local",
-    "inference_id": "7ed9da5433b41e2b"
+    "inference_id": "483c2e09a99d3428"
   },
   "summary": {
     "queries": 60,
-    "passed": 44,
-    "pass_rate": 0.7333,
+    "passed": 46,
+    "pass_rate": 0.7667,
     "answerable_queries": 40,
-    "coverage_avg": 0.9625,
-    "citation_precision_avg": 0.253,
+    "coverage_avg": 1.0,
+    "citation_precision_avg": 0.2729,
     "violation_count": 0,
     "refusal_queries": 20,
     "refusal_correct": 6,
-    "required_pages_cited": 38,
-    "latency_p50_ms": 18.72,
-    "latency_p95_ms": 26.59,
+    "required_pages_cited": 40,
+    "latency_p50_ms": 14.91,
+    "latency_p95_ms": 21.03,
     "llm_used": 0
   },
   "items": {
@@ -151,13 +152,13 @@
       "passed": true
     },
     "contradiction-07": {
-      "passed": false
+      "passed": true
     },
     "contradiction-08": {
       "passed": true
     },
     "contradiction-09": {
-      "passed": false
+      "passed": true
     },
     "contradiction-10": {
       "passed": true
@@ -223,7 +224,28 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-01T20:10:03+00:00",
-  "reason": "首次登记：v0.4.0 之后（fb42470）的离线规则路径",
-  "history": []
+  "registered_at": "2026-11-02T08:47:59+00:00",
+  "reason": "首轮模型门禁暴露的两处上下文问题已修：同句内跟在具名当事人之后的人称代词（如“不能替其定案”）不再被当作指向前文；“邮件”可指代电子邮件材料，类型词收窄检索范围时保留问题中点名的当事人自己的材料。contradiction-07、contradiction-09 由失败转为通过，无退化；提示词升为 v5（长度预算与带引用的拒答），规则模式不调用模型，不受影响。",
+  "history": [
+    {
+      "inference_id": "7ed9da5433b41e2b",
+      "registered_at": "2026-11-01T20:10:03+00:00",
+      "reason": "首次登记：v0.4.0 之后（fb42470）的离线规则路径",
+      "summary": {
+        "queries": 60,
+        "passed": 44,
+        "pass_rate": 0.7333,
+        "answerable_queries": 40,
+        "coverage_avg": 0.9625,
+        "citation_precision_avg": 0.253,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 38,
+        "latency_p50_ms": 18.72,
+        "latency_p95_ms": 26.59,
+        "llm_used": 0
+      }
+    }
+  ]
 }
