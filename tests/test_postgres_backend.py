@@ -279,14 +279,17 @@ def test_isolated_harnesses_never_inherit_a_configured_postgresql(monkeypatch, t
 
 
 @needs_postgres
-def test_an_older_postgresql_schema_is_refused_instead_of_half_upgraded(pg_db):
+def test_postgresql_schemas_that_cannot_be_upgraded_in_place_are_refused(pg_db):
+    """Older versions with migration steps upgrade (tests/test_postgres_migrations.py);
+    one older than the migration baseline, or newer than the code, is refused."""
     import psycopg
 
     from app.db import SCHEMA_VERSION, init_db
+    from app.db_postgres import MIGRATION_BASELINE
 
     with psycopg.connect(pg_db, autocommit=True) as conn:
-        conn.execute("UPDATE lexvault_schema_meta SET version = %s", (SCHEMA_VERSION - 1,))
-    with pytest.raises(RuntimeError, match="needs migration"):
+        conn.execute("UPDATE lexvault_schema_meta SET version = %s", (MIGRATION_BASELINE - 1,))
+    with pytest.raises(RuntimeError, match="predates"):
         init_db(seed=False)
     with psycopg.connect(pg_db, autocommit=True) as conn:
         conn.execute("UPDATE lexvault_schema_meta SET version = %s", (SCHEMA_VERSION + 1,))
