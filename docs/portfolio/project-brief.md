@@ -76,14 +76,14 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-02，提交 `2d992da`；之后只改了文档）
+## 4.1 质量基线（2026-11-02，提交 `a4d13a8`；之后只改了文档）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1701 passed / 0 failed / 20 skipped，综合覆盖率 86.73%（分支 78.74%）；Python 3.14.6：1701 passed / 0 failed / 20 skipped，86.83%（分支 78.88%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 12 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
-| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1712 passed / 0 failed / 9 skipped，覆盖率 87.87%（分支 80.11%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；313 个测试在测试体内实际连到 PostgreSQL；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1713 passed / 1 failed / 20 skipped，综合覆盖率 86.73%（分支 78.81%），失败的是下方说明的已知偶发用例，单独重跑通过；Python 3.14.6：1714 passed / 0 failed / 20 skipped，86.83%（分支 78.95%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 12 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1725 passed / 0 failed / 9 skipped，覆盖率 87.86%（分支 80.17%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；313 个测试在测试体内实际连到 PostgreSQL；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
 | 信息隔离墙 | 以墙外管理员、仍被分配到该案的墙外律师遍历全部 GET 接口，墙内标记 0 次出现；PostgreSQL 上关掉应用层检查重做仍为 0，SQLite 对照为 10 个接口泄露；33 张表强制行级安全，生成器拒绝未归类的案件关联表 |
-| 答案质量门禁 | 60 题冻结评测集，规则模式 44/60 通过；SQLite 与 PostgreSQL 逐题结果一致（59 题回答与引用逐字相同，1 题两条引用先后不同）；CI 每次推送运行，退化即阻断 |
+| 答案质量门禁 | 60 题冻结评测集，规则模式 46/60 通过，PostgreSQL 上逐题通过情况与 SQLite 相同；CI 每次推送运行，退化即阻断。模型模式基线 51/60（本机 Qwen3.8-27B 4-bit，单轮，[记录](../history/eval-gate-model-baseline-20261102.md)） |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 13 项、`build`/`build:static` 通过；e2e 见下方说明 |
 | 接口类型 | 11 个核心读接口声明 Pydantic 响应模型，改动前后在演示库上的响应逐字段相同；前端核心组件改用生成的 TypeScript 类型；材料接口不返回服务器存储路径，由遍历全部 GET 接口与导出包的测试守住 |
@@ -93,7 +93,7 @@ uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir 
 
 e2e 说明：GitHub Actions（Playwright Chromium）上全部通过。云端 Linux 用系统 Chrome for Testing 153 运行时，导出下载的建议文件名是 `download` 而非 `*.zip`，这一项在改动前后都失败，属于浏览器环境差异，其余 28 项通过。
 
-已知偶发失败：`tests/test_eval_transport_faults.py` 用 0.35 秒的任务截止模拟超时，机器负载高时偶尔来不及到达注入点而失败，单独重跑通过；它测的是评测器的故障分类，不涉及产品路径。
+已知偶发失败：`tests/test_eval_transport_faults.py` 用 0.35 秒的任务截止模拟超时，机器负载高时偶尔来不及到达注入点而失败，空闲时也偶有发生（2026-11-02 单独连跑 3 次失败 1 次），单独重跑通过；它测的是评测器的故障分类，不涉及产品路径。
 
 ## 4.2 三组对照实测（Qwen3.8-27B）
 
