@@ -19,7 +19,7 @@ POST /api/cases/{case_id}/conflict-check                           # 重新检�
 POST /api/cases/{case_id}/conflict-check/decision {"decision": "approve" | "reject", "reason": "至少 10 个字"}
 ```
 
-建案时带上 `parties`，或者之后每次修改当事人，都会自动检查一次，每次检查单独留一条记录。目前没有界面，只能通过接口操作。
+建案时带上 `parties`，或者之后每次修改当事人，都会自动检查一次，每次检查单独留一条记录。界面：案件的“利益冲突与隔离”页可以登记当事人、查看命中、重新检查，管理员可在这里写明理由放行或驳回；检查未通过时，案件标题旁会显示“利益冲突待审批”。
 
 ## 什么算冲突
 

@@ -65,8 +65,14 @@ def seed_failure(directory: Path) -> None:
 
 def main() -> int:
     token = os.environ["LEXVAULT_E2E_TOKEN"]
-    if len(token) < 32:
-        raise ValueError("E2E token must be randomly generated with at least 32 characters")
+    # Optional second administrator: a conflict check is cleared by someone
+    # other than the person who ran it.
+    partner = os.environ.get("LEXVAULT_E2E_PARTNER_TOKEN", "")
+    if len(token) < 32 or (partner and (len(partner) < 32 or partner == token)):
+        raise ValueError("E2E tokens must be distinct, random and at least 32 characters")
+    tokens = {token: {"name": "合成页面验证", "admin": True}}
+    if partner:
+        tokens[partner] = {"name": "合成风控合伙人", "admin": True}
     stopped = False
 
     def stop(_signum: int, _frame: FrameType | None) -> None:
@@ -84,7 +90,7 @@ def main() -> int:
             "LAW_REVIEW_DATA_DIR": directory,
             "LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB": str(Path(directory) / "checkpoints.sqlite"),
             "LAW_REVIEW_AUTH_MODE": "token",
-            "LAW_REVIEW_API_TOKENS_JSON": json.dumps({token: {"name": "合成页面验证", "admin": True}}),
+            "LAW_REVIEW_API_TOKENS_JSON": json.dumps(tokens),
             "LAW_REVIEW_LLM_URL": model.base_url,
             "LAW_REVIEW_LLM_MODEL": CHAT_MODEL,
             "LAW_REVIEW_EMBEDDING_URL": model.base_url,

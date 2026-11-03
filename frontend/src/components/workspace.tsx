@@ -15,6 +15,7 @@ import { ExportCase } from "./export";
 import { Search } from "./search";
 import { CaseAssignment, Members } from "./members";
 import { ReviewTasks } from "./tasks";
+import { Compliance, Walls, conflictBlocked } from "./compliance";
 import { Empty, ErrorBox, Fields, Modal, list, useData, values } from "./ui";
 
 export default function Workspace() {
@@ -42,6 +43,7 @@ function Shell({
     [search, setSearch] = useState(""),
     [create, setCreate] = useState(false),
     [storage, setStorage] = useState<"archived" | "trash" | null>(null),
+    [walls, setWalls] = useState(false),
     [error, setError] = useState("");
   const allCases = rowsOf<CaseSummary>(cases.data),
     current = allCases.find((row) => row.id === selected) || allCases[0];
@@ -90,6 +92,7 @@ function Shell({
         <div className="sidebar-bottom">
           <button onClick={() => setStorage("archived")}>已归档案卷</button>
           <button onClick={() => setStorage("trash")}>回收站</button>
+          {identity.admin ? <button onClick={() => setWalls(true)}>隔离墙</button> : null}
           <p>
             {text(identity.name)}
             <button
@@ -152,6 +155,7 @@ function Shell({
           </form>
         </Modal>
       )}
+      {walls && <Walls identity={identity} close={() => setWalls(false)} changed={cases.reload} />}
       {storage && (
         <Storage
           status={storage}
@@ -215,7 +219,8 @@ function CaseWorkspace({
 }) {
   const caseId = caseRow.id,
     detail = useData(`/api/cases/${caseId}`),
-    audit = useData(`/api/cases/${caseId}/audit`);
+    audit = useData(`/api/cases/${caseId}/audit`),
+    conflict = useData(`/api/cases/${caseId}/parties`);
   const [view, setView] = useState(() => {
       const value =
         typeof window === "undefined"
@@ -233,6 +238,7 @@ function CaseWorkspace({
         "export",
         "settings",
         "members",
+        "conflicts",
       ].includes(value || "")
         ? value!
         : "overview";
@@ -276,6 +282,7 @@ function CaseWorkspace({
   const record: CaseDetail | CaseSummary = detail.data ? objectOf<CaseDetail>(detail.data) : caseRow,
     metrics = "metrics" in record ? record.metrics : null;  const roles = identity.roles ? object(identity.roles) : {};
   const canManageMembers = Boolean(identity.admin) || text(roles[String(caseId)]) === "owner";
+  const conflictStatus = conflict.data ? text(object(conflict.data).status) : "";
   const views: Record<string, string> = {
     overview: "案件总览",
     documents: "卷宗目录",
@@ -286,6 +293,7 @@ function CaseWorkspace({
     metrics: "用量与费用",
     search: "全文检索",
     export: "成果导出",
+    conflicts: "利益冲突与隔离",
     settings: "模型设置",
     ...(identity.admin ? { members: "成员与权限" } : {}),
   };
@@ -300,6 +308,11 @@ function CaseWorkspace({
         </div>
         <div>
           <span className="badge">{record.status || "阅卷中"}</span>
+          {conflictBlocked(conflictStatus) && (
+            <button className="badge warn" onClick={() => setView("conflicts")}>
+              {conflictStatus === "pending" ? "利益冲突待审批" : "利益冲突未获放行"}
+            </button>
+          )}
           <button onClick={() => setEditing(true)}>修改案件信息</button>
           <button
             aria-label="切换主题"
@@ -426,6 +439,18 @@ function CaseWorkspace({
         {view === "settings" && <Settings />}
         {view === "members" && Boolean(identity.admin) && <Members />}
         {view === "search" && <Search caseId={caseId} preview={setPage} />}
+        {view === "conflicts" && (
+          <Compliance
+            caseId={caseId}
+            identity={identity}
+            conflict={conflict}
+            reloadConflict={() => {
+              conflict.reload();
+              audit.reload();
+            }}
+            hidden={refresh}
+          />
+        )}
       </main>
       {page && (
         <Preview

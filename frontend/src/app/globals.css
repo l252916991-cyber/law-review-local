@@ -885,3 +885,41 @@ dialog form .primary {
   border-radius: 8px;
   font-size: 13px;
 }
+
+.badge.warn {
+  background: #fdf1e2;
+  color: #8a4b0f;
+  border-color: #f2d9b8;
+}
+.badge.danger {
+  background: #fbe9e7;
+  color: #9b2c1f;
+  border-color: #f2cbc5;
+}
+button.badge {
+  cursor: pointer;
+}
+.dark .badge.warn {
+  background: #3d2b14;
+  color: #f4c98b;
+  border-color: #5c4120;
+}
+.dark .badge.danger {
+  background: #3f1c18;
+  color: #f2a99e;
+  border-color: #5e2a24;
+}
+fieldset.party {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0 0 12px;
+}
+.row.hit .badge {
+  margin-right: 6px;
+}
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
