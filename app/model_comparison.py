@@ -25,7 +25,7 @@ from .services import PROMPT_VERSION
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v9"
+NATIVE_BASELINE_REVISION = "specialist-review-v10"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -65,6 +65,11 @@ NATIVE_BASELINE_REVIEW = (
     "“[资料1]”，条件是文件名和页码与第 1 条来源完全一致；不一致的、范围写法和其他格式仍被拒绝。提示模板、PROMPT_VERSION、"
     "检索、可答性与回答契约本身未改动，27B 两轮 107 个保存回答没有这种写法，改写对它们是恒等；35B、9B 的保存回答经回放验证只有这几题结果变化。"
     "v8 结果保留且不被覆盖。"
+    "2026-11-07（specialist-review-v10）：35B-A3B 第二次运行与 9B 中又有回答把几个来源写在一个括号里"
+    "（“[资料2、资料3]”“[资料1/2]”“[资料1 vs 资料2]”“[资料1-6]”），被回答契约拒绝。canonical_source_markers"
+    "把它们拆成每个来源一个 [资料N]，条件是每个编号都在本轮来源范围内、范围递增；其余照旧拒绝。提示模板、"
+    "PROMPT_VERSION、检索、可答性与回答契约本身未改动；27B 两轮回答不含这些写法，35B 两次与 9B 的保存回答"
+    "回放后只有这 7 题结果变化。v9 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
     "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
@@ -72,7 +77,7 @@ NATIVE_ALGORITHM_HASHES = {
     "agent_tools.py": "f7fcfb59188bdae1e8f6a33ced57af696519cc8eaa2e2c673124943988cf4b15",
     "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
     "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-    "services.py": "2072d9fe7300f11bded2d104b652733921220f99abe8ac1871c7c30aba896e3b",
+    "services.py": "376cfdc59e23090f5fa2f6e31250a04c3f5b5fa7681cafdf48b50b70b43b7eb6",
     "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
     "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a",
 }

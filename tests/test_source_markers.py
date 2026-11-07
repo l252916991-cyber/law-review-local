@@ -1,4 +1,4 @@
-"""Source headers copied from the prompt are rewritten to ``[资料N]`` only when they are exact."""
+"""Citation markers naming real sources in another form are rewritten to ``[资料N]``; nothing else is."""
 import io
 import json
 import unittest
@@ -54,13 +54,38 @@ class CanonicalSourceMarkersTest(unittest.TestCase):
                 self.assertEqual(canonical_source_markers(answer, CONTEXTS), answer)
                 self.assertFalse(validate_review_answer(answer, CONTEXTS)["valid"])
 
-    def test_other_malformed_markers_are_not_repaired(self):
-        # Seen from Qwythos-9B in the same run; a range or a comparison is not one
-        # source, so these stay rejected.
-        for answer in ("全篇没有法条[资料1-2]。请律师复核。", "说法冲突[资料1 vs 资料2]。请律师复核。"):
-            with self.subTest(answer=answer):
+    def test_several_sources_in_one_bracket_become_one_marker_each(self):
+        # Seen from Qwen3.6-35B-A3B and Qwythos-9B in the 2026-11-07 runs.
+        cases = {
+            "[资料1/2]": "[资料1][资料2]",
+            "[资料1、资料2]": "[资料1][资料2]",
+            "[资料1 vs 资料2]": "[资料1][资料2]",
+            "[资料2 vs 资料1]": "[资料2][资料1]",
+            "[资料1-2]": "[资料1][资料2]",
+            "【资料1，资料2】": "[资料1][资料2]",
+            "[资料1和资料2]": "[资料1][资料2]",
+            "[资料1至2]": "[资料1][资料2]",
+        }
+        for marker, expected in cases.items():
+            with self.subTest(marker=marker):
+                answer = f"说法冲突{marker}。请律师复核。"
+                rewritten = canonical_source_markers(answer, CONTEXTS)
+                self.assertEqual(rewritten, f"说法冲突{expected}。请律师复核。")
+                self.assertTrue(validate_review_answer(rewritten, CONTEXTS)["valid"])
+
+    def test_a_list_or_range_outside_this_turns_sources_is_left_alone(self):
+        for marker in ("[资料1-6]", "[资料2-1]", "[资料1-1]", "[资料1、3]", "[资料0/1]", "[资料1, 资料9]"):
+            with self.subTest(marker=marker):
+                answer = f"全篇没有法条{marker}。请律师复核。"
                 self.assertEqual(canonical_source_markers(answer, CONTEXTS), answer)
                 self.assertFalse(validate_review_answer(answer, CONTEXTS)["valid"])
+
+    def test_the_six_source_range_seen_in_the_runs(self):
+        six = [{"document_id": i, "name": f"{i}.txt", "page_no": 1, "quote": "原文"} for i in range(1, 7)]
+        answer = "全文未引用任何司法解释[资料1-6]。请律师复核。"
+        rewritten = canonical_source_markers(answer, six)
+        self.assertIn("[资料1][资料2][资料3][资料4][资料5][资料6]", rewritten)
+        self.assertTrue(validate_review_answer(rewritten, six)["valid"])
 
     def test_plain_markers_and_text_are_unchanged(self):
         answer = "结论[资料1][资料2]，第3页另见。请律师复核。"

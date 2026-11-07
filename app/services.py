@@ -741,17 +741,32 @@ _COPIED_SOURCE_HEADER = re.compile(
     r"[\[【［]\s*资料\s*(\d+)\s*[｜|]\s*([^｜|\]】］\n]+?)\s*[｜|]\s*第\s*(\d+)\s*页\s*[\]】］]")
 
 
-def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str:
-    """Turn source headers the model copied into its answer back into ``[资料N]``.
+_RANGE_SEPARATOR = r"[-–—~～]|至|到"
+#: One bracket naming several sources: a list ("[资料2、资料3]", "[资料1/2]",
+#: "[资料1 vs 资料2]") or a range ("[资料1-6]").
+_MULTI_SOURCE_MARKER = re.compile(
+    r"[\[【［]\s*资料\s*(\d+(?:\s*(?:[、，,/／;；]|和|与|及|[vV][sS]\.?|" + _RANGE_SEPARATOR + r")\s*(?:资料\s*)?\d+)+)\s*[\]】］]")
+_MULTI_SOURCE_PART = re.compile(r"(\d+)|(" + _RANGE_SEPARATOR + r")")
 
-    Some models cite with the prompt's header ("[资料1｜03_李某询问笔录.txt｜第3页]")
-    instead of the requested "[资料1]". The answer contract rejects that form, so a
-    correct answer was lost as a model error (2026-11-07 cross-model gate: 3 of
-    Qwen3.6-35B-A3B's 60 answers). The rewrite happens only when the file name
-    and page are exactly those of source N, so a wrong citation stays wrong and
-    is still rejected; every other malformed marker is left as it is.
+
+def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str:
+    """Rewrite citation markers that name real sources in another form to ``[资料N]``.
+
+    The answer contract accepts only "[资料N]", and rejects the whole answer on
+    any other marker, so a correct answer was lost as a model error. Models
+    other than the baseline 27B wrote two other forms (2026-11-07 cross-model
+    gate, 7 of 162 answers from Qwen3.6-35B-A3B and Qwythos-9B):
+
+    - the prompt's source header, "[资料1｜03_李某询问笔录.txt｜第3页]": rewritten
+      only when the file name and page are exactly those of source 1;
+    - several sources in one bracket, "[资料2、资料3]", "[资料1/2]", "[资料1 vs 资料2]",
+      "[资料1-6]": rewritten to one marker per source, only when every number is
+      one of this turn's sources and every range ascends.
+
+    Anything else, including a header or number that does not match this turn's
+    sources, is left as it is and still rejected.
     """
-    def replace(match: re.Match[str]) -> str:
+    def header(match: re.Match[str]) -> str:
         index = int(match.group(1))
         if not 1 <= index <= len(contexts):
             return match.group(0)
@@ -760,7 +775,27 @@ def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str
             return f"[资料{index}]"
         return match.group(0)
 
-    return _COPIED_SOURCE_HEADER.sub(replace, answer or "")
+    def several(match: re.Match[str]) -> str:
+        indexes: list[int] = []
+        pending_range = False
+        for number, range_separator in _MULTI_SOURCE_PART.findall(match.group(1)):
+            if range_separator:
+                pending_range = True
+                continue
+            value = int(number)
+            if pending_range:
+                if not indexes or value <= indexes[-1]:
+                    return match.group(0)
+                indexes.extend(range(indexes[-1] + 1, value + 1))
+                pending_range = False
+            else:
+                indexes.append(value)
+        if not indexes or any(not 1 <= index <= len(contexts) for index in indexes):
+            return match.group(0)
+        return "".join(f"[资料{index}]" for index in dict.fromkeys(indexes))
+
+    rewritten = _COPIED_SOURCE_HEADER.sub(header, answer or "")
+    return _MULTI_SOURCE_MARKER.sub(several, rewritten)
 
 
 def read_json_with_deadline(
