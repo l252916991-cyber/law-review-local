@@ -39,6 +39,7 @@ flowchart LR
 | 法条库有用吗？ | LawBench 1,000 题配对：58.81% → 62.49%（+3.68 pp，95% CI [+2.76, +4.69]）（[记录](docs/benchmarks/corpus-rebuild-paired-20261024.md)） |
 | 断点恢复会复用过期分析吗？ | 不会：原文改动一页即拒绝恢复，且不消耗重试次数（[演示](docs/history/migration/portfolio-p3-demo-status-20261027.md)） |
 | 改提示词、换模型会悄悄变差吗？ | 60 题答案质量门禁每次推送都跑；按真实模型的失败题修复后 51 → 57/60，修复过程中还拦下一次退化（[记录](docs/history/eval-gate-model-baseline-20261102.md)） |
+| 换个本机模型行不行？ | 35B-A3B 速度是 27B 的 4 倍，逐题核对后没有事实错误；9B 答错 5 道，集中在资料不足时编造（[记录](docs/history/eval-gate-cross-model-20261107.md)） |
 | 能换企业数据库吗？ | 同一套代码跑 SQLite 与 PostgreSQL + pgvector；10,000 页向量检索 1.29 s → 48 ms，结果相同（[基准](docs/benchmarks/postgres-vector-search-20261102.md)） |
 | 能把无关的人挡在案件外吗？ | 信息隔离墙由应用层和 PostgreSQL 行级安全两层执行；关掉应用层检查后仍零泄露，SQLite 对照泄露 10 个接口（[手册](docs/runbook/case-walls.md)） |
 | 受理前能查利益冲突吗？ | 命中即锁定案件，须由另一位合伙人写明理由放行；命中隔离案件时只显示“存在冲突”（[手册](docs/runbook/conflict-check.md)） |

@@ -37,6 +37,17 @@ uv run --locked python scripts/eval_gate.py --update-baseline --from-report outp
 
 没有基线时，摘要标题写“未比较（没有基线）”，退出码 2；不会写“通过”。
 
+## 评测其他模型
+
+门禁的分数只能和**同一个模型**的基线比。评分按基线模型的写法校准，换模型后分数的差距里混着格式、评分口径和真实质量（[跨模型记录](../history/eval-gate-cross-model-20261107.md)：35B-A3B 的 8 道失败题里没有一道是回答本身错了）。所以给其他模型单独指定基线文件：
+
+```sh
+uv run --locked python scripts/eval_gate.py --mode model --endpoint http://127.0.0.1:8000/v1 \
+  --model OTHER_MODEL_ID --baseline benchmarks/eval_gate/baseline-model-OTHER.json --report output/other.json
+```
+
+第一次没有这个基线，只出报告（退出码 2）；逐题复核后，再用 `--update-baseline --from-report` 登记为该模型自己的基线。
+
 ## 回放：不接模型，检验模型调用之后的改动
 
 改回答契约、引用处理、可答性或评分时，可以用保存的真实模型输出检验，不需要跑模型的机器：
