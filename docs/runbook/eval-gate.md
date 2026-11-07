@@ -39,7 +39,7 @@ uv run --locked python scripts/eval_gate.py --update-baseline --from-report outp
 
 ## 评测其他模型
 
-门禁的分数只能和**同一个模型**的基线比。评分按基线模型的写法校准，换模型后分数的差距里混着格式、评分口径和真实质量（[跨模型记录](../history/eval-gate-cross-model-20261107.md)：35B-A3B 的 8 道失败题里没有一道是回答本身错了）。所以给其他模型单独指定基线文件：
+门禁的分数只能和**同一个模型**的基线比。评分按基线模型的写法校准，换模型后分数的差距里混着格式、评分口径和真实质量（[跨模型记录](../history/eval-gate-cross-model-20261107.md)：35B-A3B 两次运行的 18 道失败题里没有一道是回答本身错了）。所以给其他模型单独指定基线文件：
 
 ```sh
 uv run --locked python scripts/eval_gate.py --mode model --endpoint http://127.0.0.1:8000/v1 \
