@@ -37,6 +37,16 @@ uv run --locked python scripts/eval_gate.py --update-baseline --from-report outp
 
 没有基线时，摘要标题写“未比较（没有基线）”，退出码 2；不会写“通过”。
 
+## 回放：不接模型，检验模型调用之后的改动
+
+改回答契约、引用处理、可答性或评分时，可以用保存的真实模型输出检验，不需要跑模型的机器：
+
+```sh
+uv run --locked python scripts/replay_model_gate.py output/eval-gate-models-.../MODEL_DIR --report output/replay.json
+```
+
+脚本在本地起一个假端点，按问题返回该次运行保存在 `model-calls.jsonl` 里的原始输出，然后在当前代码上跑一遍模型模式。先用运行时的代码回放，结果必须与原报告逐题一致，回放才可信；再用改动后的代码回放，看哪些题变了。如果改动影响了送给模型的问题或检索结果，找不到对应输出的调用会被列出（退出码 1），这时只能重新跑模型。回放报告里的时延不是模型时延。
+
 ## 报告里有什么
 
 - **推理版本**：`inference_id` 由提示词版本、系统提示摘要、可答性与上下文策略版本、检索与回答相关模块的文件摘要、数据库后端、模型设置共同决定。同一个 `inference_id` 一定对应同一套推理配置。
