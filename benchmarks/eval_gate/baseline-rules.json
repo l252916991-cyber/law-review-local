@@ -20,12 +20,12 @@
       "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
       "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
       "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-      "services.py": "ea79ed57e0c82064748b71e9576e468c9f39e37a0147cca1b8947211fef934ca",
+      "services.py": "2072d9fe7300f11bded2d104b652733921220f99abe8ac1871c7c30aba896e3b",
       "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
     },
     "database_backend": "sqlite",
     "embeddings": "hashed-local",
-    "inference_id": "483c2e09a99d3428"
+    "inference_id": "b29b1a8fa21c4613"
   },
   "summary": {
     "queries": 60,
@@ -38,8 +38,8 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 14.05,
-    "latency_p95_ms": 20.47,
+    "latency_p50_ms": 13.8,
+    "latency_p95_ms": 19.6,
     "llm_used": 0,
     "overreach_answers": 0
   },
@@ -225,8 +225,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-02T12:40:03+00:00",
-  "reason": "新增只报告的指标“替律师下结论的回答”（answer_eval.overreach_findings），规则模式只统计模型回答，恒为 0；通过与否不变，46/60。",
+  "registered_at": "2026-11-07T10:26:50+00:00",
+  "reason": "模型调用返回前把复制进引用的来源标题“[资料N｜文件名｜第P页]”在文件名与页码完全一致时改回“[资料N]”（services.canonical_source_markers）；规则模式不调用模型，逐题结果不变，46/60，推理版本随 services.py 变化重新登记",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -289,6 +289,28 @@
         "latency_p50_ms": 13.63,
         "latency_p95_ms": 18.38,
         "llm_used": 0
+      }
+    },
+    {
+      "inference_id": "483c2e09a99d3428",
+      "gate_version": "eval-gate-v2",
+      "registered_at": "2026-11-02T12:40:03+00:00",
+      "reason": "新增只报告的指标“替律师下结论的回答”（answer_eval.overreach_findings），规则模式只统计模型回答，恒为 0；通过与否不变，46/60。",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 14.05,
+        "latency_p95_ms": 20.47,
+        "llm_used": 0,
+        "overreach_answers": 0
       }
     }
   ]

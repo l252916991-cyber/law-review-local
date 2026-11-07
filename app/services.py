@@ -732,6 +732,37 @@ def strip_reasoning(text: str) -> str:
     return text
 
 
+def source_header(index: int, item: dict[str, Any]) -> str:
+    """How source ``index`` is introduced to the model in the prompt."""
+    return f"[资料{index}｜{item['name']}｜第{item['page_no']}页]"
+
+
+_COPIED_SOURCE_HEADER = re.compile(
+    r"[\[【［]\s*资料\s*(\d+)\s*[｜|]\s*([^｜|\]】］\n]+?)\s*[｜|]\s*第\s*(\d+)\s*页\s*[\]】］]")
+
+
+def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str:
+    """Turn source headers the model copied into its answer back into ``[资料N]``.
+
+    Some models cite with the prompt's header ("[资料1｜03_李某询问笔录.txt｜第3页]")
+    instead of the requested "[资料1]". The answer contract rejects that form, so a
+    correct answer was lost as a model error (2026-11-07 cross-model gate: 3 of
+    Qwen3.6-35B-A3B's 60 answers). The rewrite happens only when the file name
+    and page are exactly those of source N, so a wrong citation stays wrong and
+    is still rejected; every other malformed marker is left as it is.
+    """
+    def replace(match: re.Match[str]) -> str:
+        index = int(match.group(1))
+        if not 1 <= index <= len(contexts):
+            return match.group(0)
+        item = contexts[index - 1]
+        if match.group(2).strip() == item.get("name") and int(match.group(3)) == item.get("page_no"):
+            return f"[资料{index}]"
+        return match.group(0)
+
+    return _COPIED_SOURCE_HEADER.sub(replace, answer or "")
+
+
 def read_json_with_deadline(
     response: Any, timeout: float, *, deadline: float | None = None, max_bytes: int = 8 * 1024 * 1024,
 ) -> dict[str, Any]:
@@ -901,8 +932,7 @@ def call_local_llm(
     # `target` so a second backend is a registration, not a second code path.
     target = resolve_model_target(model, base_url, api_override)
     context_text = "\n\n".join(
-        f"[资料{i}｜{item['name']}｜第{item['page_no']}页]\n{item['quote']}"
-        for i, item in enumerate(contexts, 1)
+        f"{source_header(i, item)}\n{item['quote']}" for i, item in enumerate(contexts, 1)
     )
     system = CHAT_SYSTEM_PROMPT
     # Only the current retrieval fragments can become citations. History and
@@ -994,6 +1024,7 @@ def call_local_llm(
                     end_frame_types=end_frame_types(target.api),
                 )
                 answer = strip_reasoning(streamed)
+        answer = canonical_source_markers(answer, contexts)
         if not answer:
             raise RuntimeError("本地模型返回了推理草稿或空正文")
         _last_llm_provenance.set(llm_provenance(route, model, target=target))
