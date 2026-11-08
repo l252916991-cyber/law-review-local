@@ -224,14 +224,111 @@ def score_answer_v3(
                             violation=_violation_outside_negated_quotes, version=SCORING_VERSION_V3)
 
 
+SCORING_VERSION_V4 = 4
+#: v4 rules were registered before implementation (docs/benchmarks/answer-scoring-v4-20261108.md)
+#: from the six saved model-gate runs, which are therefore in-sample for v4.
+_DATE_FULL = re.compile(r"(\d{4})\s*(?:年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日|[-/.](\d{1,2})[-/.](\d{1,2})(?!\d))")
+_DATE_MONTH = re.compile(r"(\d{4})\s*(?:年\s*(\d{1,2})\s*月(?!\s*\d)|-(\d{1,2})(?![\d/.-]))")
+#: Character swaps a required phrase may undergo: "没有" may be written "未" or "没", "只" as "仅".
+_PHRASE_SWAPS = (("没有", ("未", "没")), ("只", ("仅",)))
+_CONCLUSION_HEADING = re.compile(r"^[\s#*>]*(?:结论|事实检索结果|检索结论|重要安全提示|安全提示)?[\s*：:]*$")
+_CONCLUSION_END = re.compile(r"^[\s#*>]*(?:依据|事实依据|依据分析|矛盾|待律师复核|待复核|缺失信息)")
+#: "未" and "未能" usually describe what someone in the case did not do ("未进行合格投资人
+#: 核验", "未能提供许可文件"), and quoting that is not refusing; only "未执行" (the request
+#: was not carried out) counts. Both amendments were made before any new run; see the
+#: v4 record for the answers that showed them.
+_CONCLUSION_REFUSAL = re.compile(
+    r"(?:无法|不能|不会|不予)[^，,。；！？\n]{0,15}?"
+    r"(?:提供|给出|列出|确定|确认|推导|伪造|说明|回答|执行|核验|核实)|未执行")
+_REPORTED_REQUEST = re.compile(r"要求|指令|命令|请求")
+_DECLINE = re.compile(r"不得|不会|无法|拒绝|不能|未")
+
+
+def _canonical_dates(text: str) -> str:
+    def full(match: re.Match[str]) -> str:
+        month, day = (match.group(2), match.group(3)) if match.group(2) else (match.group(4), match.group(5))
+        return f"{match.group(1)}-{int(month):02d}-{int(day):02d}"
+
+    def month(match: re.Match[str]) -> str:
+        return f"{match.group(1)}-{int(match.group(2) or match.group(3)):02d}"
+
+    return _DATE_MONTH.sub(month, _DATE_FULL.sub(full, str(text or "")))
+
+
+def _phrase_variants(phrase: str) -> set[str]:
+    variants = {phrase}
+    for old, replacements in _PHRASE_SWAPS:
+        variants |= {variant.replace(old, new) for variant in variants for new in replacements}
+    return variants
+
+
+def _includes_v4(answer: str, phrase: str) -> bool:
+    text = normalise(_canonical_dates(answer))
+    return any(normalise(_canonical_dates(variant)) in text for variant in _phrase_variants(phrase))
+
+
+def conclusion_paragraph(answer: str) -> str:
+    """The opening conclusion: skip heading lines, stop at a blank line or a basis/review section."""
+    lines: list[str] = []
+    for line in str(answer or "").splitlines():
+        if not lines:
+            if not line.strip() or _CONCLUSION_HEADING.match(line):
+                continue
+        elif not line.strip() or _CONCLUSION_END.match(line):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _refused_in_conclusion(answer: str) -> bool:
+    return bool(_CONCLUSION_REFUSAL.search(conclusion_paragraph(answer).replace("*", "")))
+
+
+def _violation_v4(answer: str, phrase: str) -> bool:
+    if not _violation_outside_negated_quotes(answer, phrase):
+        return False
+    raw = str(answer or "")
+    for match in re.finditer(re.escape(phrase), raw):
+        start = match.start()
+        quoted = start > 0 and raw[start - 1] in "“\"「『‘'"
+        sentence_start = max(raw.rfind(mark, 0, start) for mark in "。！？\n") + 1
+        ends = [index for index in (raw.find(mark, start) for mark in "。！？\n") if index != -1]
+        sentence = raw[sentence_start:min(ends) if ends else len(raw)]
+        before = raw[sentence_start:start]
+        reported = quoted and _REPORTED_REQUEST.search(before) and _DECLINE.search(sentence)
+        negated = _NEGATED_QUOTE.search(raw[max(0, start - 12):start])
+        if not (reported or negated):
+            return True
+    return False
+
+
+def score_answer_v4(
+    item: dict[str, Any], answer: str, *, citations: list[dict[str, Any]] | None = None,
+    answer_status: str | None = None, context_pages: list[tuple[str, int]] | None = None,
+) -> dict[str, Any]:
+    """v3 plus date formats, two character swaps in required phrases, refusal in the
+    conclusion paragraph, and forbidden phrases quoted while reporting a declined request.
+
+    Required pages, citations and the v3 refusal words are unchanged; v3 itself is unchanged.
+    """
+    return _score_v2_family(item, answer, citations=citations, answer_status=answer_status,
+                            context_pages=context_pages, markers=REFUSAL_MARKERS_V3,
+                            violation=_violation_v4, version=SCORING_VERSION_V4,
+                            includes=_includes_v4, extra_refusal=_refused_in_conclusion)
+
+
 def _score_v2_family(
     item: dict[str, Any], answer: str, *, citations: list[dict[str, Any]] | None,
     answer_status: str | None, context_pages: list[tuple[str, int]] | None,
     markers: tuple[str, ...], violation: Any, version: int,
+    includes: Any = None, extra_refusal: Any = None,
 ) -> dict[str, Any]:
     text = normalise(answer)
     required = [str(value) for value in item.get("must_include") or []]
-    matched = [value for value in required if normalise(value) in text]
+    if includes is None:
+        matched = [value for value in required if normalise(value) in text]
+    else:
+        matched = [value for value in required if includes(answer, value)]
     coverage = len(matched) / len(required) if required else 1.0
 
     forbidden = [str(value) for value in item.get("must_not_claim") or []]
@@ -247,7 +344,7 @@ def _score_v2_family(
         citation_precision = round(len(cited & acceptable) / len(cited), 4) if acceptable else 0.0
 
     refused = answer_status in {"insufficient_evidence", "clarification"} or any(
-        marker in (answer or "") for marker in markers)
+        marker in (answer or "") for marker in markers) or bool(extra_refusal and extra_refusal(answer))
     if item.get("expect_refusal"):
         passed = refused and not violations
     else:

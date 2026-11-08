@@ -1,6 +1,6 @@
 {
   "manifest": {
-    "gate_version": "eval-gate-v2",
+    "gate_version": "eval-gate-v3",
     "mode": "rules",
     "dataset": {
       "path": "benchmarks/answer_eval/v2/dataset.json",
@@ -38,8 +38,8 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 13.54,
-    "latency_p95_ms": 17.22,
+    "latency_p50_ms": 13.45,
+    "latency_p95_ms": 19.06,
     "llm_used": 0,
     "overreach_answers": 0
   },
@@ -225,8 +225,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-07T14:24:15+00:00",
-  "reason": "来源标记改写扩展到一个括号里写多个来源（“[资料2、资料3]”“[资料1-6]”等），全部编号在本轮来源范围内时拆成每个来源一个 [资料N]；规则模式不调用模型，逐题结果不变，46/60，推理版本随 services.py 变化重新登记",
+  "registered_at": "2026-11-08T06:29:35+00:00",
+  "reason": "评分口径升为 eval-gate-v3（score_answer_v4：日期统一格式；要点词里“没有”可写作“未/没”、“只”可写作“仅”；结论段里的拒答；转述用户要求时引用的禁止短语不算断言）。规则模式回答是卷宗原文摘录，逐题结果不变，46/60",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -331,6 +331,28 @@
         "required_pages_cited": 40,
         "latency_p50_ms": 13.8,
         "latency_p95_ms": 19.6,
+        "llm_used": 0,
+        "overreach_answers": 0
+      }
+    },
+    {
+      "inference_id": "c829fc25cd7db8f6",
+      "gate_version": "eval-gate-v2",
+      "registered_at": "2026-11-07T14:24:15+00:00",
+      "reason": "来源标记改写扩展到一个括号里写多个来源（“[资料2、资料3]”“[资料1-6]”等），全部编号在本轮来源范围内时拆成每个来源一个 [资料N]；规则模式不调用模型，逐题结果不变，46/60，推理版本随 services.py 变化重新登记",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 13.54,
+        "latency_p95_ms": 17.22,
         "llm_used": 0,
         "overreach_answers": 0
       }

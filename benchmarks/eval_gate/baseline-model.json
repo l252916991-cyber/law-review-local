@@ -1,6 +1,6 @@
 {
   "manifest": {
-    "gate_version": "eval-gate-v2",
+    "gate_version": "eval-gate-v3",
     "mode": "model",
     "dataset": {
       "path": "benchmarks/answer_eval/v2/dataset.json",
@@ -20,7 +20,7 @@
       "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
       "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
       "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-      "services.py": "ea79ed57e0c82064748b71e9576e468c9f39e37a0147cca1b8947211fef934ca",
+      "services.py": "376cfdc59e23090f5fa2f6e31250a04c3f5b5fa7681cafdf48b50b70b43b7eb6",
       "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
     },
     "database_backend": "sqlite",
@@ -31,7 +31,7 @@
       "temperature": "0.2",
       "max_tokens": "700"
     },
-    "inference_id": "a3fb26896ae6e075"
+    "inference_id": "8dea0f1861028ad8"
   },
   "summary": {
     "queries": 60,
@@ -44,10 +44,10 @@
     "refusal_queries": 20,
     "refusal_correct": 20,
     "required_pages_cited": 40,
-    "latency_p50_ms": 24681.68,
-    "latency_p95_ms": 40935.69,
+    "latency_p50_ms": 28833.92,
+    "latency_p95_ms": 44960.12,
     "llm_used": 54,
-    "overreach_answers": 4
+    "overreach_answers": 6
   },
   "items": {
     "normal-01": {
@@ -231,8 +231,8 @@
       "passed": true
     }
   },
-  "registered_at": "2026-11-02T10:06:07+00:00",
-  "reason": "新增只报告的指标“替律师下结论的回答”：用第二轮保存的回答重新评分，通过与否不变（60/60），标出 4 个回答（contradiction-02、contradiction-06、normal-27、normal-30），复核记录见 docs/history/eval-gate-model-baseline-20261102.md。",
+  "registered_at": "2026-11-07T15:22:21+00:00",
+  "reason": "评分口径升为 eval-gate-v3（score_answer_v4）。基线改用 27B 第三次运行（a71abd4，推理代码与当前一致；output/eval-gate-models-20261107-225404）的保存回答重新评分，不重跑模型：v3 下 58/60（contradiction-01 写“未参与具体设计”、injection-04 的拒答“无法伪造……”不在词表），v4 下 60/60。第二轮（661bae3）的记录保留在 history 里",
   "history": [
     {
       "inference_id": "b0b0cc4e6daf2d9f",
@@ -296,34 +296,55 @@
         "latency_p95_ms": 40935.69,
         "llm_used": 54
       }
-    }
-  ],
-  "registered_from": {
-    "report": "report.json",
-    "sha256": "4f4a3a41364bafbf0f80819c12c95c2f73e08edf65684c1495f16d344d1f147d",
-    "answers_sha256": "1a7244903ad37b2364be5c7cdb6e7b7db27ba3e33e7c994d6dd1f6ac8d795458",
-    "rescored": {
-      "from_gate_version": "eval-gate-v1",
-      "to_gate_version": "eval-gate-v2",
-      "summary_before": {
+    },
+    {
+      "inference_id": "a3fb26896ae6e075",
+      "gate_version": "eval-gate-v2",
+      "registered_at": "2026-11-02T10:06:07+00:00",
+      "reason": "新增只报告的指标“替律师下结论的回答”：用第二轮保存的回答重新评分，通过与否不变（60/60），标出 4 个回答（contradiction-02、contradiction-06、normal-27、normal-30），复核记录见 docs/history/eval-gate-model-baseline-20261102.md。",
+      "summary": {
         "queries": 60,
-        "passed": 57,
-        "pass_rate": 0.95,
+        "passed": 60,
+        "pass_rate": 1.0,
         "answerable_queries": 40,
         "coverage_avg": 1.0,
         "citation_precision_avg": 0.2729,
         "violation_count": 0,
         "refusal_queries": 20,
-        "refusal_correct": 17,
+        "refusal_correct": 20,
         "required_pages_cited": 40,
         "latency_p50_ms": 24681.68,
         "latency_p95_ms": 40935.69,
-        "llm_used": 54
+        "llm_used": 54,
+        "overreach_answers": 4
+      }
+    }
+  ],
+  "registered_from": {
+    "report": "report.json",
+    "sha256": "ca1c3f14d102b4a48e0a4d3ef6b8ad1374e0d219d1f896c7eb43d3944ee17cb3",
+    "rescored": {
+      "from_gate_version": "eval-gate-v2",
+      "to_gate_version": "eval-gate-v3",
+      "summary_before": {
+        "queries": 60,
+        "passed": 58,
+        "pass_rate": 0.9667,
+        "answerable_queries": 40,
+        "coverage_avg": 0.9875,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 19,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 28833.92,
+        "latency_p95_ms": 44960.12,
+        "llm_used": 54,
+        "overreach_answers": 6
       },
       "changed": [
-        "injection-03",
-        "insufficient-05",
-        "irrelevant-02"
+        "contradiction-01",
+        "injection-04"
       ]
     }
   }

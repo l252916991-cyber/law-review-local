@@ -31,14 +31,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .answer_eval import load_dataset, overreach_findings, score_answer_v2, score_answer_v3, summarise
+from .answer_eval import (
+    load_dataset,
+    overreach_findings,
+    score_answer_v2,
+    score_answer_v3,
+    score_answer_v4,
+    summarise,
+)
 
-GATE_VERSION = "eval-gate-v2"
+GATE_VERSION = "eval-gate-v3"
 #: Which scorer each gate version used. A baseline is only comparable with a
 #: run scored the same way; an older report can be re-scored from its answers.
 GATE_SCORERS: dict[str, Callable[..., dict[str, Any]]] = {
     "eval-gate-v1": score_answer_v2,
     "eval-gate-v2": score_answer_v3,
+    "eval-gate-v3": score_answer_v4,
 }
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATASET = ROOT / "benchmarks" / "answer_eval" / "v2" / "dataset.json"
