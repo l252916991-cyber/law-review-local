@@ -77,12 +77,12 @@ uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir 
 uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-07，提交 `f3476ee`）
+## 4.1 质量基线（2026-11-08，提交 `38d1a04`）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1770 passed / 0 failed / 24 skipped，综合覆盖率 86.90%（分支 79.05%）；Python 3.14.6：1770 passed / 0 failed / 24 skipped，86.88%（分支 79.03%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 16 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
-| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1785 passed / 0 failed / 9 skipped，覆盖率 88.00%（分支 80.34%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；322 个测试在测试体内实际连到 PostgreSQL；从冻结的 v27 结构只执行迁移文件升级到 v28，与新建库逐项一致；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1802 passed / 0 failed / 24 skipped，综合覆盖率 86.94%（分支 79.10%）；Python 3.14.6：1802 passed / 0 failed / 24 skipped，86.93%（分支 79.10%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 16 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1817 passed / 0 failed / 9 skipped，覆盖率 88.04%（分支 80.41%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；322 个测试在测试体内实际连到 PostgreSQL；从冻结的 v27 结构只执行迁移文件升级到 v28，与新建库逐项一致；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
 | 信息隔离墙 | 以墙外管理员、仍被分配到该案的墙外律师遍历全部 GET 接口，墙内标记 0 次出现；PostgreSQL 上关掉应用层检查重做仍为 0，SQLite 对照为 10 个接口泄露；35 张表强制行级安全，生成器拒绝未归类的案件关联表 |
 | 答案质量门禁 | 60 题冻结评测集，规则模式 46/60 通过，PostgreSQL 上逐题通过情况与 SQLite 相同；CI 每次推送运行，退化即阻断。模型模式：本机 Qwen3.8-27B 4-bit 首轮 51/60，按失败题修复后第二轮 57/60；剩余 3 道失败复核为评分词表未覆盖的正确拒答，评分升为 v3 后用保存的回答重新评分为 60/60 并登记为基线（v3 新增措辞取自这两轮，属样本内；首轮按 v3 为 53/60，其中 1 题是勉强通过）（[记录](../history/eval-gate-model-baseline-20261102.md)） |
 | 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
