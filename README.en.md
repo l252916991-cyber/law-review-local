@@ -15,12 +15,13 @@ Each row links to the details and how to reproduce them.
 | Can resume reuse stale analysis? | No: editing one source page makes resume refuse, without consuming a retry ([demo](docs/history/migration/portfolio-p3-demo-status-20261027.md), Chinese) |
 | Can a prompt or model change silently make answers worse? | A 60-question answer-quality gate runs on every push; fixing what a real model got wrong moved it from 51 to 57/60, and the gate caught a regression on the way ([record](docs/history/eval-gate-model-baseline-20261102.md), Chinese) |
 | Would another local model do? | A 35B-A3B MoE answers 4 times faster than the 27B with no factual error after reading every failure; a 9B gets 5 wrong, mostly by inventing facts the file does not contain ([record](docs/history/eval-gate-cross-model-20261107.md), Chinese) |
+| Can the gate's scoring be trusted? | A manual review of 360 real answers: half of what the old scorer failed was actually right, the new scorer gets that down to 5%; of 60 sampled passes, one swapped who said what and was not caught ([write-up](docs/benchmarks/eval-credibility-20261108.md), Chinese) |
 | Can it run on an enterprise database? | The same code runs on SQLite and PostgreSQL + pgvector; vector search over 10,000 pages drops from 1.29 s to 48 ms with the same results ([benchmark](docs/benchmarks/postgres-vector-search-20261102.md)) |
 | Can people be kept out of a conflicted matter? | An information wall enforced twice, in the application and by PostgreSQL row-level security; with the application check off nothing leaks, while SQLite leaks through 10 endpoints ([runbook](docs/runbook/case-walls.md), Chinese) |
 | Can a new matter be checked for conflicts? | A hit locks the case until another partner approves it with a written reason; a hit on a walled case only says a conflict exists ([runbook](docs/runbook/conflict-check.md), Chinese) |
 | Engineering | Offline tests: 1,757 on Python 3.11 and 3.14 each and 1,772 on PostgreSQL, all passing, about 87% coverage; ruff, mypy and a Docker smoke test in CI ([quality baseline](docs/portfolio/project-brief.md), Chinese) |
 
-Not done yet: independent human labels (a two-reviewer blind package is ready), a recorded real-model demo, cross-model comparison, and law-firm business sign-off. Samples are small and synthetic; read the [project brief](docs/portfolio/project-brief.md) (Chinese) for exact scope.
+Not done yet: labels from a lawyer or another independent reviewer (a blind package built from real model answers is ready), a recorded real-model demo, and law-firm business sign-off. Samples are small and synthetic; read the [project brief](docs/portfolio/project-brief.md) (Chinese) for exact scope.
 
 Development: the maintainer owns direction, experiment design, acceptance criteria and trade-offs; much of the code was written with AI coding assistants (Codex, Claude).
 
