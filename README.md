@@ -44,7 +44,7 @@ flowchart LR
 | 能换企业数据库吗？ | 同一套代码跑 SQLite 与 PostgreSQL + pgvector；10,000 页向量检索 1.29 s → 48 ms，结果相同（[基准](docs/benchmarks/postgres-vector-search-20261102.md)） |
 | 能把无关的人挡在案件外吗？ | 信息隔离墙由应用层和 PostgreSQL 行级安全两层执行；关掉应用层检查后仍零泄露，SQLite 对照泄露 10 个接口（[手册](docs/runbook/case-walls.md)） |
 | 受理前能查利益冲突吗？ | 命中即锁定案件，须由另一位合伙人写明理由放行；命中隔离案件时只显示“存在冲突”（[手册](docs/runbook/conflict-check.md)） |
-| 工程质量 | 离线测试 Python 3.11 / 3.14 各 1802 项、PostgreSQL 1817 项全部通过，覆盖率约 87%；ruff、mypy、Docker 冒烟都在 CI 里（[质量基线](docs/portfolio/project-brief.md)） |
+| 工程质量 | 离线测试 Python 3.11 / 3.14 各 1812 项、PostgreSQL 1827 项全部通过，覆盖率约 87%；ruff、mypy、Docker 冒烟都在 CI 里（[质量基线](docs/portfolio/project-brief.md)） |
 
 **没做到的**：律师或独立人工评分（盲审包已备好，用的是真实模型回答）、真实模型主演示视频、律所业务签收。样本小且为合成案件。
 
