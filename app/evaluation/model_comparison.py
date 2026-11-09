@@ -20,13 +20,13 @@ from app.llm.local_backends import BackendUnknown, GovernedRetrievalLedger
 from app.paths import APP_DIR
 from app.review import agents
 from app.review.answerability import POLICY_VERSION, answer_body, parse_decision, policy_identity
-from app.review.services import PROMPT_VERSION
+from app.review.generation import PROMPT_VERSION
 from app.storage.db import connect, db_scope
 
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v13"
+NATIVE_BASELINE_REVISION = "specialist-review-v14"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -78,15 +78,19 @@ NATIVE_BASELINE_REVIEW = (
     "检索与可答性未改动；9 次保存运行新旧代码回放的逐题差异见评分 v4 记录。v10 结果保留且不被覆盖。"
     "2026-11-09（specialist-review-v12）：删除无调用者的代码——agents.py 的 AnalysisAgent、CrossExaminationAgent 兼容外壳及其两个从未被读取的属性，services.py 的 current_turn_key 与未使用常量 EXPORT_BLOCK_TYPES。提示模板、检索、回答契约、专家规则与调用路径均未改动。v11 结果保留且不被覆盖。"
     "2026-11-09（specialist-review-v13）：app/ 按领域拆成子包，八个算法文件移动到 review/、retrieval/、integration/，相对导入改为绝对导入；文件路径键改为相对 app 包的路径。函数体、提示模板、检索与调用路径均未改动。v12 结果保留且不被覆盖。"
+    "2026-11-09（specialist-review-v14）：services.py 按职责拆分。钉住的 review/services.py 换成承接其推理代码的 review/chat.py（对话编排）、review/generation.py（提示与模型调用）、retrieval/search.py（关键词检索与路由）和 core/egress.py（出站与限时读取）；函数体逐字搬移，提示模板、检索、回答契约与调用路径均未改动。v13 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
-    "review/agents.py": "5f3150b2f003909b6702bfde86e827f2df35897c6964f6fd026b6376b1fe72e9",
+    "review/agents.py": "69114a5c1250ff6e3509d6496cba6712fbaa86203afe1b746811fea5bb5bd278",
     "review/review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
-    "review/agent_tools.py": "af535aa56623386493e7ab4b39f916b004e58028101c0080073ea72841a37dc5",
-    "retrieval/rag.py": "3e2ebbb622baf73863b6006cb97e7432630b28f1153eb2091f586aa7de8c14f2",
-    "retrieval/search_backend.py": "c82fdd3ae07943c49286d9a72f43bd8d96ea8c89890dfba26f8a02bd4694af07",
-    "review/services.py": "935b49b169a537119e135b2a4eca7e342559644b75122675d33dc80d8f2169eb",
-    "integration/model_domain.py": "93d126a1cccb1bdc51f41ac1238870b5a3a8bf46dd86ead6135f6e8ba60fab20",
+    "review/agent_tools.py": "07478f077cd29d7af407d175d7f84e9047aec199b08338231392420ec80c2dcb",
+    "retrieval/rag.py": "a874b0f3fb74b51409838e2410d1e734e085062536d9dd8f2180af59acff1934",
+    "retrieval/search_backend.py": "ecedd3a487272f434b0fb8f630dddf7878df15b9eb82ccece780dd1a21fd31c0",
+    "review/chat.py": "00e3cdcd9f6c4d1e99248ab3cfa1c069df132cf622045e7cd1a9aacaef023717",
+    "review/generation.py": "e76677eadc80f51dc369cdc4c7a14b1dbf3508d690d8d7a2ce379f39e37cb314",
+    "retrieval/search.py": "c20867d789449ffbddd3d9ecff1a6703e54950b6f45c1d3f6c90f34ffd93b92a",
+    "core/egress.py": "213228963aff19f39adfaad746023b0c14dd3ffebeea21b825f53e4cddf0e008",
+    "integration/model_domain.py": "b32602b3ede6ed3b6dfd8be3f246e45b492e3e990b3b0d1338e5b9bbff28855b",
     "retrieval/statutory_retrieval.py": "2e3540e3795c347f8002da7d9798646dc0ac609351a789b3517b781482492d53",
 }
 

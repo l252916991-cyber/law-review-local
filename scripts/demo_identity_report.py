@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 BACKEND_FILES = (
-    "app/main.py", "app/review/services.py", "app/review/agents.py", "app/review/review_collaboration.py",
+    "app/main.py", "app/review/chat.py", "app/review/generation.py", "app/review/agents.py", "app/review/review_collaboration.py",
     "app/evaluation/collaboration_ablation.py", "app/evaluation/ablation_analysis.py", "app/evaluation/answer_eval.py",
 )
 FRONTEND_BINDING = Path("frontend/out/build-info.json")
@@ -88,7 +88,7 @@ def build_report(root: Path) -> dict[str, Any]:
     from app.evaluation.collaboration_ablation import precheck
     from app.integration.model_domain import LOCAL_PROMPT_VERSION
     from app.review.answerability import POLICY_VERSION, policy_identity
-    from app.review.services import PROMPT_VERSION
+    from app.review.generation import PROMPT_VERSION
 
     probe = precheck(None, None)
     return {

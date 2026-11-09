@@ -1490,7 +1490,8 @@ def seed(data_dir: Path, *, seed_value: int = 20260911) -> dict[str, Any]:
     os.environ.setdefault("LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB", str(data_dir / "checkpoints.sqlite"))
     os.environ.setdefault("LAW_REVIEW_AUTH_MODE", "local")
 
-    from app.review.services import index_upload, persist_bank_transactions
+    from app.documents.bank_ledger import persist_bank_transactions
+    from app.documents.ingest import index_upload
     from app.storage.db import connect, init_db, now
 
     init_db(seed=False)

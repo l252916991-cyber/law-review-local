@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from app.llm.model_router import FallbackConfigError
-from app.review import agents, services
+from app.review import agents, generation
 from app.review.agents import CriticAgent
 from app.storage.db import connect, init_db, now, transaction
 from tests.support import IsolatedDatabaseTestCase
@@ -77,7 +77,7 @@ class AgentFallbackTests(IsolatedDatabaseTestCase):
         """
         def fake_call(question, route, contexts, **kwargs):
             model = kwargs.get("model_override") or "test-model"
-            services._last_llm_usage.set({
+            generation._last_llm_usage.set({
                 "model": model, "usage": {"prompt_tokens": 10, "completion_tokens": 5},
                 "ttft_ms": None, "latency_ms": 1, "kind": "critic",
             })
@@ -152,7 +152,7 @@ class AgentFallbackTests(IsolatedDatabaseTestCase):
 
     def test_fallback_call_failure_is_reported_without_a_second_retry(self):
         def fake_call(question, route, contexts, **kwargs):
-            services._last_llm_usage.set({
+            generation._last_llm_usage.set({
                 "model": kwargs.get("model_override") or "test-model",
                 "usage": None, "ttft_ms": None, "latency_ms": 1, "kind": "critic",
             })
@@ -189,9 +189,9 @@ class AgentFallbackTests(IsolatedDatabaseTestCase):
 
     def test_fallback_probe_uses_the_fallback_endpoint(self):
         """The model check must hit the endpoint that will actually serve it."""
-        with patch.object(services, "local_llm_available", return_value=(False, "fallback-model")) as probe:
+        with patch.object(generation, "local_llm_available", return_value=(False, "fallback-model")) as probe:
             with self.assertRaises(RuntimeError):
-                services.call_local_llm(
+                generation.call_local_llm(
                     "问题", "事实检索", CONTEXTS,
                     model_override="fallback-model", base_url_override="http://127.0.0.1:9/v1",
                 )
@@ -225,7 +225,7 @@ class LangGraphCriticAttributionTests(IsolatedDatabaseTestCase):
 
         coordinator = LangGraphCoordinator(1)
         def fake_call(question, route, contexts, **kwargs):
-            services._last_llm_usage.set({
+            generation._last_llm_usage.set({
                 "model": "test-model", "usage": None, "ttft_ms": None, "latency_ms": 1,
                 "kind": "critic",
             })

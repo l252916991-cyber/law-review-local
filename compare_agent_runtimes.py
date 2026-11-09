@@ -19,7 +19,7 @@ from app.storage.db import init_db
 from app.review.langgraph_agents import create_langgraph_coordinator
 from app.integration.runtime_comparison import compare_runtime_results
 from app.retrieval.rag import recall_memories
-from app.review.services import LOCAL_LLM_MODEL, local_llm_available
+from app.review.generation import LOCAL_LLM_MODEL, local_llm_available
 
 
 CASES = [

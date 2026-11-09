@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.api.routes.common import require_case
 from app.api.schemas import EvidenceList
+from app.cases.gap_analysis import preview_gap_analysis, save_gap_analysis
 from app.core.audit_trail import record_field_changes
 from app.core.security import actor_name, require_case_access, require_permission
-from app.review.services import preview_gap_analysis, rowdict, save_gap_analysis
-from app.storage.db import connect, now, transaction
+from app.storage.db import connect, now, rowdict, transaction
 
 router = APIRouter()
 

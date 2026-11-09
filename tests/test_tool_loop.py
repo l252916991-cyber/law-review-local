@@ -202,7 +202,7 @@ class ChatToolLoopIntegrationTests(unittest.TestCase):
         init_db(seed=True)
 
     def _chat(self):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         return chat(1, "张某是否批准了年化12%的固定回报宣传？", "本机律师", None, True, False)
 
@@ -215,7 +215,7 @@ class ChatToolLoopIntegrationTests(unittest.TestCase):
             "usage": {"prompt_tokens": 1, "completion_tokens": 1},
             "model": "test-model",
         }
-        with patch("app.review.services.tool_loop_enabled", return_value=True), \
+        with patch("app.review.chat.tool_loop_enabled", return_value=True), \
                 patch("app.review.tool_loop.run_tool_loop", return_value=loop_result):
             result = self._chat()
         self.assertTrue(result["llm_used"])
@@ -223,9 +223,9 @@ class ChatToolLoopIntegrationTests(unittest.TestCase):
         self.assertEqual(result["context"]["tools"]["tool_calls"], 1)
 
     def test_unsupported_endpoint_falls_back_to_single_shot(self):
-        with patch("app.review.services.tool_loop_enabled", return_value=True), \
+        with patch("app.review.chat.tool_loop_enabled", return_value=True), \
                 patch("app.review.tool_loop.run_tool_loop", side_effect=ToolsUnsupportedError("no tools")), \
-                patch("app.review.services.call_local_llm", return_value="回退答案 [资料1]。\n\n请律师复核原文与上述结论。"):
+                patch("app.review.chat.call_local_llm", return_value="回退答案 [资料1]。\n\n请律师复核原文与上述结论。"):
             result = self._chat()
         self.assertTrue(result["llm_used"])
         self.assertIn("回退答案", result["answer"])

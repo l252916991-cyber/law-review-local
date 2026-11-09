@@ -166,7 +166,7 @@ class AccessControlTests(unittest.TestCase):
         self.client.delete("/api/auth/session")
         with closing(connect()) as conn:
             self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
-        with patch("app.review.services.call_local_llm", side_effect=AssertionError("no model")):
+        with patch("app.review.chat.call_local_llm", side_effect=AssertionError("no model")):
             response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
         self.assertEqual(response.status_code, 200, response.text)
         with closing(connect()) as conn:

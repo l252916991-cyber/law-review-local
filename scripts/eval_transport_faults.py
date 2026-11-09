@@ -34,7 +34,8 @@ SOURCE = "合成借款材料：借款本金为人民币128000元。本页仅用�
 ANSWER = "合成借款材料记载的借款本金为人民币128000元[资料1]。请律师复核原文与上述结论。"
 FAULTS = ("interface_5xx", "task_deadline", "return_timeout", "truncated_return")
 PATHS = ("ablation_generation", "chat_persistence")
-CLIENT_SOURCES = ("app/review/services.py", "app/evaluation/collaboration_ablation.py")
+CLIENT_SOURCES = ("app/review/chat.py", "app/review/generation.py", "app/core/egress.py",
+                  "app/evaluation/collaboration_ablation.py")
 
 
 def source_hashes() -> dict[str, str]:
@@ -196,7 +197,7 @@ def worker(endpoint: str, directory: Path, path: str, timeout: int) -> int:
                       LAW_REVIEW_TOOL_LOOP="off", LANGSMITH_TRACING="false", LANGCHAIN_TRACING_V2="false")
     sys.path.insert(0, str(ROOT))
     from app.evaluation.collaboration_ablation import live_generator
-    from app.review.services import chat
+    from app.review.chat import chat
     from app.storage.db import init_db, now, transaction
 
     init_db(seed=False)

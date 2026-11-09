@@ -84,7 +84,7 @@ class FallbackRoutingTests(unittest.TestCase):
         }
 
     def _chat(self, answers):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         calls = []
 
@@ -92,7 +92,7 @@ class FallbackRoutingTests(unittest.TestCase):
             calls.append(kwargs.get("model_override") or "primary")
             return answers[len(calls) - 1]
 
-        with patch.dict(os.environ, self.env), patch("app.review.services.call_local_llm", side_effect=fake):
+        with patch.dict(os.environ, self.env), patch("app.review.chat.call_local_llm", side_effect=fake):
             result = chat(1, "张某是否批准了年化12%的固定回报宣传？", "本机律师", None, True, False)
         return result, calls
 
@@ -113,21 +113,21 @@ class FallbackRoutingTests(unittest.TestCase):
         self.assertNotIn("route", result["provenance"])
 
     def test_fallback_that_also_fails_keeps_the_request_failed(self):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         with patch.dict(os.environ, self.env), patch(
-            "app.review.services.call_local_llm", side_effect=["草稿一", "草稿二"]
+            "app.review.chat.call_local_llm", side_effect=["草稿一", "草稿二"]
         ):
             with self.assertRaises(RuntimeError):
                 chat(1, "张某是否批准了年化12%的固定回报宣传？", "本机律师", None, True, False)
 
     def test_routing_stays_off_without_the_flag(self):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         env = dict(self.env)
         env["LAW_REVIEW_LLM_FALLBACK"] = "off"
         with patch.dict(os.environ, env), patch(
-            "app.review.services.call_local_llm", side_effect=["没有引用的草稿。"]
+            "app.review.chat.call_local_llm", side_effect=["没有引用的草稿。"]
         ):
             with self.assertRaises(RuntimeError):
                 chat(1, "张某是否批准了年化12%的固定回报宣传？", "本机律师", None, True, False)

@@ -18,7 +18,7 @@ from arq.constants import in_progress_key_prefix, job_key_prefix, result_key_pre
 from redis.exceptions import WatchError
 
 from app.core.config import config
-from app.review.services import index_upload, upload_error_message
+from app.documents.ingest import index_upload, upload_error_message
 from app.storage.db import get_db_path, init_db, now, transaction
 
 logger = logging.getLogger(__name__)

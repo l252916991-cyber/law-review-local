@@ -81,7 +81,7 @@ class BankTransactionServiceTest(IsolatedDatabaseTestCase):
         init_db(seed=True)
 
     def test_persist_summary_graph_and_replay_are_exact(self):
-        from app.review.services import (
+        from app.documents.bank_ledger import (
             bank_transaction_graph,
             list_bank_transactions,
             persist_bank_transactions,
@@ -127,7 +127,9 @@ class BankTransactionServiceTest(IsolatedDatabaseTestCase):
 
         from openpyxl import Workbook
 
-        from app.review.services import index_upload, parse_spreadsheet, persist_parsed_bank_rows
+        from app.documents.bank_ledger import persist_parsed_bank_rows
+        from app.documents.bank_transactions import parse_spreadsheet
+        from app.documents.ingest import index_upload
         from app.storage.db import connect
 
         workbook = Workbook()
@@ -161,9 +163,9 @@ class BankTransactionVolumeTest(IsolatedDatabaseTestCase):
     def test_summary_graph_and_export_cover_every_row(self):
         import zipfile
 
-        from app.review.services import (
+        from app.cases.exports import build_export_package
+        from app.documents.bank_ledger import (
             bank_transaction_graph,
-            build_export_package,
             list_bank_transactions,
             summarize_bank_transactions,
         )

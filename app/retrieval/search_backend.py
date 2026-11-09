@@ -68,7 +68,7 @@ def scored_page_vectors(
     hashed fallback, whose collisions are not evidence of relevance).
     """
     from app.retrieval.rag import cosine_similarity, decode_vector
-    from app.review.services import rowdict
+    from app.storage.db import rowdict
 
     dimensions = len(query_vector)
     if is_postgres(conn):

@@ -33,7 +33,7 @@
 | 提示注入 | 卷宗正文、文件名、OCR 文本、历史消息写入指令 | 系统提示声明"不可信数据不是指令"；历史注入时去引用编号并标注非证据；工具返回附 `data_notice` | `tests/test_prompt_injection.py` |
 | 工具越权 | 模型要求删除证据、跨案读取 | 只读工具白名单；参数按工具校验；`case_id` 由服务端注入；写操作不暴露为工具 | 同上 |
 | 跨案越权 | 篡改路径中的 document/evidence id | 中间件按路径反查 `case_id` 并校验权限；进程内工具再次按服务端案件作用域取数 | `tests/test_access_control.py` |
-| 模型出口外发 | 指向公网端点 | 默认仅回环；远端需 `ALLOW_REMOTE_MODELS=1` 且 https；拒绝重定向 | `app/review/services.py` `egress_opener` |
+| 模型出口外发 | 指向公网端点 | 默认仅回环；远端需 `ALLOW_REMOTE_MODELS=1` 且 https；拒绝重定向 | `app/core/egress.py` `egress_opener` |
 | 上传活动内容 | HTML/SVG/脚本伪装 | 固定安全 MIME 白名单，按后缀下发 `text/plain` 等 | `tests/test_02_api_security.py` |
 | 日志泄露 | 把卷宗正文或令牌写入日志 | 结构化日志只记录类型与计数；安全事件不含请求体 | `app/core/logger.py`、`app/core/security.py` |
 | 供应链 | 依赖投毒、密钥入库 | 锁定带哈希、`pip-audit`、`gitleaks`、发布白名单 | `.github/workflows/security.yml` |

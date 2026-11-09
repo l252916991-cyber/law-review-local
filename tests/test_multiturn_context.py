@@ -168,11 +168,11 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         self.assertIsNotNone(row["archived_at"])
 
     def test_chat_rejects_bad_conversation_before_retrieval_or_model(self):
+        from app.review.chat import chat
         from app.review.context import ArchivedConversationError, ConversationNotFoundError
-        from app.review.services import chat
 
         archived = make_conversation(archived=True)
-        with patch("app.retrieval.rag.HybridRetriever") as retriever, patch("app.review.services.call_local_llm") as model:
+        with patch("app.retrieval.rag.HybridRetriever") as retriever, patch("app.review.chat.call_local_llm") as model:
             with self.assertRaises(ConversationNotFoundError):
                 chat(1, "固定回报是否存在", "测试律师", 999999, True, False)
             with self.assertRaises(ArchivedConversationError):
@@ -181,7 +181,7 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         model.assert_not_called()
 
     def test_chat_returns_bounded_history_identity_on_next_turn(self):
-        from app.review.services import chat
+        from app.review.chat import chat
         from app.storage.db import connect
 
         first = chat(1, "张某关于固定回报的陈述是否存在矛盾？", "测试律师", None, False, False)

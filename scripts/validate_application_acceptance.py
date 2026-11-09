@@ -104,7 +104,8 @@ def probe_mcp(other_document: int) -> dict[str, Any]:
 
 
 def live_models() -> dict[str, Any]:
-    from app.review.services import chat, last_llm_usage
+    from app.review.chat import chat
+    from app.review.generation import last_llm_usage
     from app.review.tool_loop import run_tool_loop
 
     result: dict[str, Any] = {"real_model": True, "tools": {}, "chat": {}}

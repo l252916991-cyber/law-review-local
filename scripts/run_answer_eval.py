@@ -25,7 +25,7 @@ from app.evaluation.answer_eval import (  # noqa: E402
 
 
 def collect_live(case_id: int, dataset: dict) -> dict:
-    from app.review.services import chat
+    from app.review.chat import chat
 
     answers = {}
     for item in dataset["items"]:

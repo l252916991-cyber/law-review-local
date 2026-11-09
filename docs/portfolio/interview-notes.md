@@ -110,7 +110,7 @@
 
 产品问题当天修掉：只有文件名、页码或编号都对得上本轮来源，才改写成标准的 `[资料N]`。第二种写法 9B 第一次就写过，我起初没放行；35B 第二次又写了 3 次，才确认是常见写法。27B 和 35B 各重跑一次，同一模型两次之间都差 2 题，全部来自措辞，正好顶到门禁阈值，这也说明评分需要认得同义写法。验证没有重跑模型，而是把保存的原始输出经假端点回放：先用旧代码回放，必须与原报告逐题一致，再看新代码改变了哪几题。评分问题没有当场改，因为照着这批回答改，这批就成了样本内，要先写下规则，再用新回答检验。
 
-**位置**：`app/review/services.py`（`canonical_source_markers`）、`scripts/replay_model_gate.py`。
+**位置**：`app/review/generation.py`（`canonical_source_markers`）、`scripts/replay_model_gate.py`。
 **证据**：[跨模型记录](../history/eval-gate-cross-model-20261107.md)、`tests/test_source_markers.py`。
 
 ## Q13 准确率是多少？

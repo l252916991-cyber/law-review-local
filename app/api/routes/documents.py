@@ -18,18 +18,12 @@ from app.api.routes.common import app_state, require_case
 from app.api.schemas import DocumentSummary, PageView, SearchHit
 from app.core.audit_trail import record_field_changes
 from app.core.config import config
+from app.core.files import contained_path, safe_filename
 from app.core.security import actor_name, require_case_access, require_permission
+from app.documents.ingest import get_document, index_upload, upload_error_message
 from app.documents.tasks import batch_temp_dir, cleanup_batch_files, enqueue_batch_import
-from app.review.services import (
-    contained_path,
-    get_document,
-    index_upload,
-    rowdict,
-    safe_filename,
-    search_pages,
-    upload_error_message,
-)
-from app.storage.db import connect, now, record_security_event, sync_fts_index, transaction
+from app.retrieval.search import search_pages
+from app.storage.db import connect, now, record_security_event, rowdict, sync_fts_index, transaction
 
 router = APIRouter()
 

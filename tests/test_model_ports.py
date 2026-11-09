@@ -549,7 +549,7 @@ class ModuleBoundaryTests(unittest.TestCase):
         source = Path(model_ports.__file__).read_text(encoding="utf-8")
         self.assertIn("from app.core.config import LLMConfig", source)
         self.assertNotIn("from app.storage.db import", source)
-        self.assertNotIn("from app.review.services import", source)
+        self.assertNotIn("from app.review", source)
 
 
 if __name__ == "__main__":

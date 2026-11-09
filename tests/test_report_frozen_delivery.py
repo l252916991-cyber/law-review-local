@@ -45,7 +45,7 @@ class FrozenDeliveryCase(unittest.TestCase):
         return response.json()["id"]
 
     def upload(self, case_id, name="借条.txt", text="今借到人民币十万元整。".encode()):  # noqa: B008 - bytes are immutable
-        from app.review.services import index_upload
+        from app.documents.ingest import index_upload
         return index_upload(case_id, name, text, "text/plain")
 
     def evidence(self, case_id, title="借条原件", status="已确认"):

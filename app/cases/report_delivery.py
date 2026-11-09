@@ -28,21 +28,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from app.review.services import (
+from app.cases.exports import (
     DEFAULT_EXPORT_BLOCKS,
     EXPORT_RENDERER_VERSION,
     _block_filename,
     _evidence_table_csv,
     _export_evidence_rows,
-    _file_sha256,
-    contained_path,
     csv_safe_cell,
     get_export_template,
-    iter_bank_transactions,
-    rowdict,
-    safe_filename,
 )
-from app.storage.db import SCHEMA_VERSION, connect, get_db_path, now, transaction
+from app.core.files import contained_path, file_sha256, safe_filename
+from app.documents.bank_ledger import iter_bank_transactions
+from app.storage.db import SCHEMA_VERSION, connect, get_db_path, now, rowdict, transaction
 
 ARTIFACT_ROOT = "report_versions"
 TRANSACTION_SHEET = "资金流水.csv"
@@ -396,7 +393,7 @@ def _attachment_specs(source: dict[str, Any], data_dir: Path, *, strict: bool) -
                 "document_id": doc["id"],
                 "archive_name": f"{folder}/{safe_filename(doc['name'])}",
                 "size": path.stat().st_size,
-                "sha256": _file_sha256(path),
+                "sha256": file_sha256(path),
             })
     return specs
 
@@ -498,12 +495,12 @@ def verify_body(version_row) -> tuple[dict[str, Any], dict[str, Any]]:
         path = directory / entry["file"]
         if not path.is_file():
             raise ValueError(f"冻结正文文件缺失：{entry['archive_name']}")
-        if path.stat().st_size != entry["size"] or _file_sha256(path) != entry["sha256"]:
+        if path.stat().st_size != entry["size"] or file_sha256(path) != entry["sha256"]:
             raise ValueError(f"冻结正文文件已变化：{entry['archive_name']}")
     paths = stored_paths(source["case"]["id"])
     for attachment in body["attachments"]:
         path = attachment_path(paths, attachment)
-        if path.stat().st_size != attachment["size"] or _file_sha256(path) != attachment["sha256"]:
+        if path.stat().st_size != attachment["size"] or file_sha256(path) != attachment["sha256"]:
             raise ValueError(f"附件内容已变化：《{attachment['archive_name']}》")
     return body, source
 
@@ -571,7 +568,7 @@ def _write_package(path: Path, source: dict[str, Any], *, finalized: bool,
                 "size": attachment["size"],
             })
         archive.writestr("清单.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-    return _file_sha256(path)
+    return file_sha256(path)
 
 
 def build_preview_package(case_id: int, template_id: int | None, *, actor: str = "",

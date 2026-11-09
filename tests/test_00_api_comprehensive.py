@@ -117,7 +117,7 @@ class APIContractTest(IsolatedDatabaseTestCase):
                 "SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.case_id=1"
             ).fetchone()[0]
         with patch(
-            "app.review.services.call_local_llm",
+            "app.review.chat.call_local_llm",
             side_effect=RuntimeError("provider memory limit:SECRET_TOKEN"),
         ):
             response = self.client.post(

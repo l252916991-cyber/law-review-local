@@ -9,8 +9,7 @@ from fastapi import HTTPException
 
 from app.core.security import require_case_access
 from app.documents.tasks import get_redis_pool
-from app.review.services import rowdict
-from app.storage.db import connect
+from app.storage.db import connect, rowdict
 
 
 def app_state():

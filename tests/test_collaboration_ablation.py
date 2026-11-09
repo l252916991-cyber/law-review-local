@@ -23,7 +23,7 @@ from app.evaluation.collaboration_ablation import (
     summarise_attempts,
     verify_prepared_integrity,
 )
-from app.review import services
+from app.review import generation
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "benchmarks/answer_eval/v2/dataset.json"
@@ -114,9 +114,9 @@ def test_prompt_mirrors_the_product_chat_request(batch):
         "choices": [{"message": {"content": "ok"}}],
         "usage": {"prompt_tokens": 11, "completion_tokens": 3},
     }).encode())
-    with patch.object(services, "local_llm_available", return_value=(True, "test-model")), \
-            patch.object(services, "egress_opener", return_value=opener):
-        services.call_local_llm(prepared["question"], prepared["route"], prepared["contexts"],
+    with patch.object(generation, "local_llm_available", return_value=(True, "test-model")), \
+            patch.object(generation, "egress_opener", return_value=opener):
+        generation.call_local_llm(prepared["question"], prepared["route"], prepared["contexts"],
                                 timeout=5, model_override="test-model", object_note=note)
     body = json.loads(opener.requests[-1].data)  # type: ignore[attr-defined]
     expected = build_prompt(prepared["question"], prepared["route"], prepared["contexts"], note)
@@ -297,7 +297,7 @@ def test_live_generator_targets_the_probed_endpoint_explicitly():
         captured.update(kwargs)
         return "合成回答[资料1]。请律师复核原文与上述结论。"
 
-    with patch("app.review.services.call_local_llm", side_effect=fake_call):
+    with patch("app.review.generation.call_local_llm", side_effect=fake_call):
         generated = live_generator("stub-chat", 30, "http://127.0.0.1:18000/v1")(
             "问题", "事实检索", [], "")
     assert captured["base_url_override"] == "http://127.0.0.1:18000/v1"

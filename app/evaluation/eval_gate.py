@@ -61,7 +61,8 @@ DEFAULT_BASELINES = {
 INFERENCE_MODULES = (
     "review/agents.py", "review/answerability.py", "review/context.py", "integration/model_domain.py",
     "retrieval/rag.py", "retrieval/rag_child_index.py", "review/review_collaboration.py",
-    "retrieval/search_backend.py", "review/services.py", "retrieval/statutory_retrieval.py",
+    "retrieval/search_backend.py", "review/chat.py", "review/generation.py", "retrieval/search.py",
+    "core/egress.py", "retrieval/statutory_retrieval.py",
 )
 #: Pre-registered tolerances. Rules mode is deterministic: nothing may drop.
 #: Model mode tolerates sampling noise of up to two questions out of sixty.
@@ -89,7 +90,7 @@ def inference_manifest(mode: str, *, dataset_path: Path, model: str | None = Non
     from app.integration.model_domain import LOCAL_PROMPT_VERSION
     from app.review.answerability import POLICY_VERSION
     from app.review.context import CONTEXT_POLICY_VERSION
-    from app.review.services import CHAT_SYSTEM_PROMPT, PROMPT_VERSION
+    from app.review.generation import CHAT_SYSTEM_PROMPT, PROMPT_VERSION
 
     manifest: dict[str, Any] = {
         "gate_version": GATE_VERSION,
@@ -208,7 +209,7 @@ def _isolated_case(directory: Path, *, endpoint: str, model: str,
 def collect(dataset: dict[str, Any], directory: Path, *, mode: str, endpoint: str | None = None,
             model: str | None = None, postgres_admin_url: str | None = None) -> dict[str, dict[str, Any]]:
     """Ask every question once through ``chat`` and keep what scoring needs."""
-    from app.review.services import chat
+    from app.review.chat import chat
 
     use_llm = mode == "model"
     answers: dict[str, dict[str, Any]] = {}

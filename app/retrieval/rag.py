@@ -20,19 +20,13 @@ import urllib.request
 from typing import Any
 
 from app.core.config import LLMConfig
+from app.core.egress import assert_model_endpoint_allowed, egress_opener
+from app.core.text import concise
 from app.llm.forge_governance import governed_backend
 from app.retrieval.rag_chunks import DEFAULT_CHUNK_PROFILE
+from app.retrieval.search import best_quote, query_terms, search_pages
 from app.retrieval.search_backend import fts_page_candidates, scored_page_vectors
-from app.review.services import (
-    assert_model_endpoint_allowed,
-    best_quote,
-    concise,
-    egress_opener,
-    query_terms,
-    rowdict,
-    search_pages,
-)
-from app.storage.db import connect, now, transaction
+from app.storage.db import connect, now, rowdict, transaction
 
 EMBEDDING_MODEL = "Qwen3-Embedding-4B-4bit-DWQ"
 RERANK_MODEL = "bge-reranker-v2-m3-mlx"

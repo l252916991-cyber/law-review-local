@@ -12,8 +12,8 @@ import re
 from typing import Any
 
 from app.core.security import actor_name, require_case_access, require_permission
-from app.review.services import concise, rowdict
-from app.storage.db import now, transaction
+from app.core.text import concise
+from app.storage.db import now, rowdict, transaction
 
 READONLY_TOOL_NAMES = frozenset({
     "documents", "evidence", "search", "saved_gap_analysis",

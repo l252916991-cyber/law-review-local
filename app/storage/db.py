@@ -11,7 +11,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from app.paths import ROOT
 
@@ -1499,3 +1499,7 @@ def seed_demo() -> None:
             "INSERT INTO audit_log(case_id, action, detail, created_at) VALUES (?, '创建演示案件', '载入虚构卷宗与证据关系', ?)",
             (case_id, ts),
         )
+
+
+def rowdict(row: Any) -> dict[str, Any]:
+    return dict(row) if row is not None else {}

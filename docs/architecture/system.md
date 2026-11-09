@@ -10,7 +10,7 @@ Browser → FastAPI → business SQLite (documents/pages/evidence/audit/runs/mem
                └→ Redis queue → arq worker → document extraction/indexing
 ```
 
-HTTP 层：`app/main.py` 只负责应用生命周期、中间件、前端静态托管和路由装配；接口处理函数按领域放在 `app/api/routes/`（`system`、`cases`、`documents`、`evidence`、`chat`、`agent_runs`、`bank`、`exports`，共享的案件访问校验与 Redis 探测在 `common`），成员、人工任务、报告、复核任务与登录沿用各自模块的 `APIRouter`。业务逻辑仍在 `app/review/services.py`、`app/review/agents.py` 等模块，路由层不复制规则。
+HTTP 层：`app/main.py` 只负责应用生命周期、中间件、前端静态托管和路由装配；接口处理函数按领域放在 `app/api/routes/`（`system`、`cases`、`documents`、`evidence`、`chat`、`agent_runs`、`bank`、`exports`，共享的案件访问校验与 Redis 探测在 `common`），成员、人工任务、报告、复核任务与登录沿用各自模块的 `APIRouter`。业务逻辑在各领域子包（`app/review/`、`app/retrieval/`、`app/documents/`、`app/cases/` 等），路由层不复制规则。
 
 业务表保存可展示的审计与结果；checkpoint 保存图状态和待执行节点。LangGraph 线程以运行 ID 隔离，恢复仍使用原线程；节点副作用需要业务层幂等保护。SQLite 适合当前单机原型，不宣称多实例高并发运行能力。
 

@@ -111,11 +111,11 @@ LexVault 的差异化不在“又一个法律聊天机器人”，而在**案件
 
 | # | 差距 | 现状证据 | 影响 |
 |---|---|---|---|
-| 1 | **解析仍是页级文本，缺版面/表格/坐标** | [`app/review/services.py`](/Users/xiaoy/Documents/本地律所/app/review/services.py#L245) 用 `pdftotext -layout` 逐页取文本，仅当去空白后少于 24 字符才 OCR；[`extract_docx_pages`](/Users/xiaoy/Documents/本地律所/app/review/services.py#L284) 把表格拼成 `【表格】` 文本。 | 多栏、跨页表格、扫描件、印章/手写页会丢结构；引用只能到页，不能精确高亮。 |
+| 1 | **解析仍是页级文本，缺版面/表格/坐标** | [`app/documents/ingest.py`](../../app/documents/ingest.py) 用 `pdftotext -layout` 逐页取文本，仅当去空白后少于 24 字符才 OCR；[`extract_docx_pages`](../../app/documents/ingest.py) 把表格拼成 `【表格】` 文本。 | 多栏、跨页表格、扫描件、印章/手写页会丢结构；引用只能到页，不能精确高亮。 |
 | 2 | **引用是页级 + 格式校验，不是精确 span/版本校验** | [`validate_review_answer`](/Users/xiaoy/Documents/本地律所/app/review/agents.py#L53) 检查引用编号范围、document_id/page_no 存在、quote 非空；[`_citation`](/Users/xiaoy/Documents/本地律所/app/review/agents.py#L75) 只输出 document_id/page/quote/url，没有 char_start/end、bbox、page_sha256。 | 无法证明“引用的这句话确实在原文这个位置”；页面更新后旧引用可能指向不同文本。 |
 | 3 | **没有案件内引用/证据图谱** | [`evidence_relations`](/Users/xiaoy/Documents/本地律所/app/storage/db.py#L173) 是人工关系；没有“文档页 → 法条/案例/证据/争点”的统一边表。 | 跨文档矛盾、证据链、法条适用只能靠聊天和人工记忆，难以累积成可复用知识。 |
 | 4 | **没有律师标注的阅卷基准** | [`README.md`](/Users/xiaoy/Documents/本地律所/README.md#L222) 明确“独立人工验收集尚未建立”；现有 RAG 240 题为演示语料派生，不是独立标注。 | 改进无法证明是否真的提升；容易用单题涨分替代业务质量。 |
-| 5 | **运行轨迹与反馈不足** | [`agent_runs`/`agent_steps`](/Users/xiaoy/Documents/本地律所/app/storage/db.py#L226) 只有节点级输入输出/耗时；[`llm_provenance`](/Users/xiaoy/Documents/本地律所/app/review/services.py#L761) 只写入聊天消息，未覆盖 Agent run；没有律师接受/驳回/修改的结构化反馈。 | 失败无法归因到检索、重排、模型或提示；无法形成“bad case → 修复 → 回归”闭环。 |
+| 5 | **运行轨迹与反馈不足** | [`agent_runs`/`agent_steps`](/Users/xiaoy/Documents/本地律所/app/storage/db.py#L226) 只有节点级输入输出/耗时；[`llm_provenance`](../../app/review/generation.py) 只写入聊天消息，未覆盖 Agent run；没有律师接受/驳回/修改的结构化反馈。 | 失败无法归因到检索、重排、模型或提示；无法形成“bad case → 修复 → 回归”闭环。 |
 | 6 | **复核体验仍是文本对话框** | [`app.js`](/Users/xiaoy/Documents/本地律所/app/static/app.js#L657) 的 `openPage` 打开的是页文本对话框，不是 PDF 高亮；没有表格化审阅/检查清单。 | 律师仍要手动对照原文，效率低；AI 建议缺少“逐条接受/驳回”的闭环。 |
 
 ### 3.3 与既有路线图的关系
@@ -570,7 +570,7 @@ LexVault 的差异化不在“又一个法律聊天机器人”，而在**案件
 
 | 区域 | 文件 | 本计划关注点 |
 |---|---|---|
-| 文档解析 | [`app/review/services.py`](/Users/xiaoy/Documents/本地律所/app/review/services.py#L245) | E34 结构化解析/表格/坐标 |
+| 文档解析 | [`app/documents/ingest.py`](../../app/documents/ingest.py) | E34 结构化解析/表格/坐标 |
 | Agent 与引用 | [`app/review/agents.py`](/Users/xiaoy/Documents/本地律所/app/review/agents.py#L53) | E35 精确引用/法条解析 |
 | LangGraph 运行时 | [`app/review/langgraph_agents.py`](/Users/xiaoy/Documents/本地律所/app/review/langgraph_agents.py#L91) | 保持兼容；不替换 |
 | 数据库/迁移 | [`app/storage/db.py`](/Users/xiaoy/Documents/本地律所/app/storage/db.py#L158) | E34/E36/E38 schema |

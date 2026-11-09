@@ -28,7 +28,8 @@ from app.benchmarks.postprocess import POSTPROCESS_VERSION, postprocess
 from app.benchmarks.retrieval import RETRIEVAL_VERSION, corpus_fingerprint, retrieve
 from app.benchmarks.solver import TASK_GUIDANCE
 from app.benchmarks.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task, validate_lawbench
-from app.review.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
+from app.review.generation import LOCAL_LLM_MODEL, LOCAL_LLM_URL
+from app.core.egress import read_json_with_deadline
 
 
 # 配置常量

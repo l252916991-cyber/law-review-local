@@ -16,9 +16,11 @@ from pydantic import BaseModel, Field
 
 from app.api.routes.common import model_operation_error, require_case
 from app.api.schemas import ChatResult, ConversationSummary, Message
+from app.cases.gap_analysis import auto_analyze_case
 from app.core.security import actor_name
 from app.llm.llm_usage import token_counts
 from app.review.agent_tools import execute_readonly_tool
+from app.review.chat import chat
 from app.review.chat_idempotency import CANCELLED as CHAT_REQUEST_CANCELLED
 from app.review.chat_idempotency import COMMITTED as CHAT_REQUEST_COMMITTED
 from app.review.chat_idempotency import FAILED as CHAT_REQUEST_FAILED
@@ -26,12 +28,12 @@ from app.review.chat_idempotency import REQUEST_ID_PATTERN, ChatCancelled, Reque
 from app.review.chat_idempotency import begin as begin_chat_request
 from app.review.chat_idempotency import finish as finish_chat_request
 from app.review.context import ArchivedConversationError, ConversationNotFoundError
-from app.review.services import auto_analyze_case, chat, rowdict
 from app.storage.db import (
     CONVERSATION_ARCHIVE_RETENTION_SECONDS,
     connect,
     now,
     purge_expired_conversations,
+    rowdict,
     transaction,
 )
 
@@ -227,7 +229,7 @@ def _sse_frame(event: str, data: dict[str, Any]) -> str:
 
 def _stream_usage_payload() -> dict[str, Any] | None:
     """Usage actually reported for this turn; unknown stays ``None``."""
-    from app.review.services import last_llm_usage
+    from app.review.generation import last_llm_usage
 
     observed = last_llm_usage() or {}
     input_tokens, output_tokens = token_counts(observed.get("usage"))

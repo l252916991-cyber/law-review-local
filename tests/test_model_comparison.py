@@ -20,7 +20,7 @@ from tests.test_local_backends import local_models  # noqa: F401
 actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="installed framework Python3.12 required")
 
 
-@pytest.mark.parametrize("filename", ["services.py", "agents.py", "review_collaboration.py", "agent_tools.py"])
+@pytest.mark.parametrize("filename", ["chat.py", "generation.py", "search.py", "agents.py", "review_collaboration.py", "agent_tools.py"])
 def test_native_baseline_still_refuses_any_unreviewed_source_change(filename):
     from app.evaluation.model_comparison import native_baseline_identity
 
@@ -39,7 +39,7 @@ def test_native_baseline_identifies_reviewed_snapshot_without_claiming_an_old_co
 
     identity = native_baseline_identity()
     assert identity["schema_version"] == 2
-    assert identity["revision"] == "specialist-review-v13"
+    assert identity["revision"] == "specialist-review-v14"
     # A re-registered baseline must carry its review note, not just new hashes.
     assert "PROMPT_VERSION" in identity["review_note"]
     assert identity["source_commit"] == "31a811c92acae30caf82c9c5109ce812bd99bb04"

@@ -18,8 +18,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from app.core.egress import assert_model_endpoint_allowed
 from app.llm.model_ports import DEFAULT_MODEL_API, MODEL_APIS, configured_api
-from app.review.services import assert_model_endpoint_allowed
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@
 
 - 结论：模型调用从"一个内联的 OpenAI 请求字典"改为 `app/llm/model_ports.py` 的分层——provider 管端点与凭证，wire api 管请求/响应形状，`ModelSpec` 管能力与价格列。默认行为不变，新增 `anthropic-messages` 作为第二个协议。
 - 设计来源：pi-ai（`packages/ai`，MIT）文档中 provider / API 二分、模型可序列化、跨 provider 交接丢弃 thinking 三条约定。只取形状，未复制源码、未引入依赖；来源记录见 `docs/runbook/licenses.md`。
-- 范围：`app/llm/model_ports.py`（新）、`app/review/services.py`、`app/llm/llm_usage.py`、`app/llm/model_router.py`、`app/review/tool_loop.py`、`app/review/agents.py`（一行透传）、测试与运行手册。未改检索、评分、回答契约与数据库结构。
+- 范围：`app/llm/model_ports.py`（新）、`app/services.py`、`app/llm/llm_usage.py`、`app/llm/model_router.py`、`app/review/tool_loop.py`、`app/review/agents.py`（一行透传）、测试与运行手册。未改检索、评分、回答契约与数据库结构。
 
 ## 为什么改
 

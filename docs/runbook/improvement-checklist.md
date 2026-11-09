@@ -24,7 +24,7 @@
 | L18 | 删除闲置 Chroma/LangSmith 配置占位 | `app/core/config.py`；不误删 LangGraph checkpoint 实际配置 |
 | L19 | 维护文档收敛到 docs 的 architecture/benchmarks/runbook | 老路径保留，`docs/README.md` 为规范索引 |
 | L20 | FTS 异常记录诊断，区别空命中与检索失败 | `app/retrieval/rag.py`；同时移除查询路径全量重建 FTS |
-| L21 | 模型可用性探测增加诊断 | `app/review/services.py`；日志不得暴露敏感提示词或凭证 |
+| L21 | 模型可用性探测增加诊断 | `app/review/generation.py`（`local_llm_available`）；日志不得暴露敏感提示词或凭证 |
 | L22 | LLM 与 Critic 配置在使用时读取，消除 import 时重复默认 | `app/core/config.py`、`app/review/agents.py`、配置测试 |
 | L23 | 文件索引移到受限线程并发，事件循环不做长时间同步 OCR | `app/documents/tasks.py`、`LAW_REVIEW_INDEXING_CONCURRENCY`；并发需按磁盘/OCR实测调节 |
 | L24 | 统一推荐 CLI：`unified_benchmark_runner.py`，离线审计 `scripts/audit_benchmark.py` | 历史循环及原始回答保留；1000 题完成后独立 v3 重评，未覆盖冻结的 v2 |

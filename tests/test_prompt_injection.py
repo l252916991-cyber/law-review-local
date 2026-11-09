@@ -15,7 +15,7 @@ from fastapi import HTTPException
 from app.core.security import Principal, _principal
 from app.review.agent_tools import TOOL_DATA_NOTICE, execute_readonly_tool
 from app.review.context import HistoryTurn, render_history
-from app.review.services import CHAT_SYSTEM_PROMPT
+from app.review.generation import CHAT_SYSTEM_PROMPT
 from app.storage.db import db_scope, init_db, now, sync_fts_index, transaction
 
 

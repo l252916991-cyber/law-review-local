@@ -27,17 +27,11 @@ from collections.abc import Callable
 from typing import Any
 
 from app.core.config import LLMConfig
+from app.core.egress import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline
 from app.llm.llm_usage import record_llm_call
-from app.llm.model_ports import MODEL_API_OPENAI_COMPLETIONS, configured_api
+from app.llm.model_ports import MODEL_API_OPENAI_COMPLETIONS, configured_api, strip_reasoning
 from app.review.agent_tools import READONLY_TOOL_NAMES, TOOL_SCHEMAS, execute_readonly_tool
-from app.review.services import (
-    CHAT_SYSTEM_PROMPT,
-    assert_model_endpoint_allowed,
-    egress_opener,
-    local_llm_available,
-    read_json_with_deadline,
-    strip_reasoning,
-)
+from app.review.generation import CHAT_SYSTEM_PROMPT, local_llm_available
 
 logger = logging.getLogger(__name__)
 

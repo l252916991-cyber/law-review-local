@@ -10,7 +10,7 @@ from app.integration.forge_readonly import ReadonlyCaseSession
 from app.integration.forge_runtime import FrameworkReadonlyControl
 from app.llm.forge_governance import BackendAdmissionError, BackendLedger, OfflineModelTest
 from app.retrieval.rag import EmbeddingClient, RerankClient
-from app.review.services import call_local_llm
+from app.review.generation import call_local_llm
 from app.storage.db import init_db
 from tests.support import IsolatedDatabaseTestCase
 from tests.test_forge_readonly import dump_source, request
@@ -18,7 +18,7 @@ from tests.test_forge_readonly import dump_source, request
 
 class BackendGovernanceTests(unittest.TestCase):
     def test_legacy_keyword_call_signature_is_preserved_without_network(self):
-        with patch("app.review.services.assert_model_endpoint_allowed", side_effect=RuntimeError("body reached")):
+        with patch("app.review.generation.assert_model_endpoint_allowed", side_effect=RuntimeError("body reached")):
             with self.assertRaisesRegex(RuntimeError, "body reached"):
                 call_local_llm(question="question", route="route", contexts=[])
         ledger = BackendLedger(lambda: None)

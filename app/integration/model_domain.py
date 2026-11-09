@@ -9,8 +9,9 @@ from app.integration.host_ports import memory_record_context, search_hit_context
 from app.integration.host_writes import digest
 from app.integration.runtime_ports import ContractValidationError, RequestConflictError, UnsupportedCapabilityError
 from app.llm.local_backends import BackendGate, GovernedRetrievalLedger
+from app.llm.model_ports import strip_reasoning
 from app.review.agents import validate_review_answer
-from app.review.services import CHAT_SYSTEM_PROMPT, PROMPT_VERSION, strip_reasoning
+from app.review.generation import CHAT_SYSTEM_PROMPT, PROMPT_VERSION
 
 MODEL_NODE = "critic-model"
 LOCAL_PROMPT_VERSION = "domain-local-v1-bounded-citations"

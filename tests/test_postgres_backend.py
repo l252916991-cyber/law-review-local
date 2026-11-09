@@ -75,7 +75,7 @@ def test_a_sqlite_process_never_imports_the_postgresql_driver(tmp_path):
     script = (
         "import sys, tempfile; from pathlib import Path\n"
         "from app.evaluation.eval_gate import _isolated_case\n"
-        "from app.review.services import chat\n"
+        "from app.review.chat import chat\n"
         "with _isolated_case(Path(sys.argv[1]), endpoint='http://127.0.0.1:1/v1', model='none'):\n"
         "    chat(1, '涉案账户累计流入多少万元', 'test', None, False, False)\n"
         "assert 'psycopg' not in sys.modules, 'psycopg imported on the SQLite path'\n"

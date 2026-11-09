@@ -13,8 +13,7 @@ from app.cases.case_walls import exclusion_clause, hidden_case_ids
 from app.cases.conflicts import PartyIn, replace_parties, run_check
 from app.core.audit_trail import record_field_changes
 from app.core.security import actor_name, allowed_case_ids, identity, require_permission
-from app.review.services import rowdict
-from app.storage.db import connect, now, record_security_event, transaction
+from app.storage.db import connect, now, record_security_event, rowdict, transaction
 
 router = APIRouter()
 

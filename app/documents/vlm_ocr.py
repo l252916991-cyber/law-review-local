@@ -21,7 +21,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from app.review.services import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline, strip_reasoning
+from app.core.egress import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline
+from app.llm.model_ports import strip_reasoning
 
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 DEFAULT_TIMEOUT = 120

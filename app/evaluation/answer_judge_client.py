@@ -7,9 +7,9 @@ import time
 import urllib.request
 from typing import Any
 
+from app.core.egress import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline
 from app.evaluation.answer_eval import JUDGE_INSTRUCTION
 from app.llm.forge_governance import governed_backend
-from app.review.services import assert_model_endpoint_allowed, egress_opener, read_json_with_deadline
 
 _THINK = re.compile(r"<think[\s\S]*?</think>", re.IGNORECASE)
 

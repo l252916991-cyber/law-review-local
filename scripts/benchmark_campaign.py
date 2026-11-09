@@ -191,7 +191,7 @@ def run(directory: Path, name: str, profile: str, split: str, per_task: int, res
     # Interleave tasks so early interruption does not exclusively cover one task.
     selected.sort(key=lambda item: (item["position_in_task"], list(TASK_NAMES).index(item["task"])))
     references = {item["question_id"]: item["reference"] for item in read_rows(directory / "references.jsonl")}
-    sources = ["scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/services.py", "app/core/config.py"]
+    sources = ["scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/generation.py", "app/core/egress.py", "app/core/config.py"]
     manifest = {"campaign_sha256": digest(directory / "campaign.json"), "profile": profile, "split": split,
                 "config": campaign["profiles"][profile], "question_ids": [item["question_id"] for item in selected],
                 "input_hashes": {item["question_id"]: item["input_hash"] for item in selected},

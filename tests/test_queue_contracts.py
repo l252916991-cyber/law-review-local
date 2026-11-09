@@ -19,8 +19,8 @@ from fastapi.testclient import TestClient
 
 from app.core.config import config
 from app.documents import tasks
+from app.documents.ingest import index_upload
 from app.main import app
-from app.review.services import index_upload
 from app.storage.db import connect, db_scope, now, transaction
 
 

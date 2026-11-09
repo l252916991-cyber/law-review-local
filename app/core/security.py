@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from app.review.services import egress_opener
+from app.core.egress import egress_opener
 from app.storage.db import connect, now, record_security_event, register_identity_provider, transaction
 
 SESSION_TTL = 8 * 3600

@@ -9,7 +9,7 @@
 | 环节 | 当前实现 | 关键事实 |
 | --- | --- | --- |
 | 请求入口 | `POST /api/cases/{id}/chat`（[main.py](../../../app/main.py) `case_chat`）；`ChatRequest` 携带可选 `conversation_id` | `user_name` 只作展示作者；授权由 `require_case`/中间件按认证主体判定 |
-| 普通聊天 | [services.py](../../../app/review/services.py) `chat` | 检索只用当前问题；历史消息不进入模型；会话校验与消息写入在**同一后置事务**中，显式不存在的会话 ID 会被静默改为新建 |
+| 普通聊天 | [services.py](../../../app/review/chat.py) `chat` | 检索只用当前问题；历史消息不进入模型；会话校验与消息写入在**同一后置事务**中，显式不存在的会话 ID 会被静默改为新建 |
 | 本地模型调用 | `call_local_llm(question, route, contexts, timeout, model_override)` | 请求体仅 system + 当前问题/卷宗片段；`PROMPT_VERSION=chat-system-v3-untrusted-case-data-required-review` |
 | 原生 Agent | [agents.py](../../../app/review/agents.py) `LawReviewCoordinator.process_query` | 记忆召回只记录、不注入；审校 `CriticAgent.run` 接收问题、检索片段与专家摘要，不接收历史；`agent_runs` 记录问题/路由/答案/引用 |
 | LangGraph | [langgraph_agents.py](../../../app/review/langgraph_agents.py) `ReviewState`、`process_query`、`resume` | 状态含 `memory_hits` 但审校未用；checkpoint 以 `agent-run-<run_id>` 为线程标识，恢复前校验 run/case/question 一致 |

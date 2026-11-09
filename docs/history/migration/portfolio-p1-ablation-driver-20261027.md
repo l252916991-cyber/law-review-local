@@ -8,7 +8,7 @@
 
 | 文件 | 行数 | SHA-256 |
 |---|---|---|
-| `app/evaluation/collaboration_ablation.py` | 598 | `25bed206aebe5128d1fd2818cebb93bade6c24aef799e3ea8215f4fb6cc5d313` |
+| `app/collaboration_ablation.py` | 598 | `25bed206aebe5128d1fd2818cebb93bade6c24aef799e3ea8215f4fb6cc5d313` |
 | `scripts/run_collaboration_ablation.py` | 144 | `2bd6e10b91fa165cf9f1d72067894aff64a554c0979c5c25b48683e81fb55570` |
 | `tests/test_collaboration_ablation.py` | 253 | `bbceb4c88b9dd53fd82b1af494ec2794dff7a9b68f63836ad669ccbf29c27c9e` |
 

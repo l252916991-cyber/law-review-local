@@ -4,9 +4,9 @@ import json
 import unittest
 from unittest.mock import patch
 
-from app.review import services
+from app.review import generation
 from app.review.agents import validate_review_answer
-from app.review.services import canonical_source_markers, source_header
+from app.review.generation import canonical_source_markers, source_header
 
 CONTEXTS = [
     {"document_id": 3, "name": "03_李某询问笔录.txt", "page_no": 3, "quote": "我提醒过没有金融牌照。"},
@@ -139,9 +139,9 @@ class ModelCallReturnsCanonicalMarkersTest(unittest.TestCase):
                "LAW_REVIEW_LLM_API_KEY": "", "LAW_REVIEW_MODEL_CATALOG": "",
                "LAW_REVIEW_MODEL_CATALOG_FILE": "", "LAW_REVIEW_MODEL_CREDENTIALS_FILE": ""}
         with patch.dict("os.environ", env), \
-                patch.object(services, "local_llm_available", return_value=(True, "test-model")), \
-                patch.object(services, "egress_opener", return_value=_Opener(payload)):
-            return services.call_local_llm("问题", "事实检索", CONTEXTS, **kwargs)
+                patch.object(generation, "local_llm_available", return_value=(True, "test-model")), \
+                patch.object(generation, "egress_opener", return_value=_Opener(payload)):
+            return generation.call_local_llm("问题", "事实检索", CONTEXTS, **kwargs)
 
     def test_non_streaming_answer(self):
         body = json.dumps({"choices": [{"message": {"content": COPIED_HEADERS}}]}).encode()

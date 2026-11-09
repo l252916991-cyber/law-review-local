@@ -34,7 +34,7 @@ def test_live_route_without_separate_call_ledger_cannot_be_claimed_complete():
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "report.json"
         with patch("app.review.tool_loop.run_tool_loop", return_value={"tool_calls": 1}), \
-                patch("app.review.services.chat", return_value={"llm_used": True,
+                patch("app.review.chat.chat", return_value={"llm_used": True,
                       "provenance": {"route": {"fallback": True, "model": "synthetic-fallback"}}}):
             assert main(["--live", "--output", str(output)]) == 1
         report = json.loads(output.read_text())

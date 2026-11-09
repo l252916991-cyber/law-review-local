@@ -17,10 +17,11 @@ from pydantic import BaseModel, Field
 from app.api.routes.common import app_state, probe_redis
 from app.cases.case_walls import exclusion_clause, hidden_case_ids
 from app.core.config import LLMConfig, clear_model_override, load_model_override, save_model_override
+from app.core.egress import assert_model_endpoint_allowed
 from app.core.security import actor_name, identity, require_permission
 from app.retrieval.statutory_retrieval import corpus_status
-from app.review.services import assert_model_endpoint_allowed, local_llm_available, rowdict
-from app.storage.db import connect, database_url, get_db_path, record_security_event
+from app.review.generation import local_llm_available
+from app.storage.db import connect, database_url, get_db_path, record_security_event, rowdict
 
 router = APIRouter()
 

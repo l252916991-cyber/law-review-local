@@ -9,8 +9,7 @@ from typing import Any
 
 from app.llm.llm_usage import usage_summary
 from app.retrieval.rag import HybridRetriever
-from app.review.services import rowdict
-from app.storage.db import connect, now, transaction
+from app.storage.db import connect, now, rowdict, transaction
 
 DEMO_GROUND_TRUTH = [
     {

@@ -31,7 +31,7 @@ from scripts.benchmark_campaign import (
 SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "app/benchmarks/solver.py",
            "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py", "app/benchmarks/postprocess.py",
            "app/benchmarks/event_tools.py", "app/benchmarks/summary_tools.py", "app/retrieval/legal_corpus.py",
-           "app/review/services.py", "app/core/config.py", "app/benchmarks/weak_tasks.py"]
+           "app/review/generation.py", "app/core/egress.py", "app/core/config.py", "app/benchmarks/weak_tasks.py"]
 
 
 def configuration(profile_file: Path) -> dict[str, Any]:

@@ -15,6 +15,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from app.core.egress import read_json_with_deadline
 from app.evaluation.rag_eval import evaluate_case, platform_metrics
 from app.integration.runtime_comparison import compare_runtime_results
 from app.retrieval.rag import (
@@ -33,8 +34,9 @@ from app.review.agents import (
     LawReviewCoordinator,
     get_run_trace,
 )
+from app.review.chat import chat
+from app.review.generation import call_local_llm
 from app.review.langgraph_agents import LangGraphCoordinator, LangGraphRunError
-from app.review.services import call_local_llm, chat, read_json_with_deadline
 from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
@@ -389,7 +391,7 @@ class CaseEvaluationTest(IsolatedQualityTest):
 
 class OrdinaryChatQualityTest(IsolatedQualityTest):
     def test_plain_chat_uses_the_same_validation_gate(self):
-        with patch("app.review.services.call_local_llm", return_value="SECRET invented result without citation"), \
+        with patch("app.review.chat.call_local_llm", return_value="SECRET invented result without citation"), \
                 self.assertRaisesRegex(RuntimeError, "model_unavailable_or_invalid"):
             chat(self.case_id, "固定回报", "律师", None, True, False)
         with closing(connect()) as conn:
@@ -397,14 +399,14 @@ class OrdinaryChatQualityTest(IsolatedQualityTest):
 
     def test_plain_chat_valid_llm_answer_is_used(self):
         answer = "固定回报已经确认[资料1]，请律师复核。"
-        with patch("app.review.services.call_local_llm", return_value=answer):
+        with patch("app.review.chat.call_local_llm", return_value=answer):
             result = chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertTrue(result["llm_used"])
         self.assertEqual(result["answer"], answer)
         self.assertEqual(result["citation_check"], "passed")
 
     def test_plain_chat_error_body_is_not_persisted_or_returned(self):
-        with patch("app.review.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
+        with patch("app.review.chat.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
                 self.assertRaises(RuntimeError) as raised:
             chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertNotIn("SECRET_TOKEN", str(raised.exception))
@@ -444,9 +446,9 @@ class ResponseDeadlineTest(unittest.TestCase):
 
     def test_headers_consume_the_same_request_budget(self):
         response = io.BytesIO(b'{"choices":[{"message":{"content":"late"}}]}')
-        with patch("app.review.services.local_llm_available", return_value=(True, "fake-model")), patch(
-            "app.review.services.urllib.request.build_opener"
-        ) as opener, patch("app.review.services.time.monotonic", side_effect=[0.0, 1.1]):
+        with patch("app.review.generation.local_llm_available", return_value=(True, "fake-model")), patch(
+            "app.review.generation.urllib.request.build_opener"
+        ) as opener, patch("app.review.generation.time.monotonic", side_effect=[0.0, 1.1]):
             opener.return_value.open.return_value = response
             with self.assertRaisesRegex(RuntimeError, "TimeoutError"):
                 call_local_llm("问题", "语义检索", [], timeout=1)

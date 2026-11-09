@@ -11,8 +11,8 @@
 | 位置 | 当前事实 | 本轮影响 |
 | --- | --- | --- |
 | [检索与记忆](../../../app/retrieval/rag.py)：`remember`、`recall_memories` | 草稿须通过结构检查且绑定同案运行；召回同案已完成运行的草稿，默认 3 条，保留 `structural_checks_only_lawyer_review_required` 标记 | 结构检查不代表事实已确认；保持现有信任标记及只读召回约束 |
-| [普通问答](../../../app/review/services.py)：`chat`、`call_local_llm` | 检索直接使用当前问题；模型仅接收 system 与当前问题/卷宗片段；历史消息写入数据库但未用于本轮输入 | “它”“那一份”“刚才的金额”缺少明确对象，需在检索之前解析 |
-| [会话校验](../../../app/review/services.py)：`chat` | 会话归属及归档检查位于生成后的写入事务；无效会话 ID 当前会转为新会话 | 接入历史后必须前置校验，不能先读取历史或调用模型再拒绝 |
+| [普通问答](../../../app/review/chat.py)：`chat`、`call_local_llm` | 检索直接使用当前问题；模型仅接收 system 与当前问题/卷宗片段；历史消息写入数据库但未用于本轮输入 | “它”“那一份”“刚才的金额”缺少明确对象，需在检索之前解析 |
+| [会话校验](../../../app/review/chat.py)：`chat` | 会话归属及归档检查位于生成后的写入事务；无效会话 ID 当前会转为新会话 | 接入历史后必须前置校验，不能先读取历史或调用模型再拒绝 |
 | [原生协调器](../../../app/review/agents.py)：`process_query`、`CriticAgent.run` | 记忆召回被记录、返回，未传给审校调用；审校接收问题、检索片段与专家摘要 | 补充共享上下文契约，避免普通聊天与审校采用不同信任规则 |
 | [LangGraph](../../../app/review/langgraph_agents.py)：`ReviewState`、`_critic_node` | 状态已有 `memory_hits`，审校亦未使用；存在 checkpoint 与恢复流程 | 新增上下文须绑定运行快照，恢复不能悄悄读取更新后的历史 |
 | [请求入口](../../../app/main.py)、[后台任务](../../../app/review/review_jobs.py) | 普通聊天带 `conversation_id`；Agent 请求和后台任务请求不带；后台成功后新建会话 | Agent 连续追问需要显式会话契约，不能靠同案相似记忆推断当前会话 |

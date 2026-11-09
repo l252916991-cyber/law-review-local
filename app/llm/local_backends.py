@@ -11,10 +11,10 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request
 
+from app.core.egress import egress_opener, read_json_with_deadline
 from app.integration.host_writes import canonical, digest
 from app.integration.runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError
 from app.llm.forge_governance import BackendLedger
-from app.review.services import egress_opener, read_json_with_deadline
 from app.storage.db import connect, db_scope, now, transaction
 
 

@@ -18,7 +18,7 @@ Two providers can share one api (any OpenAI-compatible server), and one provider
 can serve models with different apis. Keeping the levels apart is what turns a
 second backend into a registration instead of a rewrite of the transport guards
 (egress approval, redirect refusal, absolute deadlines, SSE size limits) that
-already live in ``app/review/services.py``.
+already live in ``app/core/egress.py`` and ``app/review/generation.py``.
 
 A model is *data*, not behaviour. ``ModelSpec`` is a frozen record with the id,
 wire api, context window, capability flags and the price snapshot column, so the
@@ -810,3 +810,14 @@ class ScriptedProvider:
         self._record(request)
         reply = self._next_reply()
         return self._chunks(reply.text)
+
+
+def strip_reasoning(text: str) -> str:
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
+    # An interrupted reasoning response may contain an opening tag without its
+    # closing tag. Never expose that partial scratchpad to the case workspace.
+    text = re.sub(r"<think>[\s\S]*$", "", text, flags=re.IGNORECASE).strip()
+    planning_markers = ("我们需要回答用户", "需要分析资料", "问题要求", "需要回答用户")
+    if any(marker in text[:240] for marker in planning_markers):
+        return ""
+    return text

@@ -8,16 +8,15 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from app.api.routes.common import require_case
 from app.core.config import config
 from app.core.security import actor_name
-from app.review.services import (
+from app.documents.bank_ledger import (
     bank_transaction_graph,
-    index_upload,
     list_bank_transactions,
-    parse_spreadsheet,
     persist_bank_transactions,
     persist_parsed_bank_rows,
     summarize_bank_transactions,
-    upload_error_message,
 )
+from app.documents.bank_transactions import parse_spreadsheet
+from app.documents.ingest import index_upload, upload_error_message
 from app.storage.db import record_security_event
 
 router = APIRouter()

@@ -121,7 +121,8 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
         issues.append("Profile mismatch")
     if Counter(row["question_id"] for row in rows) != Counter(manifest["question_ids"]):
         issues.append("Missing, duplicate or unexpected results")
-    known_sources = {"scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/services.py", "app/core/config.py"}
+    known_sources = {"scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/generation.py", "app/core/egress.py",
+                     "app/core/config.py"}
     if manifest.get("experiment_version") == 2:
         known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py", "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") in {3, 4}:

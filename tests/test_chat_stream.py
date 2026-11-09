@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.api.routes import chat as chat_routes
 from app.main import app
-from app.review import services
+from app.review import chat, generation
 from app.review.chat_idempotency import (
     CANCELLED,
     FAILED,
@@ -27,7 +27,7 @@ from app.review.chat_idempotency import (
 from app.review.chat_idempotency import (
     lookup as lookup_chat_request,
 )
-from app.review.services import read_sse_with_deadline
+from app.review.generation import read_sse_with_deadline
 from app.storage.db import connect, db_scope, init_db
 
 
@@ -158,9 +158,9 @@ class StreamingModelCallTests(unittest.TestCase):
 
     def _call(self, body: bytes) -> tuple[str, list[str]]:
         tokens: list[str] = []
-        with patch.object(services, "local_llm_available", return_value=(True, "test-model")), \
-                patch.object(services, "egress_opener", return_value=_FakeOpener(body)):
-            answer = services.call_local_llm(
+        with patch.object(generation, "local_llm_available", return_value=(True, "test-model")), \
+                patch.object(generation, "egress_opener", return_value=_FakeOpener(body)):
+            answer = generation.call_local_llm(
                 "问题", "事实检索", [{"name": "卷宗", "page_no": 1, "quote": "原文", "document_id": 1}],
                 on_token=tokens.append,
             )
@@ -176,7 +176,7 @@ class StreamingModelCallTests(unittest.TestCase):
         answer, tokens = self._call(body)
         self.assertEqual(answer, "根据材料[资料1]")
         self.assertEqual(tokens, ["根据", "材料[资料1]"])
-        observed = services._last_llm_usage.get()
+        observed = generation._last_llm_usage.get()
         assert observed is not None
         self.assertEqual(observed["model"], "test-model")
         self.assertIsNotNone(observed["ttft_ms"])
@@ -218,9 +218,9 @@ class SecondProtocolCallTests(unittest.TestCase):
 
     def _call(self, payload: bytes, **kwargs):
         opener = _CapturingOpener(payload)
-        with patch.object(services, "local_llm_available", return_value=(True, "test-model")), \
-                patch.object(services, "egress_opener", return_value=opener):
-            answer = services.call_local_llm(
+        with patch.object(generation, "local_llm_available", return_value=(True, "test-model")), \
+                patch.object(generation, "egress_opener", return_value=opener):
+            answer = generation.call_local_llm(
                 "问题", "事实检索",
                 [{"name": "卷宗", "page_no": 1, "quote": "原文", "document_id": 1}],
                 **kwargs,
@@ -256,7 +256,7 @@ class SecondProtocolCallTests(unittest.TestCase):
     def test_provenance_names_the_protocol_and_provider(self):
         body = json.dumps({"choices": [{"message": {"content": "答案[资料1]"}}]}).encode()
         self._call(body)
-        provenance = services._last_llm_provenance.get()
+        provenance = generation._last_llm_provenance.get()
         assert provenance is not None
         self.assertEqual(provenance["model"], "test-model")
         self.assertEqual(provenance["api"], "openai-completions")
@@ -523,7 +523,7 @@ class ChatCancellationTests(unittest.TestCase):
     def test_cancel_before_the_model_call_writes_nothing(self):
         before = self._counts()
         with self.assertRaises(Exception) as raised:
-            services.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, True,
+            chat.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, True,
                           use_remote_embeddings=False, should_cancel=lambda: True)
         self.assertEqual(type(raised.exception).__name__, "ChatCancelled")
         self.assertEqual(self._counts(), before)
@@ -541,9 +541,9 @@ class ChatCancellationTests(unittest.TestCase):
                  "semantic_entailment_checked": False, "amount_calculations_checked": False,
                  "lawyer_review_required": True}
         before_messages, before_calls = self._counts()
-        with patch.object(services, "call_local_llm", return_value="根据卷宗，结论如下[资料1]。"),                 patch.object(agents, "validate_review_answer", return_value=valid):
+        with patch.object(chat, "call_local_llm", return_value="根据卷宗，结论如下[资料1]。"),                 patch.object(agents, "validate_review_answer", return_value=valid):
             with self.assertRaises(Exception) as raised:
-                services.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, True,
+                chat.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, True,
                               use_remote_embeddings=False, should_cancel=cancel_after_model)
         self.assertEqual(type(raised.exception).__name__, "ChatCancelled")
         messages, llm_calls = self._counts()
@@ -605,7 +605,7 @@ class ChatCancellationTests(unittest.TestCase):
             flags["n"] += 1
             return False
 
-        result = services.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, False,
+        result = chat.chat(1, "张某是否批准了年化12%的固定回报宣传？", "测试律师", None, False,
                                use_remote_embeddings=False, should_cancel=never_cancel)
         messages, _ = self._counts()
         self.assertEqual(messages, before_messages + 2)

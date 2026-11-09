@@ -19,7 +19,9 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.text import concise
 from app.retrieval.rag import HybridRetriever, recall_memories, remember
+from app.retrieval.search import detect_route
 from app.retrieval.statutory_retrieval import retrieve_statutory
 from app.review.context import (
     TurnContext,
@@ -28,6 +30,7 @@ from app.review.context import (
     limit_contexts,
     prepare_memory_clues,
 )
+from app.review.generation import _account_llm_call, call_local_llm
 from app.review.review_collaboration import (
     GROUNDING_VERSION,
     build_collaboration,
@@ -36,8 +39,7 @@ from app.review.review_collaboration import (
     source_reference,
     validate_grounding,
 )
-from app.review.services import _account_llm_call, call_local_llm, concise, detect_route, rowdict
-from app.storage.db import connect, now, transaction
+from app.storage.db import connect, now, rowdict, transaction
 
 logger = logging.getLogger(__name__)
 

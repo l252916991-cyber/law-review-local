@@ -41,8 +41,8 @@
 | 证据审批 | `app/main.py:986`、`app/main.py:1024` | 确认时记录审批人；改内容自动回到待复核 | 保存不校验版本，后写覆盖先写 |
 | 材料目录纠错 | `app/main.py:827` | 可改类型/人员/时间/摘要/状态 | 审计只记文件名；页码原文不可纠错 |
 | 案件信息 | `app/main.py:574`、`app/main.py:649` | 建案后只能归档/回收/恢复 | **没有任何修改入口**（标题、案号、当事人、类型、说明） |
-| 流水 | `app/review/services.py:199`、`app/review/services.py:1686` | 列表分页上限 500 | 统计、图谱、导出都只取前 500 条 |
-| 导出 | `app/review/services.py:1612`、`app/review/services.py:1656` | 正式交付仅校验模板必选块有数据 | 无报告级复核、无版本绑定、无签发人 |
+| 流水 | `app/services.py:199`、`app/services.py:1686` | 列表分页上限 500 | 统计、图谱、导出都只取前 500 条 |
+| 导出 | `app/services.py:1612`、`app/services.py:1656` | 正式交付仅校验模板必选块有数据 | 无报告级复核、无版本绑定、无签发人 |
 | 后台任务 | `app/review/review_jobs.py` | AI 阅卷任务队列与执行器 | 不是人员任务；无指派、期限、提交/退回 |
 | 部署 | `scripts/data_snapshot.py`、`docs/runbook/deployment-acceptance.md` | 备份与验收清单存在 | 清单未与代码/环境核对，缺可执行检查 |
 
@@ -51,7 +51,7 @@
 | 编号 | 缺陷 | 证据 | 影响 |
 |---|---|---|---|
 | D1 | 证据保存无版本条件 | `app/main.py:1057` 直接 `UPDATE evidence ... WHERE id = ?`，无版本或 `updated_at` 条件 | 两人同时编辑，后保存的人静默覆盖前者；审批人记录也可能被覆盖 |
-| D2 | 流水超过 500 条时统计与导出不完整 | `app/review/services.py:1686` 导出取 `limit=500`；`app/review/services.py:215`、`app/review/services.py:229` 同样只算前 500 条 | 大额案件导出缺失流水，`清单.json` 的 `transaction_count` 与哈希覆盖范围不符 |
+| D2 | 流水超过 500 条时统计与导出不完整 | `app/services.py:1686` 导出取 `limit=500`；`app/services.py:215`、`app/services.py:229` 同样只算前 500 条 | 大额案件导出缺失流水，`清单.json` 的 `transaction_count` 与哈希覆盖范围不符 |
 | D3 | 案件信息不可修改 | 无 `PATCH /api/cases/{id}`，前端无入口 | 录错案号/当事人只能重建案件，破坏案件 ID 与审计连续性 |
 | D4 | 材料纠错不完整 | `app/main.py:827` 仅目录字段；`app/main.py:843` 审计只记文件名 | OCR 错字无法修正（直接污染检索与引用）；纠错无前后值、无失效传播 |
 | D5 | 人员停用不终止会话 | `app/core/security.py:56` 每次请求重读配置，但身份平台停用不发信号 | 离职人员最多可继续使用 8 小时 |

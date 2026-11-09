@@ -19,7 +19,8 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from app.review.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
+from app.core.egress import read_json_with_deadline
+from app.review.generation import LOCAL_LLM_MODEL, LOCAL_LLM_URL
 
 SOLVER_VERSION = "lawbench-solver-v1"
 DIRECT_SYSTEM = "你正在参加中国法律能力评测。严格遵循题目的任务说明和输出格式，直接给出所要求的答案，不展示思维过程，不添加题目未要求的分析或开场白。"

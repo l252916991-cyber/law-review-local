@@ -279,7 +279,7 @@ def build_prompt(
     function, so a change in the product prompt path fails the test instead of
     silently measuring different prompts.
     """
-    from app.review.services import CHAT_SYSTEM_PROMPT
+    from app.review.generation import CHAT_SYSTEM_PROMPT
 
     context_text = "\n\n".join(
         f"[资料{i}｜{item['name']}｜第{item['page_no']}页]\n{item['quote']}"
@@ -309,7 +309,7 @@ def answer_citations(answer: str, contexts: list[dict[str, Any]]) -> list[dict[s
 
 def prepare_item(item: dict[str, Any], case_id: int, *, limit: int = 6) -> dict[str, Any]:
     """Freeze context, findings, notes and prompt digests for one question."""
-    from app.review.services import detect_route
+    from app.retrieval.search import detect_route
 
     question = item["question"]
     route = detect_route(question)
@@ -531,7 +531,7 @@ def prepare_batch(
 ) -> dict[str, Any]:
     """Freeze the whole batch without any model call; refuses an existing directory."""
     from app.evaluation.model_comparison import native_baseline_identity
-    from app.review.services import PROMPT_VERSION
+    from app.review.generation import PROMPT_VERSION
 
     # Validate the selection before touching the filesystem: an unknown id must
     # not leave a half-created batch directory behind.
@@ -614,7 +614,7 @@ def load_prepared(output: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 def precheck(endpoint: str | None, model: str | None) -> dict[str, Any]:
     """Probe the endpoint and record the sampling bounds before any batch call."""
     from app.core.config import LLMConfig
-    from app.review.services import local_llm_available
+    from app.review.generation import local_llm_available
 
     config = LLMConfig.load()
     resolved_endpoint = (endpoint or config.base_url).rstrip("/")
@@ -631,7 +631,7 @@ def live_generator(model: str, timeout: int, endpoint: str | None = None) -> Gen
     ``endpoint`` lets a drill or a second host target the probed endpoint instead
     of the process default; the product's own loopback/egress checks still apply.
     """
-    from app.review.services import call_local_llm, last_llm_usage
+    from app.review.generation import call_local_llm, last_llm_usage
 
     def generate(question: str, route: str, contexts: list[dict[str, Any]], note: str) -> Generation:
         text = call_local_llm(question, route, contexts, timeout=timeout, model_override=model,

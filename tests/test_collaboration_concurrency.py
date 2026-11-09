@@ -34,7 +34,7 @@ class CollaborationTestCase(IsolatedDatabaseTestCase):
         return response.json()["evidence"]
 
     def upload_text(self, case_id, name="借条.txt", text="借条：今借到人民币十万元整，借款人张三。"):
-        from app.review.services import index_upload
+        from app.documents.ingest import index_upload
         return index_upload(case_id, name, text.encode("utf-8"), "text/plain")
 
     def audit_rows(self, case_id, action):

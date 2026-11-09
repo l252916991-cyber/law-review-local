@@ -51,7 +51,7 @@ def write_json(path: Path, value: Any) -> None:
 
 
 def collect_rules(dataset: dict[str, Any]) -> dict[str, Any]:
-    from app.review.services import chat
+    from app.review.chat import chat
     from app.storage.db import db_scope, init_db
 
     with tempfile.TemporaryDirectory(prefix="lexvault-rule-answers-") as td:

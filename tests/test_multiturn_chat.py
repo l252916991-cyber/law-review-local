@@ -218,7 +218,7 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
         self.default_policy = context.context_policy()
 
     def ask(self, question, conversation_id=None, use_llm=False):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         return chat(self.case_id, question, "测试律师", conversation_id, use_llm, False)
 
@@ -340,7 +340,7 @@ class ModelInputTest(IsolatedDatabaseTestCase):
         init_db(seed=False)
 
     def test_history_and_resolved_object_reach_the_model_but_only_current_contexts_cite(self):
-        from app.review.services import chat
+        from app.review.chat import chat
 
         case_id, ids = create_case_with_documents(SCENARIOS["pair"])
         conversation_id = make_conversation(case_id)
@@ -349,9 +349,9 @@ class ModelInputTest(IsolatedDatabaseTestCase):
             citations=[citation(ids["jia_contract"], "甲公司采购合同.txt", 1)],
         )
         answer = "付款期限为验收合格后60日内[资料1]。请律师复核原文与上述结论。"
-        with patch("app.review.services.local_llm_available", return_value=(True, "fake-model")), \
-                patch("app.review.services.egress_opener") as opener, \
-                patch("app.review.services.read_json_with_deadline", return_value={
+        with patch("app.review.generation.local_llm_available", return_value=(True, "fake-model")), \
+                patch("app.review.generation.egress_opener") as opener, \
+                patch("app.review.generation.read_json_with_deadline", return_value={
                     "choices": [{"message": {"content": answer}}],
                 }):
             result = chat(case_id, "它的付款期限呢？", "测试律师", conversation_id, True, False)
@@ -374,7 +374,7 @@ class ModelInputTest(IsolatedDatabaseTestCase):
     def test_old_callers_default_to_no_history(self):
         import inspect
 
-        from app.review.services import call_local_llm
+        from app.review.generation import call_local_llm
 
         signature = inspect.signature(call_local_llm)
         for name in ("history", "memory", "object_note"):

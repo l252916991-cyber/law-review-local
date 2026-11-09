@@ -130,6 +130,7 @@ module = [
   "app.review.agents",
   "app.evaluation.answer_review",
   "app.documents.bank_transactions",
+  "app.documents.ingest",
   "app.benchmarks.metrics",
   "app.benchmarks.reporting",
   "app.review.context",
@@ -142,12 +143,13 @@ module = [
   "app.llm.model_ports",
   "app.retrieval.rag",
   "app.evaluation.rag_benchmark_dataset",
+  "app.cases.gap_analysis",
   "app.cases.report_delivery",
   "app.review.review_collaboration",
+  "app.review.chat",
   "app.review.review_jobs",
   "app.api.routes.agent_runs",
   "app.api.routes.evidence",
   "app.core.security",
-  "app.review.services",
 ]
 ignore_errors = true
