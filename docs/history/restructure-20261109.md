@@ -12,6 +12,10 @@
 | `c144cc0` | 合并逐字节相同的规范 JSON 摘要与复核角色判断 |
 | `bcad281` | 脚本按用途分目录，根目录评测入口移入 `scripts/benchmarks/` |
 | `c853700` | 清零 mypy 豁免名单，补齐直接依赖声明 |
+| `eae0ff6` | 文档：结构说明、本记录、失效链接 |
+| `f095553` | 把模型门禁的原文采集脚本 `capture_model_gate.py` 纳入仓库 |
+| `ee95330` | 修复拆包后 `is_postgres` 的旧包名 |
+| `74b25b7` | 重新登记规则模式门禁基线 |
 
 ## 删除的代码
 
@@ -91,12 +95,20 @@
 
 ## 对已有产物的影响
 
-- **模型对照钉住版本**从 `specialist-review-v12` 升到 `v15`：路径键改为相对 `app` 包，`services.py` 换成承接其推理代码的 `review/chat.py`、`review/generation.py`、`retrieval/search.py`、`core/egress.py`。每次升级的审阅说明写在 `NATIVE_BASELINE_REVIEW`。
-- **答案质量门禁**的 `INFERENCE_MODULES` 改为相对路径，因此推理版本号会变；规则模式 60 题的回答与重组前逐题一致（只差时延）。
+- **模型对照钉住版本**从 `specialist-review-v12` 升到 `v16`：路径键改为相对 `app` 包，`services.py` 换成承接其推理代码的 `review/chat.py`、`review/generation.py`、`retrieval/search.py`、`core/egress.py`。每次升级的审阅说明写在 `NATIVE_BASELINE_REVIEW`。
+- **答案质量门禁**的 `INFERENCE_MODULES` 改为相对路径，推理版本号随之变化，规则模式基线已重新登记（`74b25b7`）。模型模式基线来自 27B 真实运行，没有重登：用当前代码跑模型门禁时报告会注明推理版本不同，分数照常比较。
 - **LawBench 历史实验的复核**（`verify_campaign`、`verify_benchmark_run`）按当时的源码快照校验路径和摘要。重组改了冻结评分器的导入行，重组前录制的运行要在旧提交里复核：`git worktree add ../lexvault-0197bed 0197bed`，在那里运行当时的校验脚本。
 
 ## 验证
 
-- 全量离线测试：每一步提交前都跑过，`c853700` 时 1811 通过、24 跳过（跳过项是需要 PostgreSQL、未分发 LawBench 数据或 mlx 的用例）。
-- 规则门禁：46/60，与基线相同；60 题的回答文本、引用、拒答与评分和重组前逐题一致。
-- ruff、mypy（187 个源文件）、`uv lock --check`、发布清单 dry-run、`scripts/ops/doctor.py` 均通过。
+| 检查 | 结果 |
+|---|---|
+| 全量离线测试（`74b25b7`，CI 同参数：隔离数据目录、禁网、覆盖率、独立 3.12 框架解释器） | Python 3.11.18 与 3.14.6 各 1814 passed / 0 failed / 24 skipped，覆盖率 87.40% / 87.39%（分支 79.63%） |
+| PostgreSQL 16.15 + pgvector | 1829 passed / 0 failed / 9 skipped，覆盖率 88.52%；322 个测试实际连到 PostgreSQL；生成的 PostgreSQL 结构与 SQLite 迁移一致 |
+| 规则门禁 | 46/60；SQLite 与 PostgreSQL 上分别用 `0197bed` 与当前代码各跑一遍，60 题的回答、引用、拒答与评分逐题一致（只差时延） |
+| 真实模型回放 | 保存的 9 次真实模型运行（27B、35B-A3B、9B，共 540 个回答）在 `0197bed` 与当前代码上分别回放，逐题回答与判定完全一致 |
+| 函数级比对 | `services.py` 的 93 个定义 AST 完全一致；类型清理去掉注解和 `cast` 后只有几处等价改写 |
+| 静态检查与交付 | ruff、mypy（188 个源文件）、`uv lock --check`、requirements 导出一致、发布清单 dry-run、`scripts/ops/doctor.py` 通过 |
+| 前端 | `contract:check`、`typecheck`、`lint`、单测 13 项、`build:static` 通过；e2e 34 项中 32 项通过，另 2 项（导出文件名）在 `0197bed` 上同样失败，原因是本环境的 Chromium 版本，服务端响应头两边相同 |
+
+重组中发现并修复了一处漏改：`search_backend.is_postgres` 用 `__package__` 拼出驱动模块名，拆包后找不到，PostgreSQL 连接被当成 SQLite（`ee95330`）。SQLite 套件发现不了，是 PostgreSQL 套件的 6 项失败暴露出来的；修复时加了不需要数据库服务器的回归测试。

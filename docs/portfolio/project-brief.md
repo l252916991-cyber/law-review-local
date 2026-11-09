@@ -39,7 +39,7 @@
 | 检索 | 关键词 BM25 类打分 + 本地 embedding + RRF 融合，结果带 `page_text_sha256` |
 | 生成 | OpenAI 兼容本地端点（`/v1/chat/completions`），仅回环端点，禁重定向 |
 | 前端 | Next.js 静态构建，由 FastAPI 托管，Playwright 端到端；核心实体类型由后端 OpenAPI 生成 |
-| 质量 | pytest + 覆盖率门禁、ruff、mypy（脚本）、离线可复算的评分与盲审包 |
+| 质量 | pytest + 覆盖率门禁、ruff、mypy、离线可复算的评分与盲审包 |
 | 实验 | 三组 A/B/C 隔离驱动（`app/evaluation/collaboration_ablation.py`），逐题冻结提示与账本 |
 
 ## 4. 运行步骤（源码路径，已实测）
@@ -77,22 +77,22 @@ uv run --locked python scripts/ops/demo_recovery_check.py --phase resume --data-
 uv run --locked python scripts/ops/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
-## 4.1 质量基线（2026-11-09，提交 `993d893`）
+## 4.1 质量基线（2026-11-09，提交 `74b25b7`）
 
 | 检查 | 结果 |
 |---|---|
-| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1812 passed / 0 failed / 24 skipped，综合覆盖率 86.94%（分支 79.10%）；Python 3.14.6：1812 passed / 0 failed / 24 skipped，86.93%（分支 79.10%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 16 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
-| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1827 passed / 0 failed / 9 skipped，覆盖率 88.05%（分支 80.41%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；322 个测试在测试体内实际连到 PostgreSQL；从冻结的 v27 结构只执行迁移文件升级到 v28，与新建库逐项一致；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
+| 全量离线测试（隔离数据目录、禁网、覆盖率，显式指定冻结法条资产） | Python 3.11.18：1814 passed / 0 failed / 24 skipped，综合覆盖率 87.40%（分支 79.63%）；Python 3.14.6：1814 passed / 0 failed / 24 skipped，87.39%（分支 79.63%）；跳过项为私有 LawBench 数据 7 项、Apple 专用 `mlx_lm` 1 项，以及只在 PostgreSQL 下运行的 16 项；独立 3.12 框架解释器实际进程测试已执行；门槛 70% |
+| 同一套测试跑在 PostgreSQL 上 | PostgreSQL 16.15 + pgvector 0.6.0，Python 3.11.18：1829 passed / 0 failed / 9 skipped，覆盖率 88.52%（分支 80.96%）；每个测试一个新库，库归非超级用户角色所有，行级安全对全部用例生效；322 个测试在测试体内实际连到 PostgreSQL；从冻结的 v27 结构只执行迁移文件升级到 v28，与新建库逐项一致；测 SQLite 文件本身的用例标 `sqlite_only` 并写明原因 |
 | 信息隔离墙 | 以墙外管理员、仍被分配到该案的墙外律师遍历全部 GET 接口，墙内标记 0 次出现；PostgreSQL 上关掉应用层检查重做仍为 0，SQLite 对照为 10 个接口泄露；35 张表强制行级安全，生成器拒绝未归类的案件关联表 |
 | 答案质量门禁 | 60 题冻结评测集，规则模式 46/60 通过，PostgreSQL 上逐题通过情况与 SQLite 相同；CI 每次推送运行，退化即阻断。模型模式：本机 Qwen3.8-27B 4-bit 首轮 51/60，按失败题修复后第二轮 57/60；剩余 3 道失败复核为评分词表未覆盖的正确拒答，评分升为 v3 后用保存的回答重新评分为 60/60 并登记为基线（v3 新增措辞取自这两轮，属样本内；首轮按 v3 为 53/60，其中 1 题是勉强通过）（[记录](../history/eval-gate-model-baseline-20261102.md)） |
-| 静态检查 | ruff（E9/F/I/UP/B）、mypy（`scripts/` 严格 + `app/` 宽松，22 个存量模块列入只减不增名单）通过 |
+| 静态检查 | ruff（E9/F/I/UP/B/TID252）、mypy（`scripts/` 严格 + `app/` 宽松，豁免名单已清零）通过 |
 | 前端 | `contract:check`/`typecheck`/`lint` 通过，单测 13 项、`build`/`build:static` 通过；e2e 见下方说明 |
 | 接口类型 | 11 个核心读接口声明 Pydantic 响应模型，改动前后在演示库上的响应逐字段相同；前端核心组件改用生成的 TypeScript 类型；材料接口不返回服务器存储路径，由遍历全部 GET 接口与导出包的测试守住 |
-| 重点模块 | 法条核验 `statutory_retrieval.py` 行与分支覆盖率 100%；会话接口 `routes/chat.py` 85% |
+| 重点模块 | 法条核验 `retrieval/statutory_retrieval.py` 行与分支覆盖率 100%；会话接口 `api/routes/chat.py` 89.5% |
 | 容器交付 | 2026-10-28 在本机用指定基础镜像构建并通过真实 HTTP 验收；CI 的 delivery 工作流每次提交从发布包构建镜像并跑离线冒烟 |
 | 本机五人技术试点 | 旧库 v13→26 副本迁移与旧程序回退、五身份 140 次 API 与 5 个浏览器上下文 111 次请求、固定容量门槛、合成扫描件 OCR、真实模型固定事实检查（2026-10-29） |
 
-e2e 说明：GitHub Actions（Playwright Chromium）上全部通过。云端 Linux 用系统 Chrome for Testing 153 运行时，导出下载的建议文件名是 `download` 而非 `*.zip`，这一项在改动前后都失败，属于浏览器环境差异，其余 28 项通过。
+e2e 说明：GitHub Actions（Playwright Chromium）上全部通过。云端 Linux 只有 Playwright 自带的 Chromium 1243（与锁定版本要求的 1248 不同）时，导出下载的建议文件名是 `download` 而非 `*.zip`，桌面与移动两项在重组前（`0197bed`）和当前代码上都失败，服务端返回的 `Content-Disposition` 两边逐字节相同，属于浏览器环境差异；其余 32 项通过。
 
 曾经的偶发失败：`tests/test_eval_transport_faults.py` 的任务截止从发出开始信号起计时，机器稍慢时模型调用还没开始就到点，约三次失败一次；2026-11-02 改为从模型调用卡住时起计时（截止时长与断言不变），见[质量手册](../runbook/quality.md)。
 
