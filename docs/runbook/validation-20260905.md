@@ -31,12 +31,12 @@
 
 pytest 的装载、抽样和评分协议测试使用临时生成的合成夹具；它们验证工程行为，不计作真实法律题测试。真实题库和真实模型实验单独验证。
 
-私有原始证据：
+私有原始证据（本机 `output/` 目录，不入库）：
 
-- [全量日志](../../output/project_hardening/final-tests.log)
-- [JUnit](../../output/project_hardening/final-junit.xml)
-- [覆盖率 JSON](../../output/project_hardening/final-coverage.json)
-- [发布白名单](../../output/project_hardening/release-manifest.json)
+- 全量日志（`output/project_hardening/final-tests.log`）
+- JUnit（`output/project_hardening/final-junit.xml`）
+- 覆盖率 JSON（`output/project_hardening/final-coverage.json`）
+- 发布白名单（`output/project_hardening/release-manifest.json`）
 
 托管 CI 配置包含 Python 3.11 / 3.14，但尚未推送执行；本轮没有把本机 Python 3.14 结果当作远程 Linux/Python 3.11 的验证。
 
@@ -69,11 +69,11 @@ Qwythos-9B-v2-4bit-mlx，20 类各随机抽 50 题，seed=42，temperature=0，m
 
 较弱任务仍包括法律咨询 20.11%、法条背诵 25.35%、纠纷焦点识别 26.00%、场景法律依据 29.25%。本轮改善来自完整任务说明与评分/提取协议修复，没有训练新模型，也没有证明这些弱项已经解决。
 
-- [审计报告](../../output/benchmark_fixed_1000_20260905_audit_v3/REPORT.md)
-- [原始 1,000 题报告](../../output/benchmark_fixed_1000_20260905/REPORT.md)
-- [逐题审计差异](../../output/benchmark_fixed_1000_20260905_audit_v3/audit.json)
-- [同题配对 JSON](../../output/benchmark_fixed_1000_20260905_audit_v3/paired_comparison.json)
-- [评分复算校验](../../output/benchmark_fixed_1000_20260905_audit_v3/verification.json)
+- 审计报告（`output/benchmark_fixed_1000_20260905_audit_v3/REPORT.md`）
+- 原始 1,000 题报告（`output/benchmark_fixed_1000_20260905/REPORT.md`）
+- 逐题审计差异（`output/benchmark_fixed_1000_20260905_audit_v3/audit.json`）
+- 同题配对 JSON（`output/benchmark_fixed_1000_20260905_audit_v3/paired_comparison.json`）
+- 评分复算校验（`output/benchmark_fixed_1000_20260905_audit_v3/verification.json`）
 
 这些是本地混合指标均分，不是官方 LawBench 排行榜准确率。罪名参考分隔规则核对了[上游固定版本评分代码](https://github.com/open-compass/LawBench/blob/e30981bb3ff54c41571f222e0b23e92d27375388/evaluation/evaluation_functions/ljp_accusation.py)，但本地预测解析更严格，其他部分指标仍为近似。直接模型测试没有经过项目 RAG 或两种协调器，不能据此宣称 LangGraph 提升了法律答案质量。
 

@@ -16,7 +16,7 @@ uv pip check
 
 ## 离线测试
 
-CI Python 3.11/3.14 运行全部 `tests/` 与工程脚本侧测试（发布/模型安装/备份恢复），使用 `pytest-socket` 禁止网络连接、允许仅用于事件循环的 Unix socket。模型、Redis 依赖应通过 mock/fake 隔离；不使用 `continue-on-error` 把模型服务缺失伪装成成功。CI 禁止自动载入未知 pytest 插件并显式启用 pytest-cov/pytest-socket。
+CI Python 3.11/3.14 运行全部 `tests/`（含发布、模型安装、备份恢复等工程脚本的测试），使用 `pytest-socket` 禁止网络连接、允许仅用于事件循环的 Unix socket。模型、Redis 依赖应通过 mock/fake 隔离；不使用 `continue-on-error` 把模型服务缺失伪装成成功。CI 禁止自动载入未知 pytest 插件并显式启用 pytest-cov/pytest-socket。
 
 M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --locked python -m scripts.ops.setup_framework --output .venv-framework-local` 创建新环境，设置 `LAW_REVIEW_FORGE_PYTHON="$PWD/.venv-framework-local/bin/python"` 后运行离线套件。安装使用随包的带 hash 依赖导出和 wheel；可加 `--offline` 使用完整缓存。CI 已自动准备该环境；本地未设置变量会明确跳过实际框架进程测试，不能据此声称 M2 集成通过。用例固定关闭真实模型与远程检索服务。
 
@@ -28,8 +28,8 @@ CI 的 `postgres` 任务用 PostgreSQL 16 + pgvector 再跑一遍同一套离线
 
 ## 渐进质量范围
 
-- Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行 `E9`（语法）、`F`（Pyflakes：未使用/未定义名、重复定义、无用赋值）、`I`（导入排序）、`UP`（按 Python 3.11 升级语法）与 `B`（bugbear）；测试目录对 `F811` 例外，因为从兄弟模块导入的 pytest fixture 会以同名参数注入。`B905`（zip 未指定 strict）与 `B023`（循环内闭包）暂不启用：前者需要逐处评估截断语义，后者经 2026-11-01 逐处核对均在同一轮迭代内调用。FastAPI 的 `File()`/`Body()` 等默认参数登记为不可变调用。
-- mypy：`scripts/` 要求完整函数类型；`app/` 自 2026-11-01 纳入检查，先用宽松配置（检查已标注的代码，未标注函数体暂不检查）。当日仍有类型错误的 22 个模块逐个列在 `pyproject.toml` 的 `ignore_errors` 名单中，名单只减不增；其余业务模块的新错误会直接让门禁失败。不用全仓 `ignore_errors` 掩盖问题。
+- Ruff：全部维护的 `app/`、`tests/`、`scripts/` 执行 `E9`（语法）、`F`（Pyflakes：未使用/未定义名、重复定义、无用赋值）、`I`（导入排序）、`UP`（按 Python 3.11 升级语法）、`B`（bugbear）与 `TID252`（禁止相对导入，模块换位置时导入不失效）；测试目录对 `F811` 例外，因为从兄弟模块导入的 pytest fixture 会以同名参数注入。`B905`（zip 未指定 strict）与 `B023`（循环内闭包）暂不启用：前者需要逐处评估截断语义，后者经 2026-11-01 逐处核对均在同一轮迭代内调用。FastAPI 的 `File()`/`Body()` 等默认参数登记为不可变调用。
+- mypy：`scripts/` 要求完整函数类型；`app/` 用宽松配置（检查已标注的代码，未标注函数体暂不检查），下一步是逐个子包打开 `check_untyped_defs`。2026-11-01 登记的 `ignore_errors` 名单（83 个错误）已于 2026-11-09 清零，现在任何模块的类型错误都会让门禁失败；没有类型信息的第三方包（openpyxl、xlrd、cn2an、jieba、huggingface_hub）只忽略缺失的存根。不用 `ignore_errors` 掩盖问题。
 - `.pre-commit-config.yaml` 使用同一个锁定环境的本地 hooks；`uv run pre-commit install` 是开发者可选操作。
 - 正式前端执行 `pnpm --dir frontend contract:check`、`typecheck`、`lint`、`test`、`build:static` 和受影响的 `test:e2e`。旧版 `app/static/` 前端已于 2026-11-01 删除，不再有对应门禁。详见[前端运行手册](frontend.md)。
 

@@ -12,7 +12,7 @@
 | [forge_bridge.py](../../../app/integration/forge_bridge.py) | 启动独立解释器，校验 wheel 摘要，使用一次性认证、序号和有界 JSON 行协议执行节点调用；处理超时及进程清理 |
 | [forge_worker.py](../../../app/integration/forge_worker.py) | 仅在框架解释器运行；使用 ForgeHarness `Harness`/`RunKernel` 调度节点，执行只读策略、工具预算、严格引文校验及轨迹完整性检查 |
 | [setup_framework.py](../../../scripts/ops/setup_framework.py) | 校验依赖清单摘要，以带 hash 的固定版本依赖及精确 wheel 安装新的 Python 3.12 独立环境 |
-| [compare_forge_readonly.py](../../../scripts/compare_forge_readonly.py) | 显式运行本地离线工程对照，报告按 0600 权限保存到指定新文件 |
+| [compare_forge_readonly.py](https://github.com/l252916991-cyber/law-review-local/blob/0197bed/scripts/compare_forge_readonly.py)（2026-11-09 删除） | 显式运行本地离线工程对照，报告按 0600 权限保存到指定新文件 |
 | [test_forge_readonly.py](../../../tests/test_forge_readonly.py) | 单案件隔离、身份/撤权、真实框架进程、引文/法条版本、规模及协议失败用例 |
 
 框架沿用已绑定的 **0.6.0 / SDK API 1**，wheel 摘要 `69ce604c51325085ae179917605c9479e423c1d437970758733d4f580e367a16`。没有修改框架核心或把法律规则移入核心。依赖导出 `vendor/forgeharness-runtime-requirements.txt` 来自对应框架锁文件的核心依赖；摘要登记在 `FRAMEWORK_BINDING.json`，随精确允许清单交付。
@@ -96,6 +96,6 @@ M2 后续：经授权的真实材料对照、受治理模型链路、独立端�
 
 ## 7. 证据与变更记录
 
-全部证据位于 [output/migration/m2-engineering-20261022](../../../output/migration/m2-engineering-20261022)：`closing-312/`、`matrix-311/`、`matrix-314/` 保存命令、JUnit、覆盖率与日志；`synthetic-acceptance-summary.json` 和逐题报告保存对照与源库摘要；`static-results.json`、`deployment-closing.log`、`cli-smoke.log` 保存工程验证。原始测试准备脚本也保留，目录为忽略的本地实验产物，不随源码发布。
+全部证据位于 `output/migration/m2-engineering-20261022`：`closing-312/`、`matrix-311/`、`matrix-314/` 保存命令、JUnit、覆盖率与日志；`synthetic-acceptance-summary.json` 和逐题报告保存对照与源库摘要；`static-results.json`、`deployment-closing.log`、`cli-smoke.log` 保存工程验证。原始测试准备脚本也保留，目录为忽略的本地实验产物，不随源码发布。
 
 源码变更前副本在同目录 `before/`，源码清单与差异检查在 `source-before.json`、`source-final.json`、`change-review.json`。两侧目录仍无 Git 元数据；按仓库规则没有自动初始化基线，也未创建提交。后续需要恢复原仓库历史或明确授权建立基线，才能使用原子 Git 提交管理这些变更。

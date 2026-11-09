@@ -29,5 +29,6 @@
 
 - [过程文档归档](history/migration/README.md)：2026-10-21 至 11-01 的全部计划书、实施记录与证据（三组对照、多人协作、评测补齐、框架接入等），按原样保留。
 - [提交作者改写与哈希对照](history/author-rewrite-20261101.md)：旧哈希 → 新哈希的完整对照。
+- [代码结构重组](history/restructure-20261109.md)：2026-11-09 按领域拆包、拆分 `services.py`、脚本分目录的路径对照、删除清单与验证。
 - [优化编年史](history/optimization-chronicle.md)、[历史材料索引](history/README.md)、[旧版前端说明](history/legacy-ui/mobile-workspace.md)。
 - 早期计划与报告仍在 `runbook/`：[企业化改进报告](runbook/enterprise-improvement-report.md)、[42 项修复映射](runbook/improvement-checklist.md)、[2026-09-05 验收记录](runbook/validation-20260905.md)。

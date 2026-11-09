@@ -40,6 +40,28 @@ Open `http://127.0.0.1:8765`. FastAPI serves the static UI and API from the same
 
 Model functions require an explicitly configured compatible local endpoint and an actual model ID. Remote model access is disabled by default. Offline rule summaries and fixed-answer test doubles are distinct from real model results. Scan support requires working parsers/OCR and a separate quality evaluation.
 
+## Repository layout
+
+```text
+app/          Python package, absolute imports only
+  main.py     application entry point; paths.py holds repository paths
+  api/        routers, request/response schemas, static frontend
+  core/       configuration, logging, authentication, audit, egress policy, canonical digests
+  storage/    SQLite and PostgreSQL access, schema and migrations
+  documents/  upload parsing, bank statements, background tasks, OCR
+  retrieval/  hybrid page retrieval, chunk indexes, keyword search and routing, statute corpus
+  review/     chat orchestration, prompt and model calls, conversation context, agents, answer contract
+  cases/      reports and delivery, exports, ethical walls, conflicts, members, human tasks
+  llm/        model ports and routing, local backends, usage and pricing
+  integration/ framework sidecar, host ports, domain writes, MCP server
+  evaluation/ answer-quality gate, scorers, blind review, ablations
+  benchmarks/ LawBench and statute-retrieval solvers, scoring and reports
+scripts/      evaluation/, benchmarks/, corpus/, ops/, acceptance/
+frontend/     Next.js interface; tests/ offline tests; benchmarks/ datasets and baselines; docs/ documentation
+```
+
+Package responsibilities and the remaining cross-package dependencies are described in [the architecture notes](docs/architecture/system.md) (Chinese).
+
 ## Capabilities and checks
 
 - Case/document management, source preview, evidence annotations and exports.

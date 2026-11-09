@@ -21,3 +21,4 @@
 | 计划书、实施记录与证据（2026-10-21—11-01） | [migration/](migration/README.md) | 内容按原样保留；其中“待执行”“未运行”等状态是当时的事实，现行状态以 [项目说明](../portfolio/project-brief.md) 为准 |
 | 旧版 `app/static/` 前端说明 | [legacy-ui/](legacy-ui/mobile-workspace.md) | 旧界面已删除，仅供核对旧版本 |
 | 提交作者改写 | [author-rewrite-20261101.md](author-rewrite-20261101.md) | 文档中出现的旧提交哈希可用对照表换算 |
+| 代码结构重组（2026-11-09） | [restructure-20261109.md](restructure-20261109.md) | 过程记录里的旧路径（如 `app/services.py`、`scripts/eval_gate.py`）可用对照表换算；正文保持原文，链接已指向文件现在的位置 |

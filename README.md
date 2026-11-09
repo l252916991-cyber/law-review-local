@@ -75,21 +75,33 @@ pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build:stati
 ### 1.1 仓库结构
 
 ```text
-app/          产品代码：生命周期与中间件（main.py）、按领域划分的接口（routes/）、Agent 双运行时、检索、语料、权限与审计
-frontend/     Next.js + React + TypeScript 正式界面，静态构建后由 FastAPI 同源托管
-tests/        离线自动化测试（CI 禁网运行）
-benchmarks/   评测数据集与历史实验产物（LawBench 上游数据、结果 JSON）
-scripts/      发布、运维与维护工具（环境自检、备份、语料构建、发布打包）
-docs/         架构说明、运维手册、评测口径与求职材料；过程记录归档在 docs/history/
-
-scripts/benchmarks/unified_benchmark_runner.py   模型评测公开入口
-scripts/benchmarks/rag_project_benchmark.py      项目 RAG 页级检索回归入口
-scripts/benchmarks/verify_benchmark_run.py       评测产物完整性与评分复算校验
-scripts/benchmarks/compare_agent_runtimes.py     双运行时对比入口
-BENCHMARK_TEST_PLAN.md        评测验证计划
+app/                 产品代码（Python 包，一律绝对导入）
+  main.py            应用入口：生命周期、中间件、路由装配、前端托管
+  paths.py           仓库根目录等路径常量
+  api/               HTTP 层：按领域划分的路由（routes/）、请求与响应结构、前端静态托管
+  core/              配置、日志、鉴权与权限、审计、出站请求、规范 JSON 摘要
+  storage/           SQLite 与 PostgreSQL 访问、表结构与迁移
+  documents/         上传解析（PDF / DOCX / 图片 / OCR）、银行流水解析与入库、后台任务
+  retrieval/         页级混合检索、分块与索引、关键词检索与问题路由、法条语料与法条检索
+  review/            问答编排、系统提示与模型调用、上下文与多轮记忆、Agent 双运行时、工具循环、回答契约
+  cases/             报告与签发交付、导出、信息隔离墙、利益冲突、成员与人工任务、缺口分析
+  llm/               模型端口与路由、本机后端、用量与定价、后端准入
+  integration/       框架侧车、宿主读写端口、领域写入、MCP 服务
+  evaluation/        答案质量门禁、评分器、盲审、消融与模型对照
+  benchmarks/        LawBench 与法条检索基准的求解、评分与报告
+frontend/            Next.js + React + TypeScript 正式界面，静态构建后由 FastAPI 同源托管
+tests/               离线自动化测试（CI 禁网运行）
+scripts/             命令行工具，按用途分目录
+  evaluation/        答案质量门禁、答案数据集、评审与消融
+  benchmarks/        模型评测入口 unified_benchmark_runner.py、产物校验、项目 RAG 回归、LawBench 实验
+  corpus/            法条语料构建与审计
+  ops/               环境自检、安装、快照、迁移、发布打包、演示数据
+  acceptance/        部署、容量、模型、协作验收与前端测试服务器
+benchmarks/          评测数据集与已登记结果（LawBench 上游数据、门禁基线）
+docs/                架构说明、运维手册、评测口径与求职材料；过程记录在 docs/history/
 ```
 
-评测**入口脚本有意保留在根目录**，由 `.gitignore` 白名单与[发布白名单](scripts/ops/package_release.py)显式维护，使公开发布入口一眼可见；评测**数据与产物**则归入 `benchmarks/`，避免把可执行代码混入评测资产树。这是设计结果，不是历史残留。
+各子包的职责与相互依赖见[系统架构](docs/architecture/system.md#代码结构)；2026-11-09 重组前后的路径对照见[重组记录](docs/history/restructure-20261109.md)。评测数据与产物放在 `benchmarks/`，可执行代码只放在 `app/` 与 `scripts/`。
 
 `data/`、`models/`、`output/` 是本地运行边界（数据库、上传、导出、模型权重与实验产物），永不入库。
 
@@ -271,8 +283,8 @@ docker compose up -d
 ```bash
 uv run --locked ruff check app tests scripts
 uv run --locked mypy
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests tests/test_engineering.py tests/test_data_snapshot.py \
-  tests/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests \
+  -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
 # 本机若存在 output/score85 下的旧法条资产，需显式指定冻结资产根目录，否则两项旧断言会失败（见 docs/benchmarks/collaboration-corpus-recovery-20261028.md）
 # LAW_REVIEW_CORPUS_REGRESSION_ROOT=<冻结资产目录> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest ...
@@ -329,6 +341,7 @@ pnpm --dir frontend test:e2e
 | [质量门禁](docs/runbook/quality.md) | 依赖锁定、lint/类型/测试约定 |
 | [组件许可](docs/runbook/licenses.md) | 第三方组件来源与许可 |
 | [过程文档归档](docs/history/migration/README.md) | 2026-10-21—11-01 的计划书、实施记录与证据 |
+| [代码重组记录](docs/history/restructure-20261109.md) | 2026-11-09 按领域拆包、拆分 services.py、脚本分目录的路径对照与验证 |
 
 ## 11. 维护、支持与合规
 

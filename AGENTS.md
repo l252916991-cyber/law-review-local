@@ -39,6 +39,7 @@
 - Python 代码调整：运行受影响测试及 `uv run --locked ruff check app tests scripts`；涉及工程脚本或类型配置时运行 `uv run --locked mypy`。
 - Next.js 前端调整：在 `frontend/` 使用 `.node-version` 和 `package.json` 固定的工具版本，执行 `pnpm install --frozen-lockfile`、`pnpm contract:check`、`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build:static` 与受影响的 `pnpm test:e2e`。正式界面由 FastAPI 托管静态构建，修改后必须重建并确认实际进程加载该构建。旧版 `app/static/` 前端已于 2026-11-01 删除，需要核对时查看 `v0.4.0` 之前的提交。
 - 修改业务行为或修复缺陷时，按风险补充有实际断言价值的测试，覆盖正常流程与相关异常、边界条件。
+- 代码放置：产品代码按领域放在 `app/<子包>/`（职责见 `docs/architecture/system.md` 的“代码结构”），一律绝对导入（ruff `TID252`）；需要仓库内文件时用 `app.paths.ROOT` / `APP_DIR`；命令行工具放在 `scripts/<用途>/`，不在仓库根目录新增脚本。测试补丁打在名字被查找的模块上。
 - 修改 `app/storage/db.py` 的 SQLite 迁移后运行 `uv run --locked python scripts/ops/generate_postgres_schema.py` 重新生成 PostgreSQL 结构；涉及 SQL 或检索的改动，设 `LAW_REVIEW_TEST_POSTGRES_URL` 在 PostgreSQL 上再跑受影响测试（见 `docs/runbook/postgresql.md`）。
 - 改动提示词、检索、路由、可答性或模型配置时，运行 `uv run --locked python scripts/evaluation/eval_gate.py`；被拦下时先查逐题变化，确认是有意改进才用 `--update-baseline --reason` 登记新基线，不得为通过而放宽阈值（见 `docs/runbook/eval-gate.md`）。
 - 跨模块、数据结构、检索链路、依赖或 CI 调整，以及准备合并时，执行现有 CI 对应的完整检查，包括离线测试、覆盖率、依赖导出一致性与发布清单检查。

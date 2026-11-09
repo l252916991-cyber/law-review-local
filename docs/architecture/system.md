@@ -12,6 +12,33 @@ Browser → FastAPI → business SQLite (documents/pages/evidence/audit/runs/mem
 
 HTTP 层：`app/main.py` 只负责应用生命周期、中间件、前端静态托管和路由装配；接口处理函数按领域放在 `app/api/routes/`（`system`、`cases`、`documents`、`evidence`、`chat`、`agent_runs`、`bank`、`exports`，共享的案件访问校验与 Redis 探测在 `common`），成员、人工任务、报告、复核任务与登录沿用各自模块的 `APIRouter`。业务逻辑在各领域子包（`app/review/`、`app/retrieval/`、`app/documents/`、`app/cases/` 等），路由层不复制规则。
 
+## 代码结构
+
+`app/` 按领域分成 11 个子包，入口 `app/main.py` 与路径常量 `app/paths.py` 留在包根。
+
+| 子包 | 职责 | 主要依赖 |
+|---|---|---|
+| `api/` | 路由、请求与响应结构、前端静态托管；只做 HTTP 适配 | 各业务子包 |
+| `core/` | 配置、日志、鉴权与权限、审计、出站请求白名单（`egress.py`）、规范 JSON 摘要（`digest.py`） | `storage` |
+| `storage/` | SQLite 与 PostgreSQL 访问、表结构与迁移 | — |
+| `documents/` | 上传解析（`ingest.py`）、银行流水解析与入库、后台任务、OCR | `core`、`storage`、`llm` |
+| `retrieval/` | 页级混合检索（`rag.py`）、分块与子块索引、关键词检索与问题路由（`search.py`）、法条语料与法条检索 | `core`、`storage`、`llm` |
+| `review/` | 问答编排（`chat.py`）、系统提示与模型调用（`generation.py`）、上下文与多轮记忆、Agent 双运行时、工具循环、回答契约 | `retrieval`、`llm`、`core`、`storage` |
+| `cases/` | 报告与签发交付、导出、信息隔离墙、利益冲突、成员与人工任务、缺口分析 | `core`、`storage`、`documents` |
+| `llm/` | 模型端口与路由、本机后端、用量与定价、后端准入 | `core`、`storage` |
+| `integration/` | 框架侧车、宿主读写端口、领域写入、MCP 服务 | `review`、`retrieval`、`llm` |
+| `evaluation/` | 答案质量门禁、评分器、盲审、消融与模型对照 | `review`、`integration` |
+| `benchmarks/` | LawBench 与法条检索基准的求解、评分与报告 | `retrieval`、`review` |
+
+依赖大体自下而上，但仍有几处跨层引用，记在这里而不是假装没有：
+
+- `core` 依赖 `storage`：登录会话、安全事件与审计写数据库，模型配置覆盖文件的位置由 `storage` 给出。
+- `retrieval/statutory_retrieval.py` 复用 `benchmarks/statutory_gold.py` 的法条引用解析。
+- `llm/local_backends.py` 与 `review/answerability.py` 使用 `integration` 的契约类型（`runtime_ports`）与领域摘要（`host_writes.digest`）。
+- `cases/conflicts.py` 延迟导入 `api.routes.common.require_case`；`storage/db.py` 延迟导入 `retrieval.search_backend.is_postgres`。
+
+约定：一律绝对导入（ruff `TID252`）；需要仓库内文件时用 `app.paths.ROOT` / `APP_DIR`，不按 `__file__` 层数推算；测试补丁打在名字被查找的模块上，例如对话路径打 `app.review.chat.call_local_llm`，直接调用模型的打 `app.review.generation.*`。`scripts/` 按用途分为 `evaluation/`、`benchmarks/`、`corpus/`、`ops/`、`acceptance/`，脚本自行把仓库根加入 `sys.path`，也可用 `python -m scripts.<目录>.<脚本>` 运行。
+
 业务表保存可展示的审计与结果；checkpoint 保存图状态和待执行节点。LangGraph 线程以运行 ID 隔离，恢复仍使用原线程；节点副作用需要业务层幂等保护。SQLite 适合当前单机原型，不宣称多实例高并发运行能力。
 
 FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问题信号做确定性重排，并对高分命中补充同文档邻页、限制单一文档最多占结果的 60%。该限制按相关性顺序执行，允许同文档多个关键页入选，不强制先为每份文档分配一页。精确人名、金额、日期、法条号和证据类型优先保留词法命中，开放式事实问题保留语义召回。无真实命中时不再把数据库前几页当作证据。结果附带来源多样性、直接命中数、邻页数和置信度诊断；低置信度只表示需要律师核验，不代表自动拒答或事实成立。向量缓存有效性应包含内容、模型身份、后端、维度与预处理版本；仅维度相同不能证明向量空间一致。模型不可用时有显式降级，降级结果不可计作成功模型性能样本。

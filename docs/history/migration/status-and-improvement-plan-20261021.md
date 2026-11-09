@@ -150,9 +150,9 @@ I-01 复现仅使用临时合成数据库；协调器及模型调用均为 0，�
 
 ## 6. 证据位置与本次交付范围
 
-- 本轮[验证摘要](../../../output/status-review-20261021-7etaadcp/verification-summary.json)、[测试命令及隔离配置](../../../output/status-review-20261021-7etaadcp/command.json)、[测试日志](../../../output/status-review-20261021-7etaadcp/pytest.log)、[静态检查结果](../../../output/status-review-20261021-7etaadcp/static-results.json)。
-- 请求绑定问题的[隔离复现脚本](../../../output/status-review-20261021-7etaadcp/repro_request_binding.py)和[结果](../../../output/status-review-20261021-7etaadcp/repro-request-binding.json)。
-- [源码及发布清单核对](../../../output/status-review-20261021-7etaadcp/metadata-checks.json)：测试前后允许清单的 206 文件未变化，摘要为 `5089ecf83f8b99b1568cf68daf5f527ed2365793ae9e4e4056f6b2fcf58ece77`。本文及入口文档随后变化，最终文档摘要不能冒充测试前源码摘要。
+- 本轮验证摘要（`output/status-review-20261021-7etaadcp/verification-summary.json`）、测试命令及隔离配置（`output/status-review-20261021-7etaadcp/command.json`）、测试日志（`output/status-review-20261021-7etaadcp/pytest.log`）、静态检查结果（`output/status-review-20261021-7etaadcp/static-results.json`）。
+- 请求绑定问题的隔离复现脚本（`output/status-review-20261021-7etaadcp/repro_request_binding.py`）和结果（`output/status-review-20261021-7etaadcp/repro-request-binding.json`）。
+- 源码及发布清单核对（`output/status-review-20261021-7etaadcp/metadata-checks.json`）：测试前后允许清单的 206 文件未变化，摘要为 `5089ecf83f8b99b1568cf68daf5f527ed2365793ae9e4e4056f6b2fcf58ece77`。本文及入口文档随后变化，最终文档摘要不能冒充测试前源码摘要。
 - 框架[候选验证汇总](/Users/xiaoy/Documents/多agent协作/reports/framework-next/verification/summary.json)、[冻结源码清单](/Users/xiaoy/Documents/多agent协作/reports/framework-next/source.json)、[剩余工作计划](/Users/xiaoy/Documents/多agent协作/docs/REMAINING_WORK_PLAN_2026-10-20.md)。候选源码摘要为 `783e5fbd7c9ab13fa7d0f8765edb5225643a4a36b5df214be834de8e671e7848`。
 
 本地 `output/` 与框架 `reports/` 是证据位置，不自动纳入源码发布包；跨机器交付时应另行保留经审查的非敏感证据。本文未修改业务实现、依赖或真实案件数据。两侧目录均未识别为 Git 仓库，本次没有创建提交，也没有自动初始化基线。
