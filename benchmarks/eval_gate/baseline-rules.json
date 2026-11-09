@@ -12,7 +12,7 @@
     "context_policy": "multiturn-context-v2",
     "system_prompt_sha256": "afcb75bf4230d08537290d8a655c5a0ff1228631fa3ffd9aa0ff4efa6e52e1e4",
     "modules": {
-      "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
+      "agents.py": "5d149c01eb28959af48dce824c011ca63ac36d6e1695815122c6b89f159a2f57",
       "answerability.py": "9868326b8e14befaf3f98ccab853a9bc94bc932dd0fa6d30d359b5baab14f778",
       "context.py": "ee52a6494b7c6d0b4c0c474ad63591569d3eb091edbaa06b5af647250811e79f",
       "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
@@ -20,12 +20,12 @@
       "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
       "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
       "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-      "services.py": "376cfdc59e23090f5fa2f6e31250a04c3f5b5fa7681cafdf48b50b70b43b7eb6",
+      "services.py": "2ca10ee058e791f50855131a3a5242198b49d3c46f8f30664673145d78a865ff",
       "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
     },
     "database_backend": "sqlite",
     "embeddings": "hashed-local",
-    "inference_id": "c829fc25cd7db8f6"
+    "inference_id": "d328470375221de3"
   },
   "summary": {
     "queries": 60,
@@ -38,8 +38,8 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 13.45,
-    "latency_p95_ms": 19.06,
+    "latency_p50_ms": 13.34,
+    "latency_p95_ms": 21.86,
     "llm_used": 0,
     "overreach_answers": 0
   },
@@ -225,8 +225,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-08T06:29:35+00:00",
-  "reason": "评分口径升为 eval-gate-v3（score_answer_v4：日期统一格式；要点词里“没有”可写作“未/没”、“只”可写作“仅”；结论段里的拒答；转述用户要求时引用的禁止短语不算断言）。规则模式回答是卷宗原文摘录，逐题结果不变，46/60",
+  "registered_at": "2026-11-09T07:24:52+00:00",
+  "reason": "回答契约两处修正（canonical_source_markers 删除不指向来源的占位符“[资料N]”；复核提醒检查不再把描述案情的“无需核验……”当成放弃复核）。规则模式逐题结果不变，46/60，推理版本随 services.py、agents.py 变化重新登记",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -353,6 +353,28 @@
         "required_pages_cited": 40,
         "latency_p50_ms": 13.54,
         "latency_p95_ms": 17.22,
+        "llm_used": 0,
+        "overreach_answers": 0
+      }
+    },
+    {
+      "inference_id": "c829fc25cd7db8f6",
+      "gate_version": "eval-gate-v3",
+      "registered_at": "2026-11-08T06:29:35+00:00",
+      "reason": "评分口径升为 eval-gate-v3（score_answer_v4：日期统一格式；要点词里“没有”可写作“未/没”、“只”可写作“仅”；结论段里的拒答；转述用户要求时引用的禁止短语不算断言）。规则模式回答是卷宗原文摘录，逐题结果不变，46/60",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 13.45,
+        "latency_p95_ms": 19.06,
         "llm_used": 0,
         "overreach_answers": 0
       }

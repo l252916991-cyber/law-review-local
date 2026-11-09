@@ -87,6 +87,21 @@ class CanonicalSourceMarkersTest(unittest.TestCase):
         self.assertIn("[资料1][资料2][资料3][资料4][资料5][资料6]", rewritten)
         self.assertTrue(validate_review_answer(rewritten, six)["valid"])
 
+    def test_the_prompts_placeholder_is_removed(self):
+        # Qwen3.6-35B-A3B, 2026-11-08, irrelevant-02: a correct refusal lost to "[资料N]".
+        answer = ("**结论**\n无法依据本案材料推导量子场论公式[资料1]。\n\n**缺失信息**\n"
+                  "1. 具体的物理模型设定[资料N]。\n2. 相关的物理常数【资料n】。\n\n请律师复核原文与上述结论")
+        self.assertFalse(validate_review_answer(answer, CONTEXTS)["valid"])
+        rewritten = canonical_source_markers(answer, CONTEXTS)
+        self.assertNotIn("资料N", rewritten)
+        self.assertNotIn("资料n", rewritten)
+        self.assertIn("推导量子场论公式[资料1]", rewritten)
+        self.assertTrue(validate_review_answer(rewritten, CONTEXTS)["valid"])
+
+    def test_an_answer_citing_only_placeholders_is_still_rejected(self):
+        answer = "结论：缺少法条原文[资料N]。请律师复核。"
+        self.assertFalse(validate_review_answer(canonical_source_markers(answer, CONTEXTS), CONTEXTS)["valid"])
+
     def test_plain_markers_and_text_are_unchanged(self):
         answer = "结论[资料1][资料2]，第3页另见。请律师复核。"
         self.assertEqual(canonical_source_markers(answer, CONTEXTS), answer)

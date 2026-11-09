@@ -58,11 +58,20 @@ def answer_contract(answer: str, citation_count: int) -> dict[str, bool]:
         "citations_valid": bool(markers) and all(parsed)
         and all(1 <= value <= citation_count for value in markers),
         "lawyer_review_present": bool(re.search(
-            r"律师.{0,24}(?:复核|核验|核对|回看|审阅)|(?:请|需|须|待).{0,8}(?:复核|核验)", answer
-        )) and not bool(re.search(
-            r"(?:无需|不必|不用|不需要).{0,8}(?:律师)?.{0,8}(?:复核|核验)|律师.{0,8}(?:无需|不必|不用|不需要).{0,8}(?:复核|核验)", answer
-        )),
+            r"律师.{0,24}(?:复核|核验|核对|回看|审阅)|(?<![无不毋])(?:请|需|须|待).{0,8}(?:复核|核验)", answer
+        )) and not _REVIEW_WAIVED.search(answer),
     }
+
+
+#: An answer that waives the lawyer's review. Either it names the lawyer ("无需律师复核",
+#: "律师不必再核验"), or a bare waiver ends its clause ("以上结论无需复核。"). A waiver
+#: followed by an object is about the case, not the answer: "无需核验特定身份" in a
+#: description of the client checks rejected a whole answer (2026-11-08, Qwythos-9B).
+_REVIEW_NEGATION = r"(?:无需|无须|不必|不用|不需要)"
+_REVIEW_WAIVED = re.compile(
+    _REVIEW_NEGATION + r"[^。；！？\n]{0,8}律师[^。；！？\n]{0,8}(?:复核|核验|核对|审阅)"
+    r"|律师[^。；！？\n]{0,8}" + _REVIEW_NEGATION + r"[^。；！？\n]{0,8}(?:复核|核验|核对|审阅)"
+    r"|" + _REVIEW_NEGATION + r"(?:再|进行|人工|额外|另行){0,2}(?:复核|核验|核对|审阅)(?=[。；！？，,、\n]|$)")
 
 
 def validate_review_answer(answer: str, contexts: list[dict[str, Any]]) -> dict[str, Any]:

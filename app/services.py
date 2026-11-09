@@ -747,6 +747,8 @@ _RANGE_SEPARATOR = r"[-–—~～]|至|到"
 _MULTI_SOURCE_MARKER = re.compile(
     r"[\[【［]\s*资料\s*(\d+(?:\s*(?:[、，,/／;；]|和|与|及|[vV][sS]\.?|" + _RANGE_SEPARATOR + r")\s*(?:资料\s*)?\d+)+)\s*[\]】］]")
 _MULTI_SOURCE_PART = re.compile(r"(\d+)|(" + _RANGE_SEPARATOR + r")")
+#: The prompt's own placeholder copied verbatim ("[资料N]"): it names no source at all.
+_PLACEHOLDER_MARKER = re.compile(r"[\[【［]\s*资料\s*[A-Za-zＮＸｎｘ]{1,2}\s*[\]】］]")
 
 
 def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str:
@@ -762,6 +764,10 @@ def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str
     - several sources in one bracket, "[资料2、资料3]", "[资料1/2]", "[资料1 vs 资料2]",
       "[资料1-6]": rewritten to one marker per source, only when every number is
       one of this turn's sources and every range ascends.
+
+    The prompt's placeholder "[资料N]" copied verbatim (2026-11-08, Qwen3.6-35B-A3B,
+    under a list of missing information) names no source, so it is removed rather
+    than rewritten; an answer left without any real marker is still rejected.
 
     Anything else, including a header or number that does not match this turn's
     sources, is left as it is and still rejected.
@@ -795,7 +801,8 @@ def canonical_source_markers(answer: str, contexts: list[dict[str, Any]]) -> str
         return "".join(f"[资料{index}]" for index in dict.fromkeys(indexes))
 
     rewritten = _COPIED_SOURCE_HEADER.sub(header, answer or "")
-    return _MULTI_SOURCE_MARKER.sub(several, rewritten)
+    rewritten = _MULTI_SOURCE_MARKER.sub(several, rewritten)
+    return _PLACEHOLDER_MARKER.sub("", rewritten)
 
 
 def read_json_with_deadline(

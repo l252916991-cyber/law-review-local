@@ -25,7 +25,7 @@ from .services import PROMPT_VERSION
 # The source commit predates the reviewed changes below. The exact new
 # snapshot is identified by a version and literal hashes, not a future commit.
 NATIVE_BASELINE_SOURCE_COMMIT = "31a811c92acae30caf82c9c5109ce812bd99bb04"
-NATIVE_BASELINE_REVISION = "specialist-review-v10"
+NATIVE_BASELINE_REVISION = "specialist-review-v11"
 # Reviewed change since specialist-review-v1, recorded so a future drift is
 # explained instead of re-pinned silently. The file digest covers the whole
 # module, so a non-algorithmic edit still moves it; the review below states, for
@@ -70,14 +70,19 @@ NATIVE_BASELINE_REVIEW = (
     "把它们拆成每个来源一个 [资料N]，条件是每个编号都在本轮来源范围内、范围递增；其余照旧拒绝。提示模板、"
     "PROMPT_VERSION、检索、可答性与回答契约本身未改动；27B 两轮回答不含这些写法，35B 两次与 9B 的保存回答"
     "回放后只有这 7 题结果变化。v9 结果保留且不被覆盖。"
+    "2026-11-09（specialist-review-v11）：评分 v4 样本外运行中发现两个回答契约问题。一是 35B-A3B 把提示里的占位符"
+    "“[资料N]”原样写进正文，整条回答被拒；canonical_source_markers 删除这种不指向任何来源的占位符，删后没有真实引用"
+    "的回答照旧被拒。二是复核提醒检查把正文里描述案情的“无需核验特定身份”当成放弃复核；agents.py 改为只有提到律师、"
+    "或放弃复核的词结束分句时才算放弃，并让“请/需/须/待……复核”不再匹配“无需……”中的“需”。提示模板、PROMPT_VERSION、"
+    "检索与可答性未改动；9 次保存运行新旧代码回放的逐题差异见评分 v4 记录。v10 结果保留且不被覆盖。"
 )
 NATIVE_ALGORITHM_HASHES = {
-    "agents.py": "116f851437f1b86f972c7d706c9c4e0b275b24f3930a235328042d1e4a93412d",
+    "agents.py": "5d149c01eb28959af48dce824c011ca63ac36d6e1695815122c6b89f159a2f57",
     "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
     "agent_tools.py": "f7fcfb59188bdae1e8f6a33ced57af696519cc8eaa2e2c673124943988cf4b15",
     "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
     "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-    "services.py": "376cfdc59e23090f5fa2f6e31250a04c3f5b5fa7681cafdf48b50b70b43b7eb6",
+    "services.py": "2ca10ee058e791f50855131a3a5242198b49d3c46f8f30664673145d78a865ff",
     "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
     "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a",
 }
