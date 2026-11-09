@@ -26,7 +26,7 @@ _TS_RANK_WEIGHTS = "{0.0625,0.625,0.75,1.0}"
 def is_postgres(conn: Any) -> bool:
     # Without a PostgreSQL connection the driver module was never imported, so
     # a SQLite process never pays psycopg's import cost (~0.1 s) here.
-    module = sys.modules.get(f"{__package__}.db_postgres")
+    module = sys.modules.get("app.storage.db_postgres")
     return module is not None and isinstance(conn, module.PgConnection)
 
 

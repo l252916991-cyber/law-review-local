@@ -67,6 +67,17 @@ def test_rows_read_like_sqlite_rows_and_values_keep_sqlite_types():
     assert _python_value(True) == 1 and type(_python_value(True)) is int
 
 
+def test_backend_detection_finds_the_driver_module_by_its_package_path():
+    """is_postgres looks the driver module up in sys.modules; a stale module path made
+    every PostgreSQL connection look like SQLite (sqlite_master queries, FTS fallback)."""
+    from app.retrieval.search_backend import is_postgres
+    from app.storage import db_postgres
+
+    assert is_postgres(object.__new__(db_postgres.PgConnection))
+    with closing(sqlite3.connect(":memory:")) as conn:
+        assert not is_postgres(conn)
+
+
 def test_a_sqlite_process_never_imports_the_postgresql_driver(tmp_path):
     """psycopg costs ~0.1 s to import; SQLite deployments must not pay it per process."""
     import subprocess
