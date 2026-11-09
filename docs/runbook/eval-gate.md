@@ -48,6 +48,15 @@ uv run --locked python scripts/evaluation/eval_gate.py --mode model --endpoint h
 
 第一次没有这个基线，只出报告（退出码 2）；逐题复核后，再用 `--update-baseline --from-report` 登记为该模型自己的基线。
 
+要留着以后回放，用采集脚本跑（参数同上，生成设置固定为 temperature 0.2、最多 700 token、单次 180 秒，与已登记的模型运行一致）：
+
+```sh
+uv run --locked python scripts/evaluation/capture_model_gate.py --out output/eval-gate-models-.../MODEL_DIR \
+  --endpoint http://127.0.0.1:8000/v1 --model OTHER_MODEL_ID --baseline benchmarks/eval_gate/baseline-model-OTHER.json
+```
+
+输出目录里除了 `report.json`、`gate-summary.md`，还有 `model-calls.jsonl`（每次模型调用的问题、模型原文 `raw_answer`、来源标记改写后的 `rewritten_answer`、用量与耗时）和 `answers.jsonl`；已有记录的目录会被拒绝，不会覆盖。
+
 ## 回放：不接模型，检验模型调用之后的改动
 
 改回答契约、引用处理、可答性或评分时，可以用保存的真实模型输出检验，不需要跑模型的机器：
@@ -56,7 +65,7 @@ uv run --locked python scripts/evaluation/eval_gate.py --mode model --endpoint h
 uv run --locked python scripts/evaluation/replay_model_gate.py output/eval-gate-models-.../MODEL_DIR --report output/replay.json
 ```
 
-脚本在本地起一个假端点，按问题返回该次运行保存在 `model-calls.jsonl` 里的原始输出，然后在当前代码上跑一遍模型模式。记录里必须是模型返回的原文：维护者本机的采集脚本从 2026-11-07 起在来源标记改写之前取文本（改写后的文本另存为 `rewritten_answer`）；此前用带改写的代码采集的两次运行（35B 第二次、27B 第三次）存的是改写之后的文本，只能用来检验改写之后的代码。先用运行时的代码回放，结果必须与原报告逐题一致，回放才可信；再用改动后的代码回放，看哪些题变了。如果改动影响了送给模型的问题或检索结果，找不到对应输出的调用会被列出（退出码 1），这时只能重新跑模型。回放报告里的时延不是模型时延。
+脚本在本地起一个假端点，按问题返回该次运行保存在 `model-calls.jsonl` 里的原始输出，然后在当前代码上跑一遍模型模式。记录里必须是模型返回的原文：采集逻辑（2026-11-09 起是 `capture_model_gate.py`，此前是维护者本机的同样代码）从 2026-11-07 起在来源标记改写之前取文本（改写后的文本另存为 `rewritten_answer`）；此前用带改写的代码采集的两次运行（35B 第二次、27B 第三次）存的是改写之后的文本，只能用来检验改写之后的代码。先用运行时的代码回放，结果必须与原报告逐题一致，回放才可信；再用改动后的代码回放，看哪些题变了。如果改动影响了送给模型的问题或检索结果，找不到对应输出的调用会被列出（退出码 1），这时只能重新跑模型。回放报告里的时延不是模型时延。
 
 ## 报告里有什么
 
