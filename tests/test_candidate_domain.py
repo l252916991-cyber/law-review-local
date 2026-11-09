@@ -11,12 +11,18 @@ from pathlib import Path
 
 import pytest
 
-from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
-from app.db import connect, db_scope, init_db, now, transaction
-from app.domain_integration import IsolatedDomainIntegration
-from app.host_writes import create_isolated_database
-from app.runtime_ports import AccessDeniedError, ContractValidationError, ModelConfig, RequestConflictError, RunScope
-from app.security import Principal, _principal
+from app.core.security import Principal, _principal
+from app.integration.candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from app.integration.domain_integration import IsolatedDomainIntegration
+from app.integration.host_writes import create_isolated_database
+from app.integration.runtime_ports import (
+    AccessDeniedError,
+    ContractValidationError,
+    ModelConfig,
+    RequestConflictError,
+    RunScope,
+)
+from app.storage.db import connect, db_scope, init_db, now, transaction
 from tests.test_domain_integration import counts, request
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401

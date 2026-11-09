@@ -13,11 +13,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item
-from app.benchmark_reporting import atomic_json
-from app.benchmark_retrieval import corpus_fingerprint
-from app.benchmark_solver import _configuration
-from app.lawbench import TASK_NAMES
+from app.benchmarks.lawbench import TASK_NAMES
+from app.benchmarks.metrics import SCORER_VERSION, score_lawbench_item
+from app.benchmarks.reporting import atomic_json
+from app.benchmarks.retrieval import corpus_fingerprint
+from app.benchmarks.solver import _configuration
 from scripts.benchmark_campaign import (
     digest,
     probe_model,
@@ -28,10 +28,10 @@ from scripts.benchmark_campaign import (
     write_rows,
 )
 
-SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "app/benchmark_solver.py",
-           "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py", "app/benchmark_postprocess.py",
-           "app/benchmark_event_tools.py", "app/benchmark_summary_tools.py", "app/legal_corpus.py",
-           "app/services.py", "app/config.py", "app/benchmark_weak_tasks.py"]
+SOURCES = ["scripts/benchmark_experiment.py", "scripts/benchmark_campaign.py", "app/benchmarks/solver.py",
+           "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py", "app/benchmarks/postprocess.py",
+           "app/benchmarks/event_tools.py", "app/benchmarks/summary_tools.py", "app/retrieval/legal_corpus.py",
+           "app/review/services.py", "app/core/config.py", "app/benchmarks/weak_tasks.py"]
 
 
 def configuration(profile_file: Path) -> dict[str, Any]:
@@ -77,11 +77,11 @@ def run(directory: Path, name: str, profile_file: Path, split: str = "developmen
                 "scorer_version": SCORER_VERSION, "sources": {name: digest(ROOT / name) for name in SOURCES},
                 "corpus_files": corpus_fingerprint(config.get("corpus_directories", []))}
     if config["strategy"] == "weak_tasks":
-        from app.benchmark_weak_tasks import solve
+        from app.benchmarks.weak_tasks import solve
     elif config["strategy"] == "statutory_rag":
-        from app.benchmark_rag_solver import solve
+        from app.benchmarks.rag_solver import solve
     else:
-        from app.benchmark_solver import solve
+        from app.benchmarks.solver import solve
     output = directory / "runs" / name
     with (directory / "inference.lock").open("a") as model_lock:
         try:

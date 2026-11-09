@@ -87,7 +87,7 @@
 
 ## 5. 历史结果复用缺陷修复
 
-十八题后使用全新宿主与实际框架进程复用已完成的成功/拒绝结果时，发现 `app/host_integration.py` 无差别拒绝 deadline 之后收到的 succeeded 结果，连已在宿主保存的原成功也被误判为晚到完成。
+十八题后使用全新宿主与实际框架进程复用已完成的成功/拒绝结果时，发现 `app/integration/host_integration.py` 无差别拒绝 deadline 之后收到的 succeeded 结果，连已在宿主保存的原成功也被误判为晚到完成。
 
 修复保留当前授权、来源、版本、artifact 和 trace 校验；只有宿主已经是 succeeded 且框架返回结果与原保存结果完全一致，才允许在 deadline 后读取/恢复/重建投影。不刷新 deadline，不放行新的晚到成功，也不接受不一致的历史结果。
 

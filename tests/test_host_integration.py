@@ -14,12 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from app.db import connect, db_scope, init_db, transaction
-from app.forge_bridge import SidecarProtocolError
-from app.host_integration import IsolatedHostIntegration, worker_slot
-from app.host_writes import ISOLATED_RUNTIME
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import (
+from app.integration.forge_bridge import SidecarProtocolError
+from app.integration.host_integration import IsolatedHostIntegration, worker_slot
+from app.integration.host_writes import ISOLATED_RUNTIME
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import (
     ContractValidationError,
     ModelConfig,
     RequestConflictError,
@@ -28,6 +27,7 @@ from app.runtime_ports import (
     RunScope,
     UnsupportedCapabilityError,
 )
+from app.storage.db import connect, db_scope, init_db, transaction
 from tests.test_host_writes import isolated  # noqa: F401
 
 FRAMEWORK_PYTHON = os.getenv("LAW_REVIEW_FORGE_PYTHON", "")
@@ -249,7 +249,7 @@ def test_original_absolute_deadline_never_renewed(isolated):
 @actual
 @pytest.mark.parametrize("command", ["recover", "inspect", "rebuild"])
 def test_verified_historical_success_remains_readable_after_deadline(isolated, monkeypatch, command):
-    import app.host_integration as integration
+    import app.integration.host_integration as integration
 
     control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
     control.accept(request())
@@ -271,7 +271,7 @@ def test_verified_historical_success_remains_readable_after_deadline(isolated, m
 
 @actual
 def test_different_historical_result_is_not_released_after_deadline(isolated, monkeypatch):
-    import app.host_integration as integration
+    import app.integration.host_integration as integration
 
     control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
     control.accept(request())
@@ -289,7 +289,7 @@ def test_different_historical_result_is_not_released_after_deadline(isolated, mo
 
 @actual
 def test_first_success_received_after_deadline_still_requires_reconciliation(isolated, monkeypatch):
-    import app.host_integration as integration
+    import app.integration.host_integration as integration
 
     control = IsolatedHostIntegration(framework_python=FRAMEWORK_PYTHON)
     control.accept(request())

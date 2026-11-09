@@ -10,7 +10,7 @@ Browser → FastAPI → business SQLite (documents/pages/evidence/audit/runs/mem
                └→ Redis queue → arq worker → document extraction/indexing
 ```
 
-HTTP 层：`app/main.py` 只负责应用生命周期、中间件、前端静态托管和路由装配；接口处理函数按领域放在 `app/routes/`（`system`、`cases`、`documents`、`evidence`、`chat`、`agent_runs`、`bank`、`exports`，共享的案件访问校验与 Redis 探测在 `common`），成员、人工任务、报告、复核任务与登录沿用各自模块的 `APIRouter`。业务逻辑仍在 `app/services.py`、`app/agents.py` 等模块，路由层不复制规则。
+HTTP 层：`app/main.py` 只负责应用生命周期、中间件、前端静态托管和路由装配；接口处理函数按领域放在 `app/api/routes/`（`system`、`cases`、`documents`、`evidence`、`chat`、`agent_runs`、`bank`、`exports`，共享的案件访问校验与 Redis 探测在 `common`），成员、人工任务、报告、复核任务与登录沿用各自模块的 `APIRouter`。业务逻辑仍在 `app/review/services.py`、`app/review/agents.py` 等模块，路由层不复制规则。
 
 业务表保存可展示的审计与结果；checkpoint 保存图状态和待执行节点。LangGraph 线程以运行 ID 隔离，恢复仍使用原线程；节点副作用需要业务层幂等保护。SQLite 适合当前单机原型，不宣称多实例高并发运行能力。
 
@@ -22,7 +22,7 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 ## 估算费用与定价快照（A02.2）
 
-费用是"token 数 × 配置单价"，是估算值，不是账单。`app/pricing.py` 从 `LAW_REVIEW_PRICING_JSON`（内联 JSON）或 `LAW_REVIEW_PRICING_FILE` 读取价目表：`version`、`currency`、`unit_tokens`、`source` 和每个模型的输入/输出单价。
+费用是"token 数 × 配置单价"，是估算值，不是账单。`app/llm/pricing.py` 从 `LAW_REVIEW_PRICING_JSON`（内联 JSON）或 `LAW_REVIEW_PRICING_FILE` 读取价目表：`version`、`currency`、`unit_tokens`、`source` 和每个模型的输入/输出单价。
 
 - 绑定快照：`llm_calls.pricing_json` 在写入时复制当时的价目快照（版本、币种、单位、来源、单价），改价不会重算历史；`usage_summary` 因此能同时报出历史与当前版本。
 - 未知不入账：缺 usage 或该模型未配置单价时，单次费用未知，不进合计；`cost` 块分别给出 `no_price_calls` 与 `usage_missing_calls`，只有全部调用可计价时才有 `total`，否则只给 `partial_total`（已知部分）与覆盖计数。
@@ -33,10 +33,10 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 ## Agent 只读工具循环（A04.1）
 
-原生 DAG 的审校节点（`app/agents.py` 的 `CriticAgent`）在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/tool_loop.py`，不复制第二套参数校验或出口实现：
+原生 DAG 的审校节点（`app/review/agents.py` 的 `CriticAgent`）在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/review/tool_loop.py`，不复制第二套参数校验或出口实现：
 
 - 案件范围由服务端注入（`CriticAgent.case_id`）；模型给出的 `case_id` 只是惰性参数，工具执行器只接受服务端值并自行反查文档归属。
-- 只读白名单来自 `app/agent_tools.py`；轮次默认 3（上限 5）、工具调用默认 6（上限 10）、单条工具结果 12k 字符上限，超限返回结构化错误而不是继续放大。
+- 只读白名单来自 `app/review/agent_tools.py`；轮次默认 3（上限 5）、工具调用默认 6（上限 10）、单条工具结果 12k 字符上限，超限返回结构化错误而不是继续放大。
 - 工具结果、卷宗正文、历史消息与文件名一律作为不可信数据拼进消息；工具结果带 `data_notice`。
 - 端点拒绝 `tools` 参数时抛 `ToolsUnsupportedError`，审校节点显式回退到单次调用并在 `tools.reason` 记录 `endpoint_rejected_tools`。
 - 工具循环直接向模型端点发请求，因此**在宿主管控作用域内拒绝运行**（`tool_loop_unavailable_under_host_governance`），不绕过准入账本。
@@ -45,7 +45,7 @@ FTS5/BM25、法律词项和本地向量经 RRF 融合；生产检索随后按问
 
 ## 审校节点的一次性模型回退（A09.1）
 
-`app/model_router.py` 的策略被审校节点复用：主模型先答，**只有**主答案被 `validate_review_answer` 拒绝时才尝试一次回退模型；传输失败走既有失败路径（规则汇总 + 诊断），不再发起第二次模型调用。不引入"低置信"之类的新阈值。
+`app/llm/model_router.py` 的策略被审校节点复用：主模型先答，**只有**主答案被 `validate_review_answer` 拒绝时才尝试一次回退模型；传输失败走既有失败路径（规则汇总 + 诊断），不再发起第二次模型调用。不引入"低置信"之类的新阈值。
 
 - 回退使用同一案件范围、同一引用校验；回退答案不过校验就回到规则汇总，`rejected_llm_validation` 保留主答案的失败项。
 - 每次调用分别记账：主调用记 `critic`，回退记 `critic_fallback`，都带同一个 `run_id`；`model_route = {fallback, reason, model}` 进入 critic 输出、`agent_steps` 与最终结果。

@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db import connect, db_scope, init_db, now, transaction
 from app.main import app
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 ADMIN_TOKEN = "b" * 40
 

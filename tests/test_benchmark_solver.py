@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app import benchmark_solver as solver
+from app.benchmarks import solver
 
 CONFIG = {"url": "http://127.0.0.1:8000/v1", "model": "test-local"}
 

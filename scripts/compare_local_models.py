@@ -5,9 +5,9 @@ import argparse
 import json
 from pathlib import Path
 
-from app.db import db_scope, init_db, now, transaction
-from app.local_backends import LocalModels
-from app.model_comparison import compare_local_models, private_report
+from app.evaluation.model_comparison import compare_local_models, private_report
+from app.llm.local_backends import LocalModels
+from app.storage.db import db_scope, init_db, now, transaction
 
 QUESTIONS = (
     ("ordinary", 1, "请梳理固定回报审批的事实与证据。", "success"),

@@ -15,9 +15,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import review_jobs
-from app.db import _scoped_db, connect, db_scope, init_db, now, transaction
-from app.security import AccessMiddleware, Principal, _principal, current_principal
+from app.core.security import AccessMiddleware, Principal, _principal, current_principal
+from app.review import review_jobs
+from app.storage.db import _scoped_db, connect, db_scope, init_db, now, transaction
 
 
 class DeferredExecutor:
@@ -118,7 +118,7 @@ class ReviewJobTests(unittest.TestCase):
     def test_native_start_id_and_persisted_conversation(self):
         coordinator = FakeCoordinator(1)
         job_id = self.submit()
-        with patch("app.agents.create_coordinator", return_value=coordinator) as factory:
+        with patch("app.review.agents.create_coordinator", return_value=coordinator) as factory:
             self.executor.run_next()
         factory.assert_called_once_with(1, False)
         payload = self.status(job_id)
@@ -134,7 +134,7 @@ class ReviewJobTests(unittest.TestCase):
     def test_langgraph_start_tuple_return_preserved(self):
         coordinator = FakeCoordinator(1, "langgraph")
         job_id = self.submit(mode="langgraph")
-        with patch("app.langgraph_agents.create_langgraph_coordinator", return_value=coordinator) as factory:
+        with patch("app.review.langgraph_agents.create_langgraph_coordinator", return_value=coordinator) as factory:
             self.executor.run_next()
         factory.assert_called_once_with(1, False)
         self.assertIsInstance(coordinator.start_value, tuple)
@@ -147,11 +147,11 @@ class ReviewJobTests(unittest.TestCase):
         original_import = builtins.__import__
 
         def no_langgraph(name, *args, **kwargs):
-            if name == "langgraph_agents":
+            if name == "app.review.langgraph_agents":
                 raise ImportError("LangGraph unavailable")
             return original_import(name, *args, **kwargs)
 
-        with patch("app.agents.create_coordinator", return_value=coordinator), patch("builtins.__import__", no_langgraph):
+        with patch("app.review.agents.create_coordinator", return_value=coordinator), patch("builtins.__import__", no_langgraph):
             self.executor.run_next()
         self.assertEqual(self.status(job_id)["status"], "completed")
 
@@ -160,7 +160,7 @@ class ReviewJobTests(unittest.TestCase):
         original_import = builtins.__import__
 
         def no_langgraph(name, *args, **kwargs):
-            if name == "langgraph_agents":
+            if name == "app.review.langgraph_agents":
                 raise ImportError("LangGraph unavailable")
             return original_import(name, *args, **kwargs)
 
@@ -172,7 +172,7 @@ class ReviewJobTests(unittest.TestCase):
     def test_native_failure_retains_tracked_run_and_sanitizes_error(self):
         coordinator = FakeCoordinator(1, fail=True)
         job_id = self.submit()
-        with patch("app.agents.create_coordinator", return_value=coordinator):
+        with patch("app.review.agents.create_coordinator", return_value=coordinator):
             self.executor.run_next()
         payload = self.status(job_id)
         self.assertEqual(payload["status"], "failed")
@@ -203,7 +203,7 @@ class ReviewJobTests(unittest.TestCase):
         conversation_id = self.conversation_with_turn()
         coordinator = FakeCoordinator(1)
         job_id = self.submit(conversation_id=conversation_id)
-        with patch("app.agents.create_coordinator", return_value=coordinator):
+        with patch("app.review.agents.create_coordinator", return_value=coordinator):
             self.executor.run_next()
         payload = self.status(job_id)
         self.assertEqual(payload["status"], "completed", payload)
@@ -238,7 +238,7 @@ class ReviewJobTests(unittest.TestCase):
 
     def test_background_job_clarification_completes_without_agent_run(self):
         job_id = self.submit(question="它的付款期限呢？")
-        with patch("app.agents.create_coordinator", side_effect=AssertionError("must not run")):
+        with patch("app.review.agents.create_coordinator", side_effect=AssertionError("must not run")):
             self.executor.run_next()
         payload = self.status(job_id)
         self.assertEqual(payload["status"], "completed", payload)
@@ -277,7 +277,7 @@ class ReviewJobTests(unittest.TestCase):
     def test_canceled_queued_future_marks_interrupted_and_never_runs(self):
         job_id = self.submit()
         self.executor.items[0][0].cancel()
-        with patch("app.agents.create_coordinator", side_effect=AssertionError("must not run")):
+        with patch("app.review.agents.create_coordinator", side_effect=AssertionError("must not run")):
             self.executor.run_next()
         self.assertEqual(self.status(job_id)["status"], "interrupted")
         self.assert_all_slots_available()
@@ -285,7 +285,7 @@ class ReviewJobTests(unittest.TestCase):
     def test_restart_interrupts_queued_jobs_and_skips_late_executor(self):
         job_id = self.submit(mode="langgraph")
         init_db(seed=False, recover_runs=True)
-        with patch("app.langgraph_agents.create_langgraph_coordinator", side_effect=AssertionError("must not run")):
+        with patch("app.review.langgraph_agents.create_langgraph_coordinator", side_effect=AssertionError("must not run")):
             self.executor.run_next()
         payload = self.status(job_id)
         self.assertEqual(payload["status"], "interrupted")
@@ -299,7 +299,7 @@ class ReviewJobTests(unittest.TestCase):
         with transaction() as conn:
             conn.execute("UPDATE review_jobs SET run_id=? WHERE id=?", (run_id, job_id))
         init_db(seed=False, recover_runs=True)
-        with patch("app.agents.get_run_trace", return_value={"runtime": "langgraph", "resumable": True, "steps": []}):
+        with patch("app.review.agents.get_run_trace", return_value={"runtime": "langgraph", "resumable": True, "steps": []}):
             self.assertTrue(self.status(job_id)["resumable"])
         self.executor.items[0][0].cancel()
 
@@ -314,7 +314,7 @@ class ReviewJobTests(unittest.TestCase):
             self.assertEqual(response.status_code, 202, response.text)
             job_id = response.json()["job_id"]
         with tempfile.TemporaryDirectory(prefix="other-db-") as alternate:
-            with db_scope(Path(alternate) / "unused.db"), patch("app.agents.create_coordinator", return_value=coordinator):
+            with db_scope(Path(alternate) / "unused.db"), patch("app.review.agents.create_coordinator", return_value=coordinator):
                 self.executor.run_next()
                 self.assertFalse((Path(alternate) / "unused.db").exists())
         payload = self.status(job_id)
@@ -330,7 +330,7 @@ class ReviewJobTests(unittest.TestCase):
             with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": str(self.path.parent)}):
                 job_id = self.submit()
             with tempfile.TemporaryDirectory(prefix="wrong-env-db-") as alternate:
-                with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": alternate}), patch("app.agents.create_coordinator", return_value=coordinator):
+                with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": alternate}), patch("app.review.agents.create_coordinator", return_value=coordinator):
                     self.executor.run_next()
                     self.assertFalse((Path(alternate) / "law_review.db").exists())
         finally:

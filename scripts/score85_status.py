@@ -10,7 +10,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_reporting import atomic_json
+from app.benchmarks.reporting import atomic_json
 from scripts.benchmark_campaign import digest, read_rows
 
 

@@ -32,4 +32,4 @@ echo "✅ Redis 连接正常"
 echo ""
 
 # 启动 arq worker
-exec "${WORKER[@]}" app.tasks.WorkerSettings
+exec "${WORKER[@]}" app.documents.tasks.WorkerSettings

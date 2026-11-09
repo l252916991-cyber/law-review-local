@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from app import statutory_retrieval
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from app.statutory_retrieval import (
+from app.retrieval import statutory_retrieval
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
+from app.retrieval.statutory_retrieval import (
     corpus_status,
     parse_version,
     retrieve_statutory,

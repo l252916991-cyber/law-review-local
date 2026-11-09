@@ -13,8 +13,8 @@ from tests.support import IsolatedDatabaseTestCase
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-rag-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, now  # noqa: E402
-from app.rag import HybridRetriever, expand_retrieval_query, hashed_embedding, query_signals  # noqa: E402
+from app.retrieval.rag import HybridRetriever, expand_retrieval_query, hashed_embedding, query_signals  # noqa: E402
+from app.storage.db import connect, init_db, now  # noqa: E402
 
 
 def create_test_case_with_documents(conn):

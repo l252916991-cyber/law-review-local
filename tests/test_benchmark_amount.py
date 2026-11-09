@@ -1,6 +1,6 @@
 import pytest
 
-from app.benchmark_amount import crime_amount, format_amount
+from app.benchmarks.amount import crime_amount, format_amount
 
 
 @pytest.mark.parametrize(("text", "expected", "method"), [

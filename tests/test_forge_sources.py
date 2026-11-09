@@ -10,11 +10,11 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-from app.db import connect, init_db, transaction
-from app.forge_bridge import run_framework
-from app.forge_readonly import ReadonlyCaseSession
-from app.forge_sources import statute_source, verify_statutes
-from app.host_ports import capture_case_rows
+from app.integration.forge_bridge import run_framework
+from app.integration.forge_readonly import ReadonlyCaseSession
+from app.integration.forge_sources import statute_source, verify_statutes
+from app.integration.host_ports import capture_case_rows
+from app.storage.db import connect, init_db, transaction
 from tests.support import IsolatedDatabaseTestCase
 from tests.test_forge_readonly import dump_source, prepare, request, write_corpus
 
@@ -61,7 +61,7 @@ class StatuteIntegrityTests(unittest.TestCase):
 
 
 class SourceBoundaryTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):

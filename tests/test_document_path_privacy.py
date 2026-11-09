@@ -46,7 +46,7 @@ class DocumentPathPrivacyTests(IsolatedDatabaseTestCase):
         self.assertNotIn(self.data_dir, response.text)
 
     def stored_path(self) -> Path:
-        from app.db import connect
+        from app.storage.db import connect
 
         with closing(connect()) as conn:
             return Path(conn.execute("SELECT stored_path FROM documents WHERE id=?", (self.document_id,)).fetchone()[0])

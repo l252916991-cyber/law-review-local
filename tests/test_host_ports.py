@@ -19,9 +19,8 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-host-ports-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.agent_tools import _search as legacy_search  # noqa: E402
-from app.db import connect, init_db, now, transaction  # noqa: E402
-from app.host_ports import (  # noqa: E402
+from app.core.security import Principal, _principal  # noqa: E402
+from app.integration.host_ports import (  # noqa: E402
     LocalHostReadPort,
     SnapshotChangedError,
     capture_case_rows,
@@ -29,10 +28,7 @@ from app.host_ports import (  # noqa: E402
     memory_record_context,
     search_hit_context,
 )
-from app.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA  # noqa: E402
-from app.legal_corpus import LegalCorpus, split_articles  # noqa: E402
-from app.rag import hashed_embedding  # noqa: E402
-from app.runtime_ports import (  # noqa: E402  # noqa: E402
+from app.integration.runtime_ports import (  # noqa: E402  # noqa: E402
     CATALOG_LIMIT_MAX,
     MAX_QUERY_CHARS,
     SEARCH_LIMIT_MAX,
@@ -45,7 +41,11 @@ from app.runtime_ports import (  # noqa: E402  # noqa: E402
     RunScope,
     UnsupportedCapabilityError,
 )
-from app.security import Principal, _principal  # noqa: E402
+from app.retrieval.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA  # noqa: E402
+from app.retrieval.legal_corpus import LegalCorpus, split_articles  # noqa: E402
+from app.retrieval.rag import hashed_embedding  # noqa: E402
+from app.review.agent_tools import _search as legacy_search  # noqa: E402
+from app.storage.db import connect, init_db, now, transaction  # noqa: E402
 from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 QUERY = "固定回报审批"
@@ -80,7 +80,7 @@ def write_corpus(directory: Path, text: str = "当前受控合成原文。"):
 class HostReadPortTestCase(IsolatedDatabaseTestCase):
     """Shared helpers; concrete classes declare their own seeded setUpClass
     because tests/support.py wraps only the class-dict setUpClass."""
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
 
     @classmethod
@@ -180,7 +180,7 @@ class SearchReadTests(HostReadPortTestCase):
         port = self.port()
         # Compare the full metrics contract, with elapsed time controlled rather
         # than assuming two real executions take the same milliseconds.
-        with patch("app.rag.time.perf_counter", return_value=1.0):
+        with patch("app.retrieval.rag.time.perf_counter", return_value=1.0):
             result = port.search(RunScope(1), QUERY, limit=4, use_remote_embeddings=False)
             legacy_items, legacy_metrics = legacy_search(1, {"query": QUERY, "limit": 4}, False)
         self.assertEqual([search_hit_context(hit) for hit in result.hits], legacy_items)

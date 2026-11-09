@@ -40,7 +40,7 @@
 | 生成 | OpenAI 兼容本地端点（`/v1/chat/completions`），仅回环端点，禁重定向 |
 | 前端 | Next.js 静态构建，由 FastAPI 托管，Playwright 端到端；核心实体类型由后端 OpenAPI 生成 |
 | 质量 | pytest + 覆盖率门禁、ruff、mypy（脚本）、离线可复算的评分与盲审包 |
-| 实验 | 三组 A/B/C 隔离驱动（`app/collaboration_ablation.py`），逐题冻结提示与账本 |
+| 实验 | 三组 A/B/C 隔离驱动（`app/evaluation/collaboration_ablation.py`），逐题冻结提示与账本 |
 
 ## 4. 运行步骤（源码路径，已实测）
 

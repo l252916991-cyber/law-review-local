@@ -173,6 +173,7 @@ def run(output: Path) -> dict[str, Any]:
         LANGSMITH_TRACING="false",
         LANGCHAIN_TRACING_V2="false",
     )
+    # Runs inside the historical checkout (BASELINE), so it imports the old flat module layout.
     seed = (
         "from pathlib import Path; import os; from app.db import init_db; init_db(seed=True); "
         "from app.services import index_upload; "
@@ -192,7 +193,7 @@ def run(output: Path) -> dict[str, Any]:
     restore(output / "before-snapshot", output / "migration-copy")
     with server(output / "migration-copy", env, output / "migration-server.log") as base:
         migrated = summary(output / "migration-copy")
-        from app.db import SCHEMA_VERSION
+        from app.storage.db import SCHEMA_VERSION
 
         assert migrated["schema"] == SCHEMA_VERSION
         assert all(migrated[key] == before[key] for key in before if key != "schema")
@@ -235,7 +236,7 @@ def run(output: Path) -> dict[str, Any]:
         assert package_contents(package, report_id, content_hash, version_id) == delivered
         (output / "restored-formal-export.zip").write_bytes(package)
     restore(output / "before-snapshot", output / "rollback-copy")
-    command(
+    command(  # historical checkout: old flat module layout
         [sys.executable, "-c", "from app.db import init_db; init_db(seed=False)"],
         baseline,
         dict(env, LAW_REVIEW_DATA_DIR=str(output / "rollback-copy")),

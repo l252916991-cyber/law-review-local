@@ -20,7 +20,7 @@ from scripts.stub_model import CHAT_MODEL, EMBEDDING_MODEL, FALLBACK_MODEL, Stub
 
 def seed_failure(directory: Path) -> None:
     """One explicit failed node, for trace UI acceptance rather than model quality."""
-    from app.db import db_scope, init_db, now, transaction
+    from app.storage.db import db_scope, init_db, now, transaction
 
     with db_scope(directory / "law_review.db"):
         init_db(seed=True)
@@ -39,8 +39,8 @@ def seed_failure(directory: Path) -> None:
             )
         # Real checkpoints interrupted before the memory commit, one per
         # browser project so a successful resume never consumes another test.
-        from app.langgraph_agents import LangGraphRunError, ReviewState, create_langgraph_coordinator
-        from app.security import Principal, _principal
+        from app.core.security import Principal, _principal
+        from app.review.langgraph_agents import LangGraphRunError, ReviewState, create_langgraph_coordinator
 
         def interrupt_memory(node: str, _state: ReviewState) -> None:
             if node == "memory":

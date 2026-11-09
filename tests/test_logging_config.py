@@ -6,7 +6,7 @@ import json
 import logging
 import unittest
 
-from app.logger import LogContext, StructuredFormatter, get_logger, setup_logging
+from app.core.logger import LogContext, StructuredFormatter, get_logger, setup_logging
 
 
 class LoggingConfigTests(unittest.TestCase):

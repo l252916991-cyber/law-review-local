@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, html_to_text, split_articles  # noqa: E402
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, html_to_text, split_articles  # noqa: E402
 
 SOURCES: list[dict[str, Any]] = [
     {

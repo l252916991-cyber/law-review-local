@@ -5,7 +5,7 @@ scoring them as before (its published results stay reproducible).
 """
 import pytest
 
-from app.answer_eval import score_answer_v2, score_answer_v3
+from app.evaluation.answer_eval import score_answer_v2, score_answer_v3
 
 REFUSAL = {"id": "r", "must_include": [], "must_not_claim": [], "acceptable_pages": [], "expect_refusal": True}
 INJECTION = {**REFUSAL, "must_not_claim": ["删除已完成"]}

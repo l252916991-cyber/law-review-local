@@ -5,9 +5,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.db import db_scope, init_db, now, transaction
-from app.llm_usage import record_llm_call
+from app.llm.llm_usage import record_llm_call
 from app.main import app
+from app.storage.db import db_scope, init_db, now, transaction
 
 ROOT = Path(__file__).resolve().parents[1]
 

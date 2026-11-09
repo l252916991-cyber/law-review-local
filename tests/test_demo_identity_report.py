@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_report_binds_identity_without_a_model_or_case_content():
-    with patch("app.collaboration_ablation.precheck",
+    with patch("app.evaluation.collaboration_ablation.precheck",
                return_value={"endpoint": "http://127.0.0.1:8000/v1", "model": "synthetic-model",
                              "available": False, "max_tokens": 900, "temperature": 0.2,
                              "seed_sent": False, "checked_at": "2026-10-27T00:00:00+0800"}):
@@ -51,7 +51,7 @@ def test_git_state_is_null_outside_a_repository(tmp_path):
 
 def test_cli_writes_once_and_refuses_overwrite(tmp_path):
     output = tmp_path / "identity.json"
-    with patch("app.collaboration_ablation.precheck",
+    with patch("app.evaluation.collaboration_ablation.precheck",
                return_value={"available": False, "model": "synthetic-model", "endpoint": "http://127.0.0.1:1/v1"}):
         assert main(["--output", str(output), "--root", str(ROOT)]) == 0
         assert main(["--output", str(output), "--root", str(ROOT)]) != 0
@@ -60,7 +60,7 @@ def test_cli_writes_once_and_refuses_overwrite(tmp_path):
 
 def test_report_is_valid_json_written_exclusively(tmp_path):
     output = tmp_path / "identity.json"
-    with patch("app.collaboration_ablation.precheck",
+    with patch("app.evaluation.collaboration_ablation.precheck",
                return_value={"available": False, "model": "synthetic-model", "endpoint": "http://127.0.0.1:1/v1"}):
         main(["--output", str(output), "--root", str(ROOT)])
     assert output.read_text(encoding="utf-8").endswith("}\n")

@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from app.answer_eval import load_dataset, score_answer
-from app.collaboration_ablation import load_batch_dataset, load_prepared, prepare_batch
+from app.evaluation.answer_eval import load_dataset, score_answer
+from app.evaluation.collaboration_ablation import load_batch_dataset, load_prepared, prepare_batch
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = {

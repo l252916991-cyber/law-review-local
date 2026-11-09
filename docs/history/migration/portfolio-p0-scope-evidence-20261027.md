@@ -7,7 +7,7 @@
 
 ## 1. 代码与算法身份
 
-`app/model_comparison.py` 的固定摘要门禁在本机运行通过：`schema_version=2`、`revision=specialist-review-v2`、`source_commit=31a811c92acae30caf82c9c5109ce812bd99bb04`，七个算法文件摘要与登记值逐字节一致。
+`app/evaluation/model_comparison.py` 的固定摘要门禁在本机运行通过：`schema_version=2`、`revision=specialist-review-v2`、`source_commit=31a811c92acae30caf82c9c5109ce812bd99bb04`，七个算法文件摘要与登记值逐字节一致。
 
 | 算法文件 | SHA-256（与登记值一致） |
 |---|---|

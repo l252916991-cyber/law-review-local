@@ -4,8 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.corpus_audit import audit, classify, dedup_digest, heading_leak_articles
-from app.legal_corpus import SCHEMA_VERSION, split_articles
+from app.benchmarks.corpus_audit import audit, classify, dedup_digest, heading_leak_articles
+from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
 from scripts.audit_corpus_conflicts import main as audit_main
 
 

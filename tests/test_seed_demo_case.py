@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app.bank_transactions import parse_csv
+from app.documents.bank_transactions import parse_csv
 from scripts.seed_demo_case import _bank_transactions, _documents, _evidence, seed
 
 #: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
@@ -47,7 +47,7 @@ class DemoCaseSeedTests(unittest.TestCase):
             self._seed(directory)
             # Seeding twice creates two independent demo cases; it never deletes.
             with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": directory}):
-                from app.db import connect
+                from app.storage.db import connect
 
                 with connect() as conn:
                     cases = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
@@ -93,7 +93,7 @@ class DemoCaseSeedTests(unittest.TestCase):
     def test_seed_emits_case_specific_ground_truth(self) -> None:
         import json
 
-        from app.evaluation import _case_ground_truth
+        from app.evaluation.rag_eval import _case_ground_truth
 
         with tempfile.TemporaryDirectory(prefix="lexvault-demo-gt-") as directory:
             case_id = self._seed(directory)["case"]["id"]

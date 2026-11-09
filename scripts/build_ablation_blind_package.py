@@ -12,8 +12,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.ablation_review import COLLECTION_MODES, MIN_SAMPLE, build_package  # noqa: E402
-from app.collaboration_ablation import load_batch_dataset  # noqa: E402
+from app.evaluation.ablation_review import COLLECTION_MODES, MIN_SAMPLE, build_package  # noqa: E402
+from app.evaluation.collaboration_ablation import load_batch_dataset  # noqa: E402
 
 EXIT_PROTOCOL = 2
 

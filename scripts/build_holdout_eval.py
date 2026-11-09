@@ -58,7 +58,7 @@ def load_cases(path: Path = DIRECTORY / "cases.json") -> dict[str, Any]:
 
 
 def build(fixture: dict[str, Any]) -> dict[str, Any]:
-    from app.answer_eval import validate_dataset
+    from app.evaluation.answer_eval import validate_dataset
 
     sources: list[dict[str, Any]] = []
     for case in fixture["cases"]:

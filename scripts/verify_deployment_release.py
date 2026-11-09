@@ -11,7 +11,7 @@ Steps:
 3. Verify the vendored framework wheel's sha256 against vendor/FRAMEWORK_BINDING.json.
 4. Create an isolated venv, install the wheel from the extracted tree.
 5. Smoke: import forgeharness + SDK surface from the installed wheel, and
-   exercise app/runtime_ports.py from the extracted tree (stdlib-only, so it
+   exercise app/integration/runtime_ports.py from the extracted tree (stdlib-only, so it
    runs on the framework venv without LexVault dependencies).
 6. Install a fresh host venv from the extracted hashed requirements.
 7. Run readonly, isolated host, and candidate success/refusal flows from the
@@ -55,7 +55,7 @@ for name in ("Harness", "RunKernel", "Orchestrator", "RunContext", "RunResult",
 from forgeharness.applications.legal.lexvault import (
     BundleCitationVerifier, CaseBundle, LexVaultDagOrchestrator, bundle_from_lexvault_db,
 )
-from app.runtime_ports import (
+from app.integration.runtime_ports import (
     RUNTIME_PROTOCOL_VERSION, ActorIdentity, ModelConfig, RunRequest, RunScope,
     compute_request_digest, new_request_id,
 )
@@ -88,11 +88,11 @@ os.environ.update({"LAW_REVIEW_DATA_DIR": sys.argv[3], "LAW_REVIEW_AUTH_MODE": "
                    "LAW_REVIEW_LEGAL_CORPUS_DIR": "", "LAW_REVIEW_LLM_URL": "http://127.0.0.1:1/v1"})
 import app
 assert Path(app.__file__).resolve().is_relative_to(release.resolve())
-from app.db import connect, init_db
-from app.forge_bridge import run_framework
-from app.forge_readonly import ReadonlyCaseSession
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import ModelConfig, RunRequest, RunScope, new_request_id
+from app.storage.db import connect, init_db
+from app.integration.forge_bridge import run_framework
+from app.integration.forge_readonly import ReadonlyCaseSession
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import ModelConfig, RunRequest, RunScope, new_request_id
 init_db(seed=True)
 with closing(connect()) as conn:
     before = tuple(conn.iterdump())
@@ -121,11 +121,11 @@ sys.path.insert(0, str(release))
 os.environ.update({"LAW_REVIEW_AUTH_MODE": "local", "LAW_REVIEW_DATA_DIR": sys.argv[3]})
 import app
 assert Path(app.__file__).resolve().is_relative_to(release.resolve())
-from app.db import connect, db_scope, now, transaction
-from app.host_writes import create_isolated_database, ISOLATED_RUNTIME
-from app.host_integration import IsolatedHostIntegration
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import RunRequest, RunScope, ModelConfig
+from app.storage.db import connect, db_scope, now, transaction
+from app.integration.host_writes import create_isolated_database, ISOLATED_RUNTIME
+from app.integration.host_integration import IsolatedHostIntegration
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import RunRequest, RunScope, ModelConfig
 path = Path(sys.argv[3]) / 'host.sqlite'
 if not path.exists():
     create_isolated_database(path)
@@ -161,13 +161,13 @@ os.environ.update({'LAW_REVIEW_DATA_DIR':str(root), 'LAW_REVIEW_AUTH_MODE':'loca
                    'LAW_REVIEW_LEGAL_CORPUS_DIR':'', 'LAW_REVIEW_LLM_URL':'http://127.0.0.1:1/v1'})
 import app
 assert Path(app.__file__).resolve().is_relative_to(release.resolve())
-from app.answerability import policy_identity
-from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
-from app.db import connect, db_scope, transaction, now
-from app.host_writes import digest
-from app.local_backends import LocalModels
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import ModelConfig, RunRequest, RunScope
+from app.review.answerability import policy_identity
+from app.integration.candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from app.storage.db import connect, db_scope, transaction, now
+from app.integration.host_writes import digest
+from app.llm.local_backends import LocalModels
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import ModelConfig, RunRequest, RunScope
 config = root / 'deployment.json'
 if not config.exists():
     deployment = CandidateDeployment.create_new(root / 'host.sqlite')

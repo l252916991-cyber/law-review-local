@@ -8,10 +8,9 @@ from dataclasses import replace
 
 import pytest
 
-from app import db
-from app.db import connect, db_scope, init_db, now, transaction
-from app.host_writes import LocalHostWritePort, canonical, create_isolated_database
-from app.runtime_ports import (
+from app.core.security import Principal, _principal
+from app.integration.host_writes import LocalHostWritePort, canonical, create_isolated_database
+from app.integration.runtime_ports import (
     AccessDeniedError,
     ContractValidationError,
     RequestConflictError,
@@ -19,7 +18,8 @@ from app.runtime_ports import (
     WriteAction,
     WriteRequest,
 )
-from app.security import Principal, _principal
+from app.storage import db
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 @pytest.fixture
@@ -223,7 +223,7 @@ def test_each_action_conflict_and_extra_field_rejected(isolated, action):
 
 
 def test_draft_is_never_recalled_as_validated_fact(isolated):
-    from app.rag import recall_memories
+    from app.retrieval.rag import recall_memories
     port = LocalHostWritePort(RunScope(1))
     run_id = run(port)
     port.execute(request(port, WriteAction.MEMORY_DRAFT, payloads(run_id)[WriteAction.MEMORY_DRAFT]))

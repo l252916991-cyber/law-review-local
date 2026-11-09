@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.lawbench import TASK_NAMES, load_task
+from app.benchmarks.lawbench import TASK_NAMES, load_task
 from scripts import benchmark_campaign as campaign
 
 
@@ -56,10 +56,10 @@ def test_campaign_frozen_nonoverlapping_splits_and_no_gold_input(tmp_path):
 
 def test_campaign_resume_preserves_completed_calls_and_rejects_changes(tmp_path):
     directory = make_campaign(tmp_path)
-    with patch("app.benchmark_solver.solve", side_effect=[fake_solve("1-1", "i", "q", {}), KeyboardInterrupt()]):
+    with patch("app.benchmarks.solver.solve", side_effect=[fake_solve("1-1", "i", "q", {}), KeyboardInterrupt()]):
         with pytest.raises(KeyboardInterrupt):
             campaign.run(directory, "test", "qwythos-direct", "development", 1)
-    with patch("app.benchmark_solver.solve", side_effect=fake_solve) as solve:
+    with patch("app.benchmarks.solver.solve", side_effect=fake_solve) as solve:
         result = campaign.run(directory, "test", "qwythos-direct", "development", 1, True)
         assert solve.call_count == 19
     assert result["total"] == 20 and result["status"] == "completed"
@@ -76,13 +76,13 @@ def test_campaign_does_not_zero_nonempty_truncation_or_skip_technical_errors(tmp
     def truncated(*args):
         return {**fake_solve(*args), "error": "ValueError: truncated_response: budget", "finish_reason": "length"}
 
-    with patch("app.benchmark_solver.solve", side_effect=truncated):
+    with patch("app.benchmarks.solver.solve", side_effect=truncated):
         result = campaign.run(directory, "truncated", "qwythos-direct", "development", 1)
     assert result["total"] == result["truncated"] == 20
     rows = campaign.read_rows(directory / "runs/truncated/detailed_results.jsonl")
     assert all(row["output_warning"] for row in rows)
     assert all(row["score"] == 1 for row in rows if row["task"] == "3-6")
-    with patch("app.benchmark_solver.solve", return_value={**fake_solve("x", "i", "q", {}), "prediction": "", "error": "ValueError: inference failed"}):
+    with patch("app.benchmarks.solver.solve", return_value={**fake_solve("x", "i", "q", {}), "prediction": "", "error": "ValueError: inference failed"}):
         failed = campaign.run(directory, "failed", "qwythos-direct", "development", 1)
     assert failed["total"] == failed["failed"] == 20 and failed["score_100"] == 0
 
@@ -91,7 +91,7 @@ def test_campaign_does_not_zero_nonempty_truncation_or_skip_technical_errors(tmp
 def test_campaign_aborts_after_local_server_busy_signal(tmp_path, error):
     directory = make_campaign(tmp_path)
     failed = {**fake_solve("x", "i", "q", {}), "prediction": "", "error": error}
-    with patch("app.benchmark_solver.solve", return_value=failed) as solve:
+    with patch("app.benchmarks.solver.solve", return_value=failed) as solve:
         with pytest.raises(RuntimeError, match="still occupy"):
             campaign.run(directory, "busy", "qwythos-direct", "development", 1)
     assert solve.call_count == 1
@@ -100,7 +100,7 @@ def test_campaign_aborts_after_local_server_busy_signal(tmp_path, error):
 
 
 def test_verifier_recomputes_requests_and_detects_changed_final_answer(tmp_path):
-    from app import benchmark_solver
+    from app.benchmarks import solver as benchmark_solver
     from scripts.verify_campaign import verify
 
     directory = make_campaign(tmp_path)

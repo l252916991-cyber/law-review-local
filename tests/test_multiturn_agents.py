@@ -14,7 +14,7 @@ from tests.test_multiturn_chat import append_turn, citation, create_case_with_do
 class NativeAgentContextTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=False)
 
@@ -27,15 +27,15 @@ class NativeAgentContextTest(IsolatedDatabaseTestCase):
         )
 
     def test_agent_uses_resolved_object_and_persists_run_snapshot(self):
-        from app.agents import create_coordinator
-        from app.context import prepare_turn
-        from app.db import connect
+        from app.review.agents import create_coordinator
+        from app.review.context import prepare_turn
+        from app.storage.db import connect
 
         context = prepare_turn(
             self.case_id, "它的付款期限呢？", self.conversation_id,
             user_name="测试律师", use_llm=False,
         )
-        with patch("app.agents.recall_memories", return_value=[]):
+        with patch("app.review.agents.recall_memories", return_value=[]):
             result = create_coordinator(self.case_id, False).process_query(
                 "它的付款期限呢？", "测试律师", False, persist_memory=False, context=context,
             )
@@ -54,16 +54,16 @@ class NativeAgentContextTest(IsolatedDatabaseTestCase):
         self.assertEqual(identity["history"]["digest"], result["context"]["history"]["digest"])
 
     def test_agent_passes_history_and_object_note_to_critic_only(self):
-        from app.agents import create_coordinator
-        from app.context import prepare_turn
+        from app.review.agents import create_coordinator
+        from app.review.context import prepare_turn
 
         context = prepare_turn(
             self.case_id, "它的付款期限呢？", self.conversation_id,
             user_name="测试律师", use_llm=True,
         )
         answer = "付款期限为验收合格后60日内[资料1]。请律师复核原文与上述结论。"
-        with patch("app.agents.recall_memories", return_value=[]), \
-                patch("app.agents.call_local_llm", return_value=answer) as model:
+        with patch("app.review.agents.recall_memories", return_value=[]), \
+                patch("app.review.agents.call_local_llm", return_value=answer) as model:
             result = create_coordinator(self.case_id, False).process_query(
                 "它的付款期限呢？", "测试律师", True, persist_memory=False, context=context,
             )
@@ -78,9 +78,9 @@ class NativeAgentContextTest(IsolatedDatabaseTestCase):
         self.assertTrue(model.call_args.args[0].startswith("它的付款期限呢？"))
 
     def test_agent_refuses_to_run_when_clarification_is_needed(self):
-        from app.agents import create_coordinator
-        from app.context import prepare_turn
-        from app.db import connect
+        from app.review.agents import create_coordinator
+        from app.review.context import prepare_turn
+        from app.storage.db import connect
 
         fresh = make_conversation(self.case_id)
         context = prepare_turn(self.case_id, "它的付款期限呢？", fresh)
@@ -100,8 +100,8 @@ class AgentApiTest(IsolatedDatabaseTestCase):
     def setUpClass(cls):
         from fastapi.testclient import TestClient
 
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         init_db(seed=False)
         cls.client_context = TestClient(app)
@@ -132,7 +132,7 @@ class AgentApiTest(IsolatedDatabaseTestCase):
         )
 
     def messages(self, conversation_id):
-        from app.db import connect
+        from app.storage.db import connect
 
         with closing(connect()) as conn:
             return conn.execute(
@@ -141,7 +141,7 @@ class AgentApiTest(IsolatedDatabaseTestCase):
             ).fetchall()
 
     def test_agent_follow_up_binds_conversation_and_records_turn(self):
-        from app.db import connect
+        from app.storage.db import connect
 
         native = self.agent("它的付款期限呢？", self.conversation_id)
         self.assertEqual(native.status_code, 200, native.text)
@@ -166,14 +166,14 @@ class AgentApiTest(IsolatedDatabaseTestCase):
         self.assertTrue(all(json.loads(row["context_json"])["question"] for row in runs))
 
     def test_unknown_and_archived_conversations_are_rejected_before_run(self):
-        from app.db import connect
+        from app.storage.db import connect
 
         with closing(connect()) as conn:
             before = conn.execute("SELECT COUNT(*) FROM agent_runs").fetchone()[0]
         unknown = self.agent("它的付款期限呢？", 999999)
         self.assertEqual(unknown.status_code, 404, unknown.text)
         archived = make_conversation(self.case_id)
-        from app.db import now, transaction
+        from app.storage.db import now, transaction
 
         with transaction() as conn:
             conn.execute(
@@ -187,7 +187,7 @@ class AgentApiTest(IsolatedDatabaseTestCase):
         self.assertEqual(after, before)
 
     def test_ambiguous_agent_follow_up_returns_clarification_without_run(self):
-        from app.db import connect
+        from app.storage.db import connect
 
         first = self.client.post(
             f"/api/cases/{self.case_id}/chat",
@@ -217,8 +217,8 @@ class ResumeContextTest(IsolatedDatabaseTestCase):
     def setUpClass(cls):
         from fastapi.testclient import TestClient
 
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         init_db(seed=False)
         cls.client_context = TestClient(app)
@@ -237,7 +237,7 @@ class ResumeContextTest(IsolatedDatabaseTestCase):
         )
 
     def fail_run(self, conversation_id):
-        from app.langgraph_agents import create_langgraph_coordinator
+        from app.review.langgraph_agents import create_langgraph_coordinator
 
         def inject(node, state):
             if node == "memory":
@@ -247,7 +247,7 @@ class ResumeContextTest(IsolatedDatabaseTestCase):
             self.case_id, False, failure_injector=inject,
             checkpoint_path=Path(os.environ["LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB"]),
         )
-        with patch("app.langgraph_agents.create_langgraph_coordinator", return_value=coordinator):
+        with patch("app.review.langgraph_agents.create_langgraph_coordinator", return_value=coordinator):
             response = self.client.post(
                 f"/api/cases/{self.case_id}/agent-chat",
                 json={
@@ -276,7 +276,7 @@ class ResumeContextTest(IsolatedDatabaseTestCase):
         self.assertEqual(payload["context"]["restored"], True)
         self.assertEqual(payload["context"]["resolution"]["object_document_ids"], [self.ids["jia_contract"]])
         self.assertEqual(payload["resume_count"], 1)
-        from app.db import connect
+        from app.storage.db import connect
 
         with closing(connect()) as conn:
             saved = conn.execute(
@@ -285,7 +285,7 @@ class ResumeContextTest(IsolatedDatabaseTestCase):
         self.assertEqual(saved, 1)
 
     def test_resume_is_refused_after_conversation_is_archived(self):
-        from app.db import now, transaction
+        from app.storage.db import now, transaction
 
         run_id = self.fail_run(self.conversation_id)
         with transaction() as conn:

@@ -15,11 +15,11 @@
 
 ## 1. 正向优化清单
 
-### 1.1 评分器修复（app/benchmark_metrics.py）
+### 1.1 评分器修复（app/benchmarks/metrics.py）
 
-1. **拒答判定逻辑修复（P0）**：原 `if not actual: abstained=True` 把参考答案解析结果为空当成"模型拒答"，45.23% 的有效答案被误标为拒答（1,525 个完整答案被丢弃）。修复为 `abstained = not prediction`，位置 `app/benchmark_metrics.py:255`。1,000 题重评分验证：拒答率 45.23% → 0%。（来源：FINAL_PROJECT_SUMMARY.md、PROJECT_COMPLETION_SUMMARY.md；诊断脚本 check_abstain_logic.py）
-2. **答案提取规则改进（P1）**：`extract_option_set()` 从 3 种格式扩展到 7 种（"正确答案是：**B**"、"选B"、"B项正确"、加粗、行首单独字母等，过滤无效字符）；`extract_labels()` 升级为三级匹配（精确 → 去空格/标点模糊 → jieba 关键词 60% 阈值）。3,372 题重评分：**平均分 0.2096 → 0.3050（+45.5%）**，满分题 11.4% → 20.6%（+81.1%），高分题(>0.5) 18.8% → 29.5%，低分题(<0.1) 62.5% → 54.2%，383 题得分提升（11.4%）。任务级：2-3 司法要素 0.0487→0.2382（+388.8%）、2-2 争议焦点 0.2620→0.6180（+135.9%）、1-2 选择题 0.3540→0.4800（+35.6%）、2-4 0.0940→0.1180（+25.5%）。位置 `app/benchmark_metrics.py:102-195`。（来源：PROJECT_COMPLETION_SUMMARY.md、rescore_with_improved_extraction.py）
-3. **多选截断修复（P1）**：正则 `(?:选|应选|答)\s*([{allowed}])` 只匹配单字母，gold='AC'、pred='AC' 只提取 'A' 判 0 分（对答判错），gold='A'、pred='AC' 判 1.0（错答判对）。改为 `([{allowed}]+)`，位置 `app/benchmark_metrics.py:125`。影响约 150 题（任务 1-2/2-8/3-6）。（来源：SECURITY_AND_BUG_REPORT.md 问题 3、FIXES_COMPLETED.md）
+1. **拒答判定逻辑修复（P0）**：原 `if not actual: abstained=True` 把参考答案解析结果为空当成"模型拒答"，45.23% 的有效答案被误标为拒答（1,525 个完整答案被丢弃）。修复为 `abstained = not prediction`，位置 `app/benchmarks/metrics.py:255`。1,000 题重评分验证：拒答率 45.23% → 0%。（来源：FINAL_PROJECT_SUMMARY.md、PROJECT_COMPLETION_SUMMARY.md；诊断脚本 check_abstain_logic.py）
+2. **答案提取规则改进（P1）**：`extract_option_set()` 从 3 种格式扩展到 7 种（"正确答案是：**B**"、"选B"、"B项正确"、加粗、行首单独字母等，过滤无效字符）；`extract_labels()` 升级为三级匹配（精确 → 去空格/标点模糊 → jieba 关键词 60% 阈值）。3,372 题重评分：**平均分 0.2096 → 0.3050（+45.5%）**，满分题 11.4% → 20.6%（+81.1%），高分题(>0.5) 18.8% → 29.5%，低分题(<0.1) 62.5% → 54.2%，383 题得分提升（11.4%）。任务级：2-3 司法要素 0.0487→0.2382（+388.8%）、2-2 争议焦点 0.2620→0.6180（+135.9%）、1-2 选择题 0.3540→0.4800（+35.6%）、2-4 0.0940→0.1180（+25.5%）。位置 `app/benchmarks/metrics.py:102-195`。（来源：PROJECT_COMPLETION_SUMMARY.md、rescore_with_improved_extraction.py）
+3. **多选截断修复（P1）**：正则 `(?:选|应选|答)\s*([{allowed}])` 只匹配单字母，gold='AC'、pred='AC' 只提取 'A' 判 0 分（对答判错），gold='A'、pred='AC' 判 1.0（错答判对）。改为 `([{allowed}]+)`，位置 `app/benchmarks/metrics.py:125`。影响约 150 题（任务 1-2/2-8/3-6）。（来源：SECURITY_AND_BUG_REPORT.md 问题 3、FIXES_COMPLETED.md）
 4. **千分位陷阱修复（3-7 犯罪金额）**："8,500元" 被拆为 [8.0, 500.0] 导致误判；新增 `extract_crime_amount()`：先去 `,`/`，`，再匹配 `([\d.]+)\s*(万|千)?元` 做单位换算。验证 `score('8,500元','8500元')=1.0`。位置约 `benchmark_metrics.py:344-365`。（来源：SECURITY_AND_BUG_REPORT.md 问题 5、quick_fixes.py）
 5. **中文数字刑期修复（3-4/3-5）**："三年六个月" 无法解析导致拒答（3-4 拒答率曾达 49.8%）。引入 `cn2an`，`extract_months()` 支持中文数字 `年*12+月` 换算。验证：`extract_months('三年六个月')=42`。位置约 `benchmark_metrics.py:320-342`。（来源：SECURITY_AND_BUG_REPORT.md 问题 6、FIXES_COMPLETED.md）
 6. **新增 `score_prediction()` 统一评分入口**：解决双入口、新数据集多处改代码的问题，含 dataset 路由与 exact_match 兜底。（来源：SECURITY_AND_BUG_REPORT.md 问题 10）
@@ -59,7 +59,7 @@
 
 ### 1.6 LangGraph 双运行时（架构级新增）
 
-28. **LangGraphCoordinator 新增**：`app/langgraph_agents.py`（623 行）、`app/runtime_comparison.py`、`compare_agent_runtimes.py`、`tests/test_04_langgraph_runtime.py`（328 行）。与原生 Coordinator 共享全部业务 Agent，只对比调度与持久化；明确不引入 LangChain Agent/ReAct/LangSmith/云服务。（来源：ARCHITECTURE.md）
+28. **LangGraphCoordinator 新增**：`app/review/langgraph_agents.py`（623 行）、`app/integration/runtime_comparison.py`、`compare_agent_runtimes.py`、`tests/test_04_langgraph_runtime.py`（328 行）。与原生 Coordinator 共享全部业务 Agent，只对比调度与持久化；明确不引入 LangChain Agent/ReAct/LangSmith/云服务。（来源：ARCHITECTURE.md）
 29. **失败恢复能力**：`POST /api/agent-runs/{run_id}/resume`；恢复仅重跑失败节点及下游；恢复后 Critic/LLM 调用次数不重复。幂等设计：步骤按 `(run_id, node_name)` UPSERT、记忆按 `source_run_id` 去重；`agent_runs` 新增 runtime/checkpoint_thread_id/resume_count 字段。（来源：ARCHITECTURE.md、LANGGRAPH_COMPARISON_REPORT.md）
 30. **LangGraph 测试**：新增测试 30/30 通过；Playwright 验证单跑、双版本比较、故障恢复、390px 布局。（来源：LANGGRAPH_COMPARISON_REPORT.md）
 31. **API/前端集成**：`agent-chat` 支持 `mode=multi_agent`（默认）与 `mode=langgraph`；`agent-compare` 顺序执行并关闭长期记忆写入。（来源：ARCHITECTURE.md）

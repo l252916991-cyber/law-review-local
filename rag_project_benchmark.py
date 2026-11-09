@@ -21,10 +21,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 SOURCE_PATHS = (
     "rag_project_benchmark.py",
-    "app/rag.py",
-    "app/rag_chunks.py",
-    "app/rag_child_index.py",
-    "app/rag_benchmark_dataset.py",
+    "app/retrieval/rag.py",
+    "app/retrieval/rag_chunks.py",
+    "app/retrieval/rag_child_index.py",
+    "app/evaluation/rag_benchmark_dataset.py",
 )
 
 
@@ -637,9 +637,9 @@ def main() -> int:
                      "child_pipeline": args.child_pipeline}
     with tempfile.TemporaryDirectory(prefix="lexvault-rag240-") as data_dir:
         os.environ["LAW_REVIEW_DATA_DIR"] = data_dir
-        from app.db import init_db, now, transaction
-        from app.rag import HybridRetriever
-        from app.rag_benchmark_dataset import (
+        from app.storage.db import init_db, now, transaction
+        from app.retrieval.rag import HybridRetriever
+        from app.evaluation.rag_benchmark_dataset import (
             CHALLENGE_VERSION,
             DATASET_VERSION,
             LONG_PAGE_V2_VERSION,

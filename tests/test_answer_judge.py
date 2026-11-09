@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from app.answer_eval import JUDGE_PROMPT_VERSION, cohen_kappa, judge_answer, load_dataset
-from app.answer_judge_client import request_judge
-from app.answer_review import human_agreement, review_manifest
-from app.forge_governance import BackendAdmissionError, BackendLedger
+from app.evaluation.answer_eval import JUDGE_PROMPT_VERSION, cohen_kappa, judge_answer, load_dataset
+from app.evaluation.answer_judge_client import request_judge
+from app.evaluation.answer_review import human_agreement, review_manifest
+from app.llm.forge_governance import BackendAdmissionError, BackendLedger
 from scripts.run_answer_judge import cached_judges, main, read_json, run_judges
 
 DATASET = Path(__file__).resolve().parents[1] / "benchmarks/answer_eval/v2/dataset.json"
@@ -43,7 +43,7 @@ def test_untrusted_answer_is_json_data_and_cannot_supply_its_own_source():
 def test_judge_transport_failure_stops_further_calls():
     dataset = load_dataset(DATASET)
     answers = {item["id"]: {"answer": "合成答案", "citations": []} for item in dataset["items"]}
-    with patch("app.answer_judge_client.request_judge", side_effect=RuntimeError("unavailable")) as model:
+    with patch("app.evaluation.answer_judge_client.request_judge", side_effect=RuntimeError("unavailable")) as model:
         rows, calls = run_judges(dataset, answers, "http://127.0.0.1:1/v1", "test")
     assert model.call_count == 1 and not calls
     assert len(rows) == 60 and all(row["passed"] is None for row in rows)
@@ -52,7 +52,7 @@ def test_judge_transport_failure_stops_further_calls():
 
 def test_judge_respects_host_admission_before_any_network():
     calls = []
-    with BackendLedger(lambda: None).activate(), patch("app.answer_judge_client.egress_opener") as opener:
+    with BackendLedger(lambda: None).activate(), patch("app.evaluation.answer_judge_client.egress_opener") as opener:
         with pytest.raises(BackendAdmissionError):
             request_judge("q", endpoint="http://127.0.0.1:1/v1", model="test", calls=calls)
     opener.assert_not_called()
@@ -60,7 +60,7 @@ def test_judge_respects_host_admission_before_any_network():
 
 
 def test_judge_remote_endpoint_is_denied_and_not_reported_as_a_free_call():
-    with patch.dict("os.environ", {"LAW_REVIEW_ALLOW_REMOTE_MODELS": "off"}), patch("app.answer_judge_client.egress_opener") as opener:
+    with patch.dict("os.environ", {"LAW_REVIEW_ALLOW_REMOTE_MODELS": "off"}), patch("app.evaluation.answer_judge_client.egress_opener") as opener:
         with pytest.raises(ValueError):
             request_judge("q", endpoint="https://example.invalid/v1", model="test", calls=[])
     opener.assert_not_called()
@@ -133,7 +133,7 @@ def test_failed_judge_cli_preserves_negative_result_and_returns_nonzero():
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)
         (directory / "answers.json").write_text(json.dumps(answers))
-        with patch("app.answer_judge_client.request_judge", side_effect=RuntimeError("unavailable")):
+        with patch("app.evaluation.answer_judge_client.request_judge", side_effect=RuntimeError("unavailable")):
             assert main(["--answers", str(directory / "answers.json"), "--judge",
                          "--review-directory", str(directory / "review"), "--output", str(directory / "report.json")]) == 1
         report = read_json(directory / "report.json")
@@ -157,7 +157,7 @@ def test_cached_judge_and_complete_fixture_humans_recompute_without_network():
         for name, value in {"answers": answers, "human": human, "cache": {
                 "sample": manifest, "judge_version": JUDGE_PROMPT_VERSION, "judge_per_item": rows}}.items():
             (directory / f"{name}.json").write_text(json.dumps(value))
-        with patch("app.answer_judge_client.request_judge", side_effect=AssertionError("offline reuse")):
+        with patch("app.evaluation.answer_judge_client.request_judge", side_effect=AssertionError("offline reuse")):
             assert main(["--answers", str(directory / "answers.json"), "--judge-results", str(directory / "cache.json"),
                          "--human-labels", str(directory / "human.json"), "--output", str(directory / "report.json")]) == 0
         report = read_json(directory / "report.json")
@@ -179,8 +179,8 @@ def test_legacy_rule_human_comparison_also_rejects_truthy_string_labels():
 
 def test_transport_preserves_unknown_usage_and_exact_judge_target():
     calls = []
-    with patch("app.answer_judge_client.egress_opener") as opener, patch(
-        "app.answer_judge_client.read_json_with_deadline", return_value={"choices": [{"message": {"content": json.dumps(VALID)}}]}):
+    with patch("app.evaluation.answer_judge_client.egress_opener") as opener, patch(
+        "app.evaluation.answer_judge_client.read_json_with_deadline", return_value={"choices": [{"message": {"content": json.dumps(VALID)}}]}):
         request_judge("q", endpoint="http://127.0.0.1:19002/v1", model="synthetic-judge", calls=calls)
     request = opener.return_value.open.call_args.args[0]
     assert request.full_url == "http://127.0.0.1:19002/v1/chat/completions"
@@ -189,7 +189,7 @@ def test_transport_preserves_unknown_usage_and_exact_judge_target():
 
 
 def test_judge_text_mentioning_planning_words_is_not_blanked():
-    from app.answer_judge_client import strip_think_only
+    from app.evaluation.answer_judge_client import strip_think_only
 
     payload = '{"coverage_ok": true, "unsupported_claims": [], "citation_ok": true, "refusal_ok": true, ' \
               '"rationale": "回答覆盖了问题要求的关键要点"}'

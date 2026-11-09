@@ -86,9 +86,9 @@ LexVault 已具备本地法律卷宗工作台的主要技术基础：多格式�
 | E07 / G1 / P0 | 答案质量契约：逐事实引用支持、主体、日期、单位、金额、否定和不确定性 | 分别记录结构通过、语义支持、计算校验、人工核验结果；无法确定的事项标注待核验；金额工具返回输入、单位、公式与结果供复算 | Agent＋测试＋律师；依赖 E02、E24 |
 | E08 / G2 / P1 | 协作与导出：乐观并发控制、修订比较、评论及审核版本导出 | 两人修改同一证据不得静默覆盖；导出绑定案件/材料/结论版本、审核状态及引用清单；草稿导出明确标识，正式版本按角色放行 | 后端＋前端＋产品；依赖 E04、E05、E10 |
 
-E02/E03 的现状依据：`extract_docx_pages` 遍历段落并按约 1,800 字分段，没有在该函数遍历表格；`extract_pdf_pages` 在页文本去空白后不足 24 字时才触发 OCR。这意味着应单独检验“文字足够但图中仍有关键内容”的页面。此处是源码识别的风险，并非已测出的漏检率。见 [services.py](/Users/xiaoy/law-review-local/app/services.py:92)。
+E02/E03 的现状依据：`extract_docx_pages` 遍历段落并按约 1,800 字分段，没有在该函数遍历表格；`extract_pdf_pages` 在页文本去空白后不足 24 字时才触发 OCR。这意味着应单独检验“文字足够但图中仍有关键内容”的页面。此处是源码识别的风险，并非已测出的漏检率。见 [services.py](/Users/xiaoy/law-review-local/app/review/services.py:92)。
 
-E05–E07 的现状依据：`validate_review_answer` 明确返回 `semantic_entailment_checked=False` 和 `amount_calculations_checked=False`；结构合格草稿可写入并召回。见 [校验](/Users/xiaoy/law-review-local/app/agents.py:52)、[记忆写入](/Users/xiaoy/law-review-local/app/agents.py:767)、[记忆召回](/Users/xiaoy/law-review-local/app/rag.py:423)。
+E05–E07 的现状依据：`validate_review_answer` 明确返回 `semantic_entailment_checked=False` 和 `amount_calculations_checked=False`；结构合格草稿可写入并召回。见 [校验](/Users/xiaoy/law-review-local/app/review/agents.py:52)、[记忆写入](/Users/xiaoy/law-review-local/app/review/agents.py:767)、[记忆召回](/Users/xiaoy/law-review-local/app/retrieval/rag.py:423)。
 
 ### 4.2 数据保护与访问控制
 
@@ -285,11 +285,11 @@ G3 放行：对新的组织、实例、数据规模和故障域重新做隔离�
 | 依据 | 本次使用方式 |
 |---|---|
 | [README](/Users/xiaoy/law-review-local/README.md) / [系统架构](../architecture/system.md) | 产品定位、运行时、部署及输出边界 |
-| [db.py](/Users/xiaoy/law-review-local/app/db.py:329) | 增量迁移、schema 标记、启动恢复 |
-| [services.py](/Users/xiaoy/law-review-local/app/services.py:92) | PDF/DOCX 提取与实际模型请求 |
-| [agents.py](/Users/xiaoy/law-review-local/app/agents.py:52) / [rag.py](/Users/xiaoy/law-review-local/app/rag.py:423) | 引用校验、草稿记忆、检索与缓存 |
-| [security.py](/Users/xiaoy/law-review-local/app/security.py:52) / [review_jobs.py](/Users/xiaoy/law-review-local/app/review_jobs.py:23) | 配置凭证、案件授权、任务边界 |
-| [legal_corpus.py](/Users/xiaoy/law-review-local/app/legal_corpus.py:164) | 法条版本选择及来源字段 |
+| [db.py](/Users/xiaoy/law-review-local/app/storage/db.py:329) | 增量迁移、schema 标记、启动恢复 |
+| [services.py](/Users/xiaoy/law-review-local/app/review/services.py:92) | PDF/DOCX 提取与实际模型请求 |
+| [agents.py](/Users/xiaoy/law-review-local/app/review/agents.py:52) / [rag.py](/Users/xiaoy/law-review-local/app/retrieval/rag.py:423) | 引用校验、草稿记忆、检索与缓存 |
+| [security.py](/Users/xiaoy/law-review-local/app/core/security.py:52) / [review_jobs.py](/Users/xiaoy/law-review-local/app/review/review_jobs.py:23) | 配置凭证、案件授权、任务边界 |
+| [legal_corpus.py](/Users/xiaoy/law-review-local/app/retrieval/legal_corpus.py:164) | 法条版本选择及来源字段 |
 | [pyproject.toml](/Users/xiaoy/law-review-local/pyproject.toml:51) / [CI](/Users/xiaoy/law-review-local/.github/workflows/test.yml) | 已配置门槛、检查范围及运行环境 |
 | [data_snapshot.py](/Users/xiaoy/law-review-local/scripts/data_snapshot.py:128) / [发布手册](release.md) | 停写备份、恢复对象、排除项 |
 | [历史验收](validation-20260905.md) | 带日期的工程、浏览器和模型验证记录；本次未重跑 |
@@ -301,13 +301,13 @@ G3 放行：对新的组织、实例、数据规模和故障域重新做隔离�
 
 | 文件 | SHA-256 |
 |---|---|
-| app/db.py | ea284619c116b2a29c4cd0446635f990b54034c96ac42058a79ac1882aac32a5 |
-| app/services.py | 9872c034c0adcc3409508fd04f721d4b45762a7a5a884dfc551be247057687d6 |
-| app/agents.py | 86c65671f5811acb92d6e3bfab5abd9e74a83fafb40a4ac8acdb0edd6dc0351c |
-| app/rag.py | e7694280c7a8788db1f7b78e0e935812d8b7e04bc37a278884f67bec6b2c8238 |
-| app/security.py | afbfa944e8e26daee2ba7153c54a0c11e32f8fde20227086a18d4c1ddf05c19a |
-| app/review_jobs.py | caccf9a9a5ae2a3b7a356bb96b8a2e6f7f97a74ac5d06ccb140c36a4d625b4b2 |
-| app/legal_corpus.py | bd86b9f9d2576058e0abf50474ea058231ee0bd8c4724b5b0ba08d8db4f6eb1a |
+| app/storage/db.py | ea284619c116b2a29c4cd0446635f990b54034c96ac42058a79ac1882aac32a5 |
+| app/review/services.py | 9872c034c0adcc3409508fd04f721d4b45762a7a5a884dfc551be247057687d6 |
+| app/review/agents.py | 86c65671f5811acb92d6e3bfab5abd9e74a83fafb40a4ac8acdb0edd6dc0351c |
+| app/retrieval/rag.py | e7694280c7a8788db1f7b78e0e935812d8b7e04bc37a278884f67bec6b2c8238 |
+| app/core/security.py | afbfa944e8e26daee2ba7153c54a0c11e32f8fde20227086a18d4c1ddf05c19a |
+| app/review/review_jobs.py | caccf9a9a5ae2a3b7a356bb96b8a2e6f7f97a74ac5d06ccb140c36a4d625b4b2 |
+| app/retrieval/legal_corpus.py | bd86b9f9d2576058e0abf50474ea058231ee0bd8c4724b5b0ba08d8db4f6eb1a |
 | pyproject.toml | 63e00631689720450fc0d263c91c6cb09427d0eb77ca4850d3e168fdedd62515 |
 | .github/workflows/test.yml | 8699dc225fb764d80b8db4a2d0cc3b9eac0b25ea0cb02908e8c6bea343bbdc02 |
 | scripts/data_snapshot.py | f172094070d9c28ac918118d2667cab52eba6ff87ad0345f190741c0bf356067 |

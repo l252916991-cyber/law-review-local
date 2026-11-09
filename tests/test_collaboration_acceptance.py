@@ -36,7 +36,7 @@ class AcceptanceChecksTest(unittest.TestCase):
         )
         self.env.start()
         self.addCleanup(self.env.stop)
-        from app.db import init_db
+        from app.storage.db import init_db
         init_db(seed=False)
 
     def checks_by_name(self, report):
@@ -97,8 +97,8 @@ class AcceptanceChecksTest(unittest.TestCase):
         self.assertTrue((drill / "restored" / "law_review.db").is_file())
 
     def test_stale_approved_report_is_flagged(self):
-        from app.db import connect, now, transaction
-        from app.report_basis import basis_hash, basis_snapshot
+        from app.cases.report_basis import basis_hash, basis_snapshot
+        from app.storage.db import connect, now, transaction
 
         with transaction() as conn:
             case_id = conn.execute(
@@ -182,8 +182,8 @@ class AcceptanceChecksTest(unittest.TestCase):
         self.assertEqual(found["model_inference"]["status"], "skip")
 
     def _approved_frozen_report(self):
-        from app.db import now, transaction
-        from app.report_delivery import freeze_for_submission
+        from app.cases.report_delivery import freeze_for_submission
+        from app.storage.db import now, transaction
 
         with transaction() as conn:
             case_id = conn.execute(

@@ -8,8 +8,8 @@ from collections.abc import Iterator
 import psycopg
 import pytest
 
-from app.db import SCHEMA_VERSION
-from app.db_postgres import (
+from app.storage.db import SCHEMA_VERSION
+from app.storage.db_postgres import (
     MIGRATION_BASELINE,
     MIGRATIONS_DIR,
     apply_schema,

@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from app.db import connect, get_db_path, init_db, transaction
-from app.domain_integration import IsolatedDomainIntegration
-from app.domain_writes import DOMAIN_RUNTIME
-from app.host_integration import IsolatedHostIntegration
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import AccessDeniedError, ModelConfig, RequestConflictError, RunRequest, RunScope
-from app.security import Principal, _principal
+from app.core.security import Principal, _principal
+from app.integration.domain_integration import IsolatedDomainIntegration
+from app.integration.domain_writes import DOMAIN_RUNTIME
+from app.integration.host_integration import IsolatedHostIntegration
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import AccessDeniedError, ModelConfig, RequestConflictError, RunRequest, RunScope
+from app.storage.db import connect, get_db_path, init_db, transaction
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_forge_readonly import write_corpus
 from tests.test_host_writes import isolated  # noqa: F401

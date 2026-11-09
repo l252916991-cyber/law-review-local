@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 import pytest
 
-from app.db import connect
-from app.local_backends import BackendUnknown
-from app.model_comparison import compare_local_models
-from app.runtime_ports import AccessDeniedError, ContractValidationError
-from app.security import Principal, _principal
+from app.core.security import Principal, _principal
+from app.evaluation.model_comparison import compare_local_models
+from app.integration.runtime_ports import AccessDeniedError, ContractValidationError
+from app.llm.local_backends import BackendUnknown
+from app.storage.db import connect
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401
 from tests.test_local_backends import local_models  # noqa: F401
@@ -22,7 +22,7 @@ actual = pytest.mark.skipif(not os.getenv("LAW_REVIEW_FORGE_PYTHON"), reason="in
 
 @pytest.mark.parametrize("filename", ["services.py", "agents.py", "review_collaboration.py", "agent_tools.py"])
 def test_native_baseline_still_refuses_any_unreviewed_source_change(filename):
-    from app.model_comparison import native_baseline_identity
+    from app.evaluation.model_comparison import native_baseline_identity
 
     original = Path.read_bytes
 
@@ -35,16 +35,16 @@ def test_native_baseline_still_refuses_any_unreviewed_source_change(filename):
 
 
 def test_native_baseline_identifies_reviewed_snapshot_without_claiming_an_old_commit_matches():
-    from app.model_comparison import native_baseline_identity
+    from app.evaluation.model_comparison import native_baseline_identity
 
     identity = native_baseline_identity()
     assert identity["schema_version"] == 2
-    assert identity["revision"] == "specialist-review-v12"
+    assert identity["revision"] == "specialist-review-v13"
     # A re-registered baseline must carry its review note, not just new hashes.
     assert "PROMPT_VERSION" in identity["review_note"]
     assert identity["source_commit"] == "31a811c92acae30caf82c9c5109ce812bd99bb04"
     assert "commit" not in identity
-    assert "review_collaboration.py" in identity["algorithm_files"]
+    assert "review/review_collaboration.py" in identity["algorithm_files"]
 
 
 @actual
@@ -176,10 +176,10 @@ def test_system_failure_is_not_counted_as_a_business_refusal(local_models, tmp_p
 
 
 def test_native_algorithm_drift_is_rejected_before_creating_run(local_models, tmp_path, monkeypatch):
-    from app import model_comparison
+    from app.evaluation import model_comparison
     models, calls = local_models
     output = tmp_path / "uncreated"
-    monkeypatch.setitem(model_comparison.NATIVE_ALGORITHM_HASHES, "agents.py", "0" * 64)
+    monkeypatch.setitem(model_comparison.NATIVE_ALGORITHM_HASHES, "review/agents.py", "0" * 64)
     with pytest.raises(ContractValidationError, match="pinned baseline"):
         compare_local_models(case_id=1, question="合成审批记录", models=models,
             framework_python="/unused", output=output)

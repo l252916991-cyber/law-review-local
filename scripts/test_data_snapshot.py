@@ -147,8 +147,8 @@ class SnapshotTests(unittest.TestCase):
         self.assertTrue((self.snapshot / "langgraph_checkpoints.sqlite").is_file())
 
     def test_model_override_is_restored_without_copying_other_settings(self) -> None:
-        from app.config import LLMConfig
-        from app.db import db_scope
+        from app.core.config import LLMConfig
+        from app.storage.db import db_scope
 
         settings = self.source / "model_settings.json"
         settings.write_text(json.dumps({"base_url": "http://127.0.0.1:12345/v1", "model": "synthetic-validated-model"}))

@@ -1,8 +1,8 @@
 """Run the enhanced LawBench pipeline: statutory retrieval plus reference-free post-processing.
 
 The audited `unified_benchmark_runner.py` only supports direct/task_guided prompts and the
-campaign runner calls `app.benchmark_solver.solve`, so neither can exercise
-`app.benchmark_rag_solver.solve` (task-guided + statutory context + deterministic output
+campaign runner calls `app.benchmarks.solver.solve`, so neither can exercise
+`app.benchmarks.rag_solver.solve` (task-guided + statutory context + deterministic output
 repairs for 1-1/2-1/2-7/2-9/2-10). This runner fills that gap with the same discipline as the
 audited runner: frozen manifest with source and corpus hashes, per-question checkpoints,
 resumable runs, all-question denominator, and no reference answer in the solver input.
@@ -22,16 +22,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import unified_benchmark_runner as runner  # noqa: E402
-from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item  # noqa: E402
-from app.benchmark_rag_solver import solve  # noqa: E402
-from app.benchmark_reporting import PROMPT_VERSION, atomic_json, metrics, write_report  # noqa: E402
-from app.benchmark_retrieval import corpus_fingerprint  # noqa: E402
+from app.benchmarks.metrics import SCORER_VERSION, score_lawbench_item  # noqa: E402
+from app.benchmarks.rag_solver import solve  # noqa: E402
+from app.benchmarks.reporting import PROMPT_VERSION, atomic_json, metrics, write_report  # noqa: E402
+from app.benchmarks.retrieval import corpus_fingerprint  # noqa: E402
 
 PIPELINE_VERSION = "lawbench-enhanced-v1"
 SOURCES = (
-    "scripts/benchmark_enhanced_run.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-    "app/benchmark_postprocess.py", "app/benchmark_solver.py", "app/benchmark_metrics.py",
-    "app/lawbench.py", "app/benchmark_reporting.py",
+    "scripts/benchmark_enhanced_run.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+    "app/benchmarks/postprocess.py", "app/benchmarks/solver.py", "app/benchmarks/metrics.py",
+    "app/benchmarks/lawbench.py", "app/benchmarks/reporting.py",
 )
 REQUIRED_CONFIG = ("url", "model", "temperature", "max_tokens", "timeout", "enable_thinking")
 

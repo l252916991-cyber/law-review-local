@@ -13,9 +13,9 @@ from pathlib import Path
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-runtime-ports-")
 os.environ.setdefault("LAW_REVIEW_DATA_DIR", TEST_DATA)
 
-from app import runtime_ports  # noqa: E402
-from app.runtime_adapter import LEGACY_CAPABILITIES, LegacyRuntimeControl  # noqa: E402
-from app.runtime_ports import (  # noqa: E402
+from app.integration import runtime_ports  # noqa: E402
+from app.integration.runtime_adapter import LEGACY_CAPABILITIES, LegacyRuntimeControl  # noqa: E402
+from app.integration.runtime_ports import (  # noqa: E402
     DEFAULT_TENANT_ID,
     EXECUTION_MODE_BACKGROUND,
     LANGGRAPH_RUNTIME,
@@ -58,7 +58,7 @@ def _imported_roots(source_path: Path) -> set[str]:
 
 class ContractBoundaryTest(unittest.TestCase):
     def test_runtime_ports_imports_standard_library_only(self):
-        roots = _imported_roots(APP_ROOT / "app" / "runtime_ports.py")
+        roots = _imported_roots(APP_ROOT / "app" / "integration" / "runtime_ports.py")
         self.assertTrue(roots, "expected at least one import to analyze")
         allowed = {"__future__", "re", "uuid", "json", "hashlib", "dataclasses", "enum", "typing", "collections"}
         self.assertEqual(roots - allowed, set(), f"contract module leaked imports: {roots - allowed}")
@@ -68,17 +68,17 @@ class ContractBoundaryTest(unittest.TestCase):
         # framework, code must not import it (M1 keeps the framework out of the
         # host process; M2 introduces the separate-process adapter instead).
         for name in ("runtime_ports.py", "runtime_adapter.py"):
-            roots = _imported_roots(APP_ROOT / "app" / name)
+            roots = _imported_roots(APP_ROOT / "app" / "integration" / name)
             self.assertNotIn("forgeharness", roots, f"{name} must not import the framework package")
 
     def test_adapter_import_surface_stays_host_side(self):
         # The adapter is host code and may import app modules plus fastapi for
         # the existing HTTPException-based authorization errors; nothing else.
-        roots = _imported_roots(APP_ROOT / "app" / "runtime_adapter.py")
+        roots = _imported_roots(APP_ROOT / "app" / "integration" / "runtime_adapter.py")
         allowed = {"__future__", "collections", "json", "logging", "contextlib", "functools", "typing", "fastapi", "app"}
         self.assertEqual(roots - allowed, set(), f"adapter leaked imports: {roots - allowed}")
         # And the dependency direction is one-way: ports must not import adapter.
-        self.assertNotIn("app", _imported_roots(APP_ROOT / "app" / "runtime_ports.py"))
+        self.assertNotIn("app", _imported_roots(APP_ROOT / "app" / "integration" / "runtime_ports.py"))
 
 
 class RunRequestValidationTest(unittest.TestCase):

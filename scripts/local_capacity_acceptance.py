@@ -97,7 +97,7 @@ def hardware(path: Path) -> dict[str, Any]:
 def seed_data(directory: Path, profile: Profile = Profile()) -> dict[str, int]:  # noqa: B008 - frozen dataclass
     if directory.exists():
         raise ValueError("Synthetic data directory must be new")
-    from app.db import db_scope, init_db, now, transaction
+    from app.storage.db import db_scope, init_db, now, transaction
 
     with db_scope(directory / "law_review.db"):
         init_db(seed=False)

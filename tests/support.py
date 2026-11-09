@@ -32,7 +32,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
             if sqlite_only:
                 values["LAW_REVIEW_DATABASE_URL"] = ""  # an empty URL means the SQLite file
             elif admin_url:
-                from app.db_postgres import create_database, drop_database, ensure_role
+                from app.storage.db_postgres import create_database, drop_database, ensure_role
 
                 # The application role owns the database and is not a superuser,
                 # so row-level security (information walls) is in force.
@@ -48,7 +48,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
                 replaced = patch.object(module, "TEST_DATA", directory.name)
                 replaced.start()
                 current.addClassCleanup(replaced.stop)
-            from app.db import init_db
+            from app.storage.db import init_db
             init_db(seed=False)
             if original_setup:
                 original_setup.__func__(current)

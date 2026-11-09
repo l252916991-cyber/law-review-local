@@ -9,15 +9,15 @@
 | 环节 | 当前实现 | 关键事实 |
 | --- | --- | --- |
 | 请求入口 | `POST /api/cases/{id}/chat`（[main.py](../../../app/main.py) `case_chat`）；`ChatRequest` 携带可选 `conversation_id` | `user_name` 只作展示作者；授权由 `require_case`/中间件按认证主体判定 |
-| 普通聊天 | [services.py](../../../app/services.py) `chat` | 检索只用当前问题；历史消息不进入模型；会话校验与消息写入在**同一后置事务**中，显式不存在的会话 ID 会被静默改为新建 |
+| 普通聊天 | [services.py](../../../app/review/services.py) `chat` | 检索只用当前问题；历史消息不进入模型；会话校验与消息写入在**同一后置事务**中，显式不存在的会话 ID 会被静默改为新建 |
 | 本地模型调用 | `call_local_llm(question, route, contexts, timeout, model_override)` | 请求体仅 system + 当前问题/卷宗片段；`PROMPT_VERSION=chat-system-v3-untrusted-case-data-required-review` |
-| 原生 Agent | [agents.py](../../../app/agents.py) `LawReviewCoordinator.process_query` | 记忆召回只记录、不注入；审校 `CriticAgent.run` 接收问题、检索片段与专家摘要，不接收历史；`agent_runs` 记录问题/路由/答案/引用 |
-| LangGraph | [langgraph_agents.py](../../../app/langgraph_agents.py) `ReviewState`、`process_query`、`resume` | 状态含 `memory_hits` 但审校未用；checkpoint 以 `agent-run-<run_id>` 为线程标识，恢复前校验 run/case/question 一致 |
+| 原生 Agent | [agents.py](../../../app/review/agents.py) `LawReviewCoordinator.process_query` | 记忆召回只记录、不注入；审校 `CriticAgent.run` 接收问题、检索片段与专家摘要，不接收历史；`agent_runs` 记录问题/路由/答案/引用 |
+| LangGraph | [langgraph_agents.py](../../../app/review/langgraph_agents.py) `ReviewState`、`process_query`、`resume` | 状态含 `memory_hits` 但审校未用；checkpoint 以 `agent-run-<run_id>` 为线程标识，恢复前校验 run/case/question 一致 |
 | Agent 入口 | `POST /api/cases/{id}/agent-chat`、`POST /api/cases/{id}/agent-jobs` | 两类请求均无会话字段；后台成功后**新建**会话写两条消息 |
 | 会话读取/归档 | `GET /api/cases/{id}/conversations`、`GET/POST/DELETE /api/conversations/{id}[/archive]` | 归档 7 天后清理；消息按 `id` 固定顺序 |
 | 引用 | `chat`/`_citation` 都以**本轮检索片段**序号生成 `[资料N]` 与资料卡 | 无任何历史回答参与引用编号 |
-| 草稿记忆 | [rag.py](../../../app/rag.py) `remember`/`recall_memories` | 只召回同案已完成运行的 `agent_draft_validated`，保留 `structural_checks_only_lawyer_review_required` |
-| 持久化 | [db.py](../../../app/db.py) `messages`、`agent_runs` | schema v17；`messages` 无轮次类型/来源运行列，`agent_runs` 无会话/上下文快照列 |
+| 草稿记忆 | [rag.py](../../../app/retrieval/rag.py) `remember`/`recall_memories` | 只召回同案已完成运行的 `agent_draft_validated`，保留 `structural_checks_only_lawyer_review_required` |
+| 持久化 | [db.py](../../../app/storage/db.py) `messages`、`agent_runs` | schema v17；`messages` 无轮次类型/来源运行列，`agent_runs` 无会话/上下文快照列 |
 
 结论：当前所有入口都是**单轮**语义，历史只用于展示。M02-M05 的改动必须在检索之前完成对象解析，并把“历史仅帮助理解指代”与“本轮卷宗片段才是证据”分开。
 

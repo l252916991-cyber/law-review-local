@@ -9,7 +9,7 @@ from tests.support import IsolatedDatabaseTestCase
 
 
 def make_conversation(case_id=1, title="多轮测试会话", archived=False):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         conversation_id = conn.execute(
@@ -25,7 +25,7 @@ def make_conversation(case_id=1, title="多轮测试会话", archived=False):
 
 
 def append_turn(conversation_id, question, answer, *, kind="answer", citations=None):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         user_id = conn.execute(
@@ -45,12 +45,12 @@ def append_turn(conversation_id, question, answer, *, kind="answer", citations=N
 class ContextHistoryTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=True)
 
     def test_history_keeps_last_four_complete_turns_and_ignores_orphans(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         conversation_id = make_conversation()
         pairs = [
@@ -60,7 +60,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
             for i in range(1, 7)
         ]
         # A failed/incomplete request leaves an unpaired user message.
-        from app.db import now, transaction
+        from app.storage.db import now, transaction
 
         with transaction() as conn:
             conn.execute(
@@ -78,7 +78,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
         self.assertEqual(len(snapshot.digest), 64)
 
     def test_cutoff_and_digest_freeze_one_snapshot(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         conversation_id = make_conversation()
         append_turn(conversation_id, "问题1", "回答1")
@@ -92,7 +92,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
         self.assertNotEqual(frozen.digest, fresh.digest)
 
     def test_budget_drops_whole_old_turns_and_marks_truncation(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         conversation_id = make_conversation()
         append_turn(conversation_id, "旧问题", "旧" * 300)
@@ -105,7 +105,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
         self.assertFalse(snapshot.truncated)
 
     def test_single_newest_turn_over_budget_is_truncated_not_dropped(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         conversation_id = make_conversation()
         append_turn(conversation_id, "长问题" * 200, "长回答" * 400)
@@ -116,7 +116,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
         self.assertTrue(snapshot.truncated)
 
     def test_history_disabled_returns_empty_snapshot_without_reading(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         conversation_id = make_conversation()
         append_turn(conversation_id, "问题", "回答")
@@ -127,7 +127,7 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
         self.assertEqual(snapshot.as_dict()["used"], False)
 
     def test_non_factual_turns_keep_their_kind(self):
-        from app.context import load_history, render_history
+        from app.review.context import load_history, render_history
 
         conversation_id = make_conversation()
         append_turn(conversation_id, "它呢？", "请确认你指的是哪份材料。", kind="clarification")
@@ -143,13 +143,13 @@ class ContextHistoryTest(IsolatedDatabaseTestCase):
 class ConversationValidationTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=True)
 
     def test_missing_cross_case_and_archived_are_distinguished(self):
-        from app.context import ArchivedConversationError, ConversationNotFoundError, validate_conversation
-        from app.db import now, transaction
+        from app.review.context import ArchivedConversationError, ConversationNotFoundError, validate_conversation
+        from app.storage.db import now, transaction
 
         with transaction() as conn:
             other_case = conn.execute(
@@ -168,11 +168,11 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         self.assertIsNotNone(row["archived_at"])
 
     def test_chat_rejects_bad_conversation_before_retrieval_or_model(self):
-        from app.context import ArchivedConversationError, ConversationNotFoundError
-        from app.services import chat
+        from app.review.context import ArchivedConversationError, ConversationNotFoundError
+        from app.review.services import chat
 
         archived = make_conversation(archived=True)
-        with patch("app.rag.HybridRetriever") as retriever, patch("app.services.call_local_llm") as model:
+        with patch("app.retrieval.rag.HybridRetriever") as retriever, patch("app.review.services.call_local_llm") as model:
             with self.assertRaises(ConversationNotFoundError):
                 chat(1, "固定回报是否存在", "测试律师", 999999, True, False)
             with self.assertRaises(ArchivedConversationError):
@@ -181,8 +181,8 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         model.assert_not_called()
 
     def test_chat_returns_bounded_history_identity_on_next_turn(self):
-        from app.db import connect
-        from app.services import chat
+        from app.review.services import chat
+        from app.storage.db import connect
 
         first = chat(1, "张某关于固定回报的陈述是否存在矛盾？", "测试律师", None, False, False)
         self.assertGreater(first["conversation_id"], 0)
@@ -201,8 +201,8 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         self.assertEqual(kinds, ["answer", "answer", "answer", "answer"])
 
     def test_record_turn_is_idempotent_per_source_run(self):
-        from app.context import record_turn
-        from app.db import connect
+        from app.review.context import record_turn
+        from app.storage.db import connect
 
         conversation_id = make_conversation()
         kwargs = dict(
@@ -223,7 +223,7 @@ class ConversationValidationTest(IsolatedDatabaseTestCase):
         self.assertEqual(messages[-1]["kind"], "answer")
 
     def test_schema_v18_is_incremental_and_old_rows_default(self):
-        from app.db import SCHEMA_VERSION, connect, now, transaction
+        from app.storage.db import SCHEMA_VERSION, connect, now, transaction
 
         self.assertGreaterEqual(SCHEMA_VERSION, 18)
         with transaction() as conn:
@@ -254,8 +254,8 @@ class ConversationApiTest(IsolatedDatabaseTestCase):
     def setUpClass(cls):
         from fastapi.testclient import TestClient
 
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         init_db(seed=True)
         cls.client_context = TestClient(app)

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.agents import (
+from app.review.agents import (
     ContradictionAgent,
     CriticAgent,
     EvidenceAgent,
@@ -19,9 +19,9 @@ from app.agents import (
     specialist_specs,
     validate_specialist_output,
 )
-from app.db import connect, init_db, transaction
-from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
-from app.review_collaboration import build_collaboration, source_reference
+from app.review.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
+from app.review.review_collaboration import build_collaboration, source_reference
+from app.storage.db import connect, init_db, transaction
 from tests.support import IsolatedDatabaseTestCase
 
 CONTEXTS = [
@@ -60,11 +60,11 @@ def test_changed_source_text_invalidates_old_handoff_even_when_quote_is_unchange
 
 
 def test_controlled_search_hashes_full_page_before_display_truncation():
-    from app.agent_tools import _search
+    from app.review.agent_tools import _search
 
     raw = "合成原文\n" * 1200
     contexts = [{**CONTEXTS[0], "text": raw}]
-    with patch("app.rag.HybridRetriever.retrieve", return_value=(contexts, {})):
+    with patch("app.retrieval.rag.HybridRetriever.retrieve", return_value=(contexts, {})):
         items, _ = _search(1, {"query": "合成", "limit": 1}, False)
     assert len(items[0]["text"]) < len(raw)
     assert items[0]["page_text_sha256"] == hashlib.sha256(raw.encode()).hexdigest()
@@ -123,7 +123,7 @@ def test_model_sees_full_findings_as_untrusted_data_and_cannot_omit_disagreement
         {"type": "缺少原件", "severity": "高", "description": "尚未取得邮件原始载体", "suggestion": "调取邮件原件"},
     ]}
     critic = CriticAgent(allow_tool_loop=False)
-    with patch("app.agents.call_local_llm", return_value=ANSWER) as model:
+    with patch("app.review.agents.call_local_llm", return_value=ANSWER) as model:
         result = critic.run("审批是否存在矛盾？", "多文档对比", CONTEXTS, outputs, True,
                             object_note="仅看本案", history="历史指代", memory="草稿线索")
     assert model.call_count == 1
@@ -143,7 +143,7 @@ def test_model_sees_full_findings_as_untrusted_data_and_cannot_omit_disagreement
 def test_appendix_cannot_rescue_an_invalid_model_answer():
     outputs = specialists()
     outputs["facts"] = {"facts": [], "summary": "没有事实摘录"}
-    with patch("app.agents.call_local_llm", return_value="没有引用的答案。请律师复核。"):
+    with patch("app.review.agents.call_local_llm", return_value="没有引用的答案。请律师复核。"):
         result = CriticAgent().run("审批", "多文档对比", CONTEXTS, outputs, True)
     assert not result["llm_used"]
     assert "保留的候选矛盾" in result["answer"]
@@ -155,7 +155,7 @@ def test_statute_text_stays_outside_the_case_fact_prompt():
     outputs = specialists()
     outputs["statutory_conflict"] = {"status": "needs_review", "summary": "待核验",
                                      "statutes": [{"text": "仅属于法条命名空间的正文"}]}
-    with patch("app.agents.call_local_llm", return_value=ANSWER) as model:
+    with patch("app.review.agents.call_local_llm", return_value=ANSWER) as model:
         result = CriticAgent().run("审批适用法律？", "事实检索", CONTEXTS, outputs, True)
     assert "仅属于法条命名空间的正文" not in model.call_args.kwargs["object_note"]
     assert result["collaboration"]["specialists"]["statutory_conflict"] == outputs["statutory_conflict"]
@@ -177,7 +177,7 @@ class CollaborationRuntimeTests(IsolatedDatabaseTestCase):
         init_db(seed=True)
 
     def graph(self, **kwargs):
-        from app.db import get_db_path
+        from app.storage.db import get_db_path
         return create_langgraph_coordinator(1, False, checkpoint_path=Path(get_db_path()).parent / "checkpoints.sqlite", **kwargs)
 
     def test_native_and_langgraph_deliver_the_same_complete_review_and_gap_inputs(self):

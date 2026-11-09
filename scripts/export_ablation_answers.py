@@ -17,7 +17,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.collaboration_ablation import answer_citations  # noqa: E402
+from app.evaluation.collaboration_ablation import answer_citations  # noqa: E402
 
 EXIT_PROTOCOL = 2
 

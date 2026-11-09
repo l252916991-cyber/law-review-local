@@ -13,7 +13,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import db, security
+from app.core import security
+from app.storage import db
 
 TOKEN = "enterprise-test-token-" * 3
 

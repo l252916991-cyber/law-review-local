@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from app.corpus_audit import audit
-from app.corpus_canonical import REASON, build, select, source_tier
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus
+from app.benchmarks.corpus_audit import audit
+from app.benchmarks.corpus_canonical import REASON, build, select, source_tier
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus
 from scripts.build_canonical_corpus import main as build_main
 
 
@@ -184,7 +184,7 @@ def test_real_corpus_builds_clean_canonical(tmp_path, frozen_corpus_regression):
     civil = next(doc for doc in docs if doc["law_name"] == "中华人民共和国民法典")
     article = next(item for item in civil["articles"] if item["article_id"] == "1258")
     assert not any(line.strip().startswith("附") for line in article["text"].splitlines())
-    from app.benchmark_retrieval import retrieve
+    from app.benchmarks.retrieval import retrieve
 
     refs = {"1-1": "民法典第一千二百五十八条的内容是什么？",
             "3-2": "三个以上农民专业合作社出资设立联合社依据哪条法律？"}

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.answer_eval import load_dataset, score_answer, validate_dataset
+from app.evaluation.answer_eval import load_dataset, score_answer, validate_dataset
 from scripts.build_answer_eval import build, main
 
 ROOT = Path(__file__).resolve().parents[1]

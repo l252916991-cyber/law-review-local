@@ -5,7 +5,7 @@ The rules were written after reading those answers, so these are in-sample.
 """
 import pytest
 
-from app.answer_eval import overreach_findings
+from app.evaluation.answer_eval import overreach_findings
 
 
 @pytest.mark.parametrize("sentence,rule", [
@@ -47,8 +47,8 @@ def test_each_sentence_is_reported_once_with_its_text():
 
 
 def test_the_gate_counts_only_model_answers_and_never_changes_pass_or_fail():
-    from app.answer_eval import load_dataset
-    from app.eval_gate import DEFAULT_DATASET, evaluate
+    from app.evaluation.answer_eval import load_dataset
+    from app.evaluation.eval_gate import DEFAULT_DATASET, evaluate
 
     dataset = load_dataset(DEFAULT_DATASET)
     item = dataset["items"][0]

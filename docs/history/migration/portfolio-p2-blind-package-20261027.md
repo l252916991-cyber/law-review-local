@@ -28,7 +28,7 @@ uv run --locked python scripts/build_ablation_blind_package.py \
 
 产物：`review.json`（审核人可见）、`key.json`（组织者单独保管）、`PACK_MANIFEST.json`、`README.md`。包目录必须不存在；任一步失败都不会留下“看起来完整”的旧包。
 
-裁判侧完整性检查由 `app.ablation_review.preview_scores()` 提供：把标签映射回组别并复算确定性评分，只用于确认映射正确，不是人工标签。
+裁判侧完整性检查由 `app.evaluation.ablation_review.preview_scores()` 提供：把标签映射回组别并复算确定性评分，只用于确认映射正确，不是人工标签。
 
 ## 3. 替身演练（不是质量证据）
 

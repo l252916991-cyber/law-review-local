@@ -1,7 +1,7 @@
 """Score statutory retrieval against extracted citation gold, offline and model-free.
 
 For each pinned LawBench question this resolves the reference citation
-(``app.statutory_gold``) to a frozen-corpus article, runs
+(``app.benchmarks.statutory_gold``) to a frozen-corpus article, runs
 ``benchmark_retrieval.retrieve`` and reports hit@5 / MRR@10 / NDCG@10 with
 ``statutory_benchmark.metrics``. This separates "did retrieval find the right
 article" from "did the generator's answer score well".
@@ -18,11 +18,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_retrieval import retrieve  # noqa: E402
-from app.lawbench import load_task  # noqa: E402
-from app.legal_corpus import LegalCorpus  # noqa: E402
-from app.statutory_benchmark import METRICS, metrics  # noqa: E402
-from app.statutory_gold import gold_citations  # noqa: E402
+from app.benchmarks.lawbench import load_task  # noqa: E402
+from app.benchmarks.retrieval import retrieve  # noqa: E402
+from app.benchmarks.statutory_benchmark import METRICS, metrics  # noqa: E402
+from app.benchmarks.statutory_gold import gold_citations  # noqa: E402
+from app.retrieval.legal_corpus import LegalCorpus  # noqa: E402
 
 DEFAULT_TASKS = ("1-1", "3-1", "3-2", "3-8")
 

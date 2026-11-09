@@ -8,9 +8,9 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [forge_readonly.py](../../../app/forge_readonly.py) | 可信主体与案件范围、只读源连接、单案件私有快照、固定节点调用、源版本复核、精确引文映射及旧路径对照 |
-| [forge_bridge.py](../../../app/forge_bridge.py) | 启动独立解释器，校验 wheel 摘要，使用一次性认证、序号和有界 JSON 行协议执行节点调用；处理超时及进程清理 |
-| [forge_worker.py](../../../app/forge_worker.py) | 仅在框架解释器运行；使用 ForgeHarness `Harness`/`RunKernel` 调度节点，执行只读策略、工具预算、严格引文校验及轨迹完整性检查 |
+| [forge_readonly.py](../../../app/integration/forge_readonly.py) | 可信主体与案件范围、只读源连接、单案件私有快照、固定节点调用、源版本复核、精确引文映射及旧路径对照 |
+| [forge_bridge.py](../../../app/integration/forge_bridge.py) | 启动独立解释器，校验 wheel 摘要，使用一次性认证、序号和有界 JSON 行协议执行节点调用；处理超时及进程清理 |
+| [forge_worker.py](../../../app/integration/forge_worker.py) | 仅在框架解释器运行；使用 ForgeHarness `Harness`/`RunKernel` 调度节点，执行只读策略、工具预算、严格引文校验及轨迹完整性检查 |
 | [setup_framework.py](../../../scripts/setup_framework.py) | 校验依赖清单摘要，以带 hash 的固定版本依赖及精确 wheel 安装新的 Python 3.12 独立环境 |
 | [compare_forge_readonly.py](../../../scripts/compare_forge_readonly.py) | 显式运行本地离线工程对照，报告按 0600 权限保存到指定新文件 |
 | [test_forge_readonly.py](../../../tests/test_forge_readonly.py) | 单案件隔离、身份/撤权、真实框架进程、引文/法条版本、规模及协议失败用例 |

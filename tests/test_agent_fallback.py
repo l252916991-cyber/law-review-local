@@ -3,10 +3,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import agents, services
-from app.agents import CriticAgent
-from app.db import connect, init_db, now, transaction
-from app.model_router import FallbackConfigError
+from app.llm.model_router import FallbackConfigError
+from app.review import agents, services
+from app.review.agents import CriticAgent
+from app.storage.db import connect, init_db, now, transaction
 from tests.support import IsolatedDatabaseTestCase
 
 CONTEXTS = [
@@ -221,7 +221,7 @@ class LangGraphCriticAttributionTests(IsolatedDatabaseTestCase):
             ).lastrowid)
         state = {"case_id": 1, "run_id": run_id, "question": "问题", "route": "事实检索",
                  "contexts": CONTEXTS, "specialist_outputs": {}, "use_llm": True}
-        from app.langgraph_agents import LangGraphCoordinator
+        from app.review.langgraph_agents import LangGraphCoordinator
 
         coordinator = LangGraphCoordinator(1)
         def fake_call(question, route, contexts, **kwargs):

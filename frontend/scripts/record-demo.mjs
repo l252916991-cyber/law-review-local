@@ -31,7 +31,7 @@ let report = { ok: false, synthetic_data: true, model: "fixed_answer_test_double
   narration: "silent_with_captions", scenes: [], source_head: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
   dirty: Boolean(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()),
   frontend_input_sha256: JSON.parse(readFileSync(join(root, "frontend/out/build-info.json"), "utf8")).input_sha256,
-  runtime_files: Object.fromEntries(["app/main.py", "app/services.py", "app/tool_loop.py", "scripts/frontend_test_server.py"].map(path =>
+  runtime_files: Object.fromEntries(["app/main.py", "app/review/services.py", "app/review/tool_loop.py", "scripts/frontend_test_server.py"].map(path =>
     [path, createHash("sha256").update(readFileSync(join(root, path))).digest("hex")])) };
 const delay = ms => new Promise(done => setTimeout(done, ms));
 try {

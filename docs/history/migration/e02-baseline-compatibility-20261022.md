@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- |
 | LexVault | M2 工程收口 | `5a5cbc776160953312e880d4f38d689d7b9e833d8ece038b6083f6f853860c2f` | 219 | 执行计划书编制前基线（`output/migration/m2-engineering-20261022/source-final.json`） |
 | LexVault | 执行计划书 + 文档索引 | `9bc854be75d4cd4c11caed8e8a9d7c3b24376488cc1fe88a78369e5705322627` | 220 | 计划书自身入库后的文档修订 |
-| LexVault | **E02 执行时点**（含 E01 总表与 E04 代码） | `1dc1b323dafcdf48438007edd97a4b40279580cc97aa2c760dcc67808ece4af0` | 225 | 相对 M2 收口 +6：`app/host_ports.py`、`app/forge_runtime.py`、`tests/test_host_ports.py`、`tests/test_forge_runtime.py`、`docs/history/migration/e01-entry-inventory-20261022.md`；另有文档索引变更 |
+| LexVault | **E02 执行时点**（含 E01 总表与 E04 代码） | `1dc1b323dafcdf48438007edd97a4b40279580cc97aa2c760dcc67808ece4af0` | 225 | 相对 M2 收口 +6：`app/integration/host_ports.py`、`app/integration/forge_runtime.py`、`tests/test_host_ports.py`、`tests/test_forge_runtime.py`、`docs/history/migration/e01-entry-inventory-20261022.md`；另有文档索引变更 |
 | ForgeHarness | 0.6.0 r1 候选冻结 | `13d50704639062208558cc6b94670808d071f6ad1c0a6b1f154380d1d458f39c` | 420 | `reports/release-0.6.0-r1/source.json`（清单 sha256 `4b79d94061c71d5acf62dda4d561323a49fba678dd13bfeebbee92e43b08eaa7`） |
 | ForgeCommerce | 当前检出（= 远端 HEAD） | `ac48da0ec971e73d82d4e13031d9555b7715ea3667c8fd10b958982257d13e0b`（参考口径：根文件+src/tests/scripts/docs+vendor，79 文件） | 79 | 权威身份是其 git HEAD `6a752d845e0135fcf2da67fb81beef87c8b3fc21`；内容摘要与 2026-10-21 计算值一致，未变 |
 
@@ -46,7 +46,7 @@
 
 | 层 | 版本/结构 | 兼容规则 | 回滚 |
 | --- | --- | --- | --- |
-| LexVault 业务库 | schema **v15**（`SCHEMA_VERSION`，`app/db.py:379`） | v13→v14（`runtime_requests` 映射表）→v15（`request_digest`/`principal_name` 绑定列）增量迁移；高版本拒绝降级 | 旧代码（≤v13）打开 v15 库按既有防降级拒绝；回滚需恢复备份 + `output/migration/m0-baseline-20261021/pre-change/` 文件级回滚基线 |
+| LexVault 业务库 | schema **v15**（`SCHEMA_VERSION`，`app/storage/db.py:379`） | v13→v14（`runtime_requests` 映射表）→v15（`request_digest`/`principal_name` 绑定列）增量迁移；高版本拒绝降级 | 旧代码（≤v13）打开 v15 库按既有防降级拒绝；回滚需恢复备份 + `output/migration/m0-baseline-20261021/pre-change/` 文件级回滚基线 |
 | LexVault 运行表 | `agent_runs`/`agent_steps`/`review_jobs`/`memory`/`gap_detections`/`audit_log` | 执行状态仍由这些表单一拥有；框架映射表只做关联（M1 契约 §5） | 同上 |
 | LangGraph 检查点 | 独立 SQLite（`LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB`） | 线程 ID `agent-run-{run_id}`；恢复前校验案件/线程/问题一致 | 与业务库同目录备份 |
 | ForgeHarness SDK | SDK API **1**（当前绑定 wheel） | 公共 SDK 按框架兼容策略演进，新候选重新资格化 | 发行物按 sha256 指认，不覆盖旧件 |

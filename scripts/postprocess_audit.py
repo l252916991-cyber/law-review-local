@@ -2,7 +2,7 @@
 
 This complements ``audit_benchmark.py``: that tool re-scores stored answers with the
 current scorer, while this tool first applies the project's deterministic,
-gold-blind output repairs (``app/benchmark_postprocess.py``) and then re-scores.
+gold-blind output repairs (``app/benchmarks/postprocess.py``) and then re-scores.
 The source run is never modified; every row keeps its original prediction and
 score, and ``audit.json`` records per-task and per-policy deltas.
 
@@ -24,10 +24,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_metrics import SCORER_VERSION, parse_label_answer, score_lawbench_item, task_label_space
-from app.benchmark_postprocess import POSTPROCESS_VERSION, postprocess
-from app.benchmark_reporting import atomic_json, source_hashes, write_report
-from app.benchmark_retrieval import RETRIEVAL_VERSION, retrieve
+from app.benchmarks.metrics import SCORER_VERSION, parse_label_answer, score_lawbench_item, task_label_space
+from app.benchmarks.postprocess import POSTPROCESS_VERSION, postprocess
+from app.benchmarks.reporting import atomic_json, source_hashes, write_report
+from app.benchmarks.retrieval import RETRIEVAL_VERSION, retrieve
 from scripts.audit_benchmark import paired_interval, sha256
 from verify_benchmark_run import verify
 

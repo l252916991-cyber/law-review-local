@@ -21,9 +21,9 @@
 
 ## 2. 调查依据与设计要求
 
-当前代码中，`app/rag.py::vector_search` 的 dense 召回允许正余弦候选，neural rerank 参与排序；`app/agents.py::validate_review_answer` 检查格式、引用范围、来源存在和复核提示；`app/domain_writes.py::verify_sources` 核验来源身份与原文。上述机制分别有其职责，仍需调查无关材料为何进入回答以及最终接受路径为何未拒绝。不能仅凭代码形态判定完整根因，不能直接猜一个分数阈值。
+当前代码中，`app/retrieval/rag.py::vector_search` 的 dense 召回允许正余弦候选，neural rerank 参与排序；`app/review/agents.py::validate_review_answer` 检查格式、引用范围、来源存在和复核提示；`app/integration/domain_writes.py::verify_sources` 核验来源身份与原文。上述机制分别有其职责，仍需调查无关材料为何进入回答以及最终接受路径为何未拒绝。不能仅凭代码形态判定完整根因，不能直接猜一个分数阈值。
 
-`app/model_comparison.py` 目前把 `source_rejection` 与候选失败、检索 contexts 为空等条件绑定。新拒绝契约须覆盖“召回了材料，但材料与问题不相关”的场景；候选材料可以保留供审计。服务异常、超时、未知用量和业务拒绝必须具有可区分的结果，不能将任意失败计为正确拒绝。
+`app/evaluation/model_comparison.py` 目前把 `source_rejection` 与候选失败、检索 contexts 为空等条件绑定。新拒绝契约须覆盖“召回了材料，但材料与问题不相关”的场景；候选材料可以保留供审计。服务异常、超时、未知用量和业务拒绝必须具有可区分的结果，不能将任意失败计为正确拒绝。
 
 设计时分别处理：问题与来源的相关性、材料是否足以回答、最终答案的来源支持范围。明确证据不足或无法判定时的响应与状态；保持现有原文校验。若采用额外模型判断，必须接入已有准入、预算、用量与恢复机制，并给出验证范围。没有相应证据时，继续保留 `semantic_entailment_checked=false` 的诚实声明。
 

@@ -22,7 +22,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.legal_corpus import ARTICLE_RE, SCHEMA_VERSION, LegalCorpus, article_number, split_articles  # noqa: E402
+from app.retrieval.legal_corpus import (  # noqa: E402
+    ARTICLE_RE,
+    SCHEMA_VERSION,
+    LegalCorpus,
+    article_number,
+    split_articles,
+)
 from scripts.benchmark_campaign import read_rows  # noqa: E402
 
 SEARCH_URL = "https://flk.npc.gov.cn/law-search/search/list"

@@ -3,7 +3,7 @@
 Builds a :class:`StatutoryIndex` over a canonical corpus (embedding every article
 through the local service), assembles a dev/confirm dataset from pinned LawBench
 citation gold, and reports the four modes through
-:func:`app.statutory_benchmark.evaluate`. This is the retrieval-ranking counterpart
+:func:`app.benchmarks.statutory_benchmark.evaluate`. This is the retrieval-ranking counterpart
 to ``scripts/statutory_gold_report.py`` (which scores the production lexical path).
 """
 from __future__ import annotations
@@ -17,14 +17,14 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_retrieval import RETRIEVAL_VERSION, matched_law_names  # noqa: E402
-from app.lawbench import load_task  # noqa: E402
-from app.legal_corpus import LegalCorpus  # noqa: E402
-from app.rag import EmbeddingClient, RerankClient  # noqa: E402
-from app.statutory_benchmark import evaluate  # noqa: E402
-from app.statutory_gold import gold_citations  # noqa: E402
-from app.statutory_hybrid import MODES, StatutoryHybrid  # noqa: E402
-from app.statutory_index import IndexSpec, StatutoryIndex, build_validity  # noqa: E402
+from app.benchmarks.lawbench import load_task  # noqa: E402
+from app.benchmarks.retrieval import RETRIEVAL_VERSION, matched_law_names  # noqa: E402
+from app.benchmarks.statutory_benchmark import evaluate  # noqa: E402
+from app.benchmarks.statutory_gold import gold_citations  # noqa: E402
+from app.benchmarks.statutory_hybrid import MODES, StatutoryHybrid  # noqa: E402
+from app.benchmarks.statutory_index import IndexSpec, StatutoryIndex, build_validity  # noqa: E402
+from app.retrieval.legal_corpus import LegalCorpus  # noqa: E402
+from app.retrieval.rag import EmbeddingClient, RerankClient  # noqa: E402
 
 
 def build_index(corpus: LegalCorpus, embedding: EmbeddingClient, spec: IndexSpec) -> StatutoryIndex:

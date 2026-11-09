@@ -18,10 +18,9 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-runtime-adapter-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, now, transaction  # noqa: E402
-from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator  # noqa: E402
-from app.runtime_adapter import LegacyRuntimeControl, current_actor_identity  # noqa: E402
-from app.runtime_ports import (  # noqa: E402
+from app.core.security import Principal, _principal, current_principal  # noqa: E402
+from app.integration.runtime_adapter import LegacyRuntimeControl, current_actor_identity  # noqa: E402
+from app.integration.runtime_ports import (  # noqa: E402
     EXECUTION_MODE_BACKGROUND,
     RUNTIME_PROTOCOL_VERSION,
     AccessDeniedError,
@@ -40,7 +39,8 @@ from app.runtime_ports import (  # noqa: E402
     UnsupportedExecutionModeError,
     new_request_id,
 )
-from app.security import Principal, _principal, current_principal  # noqa: E402
+from app.review.langgraph_agents import LangGraphRunError, create_langgraph_coordinator  # noqa: E402
+from app.storage.db import connect, init_db, now, transaction  # noqa: E402
 from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 QUESTION = "张某关于固定回报审批的陈述是否矛盾？"
@@ -231,7 +231,7 @@ class StartContractTests(LegacyRuntimeControlTestBase):
 
         request = make_request()
         before = self.run_count()
-        with patch("app.agents.create_coordinator", return_value=ExplodingCoordinator()):
+        with patch("app.review.agents.create_coordinator", return_value=ExplodingCoordinator()):
             handle = self.control.start(request)
         self.assertEqual(handle.status, "failed")
         self.assertTrue(handle.started_new)
@@ -248,7 +248,7 @@ class StartContractTests(LegacyRuntimeControlTestBase):
     def test_constructor_failure_before_execution_releases_the_claim(self):
         request = make_request()
         before = self.run_count()
-        with patch("app.agents.create_coordinator", side_effect=RuntimeError("initialization failed")):
+        with patch("app.review.agents.create_coordinator", side_effect=RuntimeError("initialization failed")):
             handle = self.control.start(request)
         self.assertEqual(handle.status, "failed")
         self.assertFalse(handle.needs_reconciliation)
@@ -269,7 +269,7 @@ class StartContractTests(LegacyRuntimeControlTestBase):
 
         request = make_request()
         before = self.run_count()
-        with patch("app.agents.create_coordinator", return_value=LostCallbackCoordinator()) as factory:
+        with patch("app.review.agents.create_coordinator", return_value=LostCallbackCoordinator()) as factory:
             handle = self.control.start(request)
             self.assertTrue(handle.needs_reconciliation)
             with self.assertRaises(ReconciliationRequiredError):
@@ -289,7 +289,7 @@ class StartContractTests(LegacyRuntimeControlTestBase):
                                 on_run_started=on_run_started)
 
         request = make_request(runtime="langgraph")
-        with patch("app.langgraph_agents.create_langgraph_coordinator", side_effect=injecting_factory):
+        with patch("app.review.langgraph_agents.create_langgraph_coordinator", side_effect=injecting_factory):
             handle = self.control.start(request)
         self.assertEqual(handle.status, "failed")
         self.assertIsNotNone(handle.run_id)
@@ -379,7 +379,7 @@ class ResumeCapabilityTests(LegacyRuntimeControlTestBase):
     def test_resume_failure_reports_resumable_error(self):
         run_id = self.failed_langgraph_run()
         error = LangGraphRunError("langgraph_resume_failed", run_id, True, 1)
-        with patch("app.langgraph_agents.resume_langgraph_run", side_effect=error):
+        with patch("app.review.langgraph_agents.resume_langgraph_run", side_effect=error):
             handle = self.control.resume(run_id)
         self.assertEqual(handle.status, "failed")
         self.assertFalse(handle.started_new)
@@ -388,12 +388,12 @@ class ResumeCapabilityTests(LegacyRuntimeControlTestBase):
 
     def test_resume_lost_race_maps_to_not_found(self):
         run_id = self.failed_langgraph_run()
-        with patch("app.langgraph_agents.resume_langgraph_run", side_effect=KeyError("gone")):
+        with patch("app.review.langgraph_agents.resume_langgraph_run", side_effect=KeyError("gone")):
             with self.assertRaises(RunNotFoundError):
                 self.control.resume(run_id)
 
     def test_factory_exposes_runtime_control(self):
-        from app.runtime_adapter import legacy_runtime_control
+        from app.integration.runtime_adapter import legacy_runtime_control
         self.assertIsInstance(legacy_runtime_control(), LegacyRuntimeControl)
 
 
@@ -554,7 +554,7 @@ class RequestBindingTests(LegacyRuntimeControlTestBase):
     def test_crash_window_mapping_requires_reconciliation(self):
         # A claim whose digest landed but whose run association never did
         # (crash between run insert and mapping update) must fail closed.
-        from app.runtime_ports import compute_request_digest
+        from app.integration.runtime_ports import compute_request_digest
 
         request = make_request()
         digest = compute_request_digest(request, principal_name="本机律师", effective_author="本机律师")
@@ -820,7 +820,7 @@ class SchemaMigrationTests(LegacyRuntimeControlTestBase):
         with closing(connect()) as conn:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(runtime_requests)")}
             version = conn.execute("PRAGMA user_version").fetchone()[0]
-        from app import db as app_db
+        from app.storage import db as app_db
         self.assertEqual(version, app_db.SCHEMA_VERSION)
         self.assertTrue({
             "request_id", "case_id", "runtime", "protocol_version", "run_id", "job_id",
@@ -831,7 +831,7 @@ class SchemaMigrationTests(LegacyRuntimeControlTestBase):
         import tempfile
         from unittest.mock import patch as mock_patch
 
-        from app import db
+        from app.storage import db
         with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "v14.db")):
             with mock_patch.object(db, "SCHEMA_VERSION", 14):
                 db.init_db(seed=False)

@@ -6,19 +6,19 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.db import init_db
-from app.forge_governance import BackendAdmissionError, BackendLedger, OfflineModelTest
-from app.forge_readonly import ReadonlyCaseSession
-from app.forge_runtime import FrameworkReadonlyControl
-from app.rag import EmbeddingClient, RerankClient
-from app.services import call_local_llm
+from app.integration.forge_readonly import ReadonlyCaseSession
+from app.integration.forge_runtime import FrameworkReadonlyControl
+from app.llm.forge_governance import BackendAdmissionError, BackendLedger, OfflineModelTest
+from app.retrieval.rag import EmbeddingClient, RerankClient
+from app.review.services import call_local_llm
+from app.storage.db import init_db
 from tests.support import IsolatedDatabaseTestCase
 from tests.test_forge_readonly import dump_source, request
 
 
 class BackendGovernanceTests(unittest.TestCase):
     def test_legacy_keyword_call_signature_is_preserved_without_network(self):
-        with patch("app.services.assert_model_endpoint_allowed", side_effect=RuntimeError("body reached")):
+        with patch("app.review.services.assert_model_endpoint_allowed", side_effect=RuntimeError("body reached")):
             with self.assertRaisesRegex(RuntimeError, "body reached"):
                 call_local_llm(question="question", route="route", contexts=[])
         ledger = BackendLedger(lambda: None)
@@ -110,7 +110,7 @@ class BackendGovernanceTests(unittest.TestCase):
 
 @unittest.skipUnless(os.getenv("LAW_REVIEW_FORGE_PYTHON"), "separate framework interpreter required")
 class GovernedModelProcessTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
 
     @classmethod
@@ -122,7 +122,7 @@ class GovernedModelProcessTests(IsolatedDatabaseTestCase):
 
     def test_scripted_generation_uses_framework_core_and_is_not_real_model_quality(self):
         before = dump_source()
-        with patch("app.agents.call_local_llm", side_effect=AssertionError("real model forbidden")):
+        with patch("app.review.agents.call_local_llm", side_effect=AssertionError("real model forbidden")):
             handle = self.control().start(request())
         self.assertEqual(handle.status, "completed", handle.error)
         result = handle.result.to_legacy()

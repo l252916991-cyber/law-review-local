@@ -14,8 +14,8 @@ from scripts.data_snapshot import backup, restore
 class RuntimeRestoreTests(unittest.TestCase):
     def test_failed_graph_resumes_from_restored_checkpoint_without_repeating_critic(self) -> None:
         # Imports stay inside the test so importing release tooling never initializes the app.
-        from app.db import connect, db_scope, init_db
-        from app.langgraph_agents import LangGraphCoordinator, LangGraphRunError
+        from app.review.langgraph_agents import LangGraphCoordinator, LangGraphRunError
+        from app.storage.db import connect, db_scope, init_db
 
         with tempfile.TemporaryDirectory(prefix="lexvault-restore-drill-") as directory:
             root = Path(directory).resolve()
@@ -40,7 +40,7 @@ class RuntimeRestoreTests(unittest.TestCase):
                     1, False, lambda node, _state: resumed_nodes.append(node),
                     root / "restored/langgraph_checkpoints.sqlite",
                 )
-                with patch("app.langgraph_agents.CriticAgent.run", side_effect=AssertionError("Critic must not repeat")):
+                with patch("app.review.langgraph_agents.CriticAgent.run", side_effect=AssertionError("Critic must not repeat")):
                     result = coordinator.resume(run_id)
                 self.assertEqual(result["resume_count"], 1)
                 self.assertEqual(resumed_nodes, ["memory"])

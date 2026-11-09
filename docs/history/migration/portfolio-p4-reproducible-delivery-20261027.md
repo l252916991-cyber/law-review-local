@@ -13,7 +13,7 @@
 | 归档 SHA-256 | `03c65406ebb24eafa6d4b7e8e63e29ab0425447d672d0872bb17f36b7b7c8972` |
 | 成员数 | 460 个源码文件；解压后 461 个文件（含 `RELEASE_MANIFEST.json`） |
 | 包内清单 | 逐成员摘要 **460 项全部一致，0 项不匹配** |
-| 代码一致性 | 包内 `app/agents.py` = `4dd5451b…aa2c`、`app/collaboration_ablation.py` = `ab9bd97a…2451`、`app/ablation_review.py` = `302957a3…f07`、`app/ablation_analysis.py` = `a86518cb…cb5b`，与提交 `3998b7a` 逐字节相同；文档树含阶段记录，因此身份以代码摘要与成员清单为准 |
+| 代码一致性 | 包内 `app/review/agents.py` = `4dd5451b…aa2c`、`app/evaluation/collaboration_ablation.py` = `ab9bd97a…2451`、`app/evaluation/ablation_review.py` = `302957a3…f07`、`app/evaluation/ablation_analysis.py` = `a86518cb…cb5b`，与提交 `3998b7a` 逐字节相同；文档树含阶段记录，因此身份以代码摘要与成员清单为准 |
 | 后续提交 | 本包对应 `3998b7a`，已包含分析层、盲审包与身份核对脚本；再往后的提交按第 2 节重新打包即可复核 |
 
 ## 2. 新目录重建

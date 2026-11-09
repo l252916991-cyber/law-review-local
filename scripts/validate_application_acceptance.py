@@ -69,7 +69,7 @@ def probe_mcp(other_document: int) -> dict[str, Any]:
         {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {
             "name": "get_page", "arguments": {"document_id": other_document, "page_no": 1}}},
     ]
-    command = [sys.executable, "-m", "app.mcp_server", "--case-id", "1"]
+    command = [sys.executable, "-m", "app.integration.mcp_server", "--case-id", "1"]
     rows: list[dict[str, Any]] = []
     with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, text=True, cwd=ROOT) as process:
@@ -104,8 +104,8 @@ def probe_mcp(other_document: int) -> dict[str, Any]:
 
 
 def live_models() -> dict[str, Any]:
-    from app.services import chat, last_llm_usage
-    from app.tool_loop import run_tool_loop
+    from app.review.services import chat, last_llm_usage
+    from app.review.tool_loop import run_tool_loop
 
     result: dict[str, Any] = {"real_model": True, "tools": {}, "chat": {}}
     started = time.perf_counter()
@@ -128,7 +128,7 @@ def live_models() -> dict[str, Any]:
     except Exception as exc:
         result["chat"] = {"error_type": type(exc).__name__, "error": str(exc)}
     result["chat"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
-    from app.db import connect
+    from app.storage.db import connect
     with connect() as conn:
         result["calls"] = [dict(row) for row in conn.execute(
             "SELECT kind,model,status,input_tokens,output_tokens,latency_ms FROM llm_calls ORDER BY id")]
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     endpoint = loopback_endpoint(args.endpoint)
     with tempfile.TemporaryDirectory(prefix="lexvault-acceptance-") as directory:
         with isolated_environment(Path(directory), endpoint, args.model, args.fallback_model):
-            from app.db import db_scope, init_db, now, transaction
+            from app.storage.db import db_scope, init_db, now, transaction
             with db_scope(Path(directory) / "law_review.db"):
                 init_db(seed=True)
                 with transaction() as conn:

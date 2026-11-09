@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from app.statutory_benchmark import evaluate, metrics, paired_delta
-from app.statutory_hybrid import MODES, StatutoryHybrid
-from app.statutory_index import IndexSpec, StatutoryIndex
+from app.benchmarks.statutory_benchmark import evaluate, metrics, paired_delta
+from app.benchmarks.statutory_hybrid import MODES, StatutoryHybrid
+from app.benchmarks.statutory_index import IndexSpec, StatutoryIndex
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
 
 
 @pytest.fixture

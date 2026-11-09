@@ -12,8 +12,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_metrics import score_lawbench_item
-from app.benchmark_reporting import atomic_json, metrics
+from app.benchmarks.metrics import score_lawbench_item
+from app.benchmarks.reporting import atomic_json, metrics
 from scripts.benchmark_campaign import digest, read_rows, validate_campaign
 
 
@@ -21,7 +21,7 @@ def _legacy_postprocess_v1(task_id: str, question: str, prediction: str) -> tupl
     """Reconstruct v3/v4 experiments after the live postprocessor evolves."""
     if task_id != "2-1" or not prediction:
         return prediction, {"version": "benchmark-postprocess-v1", "applied": False}
-    from app.benchmark_postprocess import preserve_correction_surface
+    from app.benchmarks.postprocess import preserve_correction_surface
     revised = preserve_correction_surface(question, prediction)
     return revised, {"version": "benchmark-postprocess-v1", "applied": revised != prediction,
                      "original_prediction": prediction if revised != prediction else None,
@@ -31,8 +31,8 @@ def _legacy_postprocess_v1(task_id: str, question: str, prediction: str) -> tupl
 def _legacy_postprocess_v2(task_id: str, question: str, prediction: str,
                            retrieval: dict[str, Any] | None) -> tuple[str, dict[str, object]]:
     """Reconstruct frozen experiment-v5 deterministic processing."""
-    from app.benchmark_amount import crime_amount, format_amount
-    from app.benchmark_postprocess import ARTICLE_HEADING, _source_order_triggers, preserve_correction_surface
+    from app.benchmarks.amount import crime_amount, format_amount
+    from app.benchmarks.postprocess import ARTICLE_HEADING, _source_order_triggers, preserve_correction_surface
     revised, policy = prediction, "unchanged"
     details: dict[str, object] = {}
     if task_id == "1-1" and retrieval and retrieval.get("mode") == "exact_article" and retrieval.get("hits"):
@@ -62,7 +62,7 @@ def _legacy_postprocess_v3(task_id: str, question: str, prediction: str,
     revised, audit = _legacy_postprocess_v2(task_id, question, prediction, retrieval)
     audit["version"] = "benchmark-postprocess-v3"
     if task_id == "2-9":
-        from app.benchmark_event_tools import event_labels
+        from app.benchmarks.event_tools import event_labels
         labels = event_labels(question)
         if labels:
             revised = ";".join(labels)
@@ -75,8 +75,8 @@ def _legacy_postprocess_v3(task_id: str, question: str, prediction: str,
 def _legacy_postprocess_v4(task_id: str, question: str, prediction: str,
                            retrieval: dict[str, Any] | None) -> tuple[str, dict[str, object]]:
     """Reconstruct frozen experiment-v7 processing before summary extraction."""
-    from app.benchmark_event_tools import event_labels
-    from app.benchmark_postprocess import ARTICLE_HEADING, _source_order_triggers, preserve_correction_surface
+    from app.benchmarks.event_tools import event_labels
+    from app.benchmarks.postprocess import ARTICLE_HEADING, _source_order_triggers, preserve_correction_surface
     revised, policy = prediction, "unchanged"
     details: dict[str, object] = {}
     if task_id == "1-1" and retrieval and retrieval.get("mode") == "exact_article" and retrieval.get("hits"):
@@ -114,35 +114,35 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
         from scripts.benchmark_experiment import configuration
         if digest(run_dir / "profile.json") != manifest["profile_sha256"] or configuration(run_dir / "profile.json") != manifest["config"]:
             issues.append("External profile mismatch")
-        from app.benchmark_retrieval import corpus_fingerprint
+        from app.benchmarks.retrieval import corpus_fingerprint
         if corpus_fingerprint(manifest["config"].get("corpus_directories", [])) != manifest["corpus_files"]:
             issues.append("Corpus fingerprint mismatch")
     elif manifest["config"] != campaign["profiles"][manifest["profile"]]:
         issues.append("Profile mismatch")
     if Counter(row["question_id"] for row in rows) != Counter(manifest["question_ids"]):
         issues.append("Missing, duplicate or unexpected results")
-    known_sources = {"scripts/benchmark_campaign.py", "app/benchmark_solver.py", "app/services.py", "app/config.py"}
+    known_sources = {"scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/services.py", "app/core/config.py"}
     if manifest.get("experiment_version") == 2:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py", "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py", "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") in {3, 4}:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-                              "app/benchmark_postprocess.py", "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+                              "app/benchmarks/postprocess.py", "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") == 5:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-                              "app/benchmark_postprocess.py", "app/benchmark_amount.py", "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+                              "app/benchmarks/postprocess.py", "app/benchmarks/amount.py", "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") == 6:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-                              "app/benchmark_postprocess.py", "app/benchmark_amount.py", "app/benchmark_event_tools.py",
-                              "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+                              "app/benchmarks/postprocess.py", "app/benchmarks/amount.py", "app/benchmarks/event_tools.py",
+                              "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") == 7:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-                              "app/benchmark_postprocess.py", "app/benchmark_event_tools.py", "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+                              "app/benchmarks/postprocess.py", "app/benchmarks/event_tools.py", "app/retrieval/legal_corpus.py"})
     elif manifest.get("experiment_version") in {8, 9}:
-        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-                              "app/benchmark_postprocess.py", "app/benchmark_event_tools.py",
-                              "app/benchmark_summary_tools.py", "app/legal_corpus.py"})
+        known_sources.update({"scripts/benchmark_experiment.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+                              "app/benchmarks/postprocess.py", "app/benchmarks/event_tools.py",
+                              "app/benchmarks/summary_tools.py", "app/retrieval/legal_corpus.py"})
     if manifest.get("experiment_version") == 9:
-        known_sources.add("app/benchmark_weak_tasks.py")
+        known_sources.add("app/benchmarks/weak_tasks.py")
     if set(manifest["sources"]) != known_sources:
         issues.append("Source snapshot coverage mismatch")
     for name, expected in manifest["sources"].items():
@@ -186,8 +186,8 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
             if weak:
                 from unittest.mock import patch
 
-                from app.benchmark_weak_tasks import solve as weak_solve
-                with patch("app.benchmark_rag_solver._call", return_value=call) as rc, patch("app.benchmark_solver._call", return_value=call) as bc:
+                from app.benchmarks.weak_tasks import solve as weak_solve
+                with patch("app.benchmarks.rag_solver._call", return_value=call) as rc, patch("app.benchmarks.solver._call", return_value=call) as bc:
                     reconstructed = weak_solve(original["task"], original["instruction"], original["question"], manifest["config"])
                 invoked = [args for mock in (rc, bc) for args in mock.call_args_list]
                 if len(invoked) != 1 or invoked[0].args[0] != request["messages"]:
@@ -195,7 +195,7 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
                 if reconstructed["prediction"] != row["prediction"] or reconstructed.get("retrieval") != row.get("retrieval"):
                     issues.append(f"Weak task reconstruction mismatch: {key}")
             if manifest["config"]["strategy"] == "statutory_rag" or (weak and original["task"] in {"1-1", "2-1", "3-2"}):
-                from app.benchmark_retrieval import retrieve
+                from app.benchmarks.retrieval import retrieve
                 context = retrieve(original["task"], original["question"], manifest["config"]["corpus_directories"])
                 if row.get("retrieval") != context:
                     issues.append(f"Retrieval mismatch: {key}")
@@ -224,7 +224,7 @@ def verify(campaign_dir: Path, run_dir: Path, write: bool = True) -> dict[str, A
                         row["task"], original["question"], expected_prediction, row.get("retrieval"),
                     )
                 else:
-                    from app.benchmark_postprocess import postprocess
+                    from app.benchmarks.postprocess import postprocess
                     expected_prediction, audit = postprocess(
                         row["task"], original["question"], expected_prediction,
                         retrieval=row.get("retrieval"),

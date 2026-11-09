@@ -23,13 +23,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item  # noqa: E402
-from app.benchmark_retrieval import corpus_fingerprint  # noqa: E402
-from app.lawbench import load_task  # noqa: E402
+from app.benchmarks.lawbench import load_task  # noqa: E402
+from app.benchmarks.metrics import SCORER_VERSION, score_lawbench_item  # noqa: E402
+from app.benchmarks.retrieval import corpus_fingerprint  # noqa: E402
 
-SOURCES = ("app/benchmark_solver.py", "app/benchmark_rag_solver.py", "app/benchmark_retrieval.py",
-           "app/benchmark_metrics.py", "app/legal_corpus.py", "app/benchmark_postprocess.py",
-           "app/lawbench.py", "scripts/fullscale_paired.py")
+SOURCES = ("app/benchmarks/solver.py", "app/benchmarks/rag_solver.py", "app/benchmarks/retrieval.py",
+           "app/benchmarks/metrics.py", "app/retrieval/legal_corpus.py", "app/benchmarks/postprocess.py",
+           "app/benchmarks/lawbench.py", "scripts/fullscale_paired.py")
 
 
 def digest(path: Path) -> str:
@@ -57,8 +57,8 @@ def _transport_failure(error: str) -> bool:
 
 def run_arm(arm: str, task_id: str, rows_in: list[dict[str, Any]], expected: dict[str, str],
             profile: dict[str, Any], output: Path, sources: dict[str, str]) -> list[dict[str, Any]]:
-    from app.benchmark_rag_solver import solve as rag_solve
-    from app.benchmark_solver import solve as base_solve
+    from app.benchmarks.rag_solver import solve as rag_solve
+    from app.benchmarks.solver import solve as base_solve
 
     arm_dir = output / arm
     arm_dir.mkdir(parents=True, exist_ok=True)

@@ -12,29 +12,29 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.formparsers import MultiPartException
 
-from .case_reports import router as case_report_router
-from .case_walls import router as case_wall_router
-from .config import config
-from .conflicts import router as conflict_router
-from .db import init_db, process_ownership
-from .human_tasks import router as human_task_router
-from .logger import request_id as logger_request_id
-from .members import router as member_router
-from .review_jobs import router as review_job_router
-from .review_jobs import shutdown_review_executor, start_review_executor
-from .routes import agent_runs as agent_runs_routes
-from .routes import bank as bank_routes
-from .routes import cases as cases_routes
-from .routes import chat as chat_routes
-from .routes import documents as documents_routes
-from .routes import evidence as evidence_routes
-from .routes import exports as exports_routes
-from .routes import system as system_routes
-from .routes.common import probe_redis
-from .security import AccessMiddleware, apply_security_headers
-from .security import router as access_router
-from .statutory_retrieval import corpus_status
-from .tasks import reconcile_batch_dispatches
+from app.api.routes import agent_runs as agent_runs_routes
+from app.api.routes import bank as bank_routes
+from app.api.routes import cases as cases_routes
+from app.api.routes import chat as chat_routes
+from app.api.routes import documents as documents_routes
+from app.api.routes import evidence as evidence_routes
+from app.api.routes import exports as exports_routes
+from app.api.routes import system as system_routes
+from app.api.routes.common import probe_redis
+from app.cases.case_reports import router as case_report_router
+from app.cases.case_walls import router as case_wall_router
+from app.cases.conflicts import router as conflict_router
+from app.cases.human_tasks import router as human_task_router
+from app.cases.members import router as member_router
+from app.core.config import config
+from app.core.logger import request_id as logger_request_id
+from app.core.security import AccessMiddleware, apply_security_headers
+from app.core.security import router as access_router
+from app.documents.tasks import reconcile_batch_dispatches
+from app.retrieval.statutory_retrieval import corpus_status
+from app.review.review_jobs import router as review_job_router
+from app.review.review_jobs import shutdown_review_executor, start_review_executor
+from app.storage.db import init_db, process_ownership
 
 access_logger = logging.getLogger("law_review.access")
 
@@ -44,7 +44,7 @@ async def lifespan(application: FastAPI):
     application.state.ready = False
     application.state.redis_available = False
     if os.getenv("LAW_REVIEW_JSON_LOGS", "0") == "1":
-        from .logger import setup_logging
+        from app.core.logger import setup_logging
         setup_logging(os.getenv("LAW_REVIEW_LOG_LEVEL", "INFO"))
     with process_ownership():
         init_db(seed=True, recover_runs=True)
@@ -186,21 +186,21 @@ app.add_middleware(UploadBodyLimitMiddleware)
 
 @app.get("/_next/{asset_path:path}", include_in_schema=False)
 def next_frontend_asset(asset_path: str):
-    from .frontend import frontend_asset
+    from app.api.frontend import frontend_asset
 
     return frontend_asset(asset_path)
 
 
 @app.get("/", include_in_schema=False)
 def index():
-    from .frontend import frontend_shell
+    from app.api.frontend import frontend_shell
 
     return frontend_shell()
 
 
 @app.get("/mobile", include_in_schema=False)
 def mobile():
-    from .frontend import frontend_shell
+    from app.api.frontend import frontend_shell
 
     return frontend_shell()
 

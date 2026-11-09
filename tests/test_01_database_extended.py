@@ -14,8 +14,8 @@ from tests.support import IsolatedDatabaseTestCase
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-db-tests-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, now, sync_fts_index, table_names, transaction  # noqa: E402
-from app.search_backend import fts_page_candidates  # noqa: E402
+from app.retrieval.search_backend import fts_page_candidates  # noqa: E402
+from app.storage.db import connect, init_db, now, sync_fts_index, table_names, transaction  # noqa: E402
 
 
 def insert_case(conn, title, case_no):
@@ -50,7 +50,7 @@ def insert_evidence(conn, case_id, title, category, fact, source_doc_id=None):
 
 class OrderedMigrationTest(unittest.TestCase):
     def test_supported_versions_upgrade_and_repeat(self):
-        from app import db
+        from app.storage import db
         for version in (0, 1, 2):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
                 with db.db_scope(os.path.join(directory, "test.db")):
@@ -76,7 +76,7 @@ class OrderedMigrationTest(unittest.TestCase):
                         self.assertEqual(conn.execute("SELECT title FROM cases").fetchone()[0], "preserved")
 
     def test_future_version_is_not_modified_or_recovered(self):
-        from app import db
+        from app.storage import db
         with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
             with db.transaction() as conn:
                 conn.execute("CREATE TABLE future_data(value TEXT)")
@@ -92,7 +92,7 @@ class OrderedMigrationTest(unittest.TestCase):
     def test_migration_failure_rolls_back_ddl_and_version(self):
         from unittest.mock import patch
 
-        from app import db
+        from app.storage import db
         def fail(conn):
             conn.execute("CREATE TABLE partial_change(id INTEGER)")
             raise RuntimeError("injected failure")
@@ -107,7 +107,7 @@ class OrderedMigrationTest(unittest.TestCase):
     def test_v13_child_index_migration_is_ordered_and_atomic(self):
         from unittest.mock import patch
 
-        from app import db
+        from app.storage import db
 
         with tempfile.TemporaryDirectory() as directory, db.db_scope(os.path.join(directory, "test.db")):
             with patch.object(db, "SCHEMA_VERSION", 12):

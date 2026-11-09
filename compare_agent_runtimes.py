@@ -14,12 +14,12 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-from app.agents import create_coordinator, get_run_trace
-from app.db import init_db
-from app.langgraph_agents import create_langgraph_coordinator
-from app.runtime_comparison import compare_runtime_results
-from app.rag import recall_memories
-from app.services import LOCAL_LLM_MODEL, local_llm_available
+from app.review.agents import create_coordinator, get_run_trace
+from app.storage.db import init_db
+from app.review.langgraph_agents import create_langgraph_coordinator
+from app.integration.runtime_comparison import compare_runtime_results
+from app.retrieval.rag import recall_memories
+from app.review.services import LOCAL_LLM_MODEL, local_llm_available
 
 
 CASES = [
@@ -325,7 +325,7 @@ def run_benchmark(
 
 def engineering_metrics() -> dict[str, Any]:
     root = Path(__file__).resolve().parent
-    names = ["app/agents.py", "app/langgraph_agents.py", "app/runtime_comparison.py",
+    names = ["app/review/agents.py", "app/review/langgraph_agents.py", "app/integration/runtime_comparison.py",
              "compare_agent_runtimes.py", "tests/test_04_langgraph_runtime.py"]
     return {"source_lines": {name: len((root / name).read_text().splitlines()) for name in names}}
 

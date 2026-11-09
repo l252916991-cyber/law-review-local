@@ -6,7 +6,7 @@
 
 **答**：为了把“发现”和“判断”分开。事实摘录、证据来源、候选矛盾、证据疏漏四类工作有明确输入边界（同一批检索页），适合确定性规则先做结构化整理；模型只做最后的审校与表述。收益是可审计：每个专家的输出带来源绑定与稳定编号，分歧可以被保留而不是被模型概括掉。代价是输入变长（本机 60 题：B 组提示中位 7,568 字符、C 组 9,719 字符，A 组 855 字符；实测输入 token B/C 为 A 的 4.9–6.4 倍），但两批数据的通过率都没有因此提高。
 
-**位置**：`app/agents.py`（`specialist_specs` / `run_specialist`）、`app/review_collaboration.py`（`build_collaboration`）。
+**位置**：`app/review/agents.py`（`specialist_specs` / `run_specialist`）、`app/review/review_collaboration.py`（`build_collaboration`）。
 **证据**：[specialist-collaboration-20261026.md](../history/migration/specialist-collaboration-20261026.md)、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md) 第 5 节。
 
 ## Q2 为什么保留规则专家，不全部换成 LLM？
@@ -22,21 +22,21 @@
 
 做法上有两道保险：一是 `group_note()` 是唯一入口，`C = B + crosscheck` 用前缀关系表达；二是回归把 B/C 的说明块从 user 消息中剥离后，要求与 A 逐字节相同。另外用一个捕获型 opener 抓取产品 `call_local_llm` 的真实请求体，逐字段与 `build_prompt()` 比较——产品提示路径一变，测试先红。
 
-**位置**：`app/collaboration_ablation.py`（`group_note` / `build_prompt` / `prepare_item`）。
+**位置**：`app/evaluation/collaboration_ablation.py`（`group_note` / `build_prompt` / `prepare_item`）。
 **证据**：`tests/test_collaboration_ablation.py`（15 项，含 `test_groups_differ_only_in_the_registered_note`、`test_prompt_mirrors_the_product_chat_request`）。
 
 ## Q4 怎么控预算、怎么记账？
 
 **答**：四层。①冻结：`prepare` 阶段就把三组提示算好并记录 `sha256` 与字符数，`run` 只读冻结批次，运行前重算摘要，摘要不符直接拒绝。②硬上限：单次提示 48,000 字符封顶，超过即 `budget_exceeded`，**不发起调用、不截断**；输出上限与配置不一致时拒绝开始。③账本：每次尝试写 `attempts.jsonl`，含 outcome、耗时、input/output token（端点没报就写 `null` 并计 `unknown_usage`，从不写 0）。④分母：失败、未尝试、规则拒答都留在 `pass_rate_all_planned` 里，另给 `pass_rate_executed_ok`，两个数一起报。
 
-**位置**：`app/collaboration_ablation.py`（`_attempt` / `summarise_attempts` / `run_batch`）。
+**位置**：`app/evaluation/collaboration_ablation.py`（`_attempt` / `summarise_attempts` / `run_batch`）。
 **证据**：P1 第 4 节；`tests/test_collaboration_ablation.py` 中预算、未知用量、分母三项测试。
 
 ## Q5 如何防止“过期分析被复用”？
 
 **答**：受控检索在展示前先记录完整页面的 `page_text_sha256`，checkpoint 里存的是这个摘要。恢复时逐页比对当前案件原文：改动即使落在返回文本窗口之外也会被发现，报“运行依据的资料页内容已变化，拒绝恢复旧分析”，运行保持 `failed`、`resume_count` 不增加（不消耗重试）。没有完整页摘要的旧 checkpoint 只保留存在性检查，并如实标注不能冒充新版本校验。
 
-**位置**：`app/agent_tools.py`（`page_text_sha256`）、`app/langgraph_agents.py`（`resume`）。
+**位置**：`app/review/agent_tools.py`（`page_text_sha256`）、`app/review/langgraph_agents.py`（`resume`）。
 **证据**：[P3](../history/migration/portfolio-p3-demo-status-20261027.md) 第 2 节（三份证据 JSON 与摘要）、`scripts/demo_recovery_check.py`。
 
 ## Q6 怎么评测？为什么分三层？
@@ -47,7 +47,7 @@
 - **回答质量**：确定性词面评分（要点覆盖、无据断言、引用精度、该拒答时是否拒答）、模型 Judge、独立人工评分**分别报告**；Judge/人工一致性只在有 ≥20 个有效匹配标签时才算 κ，缺人工就留空。
 - **效率**：每题 input/output token、调用数、耗时中位与分位；小样本 p95 不当 SLA，本地 token 不是账单。
 
-**位置**：`app/answer_eval.py`、`scripts/run_answer_eval.py`、`scripts/run_answer_judge.py`、`app/answer_review.py`。
+**位置**：`app/evaluation/answer_eval.py`、`scripts/run_answer_eval.py`、`scripts/run_answer_judge.py`、`app/evaluation/answer_review.py`。
 **证据**：[answer-evaluation.md](../runbook/answer-evaluation.md)。
 
 ## Q7 讲一个负结果。
@@ -79,7 +79,7 @@
 
 取舍：管理员同样在墙外，靠破窗访问兜底（限 30 分钟、写理由、留痕）。审计日志和安全事件按设计不受行级策略约束，展示时在应用层过滤。应用必须用非超级用户连接，测试库也归非超级用户角色所有，所以全量测试都在行级安全生效的情况下跑。
 
-**位置**：`app/case_walls.py`、`app/security.py`（`require_case_access`）、`scripts/generate_postgres_schema.py`（`WALLED_DIRECT` / `WALLED_VIA` / `WALL_EXEMPT`）。
+**位置**：`app/cases/case_walls.py`、`app/core/security.py`（`require_case_access`）、`scripts/generate_postgres_schema.py`（`WALLED_DIRECT` / `WALLED_VIA` / `WALL_EXEMPT`）。
 **证据**：`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)。
 
 ## Q10 行级安全的性能问题是怎么发现和解决的？
@@ -101,7 +101,7 @@
 
 所以它现在只报告不阻断。下一步要靠律师标注来校准，而不是看着同一批数据继续加规则。
 
-**位置**：`app/answer_eval.py`（`overreach_findings`）、`app/eval_gate.py`。
+**位置**：`app/evaluation/answer_eval.py`（`overreach_findings`）、`app/evaluation/eval_gate.py`。
 **证据**：[检测校准记录](../benchmarks/overreach-detector-20261102.md)、`tests/test_overreach.py`。
 
 ## Q12 换一个模型，门禁分数能直接比吗？
@@ -110,7 +110,7 @@
 
 产品问题当天修掉：只有文件名、页码或编号都对得上本轮来源，才改写成标准的 `[资料N]`。第二种写法 9B 第一次就写过，我起初没放行；35B 第二次又写了 3 次，才确认是常见写法。27B 和 35B 各重跑一次，同一模型两次之间都差 2 题，全部来自措辞，正好顶到门禁阈值，这也说明评分需要认得同义写法。验证没有重跑模型，而是把保存的原始输出经假端点回放：先用旧代码回放，必须与原报告逐题一致，再看新代码改变了哪几题。评分问题没有当场改，因为照着这批回答改，这批就成了样本内，要先写下规则，再用新回答检验。
 
-**位置**：`app/services.py`（`canonical_source_markers`）、`scripts/replay_model_gate.py`。
+**位置**：`app/review/services.py`（`canonical_source_markers`）、`scripts/replay_model_gate.py`。
 **证据**：[跨模型记录](../history/eval-gate-cross-model-20261107.md)、`tests/test_source_markers.py`。
 
 ## Q13 准确率是多少？
@@ -121,5 +121,5 @@
 
 律师复核包已经备好：20 道冻结题、真实模型回答、不含自动评分，律师大约一小时能标完，交回来就能算出律师和门禁的一致率。
 
-**位置**：`app/answer_eval.py`（`score_answer_v4`）、`scripts/run_answer_judge.py`（盲审包）。
+**位置**：`app/evaluation/answer_eval.py`（`score_answer_v4`）、`scripts/run_answer_judge.py`（盲审包）。
 **证据**：[评测可信度说明](../benchmarks/eval-credibility-20261108.md)、[评分 v4 记录](../benchmarks/answer-scoring-v4-20261108.md)、[逐题人工标签](../benchmarks/scorer-validity-20261108.json)。

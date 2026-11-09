@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.ablation_analysis import (
+from app.evaluation.ablation_analysis import (
     analyse,
     case_bootstrap,
     load_attempts,

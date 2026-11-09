@@ -39,7 +39,7 @@ kernel 对模型/工具的准入及结算串行化，避免并发花同一额度
 
 ## 3. 律所来源与规模契约
 
-新增 [forge_sources.py](../../../app/forge_sources.py)，为法条声明独立 `source_contract_version=1`：kind、语料摘要、文档身份、法律名称/版本、条号/子条及正文摘要。`[statute:N]「原文」` 不伪装为案件页；案件来源仍按原始 document_id/page_no/text_sha256 校验。
+新增 [forge_sources.py](../../../app/integration/forge_sources.py)，为法条声明独立 `source_contract_version=1`：kind、语料摘要、文档身份、法律名称/版本、条号/子条及正文摘要。`[statute:N]「原文」` 不伪装为案件页；案件来源仍按原始 document_id/page_no/text_sha256 校验。
 
 只有固定语料中精确解析为 `ok` 的法条可形成已核验来源；发现式候选不能自动升级。校验拒绝正文篡改、错误/重复身份、异版本语料、不精确或缺少的引文。纯法条结果明确只列法条原文并要求律师复核，不输出未经材料支持的案件结论。
 
@@ -53,7 +53,7 @@ kernel 对模型/工具的准入及结算串行化，避免并发花同一额度
 
 ## 4. 离线模型与检索治理
 
-新增 [forge_governance.py](../../../app/forge_governance.py)。BackendLedger 仅在私有快照操作范围内激活，读取前后重新授权，限制物理调用次数、累计序列化输入字符和 admission deadline。默认上限 128 调用、2000 万序列化字符，输入含 JSON 开销，独立于案件容量边界。超时后停止后续工作，不宣称已回滚外部效果。
+新增 [forge_governance.py](../../../app/llm/forge_governance.py)。BackendLedger 仅在私有快照操作范围内激活，读取前后重新授权，限制物理调用次数、累计序列化输入字符和 admission deadline。默认上限 128 调用、2000 万序列化字符，输入含 JSON 开销，独立于案件容量边界。超时后停止后续工作，不宣称已回滚外部效果。
 
 嵌入和重排客户端及生成入口使用同一上下文守卫。新离线路径只允许 `hashed-local` 嵌入，其他网络后端在执行前拒绝。事件记录调用身份、后端/模型、请求摘要、输入量、是否执行、失败类型和耗时，不含案件正文或凭据；取不到实际 provider token 时保留 `None`，不填零。该范围外的原正式入口保持登记状态，不能据此宣称全产品旁路已关闭。
 
@@ -62,8 +62,8 @@ kernel 对模型/工具的准入及结算串行化，避免并发花同一额度
 示例（只用于已授权隔离数据和测试，不是生产启用命令）：
 
 ```python
-from app.forge_governance import OfflineModelTest
-from app.forge_runtime import FrameworkReadonlyControl
+from app.llm.forge_governance import OfflineModelTest
+from app.integration.forge_runtime import FrameworkReadonlyControl
 
 control = FrameworkReadonlyControl(model_test=OfflineModelTest())
 # 使用可信宿主构造的 request；仍为 use_llm=False、远程嵌入=False、persist_memory=False。

@@ -2,7 +2,7 @@
 a description of the case that happens to use the same words does not."""
 import pytest
 
-from app.agents import answer_contract
+from app.review.agents import answer_contract
 
 REMINDER = "请律师复核原文与上述结论。"
 

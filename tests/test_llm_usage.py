@@ -4,8 +4,8 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 
-from app.db import connect, db_scope, init_db, now, transaction
-from app.llm_usage import percentile, record_llm_call, token_counts, usage_summary
+from app.llm.llm_usage import percentile, record_llm_call, token_counts, usage_summary
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 class TokenCountTests(unittest.TestCase):
@@ -50,7 +50,7 @@ class AccountingTests(unittest.TestCase):
 
     def test_migration_creates_the_accounting_table(self):
         with closing(
-            __import__("app.db", fromlist=["connect"]).connect()
+            __import__("app.storage.db", fromlist=["connect"]).connect()
         ) as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             columns = {row[1] for row in conn.execute("PRAGMA table_info(llm_calls)")}

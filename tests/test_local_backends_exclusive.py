@@ -7,7 +7,7 @@ import urllib.error
 
 import pytest
 
-from app.local_backends import LocalModels
+from app.llm.local_backends import LocalModels
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401
 from tests.test_local_backends import local_models  # noqa: F401
@@ -76,7 +76,7 @@ def test_exclusive_residency_unloads_registered_models_before_inference(local_mo
     fixture, _ = local_models
     models = _models(fixture, exclusive_residency=True)
     opener = _FakeOpener()
-    monkeypatch.setattr("app.local_backends.egress_opener", lambda: opener)
+    monkeypatch.setattr("app.llm.local_backends.egress_opener", lambda: opener)
 
     body = models.invoke("llm", _llm_payload(models), 1)
 
@@ -103,7 +103,7 @@ def test_exclusive_residency_accepts_the_admin_detail_error_shape(local_models, 
         return original_open(request, timeout)
 
     opener.open = open_admin_shape
-    monkeypatch.setattr("app.local_backends.egress_opener", lambda: opener)
+    monkeypatch.setattr("app.llm.local_backends.egress_opener", lambda: opener)
 
     body = models.invoke("llm", _llm_payload(models), 1)
 
@@ -126,7 +126,7 @@ def test_exclusive_residency_rejects_an_unexpected_unload_error(local_models, mo
     fixture, _ = local_models
     models = _models(fixture, exclusive_residency=True)
     opener = _FakeOpener(unloads={"llm": ("http", 500, "unload failed")})
-    monkeypatch.setattr("app.local_backends.egress_opener", lambda: opener)
+    monkeypatch.setattr("app.llm.local_backends.egress_opener", lambda: opener)
 
     with pytest.raises(RuntimeError, match="residency admission"):
         models.invoke("llm", _llm_payload(models), 1)
@@ -138,7 +138,7 @@ def test_exclusive_residency_propagates_an_unload_timeout(local_models, monkeypa
     fixture, _ = local_models
     models = _models(fixture, exclusive_residency=True)
     opener = _FakeOpener(unloads={"embedding": ("timeout", None, None)})
-    monkeypatch.setattr("app.local_backends.egress_opener", lambda: opener)
+    monkeypatch.setattr("app.llm.local_backends.egress_opener", lambda: opener)
 
     with pytest.raises(TimeoutError, match="unload request timed out"):
         models.invoke("llm", _llm_payload(models), 1)
@@ -150,7 +150,7 @@ def test_exclusive_residency_deadline_prevents_any_unload_request(local_models, 
     fixture, _ = local_models
     models = _models(fixture, exclusive_residency=True)
     opener = _FakeOpener()
-    monkeypatch.setattr("app.local_backends.egress_opener", lambda: opener)
+    monkeypatch.setattr("app.llm.local_backends.egress_opener", lambda: opener)
 
     with pytest.raises(TimeoutError, match="original deadline"):
         models._release_registered_models(time.monotonic() - 1)

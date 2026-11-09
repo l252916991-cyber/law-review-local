@@ -1,13 +1,13 @@
 # MCP 接入（只读案件工具）
 
-`app/mcp_server.py` 以 stdio + JSON-RPC 2.0 暴露案件只读工具，供支持 MCP 的客户端（Cursor、Claude Desktop 等）调用。它不引入第三方依赖，只做协议适配。
+`app/integration/mcp_server.py` 以 stdio + JSON-RPC 2.0 暴露案件只读工具，供支持 MCP 的客户端（Cursor、Claude Desktop 等）调用。它不引入第三方依赖，只做协议适配。
 
 ## 1. 启动
 
 ```bash
 LAW_REVIEW_DATA_DIR=/path/to/data \
 LAW_REVIEW_MCP_CASE_ID=1 \
-uv run --locked python -m app.mcp_server
+uv run --locked python -m app.integration.mcp_server
 ```
 
 也可用 `--case-id 1`；`--list-tools` 打印工具描述后退出，便于排查客户端为何看不到工具。
@@ -19,7 +19,7 @@ uv run --locked python -m app.mcp_server
   "mcpServers": {
     "lexvault-case": {
       "command": "uv",
-      "args": ["run", "--locked", "--directory", "/path/to/law-review-local", "python", "-m", "app.mcp_server"],
+      "args": ["run", "--locked", "--directory", "/path/to/law-review-local", "python", "-m", "app.integration.mcp_server"],
       "env": {
         "LAW_REVIEW_DATA_DIR": "/path/to/data",
         "LAW_REVIEW_MCP_CASE_ID": "1"

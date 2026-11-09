@@ -124,14 +124,14 @@ flowchart TB
 
 | 位置 | 计划改动 |
 | --- | --- |
-| `app/agents.py` | 分离领域节点与调度/持久化；保持规则结果；显式注入模型、检索、记忆与结果存储端口 |
-| `app/langgraph_agents.py` | 过渡期保留历史运行恢复；退出前验证任务归属和版本，不将旧 checkpoint 直接交给 ForgeHarness |
-| `app/review_jobs.py` | 使用公共运行接口和 run_started 事件；替换对私有 `_start_run` 的临时修改；持久关联请求与运行；固定可信身份及数据作用域 |
+| `app/review/agents.py` | 分离领域节点与调度/持久化；保持规则结果；显式注入模型、检索、记忆与结果存储端口 |
+| `app/review/langgraph_agents.py` | 过渡期保留历史运行恢复；退出前验证任务归属和版本，不将旧 checkpoint 直接交给 ForgeHarness |
+| `app/review/review_jobs.py` | 使用公共运行接口和 run_started 事件；替换对私有 `_start_run` 的临时修改；持久关联请求与运行；固定可信身份及数据作用域 |
 | `app/main.py` | 同步入口、后台入口、inspect/resume、对照入口统一调度；保留既有请求/结果兼容；错误返回准确的恢复能力 |
-| `app/db.py` | 仅按需新增映射/投影/回执及迁移；保留历史行和原 runtime，确保旧版本回滚兼容性经过测试 |
-| `app/agent_tools.py`、`app/rag.py`、`app/services.py` | 通过宿主端口复用；维持案件权限、受控模型端点、原检索与业务校验 |
+| `app/storage/db.py` | 仅按需新增映射/投影/回执及迁移；保留历史行和原 runtime，确保旧版本回滚兼容性经过测试 |
+| `app/review/agent_tools.py`、`app/retrieval/rag.py`、`app/review/services.py` | 通过宿主端口复用；维持案件权限、受控模型端点、原检索与业务校验 |
 | `app/static/app.js`、`app/static/mobile.js` 及相关 HTML | 按服务端能力展示运行、错误、进度与恢复；不把 LangGraph 专属字段当成所有运行的恢复依据 |
-| 拟新增 `app/runtime_ports.py`、`app/forge_runtime.py` | 放置协议和适配器；具体拆分在 M1 确认，当前不宣称已存在 |
+| 拟新增 `app/integration/runtime_ports.py`、`app/integration/forge_runtime.py` | 放置协议和适配器；具体拆分在 M1 确认，当前不宣称已存在 |
 | 依赖、部署、CI、运维与发布清单 | 锁定宿主与独立框架环境；增加协议/集成检查；退出旧运行时后再清理依赖与许可证清单 |
 
 ### 5.2 只读对照的特别约束
@@ -260,7 +260,7 @@ ForgeHarness 以其 [Makefile](/Users/xiaoy/Documents/多agent协作/Makefile)�
 ## 10. 依据与状态入口
 
 - [LexVault 系统架构](system.md)、[策略基线](strategy-baseline-20260914.md)。
-- [原生领域节点与协调器](../../app/agents.py)、[LangGraph 运行时](../../app/langgraph_agents.py)、[后台任务](../../app/review_jobs.py)。
+- [原生领域节点与协调器](../../app/review/agents.py)、[LangGraph 运行时](../../app/review/langgraph_agents.py)、[后台任务](../../app/review/review_jobs.py)。
 - [ForgeHarness 当前状态](/Users/xiaoy/Documents/多agent协作/docs/STATUS.md)、[框架路线](/Users/xiaoy/Documents/多agent协作/docs/FRAMEWORK_STRATEGY.md)、[剩余完善与验收计划书](/Users/xiaoy/Documents/多agent协作/docs/REMAINING_WORK_PLAN_2026-10-20.md)。
 - [自定义编排内核](/Users/xiaoy/Documents/多agent协作/src/forgeharness/sdk/kernel.py)、[Harness 控制入口](/Users/xiaoy/Documents/多agent协作/src/forgeharness/sdk/harness.py)、[法律原型](/Users/xiaoy/Documents/多agent协作/src/forgeharness/applications/legal/lexvault/dag.py)、[只读导出器](/Users/xiaoy/Documents/多agent协作/src/forgeharness/applications/legal/lexvault/exporter.py)。
 

@@ -14,7 +14,7 @@ def test_external_profile_does_not_modify_campaign_and_resume_is_frozen(tmp_path
     original = (directory / "campaign.json").read_bytes()
     profile = tmp_path / "external.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "task_guided"}))
-    with patch.object(experiment, "probe_model"), patch("app.benchmark_solver.urllib.request.build_opener") as opener:
+    with patch.object(experiment, "probe_model"), patch("app.benchmarks.solver.urllib.request.build_opener") as opener:
         opener.return_value.open.side_effect = lambda *a, **k: io.BytesIO(json.dumps({"choices": [{"message": {"content": "A"}, "finish_reason": "stop"}]}).encode())
         result = experiment.run(directory, "external", profile, per_task=1)
         assert result["total"] == 20
@@ -31,7 +31,7 @@ def test_external_profile_can_run_one_selected_task(tmp_path):
     directory = make_campaign(tmp_path)
     profile = tmp_path / "single-task.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "task_guided"}))
-    with patch.object(experiment, "probe_model"), patch("app.benchmark_solver.urllib.request.build_opener") as opener:
+    with patch.object(experiment, "probe_model"), patch("app.benchmarks.solver.urllib.request.build_opener") as opener:
         opener.return_value.open.side_effect = lambda *a, **k: io.BytesIO(json.dumps({
             "choices": [{"message": {"content": "A"}, "finish_reason": "stop"}]
         }).encode())
@@ -56,11 +56,11 @@ def test_promoted_routes_run_and_verify_offline(tmp_path):
     directory = make_campaign(tmp_path)
     corpus = tmp_path / "corpus"
     corpus.mkdir()
-    from app.legal_corpus import SCHEMA_VERSION
+    from app.retrieval.legal_corpus import SCHEMA_VERSION
     (corpus / "manifest.json").write_text(json.dumps({"schema_version": SCHEMA_VERSION, "documents": []}))
     profile = tmp_path / "promoted.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "weak_tasks", "corpus_directories": [str(corpus)]}))
-    with patch.object(experiment, "probe_model"), patch("app.benchmark_solver.urllib.request.build_opener") as opener:
+    with patch.object(experiment, "probe_model"), patch("app.benchmarks.solver.urllib.request.build_opener") as opener:
         opener.return_value.open.side_effect = lambda *a, **k: io.BytesIO(json.dumps({
             "choices": [{"message": {"content": "测试回答。"}, "finish_reason": "stop"}]
         }).encode())
@@ -87,7 +87,7 @@ def test_capacity_error_stops_after_first_record(tmp_path):
     profile = tmp_path / "capacity.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "task_guided"}))
     import urllib.error
-    with patch.object(experiment, "probe_model"), patch("app.benchmark_solver.urllib.request.build_opener") as opener:
+    with patch.object(experiment, "probe_model"), patch("app.benchmarks.solver.urllib.request.build_opener") as opener:
         opener.return_value.open.side_effect = urllib.error.HTTPError("http://localhost", 507, "Insufficient Storage", {}, None)
         with pytest.raises(RuntimeError, match="stop now"):
             experiment.run(directory, "capacity", profile, per_task=1)
@@ -103,7 +103,7 @@ def test_status_does_not_reuse_stale_verification(tmp_path):
     directory = make_campaign(tmp_path)
     profile = tmp_path / "fixture.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "task_guided"}))
-    with patch.object(experiment, "probe_model"), patch("app.benchmark_solver.urllib.request.build_opener") as opener:
+    with patch.object(experiment, "probe_model"), patch("app.benchmarks.solver.urllib.request.build_opener") as opener:
         opener.return_value.open.side_effect = lambda *a, **k: io.BytesIO(json.dumps({"choices": [{"message": {"content": "A"}, "finish_reason": "stop"}]}).encode())
         experiment.run(directory, "status", profile, per_task=1)
     output = directory / "runs/status"

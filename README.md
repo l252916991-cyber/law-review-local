@@ -124,7 +124,7 @@ LexVault 的检索目标不是单纯提高召回率，而是在法律场景下�
 
 ### 3.1 法条检索与引用安全边界
 
-法律条文与普通知识文档不同：词面相似的段落不构成已核验的法律引用。因此法条侧采用**偏向 fail-closed** 的策略（`app/statutory_retrieval.py`）：
+法律条文与普通知识文档不同：词面相似的段落不构成已核验的法律引用。因此法条侧采用**偏向 fail-closed** 的策略（`app/retrieval/statutory_retrieval.py`）：
 
 - 问题中显式写出的法名与条号（如《工伤保险条例》第十四条）被解析后，在受控法条语料中做**精确查找**；只有「唯一法名 + 唯一条号 + 语料命中」同时成立，状态才是 `ok`。
 - **纯文本检索永远不返回 `ok`**，只返回 `candidate`——语义相近不等于引用成立。
@@ -136,7 +136,7 @@ LexVault 的检索目标不是单纯提高召回率，而是在法律场景下�
 
 ### 3.2 卷宗证据检索
 
-案件材料走页级混合检索（`app/rag.py`），服务于案件事实、证据与文档内容：
+案件材料走页级混合检索（`app/retrieval/rag.py`），服务于案件事实、证据与文档内容：
 
 - 关键词通道为 FTS5/BM25 与法律词项 bigram，向量通道为本地 embedding，两路以 RRF 融合（`k=60`，通道权重随查询画像与向量后端自适应）。
 - 确定性 hashed 向量后端只作召回通道并把权重压到 0.25，避免其越过精确法律词项、金额或文件名的匹配。
@@ -156,7 +156,7 @@ Agent 专家协作使用来源绑定的结构化交接：事实摘录、证据�
 
 ### 3.4 多轮追问与澄清边界
 
-同一案件的同一会话内支持后续追问（`app/context.py`）：服务端只读取最近 4 个完整问答轮次（合计不超过 4000 字符）用于理解“它/该合同/第 2 份”等指代，按确定性规则解析对象后**重新检索**，引用卡片仍只来自本轮检索片段。历史回答、草稿线索与卷宗文本一样是不可信数据，不是证据，也不参与 `[资料N]` 编号。
+同一案件的同一会话内支持后续追问（`app/review/context.py`）：服务端只读取最近 4 个完整问答轮次（合计不超过 4000 字符）用于理解“它/该合同/第 2 份”等指代，按确定性规则解析对象后**重新检索**，引用卡片仍只来自本轮检索片段。历史回答、草稿线索与卷宗文本一样是不可信数据，不是证据，也不参与 `[资料N]` 编号。
 
 - 显式更正（“不是这份，改看……”）优先于历史对象；对象无法唯一确定时返回 `answer_status=clarification` 与候选材料，下一轮可直接回复序号或材料名称。
 - 本轮检索在解析范围内没有当前原文支持时返回 `answer_status=insufficient_evidence`，不引用历史回答、不猜测事实。
@@ -220,7 +220,7 @@ uv run python scripts/doctor.py --require-ocr
 
 ```bash
 docker run -d --name lexvault-redis -p 127.0.0.1:6379:6379 redis:7-alpine
-uv run arq app.tasks.WorkerSettings
+uv run arq app.documents.tasks.WorkerSettings
 ```
 
 批量导入限 200 文件/次、单文件 200MB，登记与派发走持久化 outbox，进程重启自动补偿未确认入队。Redis 未启动时基础功能不受影响，批量导入返回 503。
@@ -253,7 +253,7 @@ docker compose up -d
 | `LAW_REVIEW_OIDC_*` | 组织登录（保持为空即禁用） |
 | `LAW_REVIEW_JSON_LOGS` / `LAW_REVIEW_LOG_LEVEL` | 结构化日志开关与级别 |
 | `LAW_REVIEW_TOOL_LOOP` | 可选：开启原生 tool calling（默认 `off`）；端点拒绝 `tools` 参数时自动回退单次问答 |
-| `LAW_REVIEW_MCP_CASE_ID` | MCP stdio 服务绑定的案件 id，配合 `python -m app.mcp_server`；见 [MCP 接入](docs/runbook/mcp.md) |
+| `LAW_REVIEW_MCP_CASE_ID` | MCP stdio 服务绑定的案件 id，配合 `python -m app.integration.mcp_server`；见 [MCP 接入](docs/runbook/mcp.md) |
 | `LAW_REVIEW_LLM_FALLBACK*` | 可选回退模型：主模型回答未通过引用校验时重试一次，回退答案须通过同一校验 |
 | `LAW_REVIEW_VLM_*` | 可选视觉转录：扫描页优先走视觉模型，失败自动回退 Tesseract，不会产生空白页 |
 

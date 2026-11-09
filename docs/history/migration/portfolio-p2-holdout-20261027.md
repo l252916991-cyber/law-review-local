@@ -22,7 +22,7 @@
 
 | 手段 | 实现 |
 |---|---|
-| 数据隔离 | 保留集不引用 `app.db.seed_demo`；隔离库由 `dataset.json` 的 `cases` 直接播种（`init_db(seed=False)`） |
+| 数据隔离 | 保留集不引用 `app.storage.db.seed_demo`；隔离库由 `dataset.json` 的 `cases` 直接播种（`init_db(seed=False)`） |
 | 文本一致 | 播种的页正文就是冻结正文，`verify_frozen_pages` 逐页比对隔离库与 `sources`，不一致直接失败 |
 | 引用隔离 | `validate_cross_case` 要求每题的 `acceptable_pages` 都属于本题 `case_id`，跨案例引用在冻结与测试阶段都被拒绝 |
 | 运行隔离 | `prepare` 的 manifest 记录 `case_id`、`context_pages`、提示摘要；批次目录新建，不覆盖旧批次 |

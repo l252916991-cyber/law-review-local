@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         "LAW_REVIEW_LLM_MAX_TOKENS": str(run_model.get("max_tokens", "700")),
         "LAW_REVIEW_LLM_TIMEOUT": "30", "LAW_REVIEW_LLM_API": "openai-completions",
     })
-    from app import eval_gate
+    from app.evaluation import eval_gate
 
     try:
         with tempfile.TemporaryDirectory(prefix="lexvault-replay-") as work:

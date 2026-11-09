@@ -5,10 +5,10 @@ import json
 
 import pytest
 
-from app import benchmark_retrieval
-from app.benchmark_retrieval import DENSE_INDEX_ENV, retrieve
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from app.statutory_index import IndexSpec, StatutoryIndex, build_validity
+from app.benchmarks import retrieval as benchmark_retrieval
+from app.benchmarks.retrieval import DENSE_INDEX_ENV, retrieve
+from app.benchmarks.statutory_index import IndexSpec, StatutoryIndex, build_validity
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
 
 MODEL = "fake-dense-v1"
 

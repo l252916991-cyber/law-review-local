@@ -17,11 +17,11 @@ from fakeredis import FakeServer
 from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
 
-from app import tasks
-from app.config import config
-from app.db import connect, db_scope, now, transaction
+from app.core.config import config
+from app.documents import tasks
 from app.main import app
-from app.services import index_upload
+from app.review.services import index_upload
+from app.storage.db import connect, db_scope, now, transaction
 
 
 class FakeArqRedis(FakeRedis, ArqRedis):
@@ -36,7 +36,7 @@ class QueueContractTests(unittest.TestCase):
         self.db_context.__enter__()
         self.addCleanup(self.db_context.__exit__, None, None, None)
         self.pool = SimpleNamespace(ping=AsyncMock(return_value=True), aclose=AsyncMock())
-        self.pool_patch = patch("app.routes.common.get_redis_pool", AsyncMock(return_value=self.pool))
+        self.pool_patch = patch("app.api.routes.common.get_redis_pool", AsyncMock(return_value=self.pool))
         self.pool_patch.start()
         self.addCleanup(self.pool_patch.stop)
         self.queue_server = FakeServer()
@@ -44,7 +44,7 @@ class QueueContractTests(unittest.TestCase):
         async def queue_pool():
             return FakeArqRedis(server=self.queue_server)
 
-        self.queue_pool_patch = patch("app.tasks.get_redis_pool", queue_pool)
+        self.queue_pool_patch = patch("app.documents.tasks.get_redis_pool", queue_pool)
         self.queue_pool_patch.start()
         self.addCleanup(self.queue_pool_patch.stop)
         self.client_context = TestClient(app)
@@ -54,7 +54,7 @@ class QueueContractTests(unittest.TestCase):
 
     def _stage_batch(self, count=2):
         queued = AsyncMock(return_value="test-job")
-        with patch("app.routes.documents.enqueue_batch_import", queued):
+        with patch("app.api.routes.documents.enqueue_batch_import", queued):
             response = self.client.post(
                 f"/api/cases/{self.case_id}/batch-import",
                 files=[("files", (f"file-{i}.txt", f"文件 {i} 内容", "text/plain")) for i in range(count)],
@@ -75,7 +75,7 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(self.pool.aclose.await_count, 4)
 
     def test_readiness_database_failure_and_not_started(self):
-        with patch('app.routes.system.sqlite3.connect', side_effect=RuntimeError('private database path')):
+        with patch('app.api.routes.system.sqlite3.connect', side_effect=RuntimeError('private database path')):
             response = self.client.get('/api/system/health')
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()['database'], 'unavailable')
@@ -86,7 +86,7 @@ class QueueContractTests(unittest.TestCase):
 
     def test_readiness_does_not_create_missing_database(self):
         missing = Path(self.directory.name) / 'missing.db'
-        with patch('app.routes.system.get_db_path', return_value=missing):
+        with patch('app.api.routes.system.get_db_path', return_value=missing):
             self.assertEqual(self.client.get('/api/system/health').status_code, 503)
         self.assertFalse(missing.exists())
 
@@ -104,7 +104,7 @@ class QueueContractTests(unittest.TestCase):
                 self.assertFalse(application.state.redis_available)
         with db_scope(Path(self.directory.name) / 'cancelled.db'):
             asyncio.run(run())
-        from app.db import process_ownership
+        from app.storage.db import process_ownership
         with db_scope(Path(self.directory.name) / 'cancelled.db'), process_ownership():
             pass  # Cancelled startup released ownership.
 
@@ -126,7 +126,7 @@ class QueueContractTests(unittest.TestCase):
         async def run():
             for error in [TimeoutError(), asyncio.CancelledError()]:
                 pool = SimpleNamespace(ping=AsyncMock(side_effect=error), aclose=AsyncMock())
-                with patch('app.routes.common.get_redis_pool', AsyncMock(return_value=pool)):
+                with patch('app.api.routes.common.get_redis_pool', AsyncMock(return_value=pool)):
                     if isinstance(error, asyncio.CancelledError):
                         with self.assertRaises(asyncio.CancelledError):
                             await probe_redis()
@@ -146,21 +146,21 @@ class QueueContractTests(unittest.TestCase):
     def test_enqueue_uses_worker_queue_stable_id_and_closes_pool(self):
         async def run():
             pool = SimpleNamespace(enqueue_job=AsyncMock(return_value=SimpleNamespace(job_id="job-7")), aclose=AsyncMock())
-            with patch("app.tasks.get_redis_pool", AsyncMock(return_value=pool)):
+            with patch("app.documents.tasks.get_redis_pool", AsyncMock(return_value=pool)):
                 self.assertEqual(await tasks.enqueue_batch_import(7, self.case_id, []), "job-7")
             self.assertEqual(pool.enqueue_job.await_args.kwargs["_queue_name"], tasks.WorkerSettings.queue_name)
             self.assertEqual(pool.enqueue_job.await_args.kwargs["_job_id"], "batch-import-7")
             pool.aclose.assert_awaited_once()
             pool.enqueue_job.side_effect = ConnectionError("offline")
             pool.aclose.reset_mock()
-            with patch("app.tasks.get_redis_pool", AsyncMock(return_value=pool)):
+            with patch("app.documents.tasks.get_redis_pool", AsyncMock(return_value=pool)):
                 with self.assertRaises(ConnectionError):
                     await tasks.enqueue_batch_import(7, self.case_id, [])
             pool.aclose.assert_awaited_once()
         asyncio.run(run())
 
     def test_unconfirmed_enqueue_keeps_dispatch_pending_and_redispatches(self):
-        with patch("app.routes.documents.enqueue_batch_import", AsyncMock(side_effect=ConnectionError("offline"))):
+        with patch("app.api.routes.documents.enqueue_batch_import", AsyncMock(side_effect=ConnectionError("offline"))):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import",
                                         files=[("files", ("test.txt", "内容", "text/plain"))])
         self.assertEqual(response.status_code, 202, response.text)
@@ -178,7 +178,7 @@ class QueueContractTests(unittest.TestCase):
         self.assertEqual(dispatch["state"], "pending")
 
         redispatched = AsyncMock(return_value="job-again")
-        with patch("app.tasks.enqueue_batch_import", redispatched):
+        with patch("app.documents.tasks.enqueue_batch_import", redispatched):
             count = asyncio.run(tasks.reconcile_batch_dispatches())
         self.assertEqual(count, 1)
         redispatched.assert_awaited_once()
@@ -199,7 +199,7 @@ class QueueContractTests(unittest.TestCase):
         async def failed_dispatch(batch_id, case_id, files):
             raise ConnectionError("offline")
 
-        with patch("app.tasks.enqueue_batch_import", failed_dispatch):
+        with patch("app.documents.tasks.enqueue_batch_import", failed_dispatch):
             self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
         with closing(connect()) as conn:
             dispatch = dict(conn.execute("SELECT * FROM batch_dispatch WHERE batch_id=?", (batch_id,)).fetchone())
@@ -218,7 +218,7 @@ class QueueContractTests(unittest.TestCase):
 
         asyncio.run(mark_running())
         redispatched = AsyncMock(return_value="job")
-        with patch("app.tasks.enqueue_batch_import", redispatched):
+        with patch("app.documents.tasks.enqueue_batch_import", redispatched):
             self.assertEqual(asyncio.run(tasks.reconcile_batch_dispatches()), 0)
         redispatched.assert_not_awaited()
 
@@ -290,7 +290,7 @@ class QueueContractTests(unittest.TestCase):
                 result = await work
             self.assertEqual(result["successful"], 1)
 
-        with patch("app.tasks.index_upload", slow_index):
+        with patch("app.documents.tasks.index_upload", slow_index):
             asyncio.run(run())
         self.assertEqual(len(calls), 1)
 
@@ -300,7 +300,7 @@ class QueueContractTests(unittest.TestCase):
                 conn.execute("UPDATE batch_imports SET status='processing' WHERE id=?", (batch_id,))
             raise ConnectionError("acknowledgment lost")
 
-        with patch("app.routes.documents.enqueue_batch_import", accepted_but_lost_ack):
+        with patch("app.api.routes.documents.enqueue_batch_import", accepted_but_lost_ack):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import",
                                         files=[("files", ("test.txt", "内容", "text/plain"))])
         self.assertEqual(response.status_code, 202)
@@ -309,7 +309,7 @@ class QueueContractTests(unittest.TestCase):
 
     def test_batch_aggregate_oversize_cleans_all_staging(self):
         queued = AsyncMock()
-        with patch.object(config, "max_upload_total_size", 5), patch("app.routes.documents.enqueue_batch_import", queued):
+        with patch.object(config, "max_upload_total_size", 5), patch("app.api.routes.documents.enqueue_batch_import", queued):
             response = self.client.post(f"/api/cases/{self.case_id}/batch-import", files=[
                 ("files", ("a.txt", b"123", "text/plain")), ("files", ("b.txt", b"456", "text/plain")),
             ])
@@ -339,7 +339,7 @@ class QueueContractTests(unittest.TestCase):
     def test_completed_batch_duplicate_delivery_is_noop(self):
         batch_id, files = self._stage_batch()
         first = asyncio.run(tasks.process_batch_import({}, batch_id, self.case_id, files))
-        with patch("app.tasks.index_upload", side_effect=AssertionError("must not rerun")):
+        with patch("app.documents.tasks.index_upload", side_effect=AssertionError("must not rerun")):
             second = asyncio.run(tasks.process_batch_import({}, batch_id, self.case_id, files))
         self.assertEqual(first, second)
         self.assertEqual(first["successful"], 2)
@@ -385,7 +385,7 @@ class QueueContractTests(unittest.TestCase):
             self.assertGreater(ticks, 4)
             self.assertEqual(result["successful"], 4)
 
-        with patch.object(config, "indexing_concurrency", 2), patch("app.tasks.index_upload", fake_index):
+        with patch.object(config, "indexing_concurrency", 2), patch("app.documents.tasks.index_upload", fake_index):
             asyncio.run(run())
         self.assertEqual(peak, 2)
 
@@ -425,7 +425,7 @@ class QueueContractTests(unittest.TestCase):
             result = await tasks.process_batch_import({}, batch_id, self.case_id, files)
             self.assertEqual(result["successful"], 2)
 
-        with patch.object(config, "indexing_concurrency", 1), patch("app.tasks.index_upload", slow_index):
+        with patch.object(config, "indexing_concurrency", 1), patch("app.documents.tasks.index_upload", slow_index):
             asyncio.run(run())
         self.assertEqual(len(calls), 2)
         self.assertEqual(len(set(calls)), 2)

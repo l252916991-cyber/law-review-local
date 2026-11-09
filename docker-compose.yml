@@ -46,7 +46,7 @@ services:
   worker:
     image: lexvault-local
     build: .
-    command: ["/opt/lexvault-venv/bin/arq", "app.tasks.WorkerSettings"]
+    command: ["/opt/lexvault-venv/bin/arq", "app.documents.tasks.WorkerSettings"]
     env_file:
       - .env
     extra_hosts:

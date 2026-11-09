@@ -5,14 +5,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app.agent_tools import (
+from app.core.security import Principal, _principal
+from app.review.agent_tools import (
     MAX_TOOL_TEXT_CHARS,
     READONLY_TOOL_NAMES,
     TOOL_SCHEMAS,
     execute_readonly_tool,
 )
-from app.db import db_scope, init_db, now, transaction
-from app.security import Principal, _principal
+from app.storage.db import db_scope, init_db, now, transaction
 
 
 class ToolCatalogTests(unittest.TestCase):
@@ -113,7 +113,7 @@ class ToolCatalogTests(unittest.TestCase):
             "hits": [{"law_name": "中华人民共和国民法典", "article_number": 585, "text": "正文", "version_date": "2020-05-28"}],
             "warning": None,
         }
-        with patch("app.statutory_retrieval.verify_citation", return_value=canned):
+        with patch("app.retrieval.statutory_retrieval.verify_citation", return_value=canned):
             result = execute_readonly_tool(
                 self.case_a, "verify_statute", {"law_name": "中华人民共和国民法典", "article_number": 585}
             )
@@ -138,7 +138,7 @@ class ToolCatalogTests(unittest.TestCase):
             "hits": [{"law_name": "民法典", "article_number": 585, "text": "正文"}],
             "warning": None,
         }
-        with patch("app.statutory_retrieval.search_statute_text", return_value=canned):
+        with patch("app.retrieval.statutory_retrieval.search_statute_text", return_value=canned):
             result = execute_readonly_tool(self.case_a, "search_statutes", {"query": "违约金"})
         self.assertEqual(result["items"][0]["status"], "candidate")
         self.assertNotEqual(result["tool_metrics"]["status"], "ok")

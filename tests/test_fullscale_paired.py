@@ -33,8 +33,8 @@ def run_main(tmp_path, limit=3):
 
 
 def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
-    with patch("app.benchmark_solver.solve", fake_solve()), \
-         patch("app.benchmark_rag_solver.solve", fake_solve()), \
+    with patch("app.benchmarks.solver.solve", fake_solve()), \
+         patch("app.benchmarks.rag_solver.solve", fake_solve()), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         assert run_main(tmp_path) == 0
         out = tmp_path / "out"
@@ -45,8 +45,8 @@ def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
         assert set(summary["arms"]) == {"tg", "lex"} and summary["questions"] == 3
         capsys.readouterr()
         # Second invocation resumes from checkpoints: rows unchanged, no new solve calls.
-        with patch("app.benchmark_solver.solve", fake_solve()), \
-             patch("app.benchmark_rag_solver.solve", fake_solve()), \
+        with patch("app.benchmarks.solver.solve", fake_solve()), \
+             patch("app.benchmarks.rag_solver.solve", fake_solve()), \
              patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
             assert run_main(tmp_path) == 0
         rows = [json.loads(line) for line in (out / "lex" / "detailed_results.jsonl").read_text().splitlines()]
@@ -54,8 +54,8 @@ def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
 
 
 def test_fullscale_rejects_tampered_checkpoint(tmp_path):
-    with patch("app.benchmark_solver.solve", fake_solve()), \
-         patch("app.benchmark_rag_solver.solve", fake_solve()), \
+    with patch("app.benchmarks.solver.solve", fake_solve()), \
+         patch("app.benchmarks.rag_solver.solve", fake_solve()), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         assert run_main(tmp_path) == 0
     out = tmp_path / "out"
@@ -63,8 +63,8 @@ def test_fullscale_rejects_tampered_checkpoint(tmp_path):
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     rows[0]["input_hash"] = "tampered"
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-    with patch("app.benchmark_solver.solve", fake_solve()), \
-         patch("app.benchmark_rag_solver.solve", fake_solve()), \
+    with patch("app.benchmarks.solver.solve", fake_solve()), \
+         patch("app.benchmarks.rag_solver.solve", fake_solve()), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         with pytest.raises(ValueError, match="checkpoint input changed"):
             run_main(tmp_path)
@@ -85,8 +85,8 @@ def test_transport_failure_aborts_without_checkpoint(tmp_path):
         return {"prediction": "", "error": "URLError: connection refused",
                 "finish_reason": None, "usage": None, "latency_ms": 1.0, "solver_version": "fake"}
 
-    with patch("app.benchmark_solver.solve", solve), \
-         patch("app.benchmark_rag_solver.solve", solve), \
+    with patch("app.benchmarks.solver.solve", solve), \
+         patch("app.benchmarks.rag_solver.solve", solve), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         tg, rag = write_profiles(tmp_path)
         with pytest.raises(RuntimeError, match="aborting tg for repair"):
@@ -100,8 +100,8 @@ def test_transport_failure_aborts_without_checkpoint(tmp_path):
 def test_transport_error_rows_regenerate_on_resume(tmp_path):
     tg, rag = write_profiles(tmp_path)
     out = tmp_path / "out4"
-    with patch("app.benchmark_solver.solve", fake_solve()), \
-         patch("app.benchmark_rag_solver.solve", fake_solve()), \
+    with patch("app.benchmarks.solver.solve", fake_solve()), \
+         patch("app.benchmarks.rag_solver.solve", fake_solve()), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         assert main(["--task", "3-2", "--profile-tg", str(tg), "--profile-rag", str(rag),
                      "--output", str(out), "--limit", "2"]) == 0
@@ -110,8 +110,8 @@ def test_transport_error_rows_regenerate_on_resume(tmp_path):
     rows[0]["error"] = "URLError: connection refused"
     rows[0]["score"] = 0.0
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-    with patch("app.benchmark_solver.solve", fake_solve()), \
-         patch("app.benchmark_rag_solver.solve", fake_solve()), \
+    with patch("app.benchmarks.solver.solve", fake_solve()), \
+         patch("app.benchmarks.rag_solver.solve", fake_solve()), \
          patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
         assert main(["--task", "3-2", "--profile-tg", str(tg), "--profile-rag", str(rag),
                      "--output", str(out), "--limit", "2"]) == 0

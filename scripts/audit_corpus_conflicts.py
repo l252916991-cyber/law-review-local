@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.corpus_audit import ACTIONS, audit  # noqa: E402
+from app.benchmarks.corpus_audit import ACTIONS, audit  # noqa: E402
 
 SEVERITY = {kind: rank for rank, kind in enumerate(
     ("substantive_conflict", "boundary_difference", "cosmetic_duplicate", "exact_duplicate"))}

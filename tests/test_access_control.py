@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.db import connect, db_scope, init_db, now, transaction
+from app.core.security import configured_tokens
 from app.main import app
-from app.security import configured_tokens
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 class AccessControlTests(unittest.TestCase):
@@ -125,7 +125,7 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
         self.client.cookies.clear()
         self.client.post('/api/auth/session', json={'token': self.token})
-        with patch('app.security.SESSION_TTL', 0):
+        with patch('app.core.security.SESSION_TTL', 0):
             self.client.post('/api/auth/session', json={'token': self.token})
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
         self.client.post('/api/auth/session', json={'token': self.token})
@@ -137,7 +137,7 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/cases').status_code, 401)
 
     def test_persisted_session_survives_security_module_reload_and_expiry_is_purged(self):
-        import app.security as security
+        import app.core.security as security
         response = self.client.post("/api/auth/session", json={"token": self.token})
         self.assertEqual(response.status_code, 200)
         cookie = self.client.cookies.get("lexvault_session")
@@ -158,7 +158,7 @@ class AccessControlTests(unittest.TestCase):
             self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
 
     def test_oidc_and_token_sessions_share_capacity_and_logout_deletes_row(self):
-        from app import security
+        from app.core import security
         self.client.post("/api/auth/session", json={"token": self.token})
         cookie = self.client.cookies.get("lexvault_session")
         with closing(connect()) as conn:
@@ -166,7 +166,7 @@ class AccessControlTests(unittest.TestCase):
         self.client.delete("/api/auth/session")
         with closing(connect()) as conn:
             self.assertIsNone(conn.execute("SELECT 1 FROM auth_sessions WHERE session_hash=?", (security._session_hash(cookie),)).fetchone())
-        with patch("app.services.call_local_llm", side_effect=AssertionError("no model")):
+        with patch("app.review.services.call_local_llm", side_effect=AssertionError("no model")):
             response = self.client.post(f"/api/cases/{self.cases[0]}/chat", headers=self.headers, json={"question": "案件有多少份卷宗？", "user_name": "伪造管理员", "use_llm": False})
         self.assertEqual(response.status_code, 200, response.text)
         with closing(connect()) as conn:
@@ -241,7 +241,7 @@ class AccessControlTests(unittest.TestCase):
                 self.assertNotIn("外部机密内容", response.text)
 
     def test_security_events_record_denials_auth_and_downloads(self):
-        from app.db import connect
+        from app.storage.db import connect
         self.client.get("/api/cases")  # 401 anonymous
         self.client.get("/api/dashboard", headers=self.headers)  # 403 scoped member
         self.client.post("/api/auth/session", json={"token": "wrong-token"})  # failed login
@@ -274,7 +274,7 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(download["actor"], "管理员")
 
     def test_security_events_survive_case_deletion(self):
-        from app.db import connect
+        from app.storage.db import connect
         self.client.get("/api/dashboard", headers=self.headers)  # record a denial
         # Business deletion cascades case-owned rows; the security trail has
         # no foreign key and must survive it.
@@ -486,7 +486,7 @@ class AccessControlTests(unittest.TestCase):
                 return {"id_token": token, "access_token": "at"}
             raise AssertionError(url)
 
-        security_module = __import__("app.security", fromlist=["security"])
+        security_module = __import__("app.core.security", fromlist=["security"])
         principal_env = patch.dict(os.environ, {
             "LAW_REVIEW_OIDC_ISSUER": "https://idp.example", "LAW_REVIEW_OIDC_CLIENT_ID": "lexvault-client",
             "LAW_REVIEW_OIDC_CLIENT_SECRET": "secret",
@@ -524,7 +524,7 @@ class AccessControlTests(unittest.TestCase):
     def test_oidc_unmapped_identity_and_bad_audience_rejected(self):
         import jwt as pyjwt
         from cryptography.hazmat.primitives.asymmetric import rsa
-        security_module = __import__("app.security", fromlist=["security"])
+        security_module = __import__("app.core.security", fromlist=["security"])
         private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         public_numbers = private_key.public_key().public_numbers()
         import base64
@@ -699,7 +699,7 @@ class AccessControlTests(unittest.TestCase):
                 untrusted.close()
 
     def test_model_config_override_is_admin_only_and_applies(self):
-        from app.config import LLMConfig
+        from app.core.config import LLMConfig
 
         admin = {"Authorization": f"Bearer {self.admin_token}"}
         self.assertEqual(self.client.get("/api/model-config", headers=self.headers).status_code, 403)
@@ -736,7 +736,7 @@ class AccessControlTests(unittest.TestCase):
         opener = MagicMock()
         opener.open.return_value = response
         with patch.dict(os.environ, {"LAW_REVIEW_MODEL_LOOPBACK_HOST": "host.docker.internal"}), patch(
-            "app.routes.system.urllib.request.build_opener", return_value=opener
+            "app.api.routes.system.urllib.request.build_opener", return_value=opener
         ):
             result = self.client.post(
                 "/api/model-config/test",
@@ -750,7 +750,7 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(request.full_url, "http://host.docker.internal:8000/v1/models")
 
     def test_model_detection_rejects_loopback_prefix_hostname(self):
-        with patch("app.routes.system.urllib.request.build_opener") as build_opener:
+        with patch("app.api.routes.system.urllib.request.build_opener") as build_opener:
             result = self.client.post(
                 "/api/model-config/test",
                 headers={"Authorization": f"Bearer {self.admin_token}"},

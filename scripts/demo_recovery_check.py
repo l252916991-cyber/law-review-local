@@ -28,10 +28,10 @@ from typing import TYPE_CHECKING, Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.db import connect, db_scope, init_db, transaction  # noqa: E402
+from app.storage.db import connect, db_scope, init_db, transaction  # noqa: E402
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from app.langgraph_agents import ReviewState
+    from app.review.langgraph_agents import ReviewState
 
 DEFAULT_QUESTION = "张某审批陈述是否矛盾，证据存在什么疏漏？"
 EXIT_REJECTED = 4
@@ -64,8 +64,8 @@ def run_row(run_id: int) -> dict[str, Any]:
 
 def interrupt_once(checkpoint: Path, question: str) -> tuple[int, dict[str, Any]]:
     """Run until the memory node fails, keeping the completed review checkpoint."""
-    from app.agents import get_run_trace
-    from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
+    from app.review.agents import get_run_trace
+    from app.review.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
 
     def fail_memory(node: str, state: ReviewState) -> None:
         if node == "memory":
@@ -103,7 +103,7 @@ def phase_interrupt(data_dir: Path, output: Path, question: str) -> int:
 def phase_resume(data_dir: Path, output: Path, state: Path) -> int:
     checkpoint = data_dir / "checkpoints.sqlite"
     saved = json.loads(state.read_text(encoding="utf-8"))
-    from app.langgraph_agents import create_langgraph_coordinator
+    from app.review.langgraph_agents import create_langgraph_coordinator
 
     with db_scope(data_dir / "law_review.db"):
         before = step_count(saved["run_id"])
@@ -123,7 +123,7 @@ def phase_resume(data_dir: Path, output: Path, state: Path) -> int:
 
 def phase_tamper(data_dir: Path, output: Path, question: str) -> int:
     checkpoint = data_dir / "checkpoints.sqlite"
-    from app.langgraph_agents import create_langgraph_coordinator
+    from app.review.langgraph_agents import create_langgraph_coordinator
 
     with db_scope(data_dir / "law_review.db"):
         init_db(seed=True)

@@ -31,8 +31,8 @@ def _success_schema(operation: dict) -> dict:
 class ResponseSchemaTests(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         init_db(seed=True)
         cls.app = app
@@ -53,7 +53,7 @@ class ResponseSchemaTests(IsolatedDatabaseTestCase):
                 self.assertIs(spec["components"]["schemas"][model].get("additionalProperties"), True)
 
     def test_list_responses_keep_every_selected_column(self):
-        from app.db import connect
+        from app.storage.db import connect
 
         case_id = self.client.get("/api/cases").json()[0]["id"]
         documents = self.client.get(f"/api/cases/{case_id}/documents").json()

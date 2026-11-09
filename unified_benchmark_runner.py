@@ -23,12 +23,12 @@ from typing import Any
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item, score_lexeval_item
-from app.benchmark_postprocess import POSTPROCESS_VERSION, postprocess
-from app.benchmark_retrieval import RETRIEVAL_VERSION, corpus_fingerprint, retrieve
-from app.benchmark_solver import TASK_GUIDANCE
-from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task, validate_lawbench
-from app.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
+from app.benchmarks.metrics import SCORER_VERSION, score_lawbench_item, score_lexeval_item
+from app.benchmarks.postprocess import POSTPROCESS_VERSION, postprocess
+from app.benchmarks.retrieval import RETRIEVAL_VERSION, corpus_fingerprint, retrieve
+from app.benchmarks.solver import TASK_GUIDANCE
+from app.benchmarks.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task, validate_lawbench
+from app.review.services import LOCAL_LLM_MODEL, LOCAL_LLM_URL, read_json_with_deadline
 
 
 # 配置常量
@@ -82,19 +82,19 @@ def route_messages(record: dict[str, Any], route: str, strategy: str,
                    ) -> list[dict[str, str]]:
     """Build the exact first request messages for manifest prompt hashing."""
     if route == "legacy_prompt":
-        from app.benchmark_reporting import prompt_for
+        from app.benchmarks.reporting import prompt_for
 
         system, user = prompt_for(record, strategy=strategy)
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if route == "solver_task_guided_control":
-        from app.benchmark_solver import messages_for
+        from app.benchmarks.solver import messages_for
 
         messages, _ = messages_for(record["task"], record["instruction"], record["question"],
                                    {**config, "strategy": "task_guided"})
         return messages
     if retrieval is None:
         raise ValueError("statutory_rag route requires frozen retrieval")
-    from app.benchmark_rag_solver import messages_for
+    from app.benchmarks.rag_solver import messages_for
 
     messages, _ = messages_for(record["task"], record["instruction"], record["question"],
                                {**config, "strategy": "statutory_rag"}, retrieval)
@@ -104,7 +104,7 @@ def route_messages(record: dict[str, Any], route: str, strategy: str,
 def solver_provenance_issues(row: dict[str, Any], route: str, messages: list[dict[str, str]],
                              config: dict[str, Any], corpus_directories: list[str]) -> list[str]:
     """Validate one solver-backed row against its frozen request configuration."""
-    from app.benchmark_solver import SOLVER_VERSION, _configuration, _endpoint
+    from app.benchmarks.solver import SOLVER_VERSION, _configuration, _endpoint
 
     issues = []
     expected_request = {
@@ -144,7 +144,7 @@ def solver_provenance_issues(row: dict[str, Any], route: str, messages: list[dic
         issues.append("call result")
     expected_prediction = call.get("prediction")
     if route == "statutory_rag":
-        from app.benchmark_postprocess import postprocess
+        from app.benchmarks.postprocess import postprocess
 
         expected_prediction, expected_postprocess = postprocess(
             row["task"], row["question"], expected_prediction or "", retrieval=row.get("retrieval"),
@@ -367,7 +367,7 @@ def load_all_datasets(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 def run_benchmark(args: argparse.Namespace) -> None:
     """Frozen, resumable run; checkpoints are the source of truth."""
-    from app.benchmark_reporting import PROMPT_VERSION, atomic_json, source_hashes, write_report
+    from app.benchmarks.reporting import PROMPT_VERSION, atomic_json, source_hashes, write_report
 
     if args.dataset != "lawbench":
         raise ValueError("This audited runner currently supports --dataset lawbench only; other datasets need dedicated scorers.")
@@ -540,7 +540,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 else:
                     solver_config = {**MODEL_CONFIG, "strategy": "task_guided"}
                     if route == "statutory_rag":
-                        from app.benchmark_rag_solver import solve
+                        from app.benchmarks.rag_solver import solve
 
                         solver_config.update(
                             strategy="statutory_rag", corpus_directories=corpus_directories,
@@ -548,7 +548,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
                             retrieval_context=sample["retrieval"],
                         )
                     else:
-                        from app.benchmark_solver import solve
+                        from app.benchmarks.solver import solve
                     result = solve(record["task"], record["instruction"], record["question"], solver_config)
                     prediction, latency, error = result["prediction"], result["latency_ms"], result["error"]
                     calls = result.get("calls", [])
@@ -598,7 +598,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
 
 def generate_summary_report(results: list[dict], output_dir: Path, duration: float, model_config: dict) -> None:
     """Backward-compatible reporting entry point with the corrected denominator."""
-    from app.benchmark_reporting import write_report
+    from app.benchmarks.reporting import write_report
     write_report(results, output_dir, duration, model_config, {"planned_questions": len(results)}, "completed")
 
 

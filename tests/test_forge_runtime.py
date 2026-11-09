@@ -18,16 +18,16 @@ from unittest.mock import patch
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-forge-runtime-")
 os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
-from app.db import connect, init_db, now, transaction  # noqa: E402
-from app.forge_runtime import (  # noqa: E402
+from app.core.security import Principal, _principal  # noqa: E402
+from app.integration.forge_runtime import (  # noqa: E402
     FRAMEWORK_READONLY_CAPABILITIES,
     FRAMEWORK_READONLY_RUNTIME,
     FrameworkReadonlyControl,
     framework_readonly_control,
     resolve_framework_python,
 )
-from app.runtime_adapter import current_actor_identity  # noqa: E402
-from app.runtime_ports import (  # noqa: E402
+from app.integration.runtime_adapter import current_actor_identity  # noqa: E402
+from app.integration.runtime_ports import (  # noqa: E402
     EXECUTION_MODE_BACKGROUND,
     AccessDeniedError,
     ContractValidationError,
@@ -40,7 +40,7 @@ from app.runtime_ports import (  # noqa: E402
     UnsupportedExecutionModeError,
     new_request_id,
 )
-from app.security import Principal, _principal  # noqa: E402
+from app.storage.db import connect, init_db, now, transaction  # noqa: E402
 from tests.support import IsolatedDatabaseTestCase  # noqa: E402
 
 FRAMEWORK_PYTHON = os.getenv("LAW_REVIEW_FORGE_PYTHON", "")
@@ -87,7 +87,7 @@ class CapabilityDeclarationTests(unittest.TestCase):
 
 
 class StartValidationTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
@@ -147,7 +147,7 @@ class StartValidationTests(IsolatedDatabaseTestCase):
 
 @unittest.skipUnless(FRAMEWORK_PYTHON, "set LAW_REVIEW_FORGE_PYTHON to the separately installed Python 3.12 sidecar")
 class FrameworkProcessControlTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):

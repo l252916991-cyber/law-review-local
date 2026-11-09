@@ -4,9 +4,9 @@ import json
 import unittest
 from unittest.mock import patch
 
-from app import services
-from app.agents import validate_review_answer
-from app.services import canonical_source_markers, source_header
+from app.review import services
+from app.review.agents import validate_review_answer
+from app.review.services import canonical_source_markers, source_header
 
 CONTEXTS = [
     {"document_id": 3, "name": "03_李某询问笔录.txt", "page_no": 3, "quote": "我提醒过没有金融牌照。"},

@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db import connect, db_scope, init_db, now, transaction
 from app.main import app
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 ADMIN_TOKEN = "b" * 40
 
@@ -116,7 +116,7 @@ class TaskWorkflowTest(unittest.TestCase):
 
     def race_actions(self, task, first, second):
         """Force two real HTTP requests to read the same SQLite row before either writes."""
-        from app import human_tasks
+        from app.cases import human_tasks
 
         barrier = threading.Barrier(2)
         load = human_tasks._load_task
@@ -137,7 +137,7 @@ class TaskWorkflowTest(unittest.TestCase):
                     client.close()
 
         before_audit = self.audit_count()
-        with patch("app.human_tasks._load_task", side_effect=simultaneous_load), ThreadPoolExecutor(max_workers=2) as pool:
+        with patch("app.cases.human_tasks._load_task", side_effect=simultaneous_load), ThreadPoolExecutor(max_workers=2) as pool:
             futures = [pool.submit(request, payload) for payload in (first, second)]
             responses = [future.result(timeout=15) for future in futures]
         self.assertEqual(sorted(response.status_code for response in responses), [200, 409],
@@ -356,7 +356,7 @@ class TaskWorkflowTest(unittest.TestCase):
     def test_task_transitions_are_audited(self):
         from contextlib import closing
 
-        from app.db import connect
+        from app.storage.db import connect
 
         task = self.create_task()
         self.act(task["id"], self.assistant_token, "start")

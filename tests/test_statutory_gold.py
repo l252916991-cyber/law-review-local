@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from app.statutory_gold import citations, gold_citations
+from app.benchmarks.statutory_gold import citations, gold_citations
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
 from scripts.statutory_gold_report import evaluate_task, resolve
 
 

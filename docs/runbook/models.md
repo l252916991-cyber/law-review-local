@@ -4,7 +4,7 @@ Web 项目通过本地 OpenAI-compatible 服务调用模型，模型运行环境
 
 ## 模型层：provider、wire api 与模型声明
 
-`app/model_ports.py` 把"谁提供模型"和"用什么协议说话"拆成两层，参照 pi-ai 的 provider / API 划分（见 `docs/runbook/licenses.md`）：
+`app/llm/model_ports.py` 把"谁提供模型"和"用什么协议说话"拆成两层，参照 pi-ai 的 provider / API 划分（见 `docs/runbook/licenses.md`）：
 
 - **provider** 是运行时单元：名称、端点、凭证来源（环境变量或 `<LAW_REVIEW_DATA_DIR>/model_credentials.json`）。请求级显式值优先于存量凭证。
 - **wire api** 是实现单元：`openai-completions`（默认，`/chat/completions`）与 `anthropic-messages`（`/messages`，`x-api-key` + `anthropic-version`）。新增协议只需注册一组 `request_path` / `build_chat_request` / `parse_completion` / `parse_stream_frame`，传输、超时、记账、凭据都不复制。

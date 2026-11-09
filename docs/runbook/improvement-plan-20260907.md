@@ -30,10 +30,10 @@
 ### 1.1 现状与差距
 
 现有能力（均为已实现、离线验证）：
-- 原生 + LangGraph 双 Agent 运行时（`app/agents.py`、`app/langgraph_agents.py`），失败可从 checkpoint 恢复；critic 结构校验（`validate_review_answer`）强制引用格式。
+- 原生 + LangGraph 双 Agent 运行时（`app/review/agents.py`、`app/review/langgraph_agents.py`），失败可从 checkpoint 恢复；critic 结构校验（`validate_review_answer`）强制引用格式。
 - 证据图谱（`evidence` + `evidence_relations`，关系类型含相互印证/相互矛盾/资金链路）与疏漏检测（`gap_detections` 表）。
 - 口供语义映射（`expand_semantics`）、三路检索路由（`detect_route`）、人工校准与标注（`evidence_annotations`）。
-- statutory RAG 基建成熟（`app/legal_corpus.py` v10–v19 语料、版本歧义拒绝、哈希校验），但目前主要服务基准链路（1-1=81.61%、3-1=85.52%、3-3=54.67%），**产品侧问答尚未接入法条检索**。
+- statutory RAG 基建成熟（`app/retrieval/legal_corpus.py` v10–v19 语料、版本歧义拒绝、哈希校验），但目前主要服务基准链路（1-1=81.61%、3-1=85.52%、3-3=54.67%），**产品侧问答尚未接入法条检索**。
 
 差距：分析流程是"单一问答 + 路由"，没有面向金融犯罪案卷的**显式子智能体分工**；资金流水虽是证据类别（银行流水/审计报告），但只有文本页级存储，没有结构化的资金链路分析。
 
@@ -76,7 +76,7 @@
 
 ### 2.1 现状与差距
 
-`build_export`（`app/services.py`）输出固定内容：案件摘要、内容级/证据目录 CSV（公式注入中和）、问答记录、原始卷宗、带 sha256 的清单.json。差距：内容与顺序固定，不能按律所/案件类型预设模板；AI 阅卷总结/质证记录等结构化成果不进包；缺少"律师一次性提交、系统按模板拼接"的结案动作。
+`build_export`（`app/review/services.py`）输出固定内容：案件摘要、内容级/证据目录 CSV（公式注入中和）、问答记录、原始卷宗、带 sha256 的清单.json。差距：内容与顺序固定，不能按律所/案件类型预设模板；AI 阅卷总结/质证记录等结构化成果不进包；缺少"律师一次性提交、系统按模板拼接"的结案动作。
 
 ### 2.2 目标设计
 

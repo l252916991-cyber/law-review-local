@@ -28,7 +28,7 @@
 
 | 项目 | 许可 | 本仓如何使用 |
 |---|---|---|
-| [pi-mono](https://github.com/badlogic/pi-mono)（`pi-ai` 包） | MIT | 仅参照其文档描述的 provider / wire-api 二分、`ModelSpec` 可序列化字段、跨 provider 交接丢弃 thinking 块三条约定；`app/model_ports.py` 为独立实现，未复制源码 |
+| [pi-mono](https://github.com/badlogic/pi-mono)（`pi-ai` 包） | MIT | 仅参照其文档描述的 provider / wire-api 二分、`ModelSpec` 可序列化字段、跨 provider 交接丢弃 thinking 块三条约定；`app/llm/model_ports.py` 为独立实现，未复制源码 |
 
 ## 已删除的 Vendored 前端库（v0.4.0 之前的版本）
 

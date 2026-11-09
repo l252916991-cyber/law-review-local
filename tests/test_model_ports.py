@@ -12,8 +12,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app import model_ports
-from app.model_ports import (
+from app.llm import model_ports
+from app.llm.model_ports import (
     ANTHROPIC_API_VERSION,
     MODEL_API_ANTHROPIC_MESSAGES,
     MODEL_API_OPENAI_COMPLETIONS,
@@ -545,11 +545,11 @@ class ScriptedProviderTests(unittest.TestCase):
 class ModuleBoundaryTests(unittest.TestCase):
     def test_model_ports_imports_without_the_application(self):
         # The module must stay usable from a script or a benchmark that has no
-        # database: only ``default_models`` reaches into ``app.config``.
+        # database: only ``default_models`` reaches into ``app.core.config``.
         source = Path(model_ports.__file__).read_text(encoding="utf-8")
-        self.assertIn("from .config import LLMConfig", source)
-        self.assertNotIn("from .db import", source)
-        self.assertNotIn("from .services import", source)
+        self.assertIn("from app.core.config import LLMConfig", source)
+        self.assertNotIn("from app.storage.db import", source)
+        self.assertNotIn("from app.review.services import", source)
 
 
 if __name__ == "__main__":

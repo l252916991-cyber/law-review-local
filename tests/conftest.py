@@ -10,7 +10,7 @@ import pytest
 
 def _load_corpus_regression(root, contract):
     """Verify the exact reviewed inputs before any real-corpus assertion runs."""
-    from app.legal_corpus import LegalCorpus
+    from app.retrieval.legal_corpus import LegalCorpus
 
     directories = []
     for item in contract["sources"]:
@@ -49,8 +49,8 @@ def corpus_regression_loader():
 
 @pytest.fixture(scope="session", autouse=True)
 def synthetic_lawbench(tmp_path_factory):
-    from app import lawbench
-    from app.benchmark_metrics import task_label_space
+    from app.benchmarks import lawbench
+    from app.benchmarks.metrics import task_label_space
 
     directory = tmp_path_factory.mktemp("synthetic-lawbench")
     references = {
@@ -99,7 +99,7 @@ def postgres_database_per_test(request):
         return
     import uuid
 
-    from app.db_postgres import create_database, drop_database, ensure_role
+    from app.storage.db_postgres import create_database, drop_database, ensure_role
     from tests.support import POSTGRES_APP_ROLE
 
     ensure_role(admin_url, POSTGRES_APP_ROLE)
@@ -121,7 +121,7 @@ def pytest_runtest_call(item):
     if not os.environ.get("LAW_REVIEW_TEST_POSTGRES_URL"):
         yield
         return
-    from app import db_postgres
+    from app.storage import db_postgres
 
     before = db_postgres.connections_opened
     yield

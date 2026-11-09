@@ -16,14 +16,14 @@ os.environ["LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB"] = str(Path(TEST_DATA) / "checkp
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.agents import EvidenceAgent, FactAgent, answer_contract, create_coordinator, get_run_trace  # noqa: E402
-from app.db import SCHEMA, connect, init_db, transaction  # noqa: E402
-from app.langgraph_agents import (  # noqa: E402
+from app.integration.runtime_comparison import compare_runtime_results  # noqa: E402
+from app.main import app  # noqa: E402
+from app.review.agents import EvidenceAgent, FactAgent, answer_contract, create_coordinator, get_run_trace  # noqa: E402
+from app.review.langgraph_agents import (  # noqa: E402
     LangGraphRunError,
     create_langgraph_coordinator,
 )
-from app.main import app  # noqa: E402
-from app.runtime_comparison import compare_runtime_results  # noqa: E402
+from app.storage.db import SCHEMA, connect, init_db, transaction  # noqa: E402
 
 
 class LangGraphRuntimeTest(IsolatedDatabaseTestCase):
@@ -106,7 +106,7 @@ class LangGraphRuntimeTest(IsolatedDatabaseTestCase):
 
         answer = "结论依据[资料1]，仍需律师复核。"
         coordinator = self.coordinator(failure_injector=inject)
-        with patch("app.agents.call_local_llm", return_value=answer) as llm:
+        with patch("app.review.agents.call_local_llm", return_value=answer) as llm:
             with self.assertRaises(LangGraphRunError) as caught:
                 coordinator.process_query("梳理募集资金流向", "恢复测试", True)
             run_id = caught.exception.run_id
@@ -161,7 +161,7 @@ class LangGraphRuntimeTest(IsolatedDatabaseTestCase):
         self.assertFalse(result["resumable"])
 
     def test_empty_gap_output_is_supported(self):
-        with patch("app.langgraph_agents.GapDetectionAgent.run", return_value={"gaps": [], "summary": "无疏漏"}):
+        with patch("app.review.langgraph_agents.GapDetectionAgent.run", return_value={"gaps": [], "summary": "无疏漏"}):
             result = self.coordinator().process_query("检查本案证据疏漏", use_llm=False)
         self.assertIn("gap_detection", {step["node"] for step in result["steps"]})
 
@@ -202,7 +202,7 @@ class LangGraphRuntimeTest(IsolatedDatabaseTestCase):
             conn.commit()
         finally:
             conn.close()
-        with patch("app.db.DB_PATH", path):
+        with patch("app.storage.db.DB_PATH", path):
             init_db(seed=False)
             init_db(seed=False)
             with transaction() as conn:
@@ -212,8 +212,8 @@ class LangGraphRuntimeTest(IsolatedDatabaseTestCase):
         self.assertEqual(row["final_answer"], "保留原答案")
 
     def test_empty_retrieval_and_model_fallback_are_supported(self):
-        with patch("app.langgraph_agents.RetrievalAgent.retrieve", return_value={"contexts": [], "metrics": {}}), patch(
-            "app.agents.call_local_llm", side_effect=RuntimeError("模型不可用")
+        with patch("app.review.langgraph_agents.RetrievalAgent.retrieve", return_value={"contexts": [], "metrics": {}}), patch(
+            "app.review.agents.call_local_llm", side_effect=RuntimeError("模型不可用")
         ):
             result = self.coordinator().process_query(
                 "完全不存在的材料", "异常测试", True, persist_memory=False
@@ -254,7 +254,7 @@ class LangGraphAPITest(IsolatedDatabaseTestCase):
 
     def test_compare_endpoint(self):
         snapshot = [{"id": 42, "content": "执行前记忆"}]
-        with patch("app.rag.recall_memories", return_value=snapshot) as recall:
+        with patch("app.retrieval.rag.recall_memories", return_value=snapshot) as recall:
             response = self.client.post(
                 "/api/cases/1/agent-compare",
                 json={
@@ -305,7 +305,7 @@ class LangGraphAPITest(IsolatedDatabaseTestCase):
                 raise RuntimeError("API恢复测试")
 
         coordinator = create_langgraph_coordinator(1, False, failure_injector=inject)
-        with patch("app.langgraph_agents.create_langgraph_coordinator", return_value=coordinator):
+        with patch("app.review.langgraph_agents.create_langgraph_coordinator", return_value=coordinator):
             failure = self.client.post("/api/cases/1/agent-chat", json={
                 "question": "梳理募集资金流向", "mode": "langgraph", "use_llm": False,
             })

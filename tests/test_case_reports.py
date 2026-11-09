@@ -13,8 +13,8 @@ from tests.support import IsolatedDatabaseTestCase
 
 TEST_DATA = tempfile.mkdtemp(prefix="lexvault-report-tests-")
 
-from app.db import db_scope, init_db, now, transaction  # noqa: E402
 from app.main import app  # noqa: E402
+from app.storage.db import db_scope, init_db, now, transaction  # noqa: E402
 
 
 class ReportFlowTest(IsolatedDatabaseTestCase):

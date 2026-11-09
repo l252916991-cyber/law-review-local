@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from app import eval_gate
-from app.eval_gate import (
+from app.evaluation import eval_gate
+from app.evaluation.eval_gate import (
     DEFAULT_BASELINES,
     GateConfigurationError,
     baseline_from,
@@ -40,7 +40,7 @@ def test_current_code_passes_the_committed_baseline(current):
 
 
 def test_a_retrieval_regression_is_blocked(tmp_path, monkeypatch):
-    from app.rag import HybridRetriever
+    from app.retrieval.rag import HybridRetriever
 
     original = HybridRetriever.retrieve
 
@@ -187,7 +187,7 @@ def test_a_saved_report_is_registered_only_when_the_current_code_would_produce_i
     assert len(registered["registered_from"]["sha256"]) == 64
 
     changed_code = copy.deepcopy(current)
-    changed_code["manifest"]["modules"]["rag.py"] = "0" * 64
+    changed_code["manifest"]["modules"]["retrieval/rag.py"] = "0" * 64
     changed_code["manifest"]["inference_id"] = eval_gate._inference_id(changed_code["manifest"])
     edited_id = copy.deepcopy(current)
     edited_id["manifest"]["prompt_version"] = "other"  # contents no longer match the recorded id
@@ -196,7 +196,7 @@ def test_a_saved_report_is_registered_only_when_the_current_code_would_produce_i
     for report in (changed_code, edited_id, other_scoring, {"manifest": {}}):
         code, target = register(report)
         assert code == 2 and not target.exists()
-    assert "modules/rag.py" in capsys.readouterr().err
+    assert "modules/retrieval/rag.py" in capsys.readouterr().err
 
     with pytest.raises(SystemExit):
         main(["--from-report", str(tmp_path / "report-0.json")])
@@ -215,7 +215,7 @@ def test_reports_keep_their_answers_for_rescoring(current):
 
 
 def test_an_older_report_is_rescored_only_if_its_answers_reproduce_it(current, tmp_path, capsys):
-    from app.answer_eval import load_dataset, score_answer_v2
+    from app.evaluation.answer_eval import load_dataset, score_answer_v2
     from scripts.eval_gate import main
 
     # A report as eval-gate-v1 wrote it: v2 scores, no saved answers.

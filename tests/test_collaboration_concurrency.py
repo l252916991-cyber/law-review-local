@@ -15,8 +15,8 @@ os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import connect, db_scope, init_db, now, transaction  # noqa: E402
 from app.main import app  # noqa: E402
+from app.storage.db import connect, db_scope, init_db, now, transaction  # noqa: E402
 
 
 class CollaborationTestCase(IsolatedDatabaseTestCase):
@@ -34,7 +34,7 @@ class CollaborationTestCase(IsolatedDatabaseTestCase):
         return response.json()["evidence"]
 
     def upload_text(self, case_id, name="借条.txt", text="借条：今借到人民币十万元整，借款人张三。"):
-        from app.services import index_upload
+        from app.review.services import index_upload
         return index_upload(case_id, name, text.encode("utf-8"), "text/plain")
 
     def audit_rows(self, case_id, action):
@@ -241,7 +241,7 @@ class MaterialCorrectionTest(CollaborationTestCase):
         self.assertIn("今借到人民币十万元整", page["text"])
 
     def test_simultaneous_page_corrections_have_one_winner_and_one_conflict(self):
-        from app.routes import documents as document_routes
+        from app.api.routes import documents as document_routes
 
         case = self.create_case()
         document = self.upload_text(case["id"])

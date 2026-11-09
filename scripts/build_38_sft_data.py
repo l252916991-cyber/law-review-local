@@ -47,7 +47,7 @@ CITE = re.compile(r"《[^》]{2,40}》第[零〇一二三四五六七八九十�
 # Prompt constants are read as literals from the source modules so this script
 # stays importable in the training venv (no app dependency chain) while keeping
 # a single source of truth; values are hashed into the manifest.
-CONSTANT_SOURCES = ["app/benchmark_solver.py", "app/benchmark_reporting.py"]
+CONSTANT_SOURCES = ["app/benchmarks/solver.py", "app/benchmarks/reporting.py"]
 
 
 def literal_from_source(filename: str, name: str) -> Any:
@@ -62,9 +62,9 @@ def literal_from_source(filename: str, name: str) -> Any:
     raise KeyError(f"{name} not found in {filename}")
 
 
-SYSTEM_PROMPT = literal_from_source("app/benchmark_reporting.py", "SYSTEM_PROMPT")
-GUIDED_SYSTEM_SUFFIX = literal_from_source("app/benchmark_solver.py", "GUIDED_SYSTEM_SUFFIX")
-TASK_GUIDANCE_38 = literal_from_source("app/benchmark_solver.py", "TASK_GUIDANCE")["3-8"]
+SYSTEM_PROMPT = literal_from_source("app/benchmarks/reporting.py", "SYSTEM_PROMPT")
+GUIDED_SYSTEM_SUFFIX = literal_from_source("app/benchmarks/solver.py", "GUIDED_SYSTEM_SUFFIX")
+TASK_GUIDANCE_38 = literal_from_source("app/benchmarks/solver.py", "TASK_GUIDANCE")["3-8"]
 
 CLUSTER_THRESHOLD = 0.85
 SIZES = {"holdout": 200, "valid": 200, "train": 3000}

@@ -8,9 +8,9 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
-from app import tool_loop
-from app.db import db_scope, init_db, now, transaction
-from app.tool_loop import MAX_ROUNDS_LIMIT, ToolsUnsupportedError, run_tool_loop
+from app.review import tool_loop
+from app.review.tool_loop import MAX_ROUNDS_LIMIT, ToolsUnsupportedError, run_tool_loop
+from app.storage.db import db_scope, init_db, now, transaction
 
 
 class _FakeResponse:
@@ -202,7 +202,7 @@ class ChatToolLoopIntegrationTests(unittest.TestCase):
         init_db(seed=True)
 
     def _chat(self):
-        from app.services import chat
+        from app.review.services import chat
 
         return chat(1, "张某是否批准了年化12%的固定回报宣传？", "本机律师", None, True, False)
 
@@ -215,17 +215,17 @@ class ChatToolLoopIntegrationTests(unittest.TestCase):
             "usage": {"prompt_tokens": 1, "completion_tokens": 1},
             "model": "test-model",
         }
-        with patch("app.services.tool_loop_enabled", return_value=True), \
-                patch("app.tool_loop.run_tool_loop", return_value=loop_result):
+        with patch("app.review.services.tool_loop_enabled", return_value=True), \
+                patch("app.review.tool_loop.run_tool_loop", return_value=loop_result):
             result = self._chat()
         self.assertTrue(result["llm_used"])
         self.assertEqual(result["context"]["tools"]["rounds"], 2)
         self.assertEqual(result["context"]["tools"]["tool_calls"], 1)
 
     def test_unsupported_endpoint_falls_back_to_single_shot(self):
-        with patch("app.services.tool_loop_enabled", return_value=True), \
-                patch("app.tool_loop.run_tool_loop", side_effect=ToolsUnsupportedError("no tools")), \
-                patch("app.services.call_local_llm", return_value="回退答案 [资料1]。\n\n请律师复核原文与上述结论。"):
+        with patch("app.review.services.tool_loop_enabled", return_value=True), \
+                patch("app.review.tool_loop.run_tool_loop", side_effect=ToolsUnsupportedError("no tools")), \
+                patch("app.review.services.call_local_llm", return_value="回退答案 [资料1]。\n\n请律师复核原文与上述结论。"):
             result = self._chat()
         self.assertTrue(result["llm_used"])
         self.assertIn("回退答案", result["answer"])

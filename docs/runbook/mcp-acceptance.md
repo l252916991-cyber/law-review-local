@@ -12,7 +12,7 @@ uv run --locked python scripts/validate_application_acceptance.py --output outpu
 
 ```sh
 demo_dir=$(mktemp -d)
-LAW_REVIEW_DATA_DIR="$demo_dir" uv run --locked python -c 'from app.db import init_db; init_db(seed=True)'
+LAW_REVIEW_DATA_DIR="$demo_dir" uv run --locked python -c 'from app.storage.db import init_db; init_db(seed=True)'
 ```
 
 在客户端提供的 MCP 配置界面填入以下模板，将路径替换为实际的绝对路径；本指南不修改全局客户端配置：
@@ -22,7 +22,7 @@ LAW_REVIEW_DATA_DIR="$demo_dir" uv run --locked python -c 'from app.db import in
   "mcpServers": {
     "lexvault-synthetic": {
       "command": "/absolute/path/to/project/.venv/bin/python",
-      "args": ["-m", "app.mcp_server", "--case-id", "1"],
+      "args": ["-m", "app.integration.mcp_server", "--case-id", "1"],
       "env": {
         "PYTHONPATH": "/absolute/path/to/project",
         "LAW_REVIEW_DATA_DIR": "/absolute/path/to/new-temporary-directory",

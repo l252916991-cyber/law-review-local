@@ -11,11 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from app.db import connect, get_db_path, init_db, transaction
-from app.host_writes import digest
-from app.local_backends import BackendGate, BackendUnknown, LocalModels
-from app.model_domain import LocalModelDomainIntegration
-from app.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError
+from app.integration.host_writes import digest
+from app.integration.model_domain import LocalModelDomainIntegration
+from app.integration.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError
+from app.llm.local_backends import BackendGate, BackendUnknown, LocalModels
+from app.storage.db import connect, get_db_path, init_db, transaction
 from tests.test_domain_integration import counts, request
 from tests.test_domain_writes import domain  # noqa: F401
 from tests.test_host_writes import isolated  # noqa: F401
@@ -260,6 +260,6 @@ def test_schema_16_migration_preserves_existing_receipts(local_models):
     assert counts() == before
     assert control.status("domain-process")["status"] == "queued"
     with closing(connect()) as conn:
-        from app import db as app_db
+        from app.storage import db as app_db
         assert conn.execute("PRAGMA user_version").fetchone()[0] == app_db.SCHEMA_VERSION
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()

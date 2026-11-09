@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import SCHEMA_VERSION, split_articles
-from app.statutory_retrieval import corpus_status, retrieve_statutory
+from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
+from app.retrieval.statutory_retrieval import corpus_status, retrieve_statutory
 
 
 def _corpus(directory: Path) -> str:

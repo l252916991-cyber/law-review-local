@@ -8,7 +8,7 @@ from tests.support import IsolatedDatabaseTestCase
 
 
 def create_case_with_documents(document_keys, title="多轮合同案件"):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         case_id = conn.execute(
@@ -44,7 +44,7 @@ def create_case_with_documents(document_keys, title="多轮合同案件"):
 
 
 def make_conversation(case_id, user_name="测试律师"):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         return conn.execute(
@@ -54,7 +54,7 @@ def make_conversation(case_id, user_name="测试律师"):
 
 
 def append_turn(conversation_id, question, answer, *, kind="answer", citations=None, provenance=None):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         user_id = conn.execute(
@@ -85,7 +85,7 @@ def citation(document_id, name, page, index=1):
 class ResolutionTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=False)
 
@@ -94,7 +94,7 @@ class ResolutionTest(IsolatedDatabaseTestCase):
         self.conversation_id = make_conversation(self.case_id)
 
     def resolve(self, question, cutoff=None):
-        from app.context import load_history, resolve_question
+        from app.review.context import load_history, resolve_question
 
         history = load_history(self.case_id, self.conversation_id, cutoff_message_id=cutoff)
         return resolve_question(self.case_id, question, history), history
@@ -143,7 +143,7 @@ class ResolutionTest(IsolatedDatabaseTestCase):
             citations=[citation(self.ids["jia_contract"], "甲公司采购合同.txt", 1)],
         )
         fresh = make_conversation(self.case_id)
-        from app.context import load_history, resolve_question
+        from app.review.context import load_history, resolve_question
 
         resolution = resolve_question(self.case_id, "它的付款期限呢？", load_history(self.case_id, fresh))
         self.assertEqual(resolution.status, "needs_clarification")
@@ -163,7 +163,7 @@ class ResolutionTest(IsolatedDatabaseTestCase):
         self.assertEqual(resolution.reason, "no_resolvable_object")
 
     def test_generic_type_word_does_not_override_unique_history_object(self):
-        from app.context import load_history, resolve_question
+        from app.review.context import load_history, resolve_question
 
         case_id, ids = create_case_with_documents(SCENARIOS["pair_with_supplement"], title="补充协议案件")
         conversation_id = make_conversation(case_id)
@@ -198,7 +198,7 @@ class ResolutionTest(IsolatedDatabaseTestCase):
             citations=[citation(other_ids["yi_contract"], "乙公司采购合同.txt", 2)],
         )
         # A conversation from another case cannot be loaded for this case at all.
-        from app.context import ConversationNotFoundError, load_history
+        from app.review.context import ConversationNotFoundError, load_history
 
         with self.assertRaises(ConversationNotFoundError):
             load_history(self.case_id, other_conversation)
@@ -207,18 +207,18 @@ class ResolutionTest(IsolatedDatabaseTestCase):
 class ChatFollowUpTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=False)
 
     def setUp(self):
         self.case_id, self.ids = create_case_with_documents(SCENARIOS["pair"])
-        from app import context
+        from app.review import context
 
         self.default_policy = context.context_policy()
 
     def ask(self, question, conversation_id=None, use_llm=False):
-        from app.services import chat
+        from app.review.services import chat
 
         return chat(self.case_id, question, "测试律师", conversation_id, use_llm, False)
 
@@ -264,7 +264,7 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
         self.assertTrue(all(item["document_id"] == self.ids["yi_contract"] for item in selected["citations"]))
 
     def test_clarification_is_saved_as_non_factual_turn(self):
-        from app.context import load_history
+        from app.review.context import load_history
 
         first = self.ask("两份采购合同的付款期限分别是什么？")
         ambiguous = self.ask("它的付款期限呢？", first["conversation_id"])
@@ -284,7 +284,7 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
         self.assertEqual(result["citations"], [])
 
     def test_missing_current_source_returns_insufficient_evidence(self):
-        with patch("app.rag.HybridRetriever") as retriever:
+        with patch("app.retrieval.rag.HybridRetriever") as retriever:
             retriever.return_value.retrieve.return_value = ([], {"retrieval_mode": "hybrid_rrf"})
             result = self.ask("甲公司采购合同的保密期限是多少？")
         self.assertEqual(result["answer_status"], "insufficient_evidence")
@@ -303,7 +303,7 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
 
     def test_insufficient_scope_is_limited_to_resolved_document(self):
         first = self.ask("甲公司采购合同的签署方有哪些？")
-        with patch("app.rag.HybridRetriever") as retriever:
+        with patch("app.retrieval.rag.HybridRetriever") as retriever:
             retriever.return_value.retrieve.return_value = ([], {"retrieval_mode": "hybrid_rrf"})
             result = self.ask("它的保密期限呢？", first["conversation_id"])
         self.assertEqual(result["answer_status"], "insufficient_evidence")
@@ -335,12 +335,12 @@ class ChatFollowUpTest(IsolatedDatabaseTestCase):
 class ModelInputTest(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
+        from app.storage.db import init_db
 
         init_db(seed=False)
 
     def test_history_and_resolved_object_reach_the_model_but_only_current_contexts_cite(self):
-        from app.services import chat
+        from app.review.services import chat
 
         case_id, ids = create_case_with_documents(SCENARIOS["pair"])
         conversation_id = make_conversation(case_id)
@@ -349,9 +349,9 @@ class ModelInputTest(IsolatedDatabaseTestCase):
             citations=[citation(ids["jia_contract"], "甲公司采购合同.txt", 1)],
         )
         answer = "付款期限为验收合格后60日内[资料1]。请律师复核原文与上述结论。"
-        with patch("app.services.local_llm_available", return_value=(True, "fake-model")), \
-                patch("app.services.egress_opener") as opener, \
-                patch("app.services.read_json_with_deadline", return_value={
+        with patch("app.review.services.local_llm_available", return_value=(True, "fake-model")), \
+                patch("app.review.services.egress_opener") as opener, \
+                patch("app.review.services.read_json_with_deadline", return_value={
                     "choices": [{"message": {"content": answer}}],
                 }):
             result = chat(case_id, "它的付款期限呢？", "测试律师", conversation_id, True, False)
@@ -374,7 +374,7 @@ class ModelInputTest(IsolatedDatabaseTestCase):
     def test_old_callers_default_to_no_history(self):
         import inspect
 
-        from app.services import call_local_llm
+        from app.review.services import call_local_llm
 
         signature = inspect.signature(call_local_llm)
         for name in ("history", "memory", "object_note"):
@@ -382,8 +382,8 @@ class ModelInputTest(IsolatedDatabaseTestCase):
             self.assertEqual(signature.parameters[name].kind, inspect.Parameter.KEYWORD_ONLY)
 
     def test_clarification_contract_cannot_be_relaxed_into_a_fact_answer(self):
-        from app.agents import validate_review_answer
-        from app.context import validate_context_notice
+        from app.review.agents import validate_review_answer
+        from app.review.context import validate_context_notice
 
         self.assertTrue(validate_context_notice("请确认你指的是哪份材料。", "clarification")["valid"])
         self.assertFalse(validate_context_notice("请确认；但付款期限是60日[资料1]。", "clarification")["valid"])
@@ -401,8 +401,8 @@ class ChatApiFollowUpTest(IsolatedDatabaseTestCase):
     def setUpClass(cls):
         from fastapi.testclient import TestClient
 
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         init_db(seed=False)
         cls.client_context = TestClient(app)

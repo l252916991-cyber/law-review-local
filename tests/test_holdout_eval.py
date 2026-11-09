@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.collaboration_ablation import (
+from app.evaluation.collaboration_ablation import (
     Generation,
     load_batch_dataset,
     load_prepared,

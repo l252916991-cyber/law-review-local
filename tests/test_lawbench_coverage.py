@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import SCHEMA_VERSION, split_articles
+from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
 from scripts.lawbench_coverage import coverage, load_rows, write_worklist
 
 

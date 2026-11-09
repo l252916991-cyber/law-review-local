@@ -137,7 +137,7 @@ def test_repair_is_rejected_when_it_would_not_match_the_official_tree():
 
 
 def test_chinese_article_numbers_round_trip_through_the_shared_parser():
-    from app.legal_corpus import article_number
+    from app.retrieval.legal_corpus import article_number
     from scripts.build_npc_corpus import _chinese_number
 
     for value in (1, 10, 12, 20, 100, 105, 110, 218, 999):
@@ -185,7 +185,7 @@ def test_inline_alignment_is_rejected_when_an_article_is_missing():
 
 
 def test_article_numbers_above_one_hundred_use_the_legal_spelling():
-    from app.legal_corpus import article_number
+    from app.retrieval.legal_corpus import article_number
     from scripts.build_npc_corpus import _chinese_number
 
     assert _chinese_number(110) == "一百一十"

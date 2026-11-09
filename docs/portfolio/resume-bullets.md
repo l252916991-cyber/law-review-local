@@ -7,19 +7,19 @@
 **1. 设计并实现法律材料多专家审阅流水线（原生 DAG + LangGraph 双运行时）**
 把检索、四类结构化专家、交叉来源核对、审校生成与引用校验拆成显式节点；专家输出带稳定编号与来源绑定摘要，分歧与待补事项进入确定性附录，原始回答必须先通过产品引用契约才允许追加附录。两条运行时共享同一份专家规格并对结果做一致性校验。
 
-- 证据：`app/agents.py`、`app/review_collaboration.py`、[specialist-collaboration-20261026.md](../history/migration/specialist-collaboration-20261026.md)
+- 证据：`app/review/agents.py`、`app/review/review_collaboration.py`、[specialist-collaboration-20261026.md](../history/migration/specialist-collaboration-20261026.md)
 - 可核验点：来源被篡改/上下文变化时拒绝旧交接；附录不能挽救不合格回答。
 
 **2. 实现基于页摘要的断点恢复校验，区分“复用”与“过期拒用”**
 checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文；来源改动后拒绝恢复旧分析且不消耗重试次数。提供了三阶段（中断 / 新进程恢复 / 篡改）可复现脚本与证据 JSON。
 
-- 证据：`app/langgraph_agents.py`、`scripts/demo_recovery_check.py`、[P3](../history/migration/portfolio-p3-demo-status-20261027.md)
+- 证据：`app/review/langgraph_agents.py`、`scripts/demo_recovery_check.py`、[P3](../history/migration/portfolio-p3-demo-status-20261027.md)
 - 实测：审校完成后中断，独立进程恢复 `steps 9 → 9`（未重复专家节点）、`resume_count=1`、审校摘要一致；改动一页后恢复被拒绝、`resume_count=0`。
 
 **3. 设计三组隔离对照实验（基础 RAG / 结构化交接 / 交叉审校）并实现冻结与记账**
 `prepare` 阶段冻结隔离合成库、检索上下文、规则专家发现与三组提示（不调用模型）；`run` 阶段只读冻结批次、复算提示摘要、每次尝试写入账本；失败、未尝试、规则拒答与未知用量分别统计，失败计入分母，预算超限显式失败且不截断。
 
-- 证据：`app/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md)
+- 证据：`app/evaluation/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md)
 - 实测：60 题冻结提示长度 A 中位 855、B 7,568、C 9,719 字符；三组对照 16 项、六案例保留集 6 项、恢复演示 4 项回归覆盖变量隔离、跨案例引用拒绝与 fail-closed 行为。
 
 **4. 从允许清单源码包在新目录完成可复现交付**
@@ -37,7 +37,7 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 **6. 建立答案质量门禁，让提示词、检索与模型改动可回归**
 60 题冻结评测集走真实对话路径逐题评分，与已登记基线比较：规则模式结果确定，任何一道原本通过的题失败即阻断；模型模式按预先登记的阈值容忍采样噪声并约束 p95 时延。`inference_id` 由提示词、检索相关模块摘要、数据库后端与模型设置共同决定，配置相同而结果不同时按"不确定性"阻断。CI 每次推送运行。
 
-- 证据：`app/eval_gate.py`、[eval-gate.md](../runbook/eval-gate.md)、`benchmarks/eval_gate/baseline-rules.json`
+- 证据：`app/evaluation/eval_gate.py`、[eval-gate.md](../runbook/eval-gate.md)、`benchmarks/eval_gate/baseline-rules.json`
 - 实测：故意让检索只保留第 1 页，门禁拦下并列出退化题号。本机 Qwen3.8-27B 首轮 51/60；按失败题修了同句代词误判、"宣传邮件"漏检、700 token 截断丢失复核提醒、拒答无引用四类问题，第二轮 57/60，截断 5 → 0、被回答契约拒绝 3 → 0，规则模式 44/60 → 46/60。第一版修复让另一题漏掉当事人笔录，门禁当场拦下并列出题号。剩余 3 道失败复核为评分词表未覆盖的正确拒答；评分升为 v3 时先用旧口径复现两轮原报告（各 60/60 逐题一致），再用保存的回答重新评分，第二轮 60/60（样本内），并记下 v3 会放过"拒答后又给推测数字"这类回答。
 - 代价：回答中位长度变长，p50 18.4 → 24.7 秒（p95 51.5 → 40.9 秒）。
 - 评分器盲区：词表评分查不出"替律师下结论"（判定主观明知、推翻辩解、法律定性）。新增确定性检测作为只报告的门禁指标；规则定稿后不再改，在三组对照实验的 366 个未见过的回答上测得精确率约 83%（10/12），随机抽查发现召回偏低（民事案件的"构成逾期""证明力"等说法覆盖不到），如实记录、暂不阻断。
@@ -50,17 +50,17 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 **7. 业务库支持 SQLite 与 PostgreSQL + pgvector 双后端，同一套代码**
 保留 sqlite3 形态的数据访问接口，在 PostgreSQL 一侧做占位符与方言翻译、逐语句 savepoint、写锁、错误类型映射；表结构由 SQLite 迁移自动生成（含全文检索触发器与向量列），CI 校验两边一致。案件内向量检索改在库内精确排序。
 
-- 证据：`app/db_postgres.py`、`scripts/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
+- 证据：`app/storage/db_postgres.py`、`scripts/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
 - 实测：全量测试在两种数据库上都通过；门禁 60 题两库逐题结果一致；10,000 页单案向量检索 p50 1.29 s → 48 ms，前 20 页及顺序完全相同。
 - 边界：多实例部署还需要把任务队列和 checkpoint 移出进程。PostgreSQL 逐版本迁移已有：只执行迁移文件得到的结构须与新建库逐项一致。
 
 **8. 实现信息隔离墙：应用层检查 + PostgreSQL 行级安全双层执行**
 设墙案件只有墙内名单上的人可见，管理员也不例外，墙外返回与案件不存在相同的 404；破窗访问限 30 分钟、须写理由并审计。数据库层 35 张表启用 `FORCE ROW LEVEL SECURITY`，每个连接写入当前身份，子表按主键回查父表；生成器发现未归类的案件关联表直接失败，新表不会绕过隔离墙。
 
-- 证据：`app/case_walls.py`、`scripts/generate_postgres_schema.py`、`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)、[开销基准](../benchmarks/postgres-rls-overhead-20261102.md)
+- 证据：`app/cases/case_walls.py`、`scripts/generate_postgres_schema.py`、`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)、[开销基准](../benchmarks/postgres-rls-overhead-20261102.md)
 - 实测：以墙外管理员和墙外律师身份遍历全部 GET 接口，墙内标记一次都没出现；在 PostgreSQL 上关掉应用层检查重做一遍依旧干净，同样操作在 SQLite 上有 10 个接口泄露（对照测试）。10,000 页检索 p50：对照 56 ms，没被挡的用户 68 ms，五分之四材料被隐藏的用户 120 ms，结果相同；子表策略从"在父表可见行里"改为主键回查后，这两类用户分别从 1,520 ms、373 ms 降下来（同机依次测三版写法）。
 - 边界：SQLite 部署只有应用层一道防线；本项目是单律所实例，多租户是同一机制的迁移方向，未实现。
-- 配套：利益冲突检查（`app/conflicts.py`、[conflict-check.md](../runbook/conflict-check.md)）。登记委托人、对方当事人、关联方后检索全所案件，名称按组织形式、曾用名、统一社会信用代码比对；命中后该案所有写操作返回 409，须由检查发起人以外的合伙人写明理由放行。命中隔离案件时照样查出，但墙外的人只看到“存在冲突”，看不到是哪个案件。
+- 配套：利益冲突检查（`app/cases/conflicts.py`、[conflict-check.md](../runbook/conflict-check.md)）。登记委托人、对方当事人、关联方后检索全所案件，名称按组织形式、曾用名、统一社会信用代码比对；命中后该案所有写操作返回 409，须由检查发起人以外的合伙人写明理由放行。命中隔离案件时照样查出，但墙外的人只看到“存在冲突”，看不到是哪个案件。
 
 可用表述：
 

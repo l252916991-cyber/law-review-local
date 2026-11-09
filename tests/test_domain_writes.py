@@ -6,10 +6,16 @@ from copy import deepcopy
 
 import pytest
 
-from app.db import connect, now, transaction
-from app.domain_writes import DomainHostWritePort
-from app.host_writes import LocalHostWritePort
-from app.runtime_ports import AccessDeniedError, ContractValidationError, RequestConflictError, RunScope, WriteAction
+from app.integration.domain_writes import DomainHostWritePort
+from app.integration.host_writes import LocalHostWritePort
+from app.integration.runtime_ports import (
+    AccessDeniedError,
+    ContractValidationError,
+    RequestConflictError,
+    RunScope,
+    WriteAction,
+)
+from app.storage.db import connect, now, transaction
 from tests.test_forge_readonly import write_corpus
 from tests.test_host_writes import isolated, request, run  # noqa: F401
 
@@ -77,8 +83,8 @@ def test_corpus_identity_and_actual_membership(domain, tmp_path, monkeypatch):
     corpus.mkdir()
     write_corpus(corpus, "合成法条原文。")
     monkeypatch.setenv("LAW_REVIEW_LEGAL_CORPUS_DIR", str(corpus))
-    from app.forge_readonly import capture_corpus
-    from app.forge_sources import statute_source
+    from app.integration.forge_readonly import capture_corpus
+    from app.integration.forge_sources import statute_source
     identity, source = capture_corpus()
     hit = source.lookup("刑法", 264, version_date="2020-01-01")[0]
     payload = message(doc)

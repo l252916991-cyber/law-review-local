@@ -12,14 +12,26 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from app.db import connect, get_db_path, init_db, now, transaction
-from app.forge_bridge import SidecarProtocolError, framework_binding, run_framework
-from app.forge_readonly import CitationIntegrityError, ReadonlyCaseSession, SnapshotChangedError, exact_quote
-from app.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA
-from app.legal_corpus import LegalCorpus, split_articles
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import AccessDeniedError, ActorIdentity, ModelConfig, RunRequest, RunScope, new_request_id
-from app.security import Principal, _principal
+from app.core.security import Principal, _principal
+from app.integration.forge_bridge import SidecarProtocolError, framework_binding, run_framework
+from app.integration.forge_readonly import (
+    CitationIntegrityError,
+    ReadonlyCaseSession,
+    SnapshotChangedError,
+    exact_quote,
+)
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import (
+    AccessDeniedError,
+    ActorIdentity,
+    ModelConfig,
+    RunRequest,
+    RunScope,
+    new_request_id,
+)
+from app.retrieval.legal_corpus import SCHEMA_VERSION as CORPUS_SCHEMA
+from app.retrieval.legal_corpus import LegalCorpus, split_articles
+from app.storage.db import connect, get_db_path, init_db, now, transaction
 from tests.support import IsolatedDatabaseTestCase
 
 
@@ -65,7 +77,7 @@ def prepare(session):
 
 
 class SnapshotHostTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
@@ -132,7 +144,7 @@ class SnapshotHostTests(IsolatedDatabaseTestCase):
 
     def test_legacy_database_override_cannot_redirect_snapshot_writes_to_source(self):
         before = dump_source()
-        with patch("app.db.DB_PATH", get_db_path()):
+        with patch("app.storage.db.DB_PATH", get_db_path()):
             with self.assertRaisesRegex(RuntimeError, "safe snapshot isolation"):
                 ReadonlyCaseSession(request())
         self.assertEqual(before, dump_source())
@@ -172,7 +184,7 @@ class SnapshotHostTests(IsolatedDatabaseTestCase):
             stale = LegalCorpus(path)
             write_corpus(path, "当前受控合成原文。")
             with patch.dict(os.environ, {"LAW_REVIEW_LEGAL_CORPUS_DIR": directory}):
-                with patch("app.statutory_retrieval._corpus_cache", (directory, stale)):
+                with patch("app.retrieval.statutory_retrieval._corpus_cache", (directory, stale)):
                     with ReadonlyCaseSession(request(question="刑法第二百六十四条的法条与固定回报审批")) as session:
                         prepare(session)
                         output = session.outputs["statutory_conflict"]
@@ -196,7 +208,7 @@ FRAMEWORK_PYTHON = os.getenv("LAW_REVIEW_FORGE_PYTHON", "")
 
 @unittest.skipUnless(FRAMEWORK_PYTHON, "set LAW_REVIEW_FORGE_PYTHON to the separately installed Python 3.12 sidecar")
 class FrameworkProcessTests(IsolatedDatabaseTestCase):
-    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.db.SQLITE_FILE_ONLY).
+    #: Snapshots of the SQLite file; refused on PostgreSQL (see app.storage.db.SQLITE_FILE_ONLY).
     sqlite_only = "framework snapshot reads the SQLite file"
     @classmethod
     def setUpClass(cls):
@@ -205,7 +217,7 @@ class FrameworkProcessTests(IsolatedDatabaseTestCase):
     def run_pilot(self, question, expected_status="succeeded"):
         before = dump_source()
         with ReadonlyCaseSession(request(question=question)) as session:
-            with patch("app.agents.call_local_llm", side_effect=AssertionError("model call forbidden")):
+            with patch("app.review.agents.call_local_llm", side_effect=AssertionError("model call forbidden")):
                 report = run_framework(session, Path(FRAMEWORK_PYTHON))
             self.assertEqual(report["status"], expected_status, report)
             self.assertEqual(report["tool_calls"], len(session.access_log))
@@ -284,13 +296,13 @@ class FrameworkProcessTests(IsolatedDatabaseTestCase):
         ]
         for message in programs:
             with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
-                worker = Path(directory) / "app/forge_worker.py"
-                worker.parent.mkdir()
+                worker = Path(directory) / "app/integration/forge_worker.py"
+                worker.parent.mkdir(parents=True)
                 worker.write_text("import sys,json\ni=json.loads(sys.stdin.readline())\n"
                                   f"m={message}\nm.setdefault('token',i['token'])\n"
                                   "m['wire_version']=1\nprint(json.dumps(m),flush=True)\n")
                 with ReadonlyCaseSession(request()) as session:
-                    with patch("app.forge_bridge.ROOT", Path(directory)):
+                    with patch("app.integration.forge_bridge.ROOT", Path(directory)):
                         with self.assertRaises(SidecarProtocolError):
                             run_framework(session, Path(FRAMEWORK_PYTHON))
                     self.assertEqual(session.outputs, {})
@@ -300,7 +312,7 @@ class BindingTests(unittest.TestCase):
     def test_wheel_mismatch_is_rejected_before_starting_a_process(self):
         binding, wheel = framework_binding()
         self.assertEqual(binding["version_label"], "0.8.3")
-        with patch("app.forge_bridge.hashlib.sha256") as sha:
+        with patch("app.integration.forge_bridge.hashlib.sha256") as sha:
             sha.return_value.hexdigest.return_value = "0" * 64
             with self.assertRaisesRegex(ValueError, "digest mismatch"):
                 framework_binding()

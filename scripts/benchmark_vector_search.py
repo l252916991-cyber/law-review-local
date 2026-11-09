@@ -45,7 +45,7 @@ def page_text(rng: random.Random) -> str:
 
 
 def build_rows(cases: int, pages: int, seed: int) -> list[tuple[int, int, int, str, list[float]]]:
-    from app.rag import hashed_embedding
+    from app.retrieval.rag import hashed_embedding
 
     rng = random.Random(seed)
     rows = []
@@ -59,7 +59,7 @@ def build_rows(cases: int, pages: int, seed: int) -> list[tuple[int, int, int, s
 
 
 def load(conn: Any, rows: list[tuple[int, int, int, str, list[float]]], *, postgres: bool) -> None:
-    from app.db import now
+    from app.storage.db import now
 
     stamp = now()
     cases = sorted({row[0] for row in rows})
@@ -96,14 +96,14 @@ def load(conn: Any, rows: list[tuple[int, int, int, str, list[float]]], *, postg
 
 
 def queries(count: int, seed: int) -> list[list[float]]:
-    from app.rag import hashed_embedding
+    from app.retrieval.rag import hashed_embedding
 
     rng = random.Random(seed + 1)
     return [hashed_embedding("".join(rng.sample(VOCABULARY, 4))) for _ in range(count)]
 
 
 def time_search(conn: Any, vectors: list[list[float]], *, limit: int) -> tuple[list[float], list[list[int]]]:
-    from app.search_backend import scored_page_vectors
+    from app.retrieval.search_backend import scored_page_vectors
 
     timings, results = [], []
     for vector in vectors:
@@ -158,9 +158,9 @@ def hnsw_experiment(conn: Any, vectors: list[list[float]], *, limit: int, ef_val
 def rls_experiment(admin_url: str, rows: list[tuple[int, int, int, str, list[float]]], vectors: list[list[float]],
                    *, limit: int, baseline: list[list[int]]) -> dict[str, Any]:
     """The same search as a non-superuser application role, with an outsider identity and walls in place."""
-    from app.db import connect, init_db, now, postgres_scope, system_access, transaction
-    from app.db_postgres import PgConnection, _with_database, create_database, drop_database, ensure_role
-    from app.security import Principal, _principal  # importing security registers the identity provider
+    from app.core.security import Principal, _principal  # importing security registers the identity provider
+    from app.storage.db import connect, init_db, now, postgres_scope, system_access, transaction
+    from app.storage.db_postgres import PgConnection, _with_database, create_database, drop_database, ensure_role
 
     role = "lexvault_app"
     ensure_role(admin_url, role)
@@ -217,8 +217,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
-    from app.db import connect, db_scope, init_db, postgres_scope
-    from app.db_postgres import create_database, drop_database
+    from app.storage.db import connect, db_scope, init_db, postgres_scope
+    from app.storage.db_postgres import create_database, drop_database
 
     rows = build_rows(args.cases, args.pages, args.seed)
     vectors = queries(args.queries, args.seed)

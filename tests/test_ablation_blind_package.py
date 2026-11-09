@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from app.ablation_review import (
+from app.evaluation.ablation_review import (
     build_package,
     content_digest,
     eligible_items,
     preview_scores,
     sample_ids,
 )
-from app.collaboration_ablation import load_batch_dataset
+from app.evaluation.collaboration_ablation import load_batch_dataset
 from scripts.build_ablation_blind_package import main
 
 ROOT = Path(__file__).resolve().parents[1]

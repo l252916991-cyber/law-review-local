@@ -7,7 +7,7 @@ import json
 import pytest
 
 import scripts.build_legal_corpus as corpus_builder
-from app.legal_corpus import (
+from app.retrieval.legal_corpus import (
     SCHEMA_VERSION,
     LegalCorpus,
     VersionAmbiguityError,

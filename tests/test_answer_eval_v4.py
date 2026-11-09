@@ -6,7 +6,7 @@ before so its published results stay reproducible.
 """
 import pytest
 
-from app.answer_eval import conclusion_paragraph, score_answer_v3, score_answer_v4
+from app.evaluation.answer_eval import conclusion_paragraph, score_answer_v3, score_answer_v4
 
 CITE = [{"document_name": "src.txt", "page": 1}]
 

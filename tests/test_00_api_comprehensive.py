@@ -14,8 +14,8 @@ os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import connect  # noqa: E402
 from app.main import app  # noqa: E402
+from app.storage.db import connect  # noqa: E402
 
 
 class APIContractTest(IsolatedDatabaseTestCase):
@@ -33,9 +33,9 @@ class APIContractTest(IsolatedDatabaseTestCase):
 
     def test_model_dependency_errors_are_actionable_and_redacted(self):
         for path, target, payload in [
-            ("vector-index", "app.rag.HybridRetriever.ensure_vector_index", None),
-            ("evaluate-rag", "app.evaluation.evaluate_case", None),
-            ("agent-compare", "app.rag.recall_memories", {"question": "固定回报是否存在矛盾？"}),
+            ("vector-index", "app.retrieval.rag.HybridRetriever.ensure_vector_index", None),
+            ("evaluate-rag", "app.evaluation.rag_eval.evaluate_case", None),
+            ("agent-compare", "app.retrieval.rag.recall_memories", {"question": "固定回报是否存在矛盾？"}),
         ]:
             for code in ("embedding_model_unavailable", "rerank_model_unavailable"):
                 with self.subTest(path=path, code=code), patch(target, side_effect=RuntimeError(code + ":SECRET_TOKEN")):
@@ -101,7 +101,7 @@ class APIContractTest(IsolatedDatabaseTestCase):
 
     def test_chat_remote_retrieval_failure_is_actionable_and_redacted(self):
         with patch(
-            "app.rag.HybridRetriever.retrieve",
+            "app.retrieval.rag.HybridRetriever.retrieve",
             side_effect=RuntimeError("embedding_model_unavailable:SECRET_TOKEN"),
         ):
             response = self.client.post(
@@ -117,7 +117,7 @@ class APIContractTest(IsolatedDatabaseTestCase):
                 "SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.case_id=1"
             ).fetchone()[0]
         with patch(
-            "app.services.call_local_llm",
+            "app.review.services.call_local_llm",
             side_effect=RuntimeError("provider memory limit:SECRET_TOKEN"),
         ):
             response = self.client.post(
@@ -161,12 +161,12 @@ class APIContractTest(IsolatedDatabaseTestCase):
         self.assertEqual(self.client.post("/api/cases/1/documents", files=files).status_code, 400)
 
     def test_batch_upload_sanitizes_filename_before_queue(self):
-        from app.db import get_db_path
+        from app.storage.db import get_db_path
 
         queued = AsyncMock(return_value="job-1")
         # This tests filename staging, not a real Redis connection. The full
         # offline suite intentionally blocks Redis during application startup.
-        with patch("app.routes.documents.enqueue_batch_import", queued), patch.object(app.state, "redis_available", True):
+        with patch("app.api.routes.documents.enqueue_batch_import", queued), patch.object(app.state, "redis_available", True):
             response = self.client.post(
                 "/api/cases/1/batch-import",
                 files=[("files", ("../../逃逸.txt", "批量内容", "text/plain"))],

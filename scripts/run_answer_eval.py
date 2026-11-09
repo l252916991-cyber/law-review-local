@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.answer_eval import (  # noqa: E402
+from app.evaluation.answer_eval import (  # noqa: E402
     cohen_kappa,
     evaluate_answers,
     load_dataset,
@@ -25,7 +25,7 @@ from app.answer_eval import (  # noqa: E402
 
 
 def collect_live(case_id: int, dataset: dict) -> dict:
-    from app.services import chat
+    from app.review.services import chat
 
     answers = {}
     for item in dataset["items"]:

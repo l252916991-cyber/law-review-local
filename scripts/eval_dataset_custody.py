@@ -18,7 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from app.answer_eval import cohen_kappa, validate_dataset  # noqa: E402
+from app.evaluation.answer_eval import cohen_kappa, validate_dataset  # noqa: E402
 
 DIMENSIONS = ("answerable_from_record", "requires_refusal", "injection_attempt")
 

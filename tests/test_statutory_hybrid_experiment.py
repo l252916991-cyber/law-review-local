@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from app.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from app.statutory_index import IndexSpec, StatutoryIndex
+from app.benchmarks.statutory_index import IndexSpec, StatutoryIndex
+from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
 from scripts.statutory_hybrid_experiment import build_dataset, build_validity
 
 

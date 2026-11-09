@@ -1,6 +1,6 @@
-"""Generate ``app/schema_postgres.sql`` from the current SQLite schema.
+"""Generate ``app/storage/schema_postgres.sql`` from the current SQLite schema.
 
-The SQLite schema (``app/db.py`` migrations) stays the source of truth. This
+The SQLite schema (``app/storage/db.py`` migrations) stays the source of truth. This
 script builds a fresh SQLite database at the latest version, reads every table
 and index back from ``sqlite_master`` and translates them to PostgreSQL. The
 parts SQLite expresses differently are written by hand below: the full-text
@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-TARGET = ROOT / "app" / "schema_postgres.sql"
+TARGET = ROOT / "app" / "storage" / "schema_postgres.sql"
 
 #: SQLite internals and the FTS5 virtual table (replaced by ``FTS_SQL``).
 SKIPPED_TABLES = re.compile(r"^(sqlite_|pages_fts)")
@@ -201,7 +201,7 @@ PORTED_TRIGGERS = {"documents_fts_update", "host_runtime_delete", "pages_fts_del
 def sqlite_schema() -> tuple[int, list[tuple[str, str, str, str]]]:
     with tempfile.TemporaryDirectory(prefix="lexvault-schema-") as directory:
         os.environ.setdefault("LAW_REVIEW_DATA_DIR", directory)
-        from app.db import SCHEMA_VERSION, connect, db_scope, init_db
+        from app.storage.db import SCHEMA_VERSION, connect, db_scope, init_db
 
         with db_scope(Path(directory) / "law_review.db"):
             init_db(seed=False)
@@ -299,8 +299,8 @@ def render() -> str:
 
 def missing_migrations() -> list[str]:
     """Every schema version after the migration baseline needs its upgrade step."""
-    from app.db import SCHEMA_VERSION
-    from app.db_postgres import MIGRATION_BASELINE, migration_file
+    from app.storage.db import SCHEMA_VERSION
+    from app.storage.db_postgres import MIGRATION_BASELINE, migration_file
 
     return [migration_file(version).relative_to(ROOT).as_posix()
             for version in range(MIGRATION_BASELINE + 1, SCHEMA_VERSION + 1) if not migration_file(version).exists()]
@@ -314,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     missing = missing_migrations()
     if args.check:
         if not TARGET.exists() or TARGET.read_text(encoding="utf-8") != text:
-            print("app/schema_postgres.sql 与当前 SQLite 结构不一致；运行 scripts/generate_postgres_schema.py", file=sys.stderr)
+            print("app/storage/schema_postgres.sql 与当前 SQLite 结构不一致；运行 scripts/generate_postgres_schema.py", file=sys.stderr)
             return 1
     else:
         TARGET.write_text(text, encoding="utf-8")

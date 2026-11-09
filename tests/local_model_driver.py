@@ -7,11 +7,11 @@ import signal
 import sys
 from pathlib import Path
 
-from app.candidate_domain import CandidateDeployment, CandidateDomainIntegration
-from app.db import db_scope
-from app.local_backends import LocalModels
-from app.model_domain import LocalModelDomainIntegration
-from app.runtime_ports import ModelConfig
+from app.integration.candidate_domain import CandidateDeployment, CandidateDomainIntegration
+from app.integration.model_domain import LocalModelDomainIntegration
+from app.integration.runtime_ports import ModelConfig
+from app.llm.local_backends import LocalModels
+from app.storage.db import db_scope
 from tests.test_domain_integration import request
 
 
@@ -64,11 +64,11 @@ def main():
                 return result
             control._extra_operation = operation
         if mode == "journal":
-            import app.host_integration as integration
-            real_worker = integration.ROOT / "app/host_integration_worker.py"
+            import app.integration.host_integration as integration
+            real_worker = integration.ROOT / "app/integration/host_integration_worker.py"
             wrapper_root = path.parent / "local-model-test-worker"
-            (wrapper_root / "app").mkdir(parents=True)
-            (wrapper_root / "app/host_integration_worker.py").write_text(
+            (wrapper_root / "app/integration").mkdir(parents=True)
+            (wrapper_root / "app/integration/host_integration_worker.py").write_text(
                 "import os, signal, runpy\n"
                 "from forgeharness.sdk.durable import DurableRunner\n"
                 "original = DurableRunner._complete\n"

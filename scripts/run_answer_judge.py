@@ -18,8 +18,14 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.answer_eval import JUDGE_PROMPT_VERSION, evaluate_answers, judge_answer, load_dataset, valid_judge_payload
-from app.answer_review import content_digest, human_agreement, review_manifest
+from app.evaluation.answer_eval import (
+    JUDGE_PROMPT_VERSION,
+    evaluate_answers,
+    judge_answer,
+    load_dataset,
+    valid_judge_payload,
+)
+from app.evaluation.answer_review import content_digest, human_agreement, review_manifest
 from scripts.validate_application_acceptance import isolated_environment, loopback_endpoint
 
 
@@ -45,8 +51,8 @@ def write_json(path: Path, value: Any) -> None:
 
 
 def collect_rules(dataset: dict[str, Any]) -> dict[str, Any]:
-    from app.db import db_scope, init_db
-    from app.services import chat
+    from app.review.services import chat
+    from app.storage.db import db_scope, init_db
 
     with tempfile.TemporaryDirectory(prefix="lexvault-rule-answers-") as td:
         directory = Path(td)
@@ -151,7 +157,7 @@ def package_review(directory: Path, archive: Path) -> None:
 
 def run_judges(dataset: dict[str, Any], answers: dict[str, Any], endpoint: str, model: str,
                timeout: int = 30, max_tokens: int = 500) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    from app.answer_judge_client import request_judge
+    from app.evaluation.answer_judge_client import request_judge
 
     rows: list[dict[str, Any]] = []
     calls: list[dict[str, Any]] = []

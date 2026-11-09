@@ -24,8 +24,8 @@ EVIDENCE = {"title": "收款凭证", "category": "书证", "fact": "收到款项
 class ConflictCheckTests(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import init_db
         from app.main import app
+        from app.storage.db import init_db
 
         env = patch.dict(os.environ, {
             "LAW_REVIEW_AUTH_MODE": "token",
@@ -71,7 +71,7 @@ class ConflictCheckTests(IsolatedDatabaseTestCase):
     def audit(self, case_id: int) -> list[str]:
         from contextlib import closing
 
-        from app.db import connect, system_access
+        from app.storage.db import connect, system_access
 
         with system_access(), closing(connect()) as conn:
             return [row[0] for row in conn.execute("SELECT action FROM audit_log WHERE case_id = ? ORDER BY id",
@@ -194,8 +194,8 @@ class LocalModeConflictTests(IsolatedDatabaseTestCase):
     def test_the_single_local_user_may_decide_but_the_audit_says_nobody_double_checked(self):
         from contextlib import closing
 
-        from app.db import connect, init_db
         from app.main import app
+        from app.storage.db import connect, init_db
 
         init_db(seed=False)
         with TestClient(app) as client:

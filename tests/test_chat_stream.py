@@ -10,25 +10,25 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app import services
-from app.chat_idempotency import (
+from app.api.routes import chat as chat_routes
+from app.main import app
+from app.review import services
+from app.review.chat_idempotency import (
     CANCELLED,
     FAILED,
     ChatCancelled,
 )
-from app.chat_idempotency import (
+from app.review.chat_idempotency import (
     begin as begin_chat_request,
 )
-from app.chat_idempotency import (
+from app.review.chat_idempotency import (
     finish as finish_chat_request,
 )
-from app.chat_idempotency import (
+from app.review.chat_idempotency import (
     lookup as lookup_chat_request,
 )
-from app.db import connect, db_scope, init_db
-from app.main import app
-from app.routes import chat as chat_routes
-from app.services import read_sse_with_deadline
+from app.review.services import read_sse_with_deadline
+from app.storage.db import connect, db_scope, init_db
 
 
 class _FakeResponse:
@@ -114,7 +114,7 @@ class SSEReaderTests(unittest.TestCase):
             read_sse_with_deadline(_FakeResponse(b""), 5, deadline=0)
 
     def test_anthropic_frames_are_parsed_and_usage_is_merged(self):
-        from app.model_ports import (
+        from app.llm.model_ports import (
             MODEL_API_ANTHROPIC_MESSAGES,
             end_frame_types,
             parse_stream_frame,
@@ -529,7 +529,7 @@ class ChatCancellationTests(unittest.TestCase):
         self.assertEqual(self._counts(), before)
 
     def test_cancel_after_the_model_call_keeps_the_ledger_but_no_messages(self):
-        from app import agents
+        from app.review import agents
 
         calls = {"n": 0}
 

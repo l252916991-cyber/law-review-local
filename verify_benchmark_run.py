@@ -8,8 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from app.benchmark_metrics import score_lawbench_item
-from app.benchmark_reporting import atomic_json, metrics, paired_baseline, prompt_for, source_hashes
+from app.benchmarks.metrics import score_lawbench_item
+from app.benchmarks.reporting import atomic_json, metrics, paired_baseline, prompt_for, source_hashes
 
 
 def _hash_json(value: object) -> str:
@@ -70,7 +70,7 @@ def verify(directory: Path, *, artifacts_only: bool = False, write: bool = True)
                         or retrieval.get("ranker_policy") != "lexical":
                     issues.append(f"Retrieval provenance mismatch: {key}")
                 if not artifacts_only:
-                    from app.benchmark_retrieval import retrieve
+                    from app.benchmarks.retrieval import retrieve
 
                     current = retrieve(row["task"], row["question"], manifest["retrieval"]["corpus_directories"],
                                        ranker_policy="lexical")

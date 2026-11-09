@@ -12,7 +12,7 @@
 
 ## 2. 候选契约与持久化
 
-新增 `app/answerability.py`：最终协议 `candidate-answerability-v8` 只接收 decision、reason、findings 三个字段；decision 区分 supported、unrelated、insufficient。每项 finding 给出文本与非空来源编号数组，支持同义改写和按现有资料限定范围的宽泛阅卷。具体事实缺少支持时拒绝，拒绝的 findings 必须为空，不能附带其他主题的法律结论。JSON 重复键、非法结构、缺少/越界来源、伪造文本内引用和混合拒绝/成功发现均为系统校验失败，不计正确拒绝。
+新增 `app/review/answerability.py`：最终协议 `candidate-answerability-v8` 只接收 decision、reason、findings 三个字段；decision 区分 supported、unrelated、insufficient。每项 finding 给出文本与非空来源编号数组，支持同义改写和按现有资料限定范围的宽泛阅卷。具体事实缺少支持时拒绝，拒绝的 findings 必须为空，不能附带其他主题的法律结论。JSON 重复键、非法结构、缺少/越界来源、伪造文本内引用和混合拒绝/成功发现均为系统校验失败，不计正确拒绝。
 
 材料明确记载“未见某记录”时，可以据此回答该快照内记录有无，仍不能推断事情没有发生。v6/v7 的租赁凭据问题曾被误拒，v8 保留明确的范围区别并恢复较完整的协议提示；最终设备保修样本仍有一项同类误拒，见第 4 节。询问具体批准人而没有相应记录时仍按材料不足处理。
 

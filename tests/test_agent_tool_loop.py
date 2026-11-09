@@ -9,9 +9,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import agents, tool_loop
-from app.agents import CriticAgent
-from app.db import connect, init_db
+from app.review import agents, tool_loop
+from app.review.agents import CriticAgent
+from app.storage.db import connect, init_db
 from tests.support import IsolatedDatabaseTestCase
 
 CONTEXTS = [
@@ -199,7 +199,7 @@ class ToolLoopTests(IsolatedDatabaseTestCase):
         self.assertEqual(len(result["tool_trace"]), 2)
 
     def test_governed_host_scope_refuses_the_network_loop(self):
-        from app.forge_governance import BackendLedger
+        from app.llm.forge_governance import BackendLedger
 
         ledger = BackendLedger(authorize=lambda: None)
         with ledger.activate():
@@ -303,7 +303,7 @@ class CriticToolLoopTests(IsolatedDatabaseTestCase):
 
     def test_langgraph_critic_is_documented_as_single_shot(self):
         """The LangGraph coordinator builds CriticAgent without a case scope."""
-        from app.langgraph_agents import LangGraphCoordinator
+        from app.review.langgraph_agents import LangGraphCoordinator
 
         with patch.object(agents, "call_local_llm", return_value=VALID_ANSWER):
             output = CriticAgent().run("问题", "事实检索", CONTEXTS, {}, True)

@@ -67,7 +67,7 @@ def test_mixed_run_routes_only_3_2_through_lexical_rag_and_freezes_actual_reques
                 patch.object(runner, "corpus_fingerprint", return_value={"manifest": "digest"}), \
                 patch.object(runner, "retrieve", return_value=LEXICAL) as retrieval, \
                 patch.object(runner, "call_model", side_effect=_legacy_call) as legacy, \
-                patch("app.benchmark_rag_solver._call", side_effect=_solver_call):
+                patch("app.benchmarks.rag_solver._call", side_effect=_solver_call):
             runner.run_benchmark(_args(run_dir, tasks=["3-2", "3-8"]))
 
         rows = {row["task"]: row for row in map(json.loads, (run_dir / "detailed_results.jsonl").read_text().splitlines())}
@@ -84,7 +84,7 @@ def test_mixed_run_routes_only_3_2_through_lexical_rag_and_freezes_actual_reques
         assert manifest["routing"]["task_3_2"]["ranker_policy"] == "lexical"
         assert manifest["samples"][0]["prompt_hash"] == rag["prompt_hash"]
 
-        with patch("app.benchmark_retrieval.retrieve", return_value=LEXICAL):
+        with patch("app.benchmarks.retrieval.retrieve", return_value=LEXICAL):
             assert verify(run_dir, write=False)["valid"]
 
         resume_args = _args(run_dir, tasks=["3-2", "3-8"], resume=True)
@@ -93,7 +93,7 @@ def test_mixed_run_routes_only_3_2_through_lexical_rag_and_freezes_actual_reques
                 patch.object(runner, "corpus_fingerprint", return_value={"manifest": "digest"}), \
                 patch.object(runner, "retrieve", return_value=LEXICAL), \
                 patch.object(runner, "call_model") as legacy_resume, \
-                patch("app.benchmark_rag_solver._call") as rag_resume:
+                patch("app.benchmarks.rag_solver._call") as rag_resume:
             runner.run_benchmark(resume_args)
         legacy_resume.assert_not_called()
         rag_resume.assert_not_called()
@@ -111,13 +111,13 @@ def test_mixed_run_routes_only_3_2_through_lexical_rag_and_freezes_actual_reques
         changed["calls"][0]["request"]["max_tokens"] += 1
         changed["calls"][0]["request_sha256"] = runner.hash_json(changed["calls"][0]["request"])
         replace_rag(changed)
-        with patch("app.benchmark_retrieval.retrieve", return_value=LEXICAL):
+        with patch("app.benchmarks.retrieval.retrieve", return_value=LEXICAL):
             assert any("request body" in issue for issue in verify(run_dir, write=False)["issues"])
 
         changed = json.loads(json.dumps(original))
         changed["effective_config"]["max_tokens"] += 1
         replace_rag(changed)
-        with patch("app.benchmark_retrieval.retrieve", return_value=LEXICAL):
+        with patch("app.benchmarks.retrieval.retrieve", return_value=LEXICAL):
             assert any("effective config" in issue for issue in verify(run_dir, write=False)["issues"])
 
 
@@ -130,7 +130,7 @@ def test_explicit_off_uses_same_solver_task_guided_control_and_no_corpus_keeps_l
                 patch.object(runner, "corpus_fingerprint", return_value={}), \
                 patch.object(runner, "retrieve") as retrieval, \
                 patch.object(runner, "call_model") as legacy, \
-                patch("app.benchmark_solver._call", side_effect=_solver_call):
+                patch("app.benchmarks.solver._call", side_effect=_solver_call):
             runner.run_benchmark(_args(root / "off", disable_3_2_rag=True))
         off = json.loads((root / "off" / "detailed_results.jsonl").read_text())
         assert off["task_route"] == "solver_task_guided_control"
@@ -141,7 +141,7 @@ def test_explicit_off_uses_same_solver_task_guided_control_and_no_corpus_keeps_l
         with patch.object(runner, "load_all_datasets", return_value=[record]), \
                 patch.object(runner, "verify_model"), \
                 patch.object(runner, "call_model", side_effect=_legacy_call) as legacy, \
-                patch("app.benchmark_solver._call") as solver:
+                patch("app.benchmarks.solver._call") as solver:
             runner.run_benchmark(_args(root / "legacy", corpus=False))
         no_corpus = json.loads((root / "legacy" / "detailed_results.jsonl").read_text())
         assert no_corpus["task_route"] == "legacy_prompt"
@@ -166,21 +166,21 @@ def test_rag_error_scores_zero_with_call_trace_and_tampering_is_rejected():
             patch.object(runner, "verify_model"),
             patch.object(runner, "corpus_fingerprint", return_value={}),
             patch.object(runner, "retrieve", return_value=LEXICAL),
-            patch("app.benchmark_rag_solver._call", side_effect=failed_call),
+            patch("app.benchmarks.rag_solver._call", side_effect=failed_call),
         )
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
             runner.run_benchmark(args)
         row = json.loads((run_dir / "detailed_results.jsonl").read_text())
         assert row["score"] == 0 and row["metric"] == "error"
         assert row["attempts"] == 1 and row["calls"][0]["error"] == row["error"]
-        with patch("app.benchmark_retrieval.retrieve", return_value=LEXICAL):
+        with patch("app.benchmarks.retrieval.retrieve", return_value=LEXICAL):
             assert verify(run_dir, write=False)["valid"]
 
         manifest_path = run_dir / "manifest.json"
         manifest = json.loads(manifest_path.read_text())
         manifest["routing"]["task_3_2"]["ranker_policy"] = "auto"
         manifest_path.write_text(json.dumps(manifest))
-        with patch("app.benchmark_retrieval.retrieve", return_value=LEXICAL):
+        with patch("app.benchmarks.retrieval.retrieve", return_value=LEXICAL):
             result = verify(run_dir, write=False)
         assert not result["valid"]
         assert any("RAG route policy" in issue or "Route/config provenance" in issue for issue in result["issues"])

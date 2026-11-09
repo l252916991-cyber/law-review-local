@@ -18,8 +18,8 @@ def canonical(value: Any) -> bytes:
 
 
 def build(questions: list[dict[str, Any]]) -> dict[str, Any]:
-    from app.answer_eval import validate_dataset
-    from app.db import connect, db_scope, init_db
+    from app.evaluation.answer_eval import validate_dataset
+    from app.storage.db import connect, db_scope, init_db
 
     with tempfile.TemporaryDirectory(prefix="lexvault-answer-sources-") as td:
         with db_scope(Path(td) / "law_review.db"):
@@ -32,6 +32,7 @@ def build(questions: list[dict[str, Any]]) -> dict[str, Any]:
     description = "完全虚构的某科技公司稳盈计划侦查材料；含询问笔录、账户流水和宣传邮件，尚无判决文书或已核验法条。"
     items = [{**item, "case_description": description,
               "requires_citation": not item["expect_refusal"]} for item in questions]
+    # "case_fixture" is a frozen label inside the hashed dataset; the fixture now lives in app.storage.db.
     payload = {"name": "demo-case-answer-v2", "version": 2, "case_fixture": "app.db.seed_demo",
                "annotation_source": "assistant_generated_from_repository_synthetic_fixture",
                "notice": "编码助手依仓库合成卷宗构造，未经律师或独立人工标注。仅用于答案级回归，不代表法律准确率。",

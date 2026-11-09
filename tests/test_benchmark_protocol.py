@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import unified_benchmark_runner as runner
-from app.benchmark_metrics import extract_final_amount, extract_final_months, score_lawbench_item
-from app.benchmark_reporting import metrics, paired_baseline, prompt_for, source_hashes
+from app.benchmarks.metrics import extract_final_amount, extract_final_months, score_lawbench_item
+from app.benchmarks.reporting import metrics, paired_baseline, prompt_for, source_hashes
 
 
 class ScoringRegressionTest(unittest.TestCase):
@@ -126,7 +126,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertIn(runner.TASK_GUIDANCE[row["task"]], system)
 
     def test_hybrid_guides_only_whitelisted_tasks(self):
-        from app.benchmark_reporting import GUIDED_TASK_WHITELIST, SYSTEM_PROMPT
+        from app.benchmarks.reporting import GUIDED_TASK_WHITELIST, SYSTEM_PROMPT
 
         row = runner.load_lawbench_dataset(["2-2"], 1)[0]
         guided_system, _ = prompt_for(row, strategy="hybrid")
@@ -216,7 +216,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
         self.assertEqual(row["postprocess"]["policy"], "located-edits; no reference access")
 
     def test_correction_surface_is_scored_and_resume_checks_provenance(self):
-        from app.benchmark_postprocess import POSTPROCESS_VERSION
+        from app.benchmarks.postprocess import POSTPROCESS_VERSION
 
         raw, corrected = "本院认为，支付 100 元。", "本院认为,支付100元"
         record = runner.load_lawbench_dataset(["2-1"], 1)[0]
@@ -237,7 +237,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(row["score"], 1)
             self.assertTrue(row["postprocess"]["applied"])
             self.assertEqual(row["postprocess"]["version"], POSTPROCESS_VERSION)
-            self.assertIn("app/benchmark_postprocess.py", source_hashes())
+            self.assertIn("app/benchmarks/postprocess.py", source_hashes())
             args.resume = True
             with patch.object(runner, "load_all_datasets", return_value=[record]), \
                     patch.object(runner, "verify_model") as verify, \
@@ -263,8 +263,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 call.assert_not_called()
 
     def test_locate_strategy_applies_edits_and_leaves_baseline_intact(self):
-        from app.benchmark_postprocess import apply_located_edits, postprocess
-        from app.benchmark_reporting import prompt_for
+        from app.benchmarks.postprocess import apply_located_edits, postprocess
+        from app.benchmarks.reporting import prompt_for
 
         question = "句子：借阅档案费按规定及时归还"
         base = {"dataset": "lawbench", "task": "2-1", "question_id": "Q", "instruction": "纠正。",
@@ -343,7 +343,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
     def test_statutory_corpus_replaces_1_1_output_and_is_frozen_on_resume(self):
         import hashlib
 
-        from app.legal_corpus import SCHEMA_VERSION, split_articles
+        from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
 
         body = "第一条 当事人订立合同，应当具有相应的民事权利能力和民事行为能力。"
         with tempfile.TemporaryDirectory() as directory:
@@ -426,7 +426,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 runner.run_benchmark(args)
             root = Path(directory)
             self.assertTrue(verify(root)["valid"])
-            with patch("verify_benchmark_run.source_hashes", return_value={**source_hashes(), "app/benchmark_metrics.py": "changed"}):
+            with patch("verify_benchmark_run.source_hashes", return_value={**source_hashes(), "app/benchmarks/metrics.py": "changed"}):
                 self.assertFalse(verify(root, write=False)["valid"])
                 artifacts = verify(root, artifacts_only=True, write=False)
                 self.assertTrue(artifacts["valid"])

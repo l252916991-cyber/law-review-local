@@ -39,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.eval_gate import (  # noqa: E402
+from app.evaluation.eval_gate import (  # noqa: E402
     DEFAULT_BASELINES,
     DEFAULT_DATASET,
     GATE_VERSION,

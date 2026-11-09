@@ -15,11 +15,11 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from app.agents import CriticAgent
-from app.db import connect, db_scope, init_db, now, transaction
-from app.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
+from app.core.security import Principal, _principal
 from app.main import app
-from app.security import Principal, _principal
+from app.review.agents import CriticAgent
+from app.review.langgraph_agents import LangGraphRunError, create_langgraph_coordinator
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 class ResumeBoundaryTests(unittest.TestCase):
@@ -93,13 +93,13 @@ class ResumeBoundaryTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             self.assertIn("案件摘要.md", archive.namelist())
             self.assertNotIn("其他案件秘密", archive.read("案件摘要.md").decode())
-        with patch("app.routes.exports.build_export_package", side_effect=AssertionError("must not export another case")):
+        with patch("app.api.routes.exports.build_export_package", side_effect=AssertionError("must not export another case")):
             denied = self.client.get(f"/api/cases/{self.other_case}/export", headers=self.headers)
         self.assertEqual(denied.status_code, 404)
 
     def test_cross_case_resume_is_denied_before_invocation(self):
         run_id = self.fail_memory(self.other_case)
-        with patch("app.langgraph_agents.resume_langgraph_run", side_effect=AssertionError("must not resume")):
+        with patch("app.review.langgraph_agents.resume_langgraph_run", side_effect=AssertionError("must not resume")):
             response = self.client.post(f"/api/agent-runs/{run_id}/resume", headers=self.headers)
         self.assertEqual(response.status_code, 404)
         with closing(connect()) as conn:

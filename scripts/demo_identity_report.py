@@ -21,8 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 BACKEND_FILES = (
-    "app/main.py", "app/services.py", "app/agents.py", "app/review_collaboration.py",
-    "app/collaboration_ablation.py", "app/ablation_analysis.py", "app/answer_eval.py",
+    "app/main.py", "app/review/services.py", "app/review/agents.py", "app/review/review_collaboration.py",
+    "app/evaluation/collaboration_ablation.py", "app/evaluation/ablation_analysis.py", "app/evaluation/answer_eval.py",
 )
 FRONTEND_BINDING = Path("frontend/out/build-info.json")
 EXIT_PROTOCOL = 2
@@ -65,7 +65,7 @@ def frontend_binding(root: Path) -> dict[str, Any]:
 
 
 def dataset_identity(root: Path) -> dict[str, Any]:
-    from app.collaboration_ablation import load_batch_dataset
+    from app.evaluation.collaboration_ablation import load_batch_dataset
 
     result: dict[str, Any] = {}
     for label, relative in (("dev", "benchmarks/answer_eval/v2/dataset.json"),
@@ -84,11 +84,11 @@ def dataset_identity(root: Path) -> dict[str, Any]:
 
 def build_report(root: Path) -> dict[str, Any]:
     import app.main as main_module
-    from app.answer_eval import JUDGE_PROMPT_VERSION
-    from app.answerability import POLICY_VERSION, policy_identity
-    from app.collaboration_ablation import precheck
-    from app.model_domain import LOCAL_PROMPT_VERSION
-    from app.services import PROMPT_VERSION
+    from app.evaluation.answer_eval import JUDGE_PROMPT_VERSION
+    from app.evaluation.collaboration_ablation import precheck
+    from app.integration.model_domain import LOCAL_PROMPT_VERSION
+    from app.review.answerability import POLICY_VERSION, policy_identity
+    from app.review.services import PROMPT_VERSION
 
     probe = precheck(None, None)
     return {

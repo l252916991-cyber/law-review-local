@@ -17,8 +17,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db import connect, db_scope, init_db, now, transaction
 from app.main import app
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 def sha256(data: bytes) -> str:
@@ -45,7 +45,7 @@ class FrozenDeliveryCase(unittest.TestCase):
         return response.json()["id"]
 
     def upload(self, case_id, name="借条.txt", text="今借到人民币十万元整。".encode()):  # noqa: B008 - bytes are immutable
-        from app.services import index_upload
+        from app.review.services import index_upload
         return index_upload(case_id, name, text, "text/plain")
 
     def evidence(self, case_id, title="借条原件", status="已确认"):
@@ -296,7 +296,7 @@ class FrozenIntegrityTest(FrozenDeliveryCase):
         self.assertEqual(blocked.status_code, 400)
 
     def test_hash_only_sheet_matches_rendered_bytes_at_chunk_boundaries(self):
-        from app.report_delivery import transaction_sheet
+        from app.cases.report_delivery import transaction_sheet
 
         for count in (0, 500, 620):
             with self.subTest(count=count):
@@ -405,7 +405,7 @@ class FrozenIntegrityTest(FrozenDeliveryCase):
 
 class FrozenConcurrencyTest(FrozenDeliveryCase):
     def test_basis_changes_during_packaging_refuse_delivery_registration(self):
-        from app import report_delivery
+        from app.cases import report_delivery
 
         original = report_delivery._write_package
         for change in ("evidence", "page", "transactions"):
@@ -465,7 +465,7 @@ class FrozenConcurrencyTest(FrozenDeliveryCase):
         self.assertEqual(self.act(report["id"], "submit").status_code, 200)
         self.assertEqual(self.act(report["id"], "approve").status_code, 200)
 
-        from app import report_delivery
+        from app.cases import report_delivery
 
         original = report_delivery._write_package
 

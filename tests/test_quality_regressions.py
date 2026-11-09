@@ -15,18 +15,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.agents import (
-    CriticAgent,
-    EvidenceAgent,
-    FactAgent,
-    GapDetectionAgent,
-    LawReviewCoordinator,
-    get_run_trace,
-)
-from app.db import connect, db_scope, init_db, now, transaction
-from app.evaluation import evaluate_case, platform_metrics
-from app.langgraph_agents import LangGraphCoordinator, LangGraphRunError
-from app.rag import (
+from app.evaluation.rag_eval import evaluate_case, platform_metrics
+from app.integration.runtime_comparison import compare_runtime_results
+from app.retrieval.rag import (
     EmbeddingClient,
     HybridRetriever,
     embedding_identity,
@@ -34,8 +25,17 @@ from app.rag import (
     recall_memories,
     remember,
 )
-from app.runtime_comparison import compare_runtime_results
-from app.services import call_local_llm, chat, read_json_with_deadline
+from app.review.agents import (
+    CriticAgent,
+    EvidenceAgent,
+    FactAgent,
+    GapDetectionAgent,
+    LawReviewCoordinator,
+    get_run_trace,
+)
+from app.review.langgraph_agents import LangGraphCoordinator, LangGraphRunError
+from app.review.services import call_local_llm, chat, read_json_with_deadline
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 class IsolatedQualityTest(unittest.TestCase):
@@ -140,7 +140,7 @@ class VectorCompatibilityTest(IsolatedQualityTest):
         self.assertEqual(retriever.vector_diagnostics["incompatible_vectors_skipped"], 1)
 
     def test_retrieval_never_rebuilds_global_fts_and_reports_degradation(self):
-        with patch("app.db.sync_fts_index", side_effect=AssertionError("no global rebuild")):
+        with patch("app.storage.db.sync_fts_index", side_effect=AssertionError("no global rebuild")):
             results, metrics = self.retriever().retrieve("固定回报")
         self.assertTrue(results)
         self.assertTrue(metrics["degraded"])
@@ -150,7 +150,7 @@ class VectorCompatibilityTest(IsolatedQualityTest):
     def test_fts_fallback_is_visible_and_logs_no_case_text(self):
         with transaction() as conn:
             conn.execute("DROP TABLE pages_fts")
-        with self.assertLogs("app.rag", level="WARNING") as logs:
+        with self.assertLogs("app.retrieval.rag", level="WARNING") as logs:
             results, metrics = self.retriever().retrieve("固定回报")
         self.assertTrue(results)
         self.assertFalse(metrics["keyword"]["fts_available"])
@@ -159,7 +159,7 @@ class VectorCompatibilityTest(IsolatedQualityTest):
     def test_invalid_embedding_payload_fails_closed(self):
         client = EmbeddingClient(True)
         invalid = io.BytesIO(json.dumps({"data": [{"index": 0, "embedding": [float("nan"), 1.0]}]}).encode())
-        with patch("app.rag.urllib.request.build_opener") as opener:
+        with patch("app.retrieval.rag.urllib.request.build_opener") as opener:
             opener.return_value.open.return_value = invalid
             with self.assertRaisesRegex(RuntimeError, "embedding_model_unavailable:ValueError"):
                 client.embed(["private text"])
@@ -170,7 +170,7 @@ class CriticAndMemoryTest(IsolatedQualityTest):
     def critic(self, answer, contexts=None):
         contexts = [self.context] if contexts is None else contexts
         specialists = {"facts": FactAgent().run("问题", contexts)}
-        with patch("app.agents.call_local_llm", return_value=answer):
+        with patch("app.review.agents.call_local_llm", return_value=answer):
             return CriticAgent().run("问题", "语义检索", contexts, specialists, True)
 
     def test_critic_rejects_empty_invalid_missing_and_malformed_citations(self):
@@ -190,7 +190,7 @@ class CriticAndMemoryTest(IsolatedQualityTest):
         self.assertFalse(result["validation"]["amount_calculations_checked"])
 
     def test_source_quote_and_page_must_exist(self):
-        from app.agents import validate_review_answer
+        from app.review.agents import validate_review_answer
 
         for change in ({"quote": ""}, {"page_no": 0}, {"document_id": -1}):
             with self.subTest(change=change):
@@ -200,12 +200,12 @@ class CriticAndMemoryTest(IsolatedQualityTest):
                 self.assertIn("sources_valid", validation["issues"])
                 # Source-bound specialists now reject unusable source identity
                 # before spending tokens, rather than returning an unbound draft.
-                with patch("app.agents.call_local_llm") as model, self.assertRaises(ValueError):
+                with patch("app.review.agents.call_local_llm") as model, self.assertRaises(ValueError):
                     self.critic("依据[资料1]，需律师复核。", contexts)
                 model.assert_not_called()
 
     def test_failure_details_do_not_leak_into_fallback_trace_or_memory(self):
-        with patch("app.agents.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN sensitive case")):
+        with patch("app.review.agents.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN sensitive case")):
             result = LawReviewCoordinator(self.case_id, False).process_query("固定回报", use_llm=True)
         self.assertFalse(result["memory_persisted"])
         self.assertEqual(result["failure_diagnostic"]["error_type"], "RuntimeError")
@@ -331,7 +331,7 @@ class RuntimeQualityTest(IsolatedQualityTest):
             if node == "memory":
                 raise RuntimeError("SECRET memory failure")
 
-        with patch("app.agents.call_local_llm", return_value="依据[资料1]，请律师复核。") as llm:
+        with patch("app.review.agents.call_local_llm", return_value="依据[资料1]，请律师复核。") as llm:
             with self.assertRaises(LangGraphRunError) as caught:
                 self.graph(failure_injector=inject).process_query("固定回报", use_llm=True)
             result = self.graph().resume(caught.exception.run_id)
@@ -389,7 +389,7 @@ class CaseEvaluationTest(IsolatedQualityTest):
 
 class OrdinaryChatQualityTest(IsolatedQualityTest):
     def test_plain_chat_uses_the_same_validation_gate(self):
-        with patch("app.services.call_local_llm", return_value="SECRET invented result without citation"), \
+        with patch("app.review.services.call_local_llm", return_value="SECRET invented result without citation"), \
                 self.assertRaisesRegex(RuntimeError, "model_unavailable_or_invalid"):
             chat(self.case_id, "固定回报", "律师", None, True, False)
         with closing(connect()) as conn:
@@ -397,14 +397,14 @@ class OrdinaryChatQualityTest(IsolatedQualityTest):
 
     def test_plain_chat_valid_llm_answer_is_used(self):
         answer = "固定回报已经确认[资料1]，请律师复核。"
-        with patch("app.services.call_local_llm", return_value=answer):
+        with patch("app.review.services.call_local_llm", return_value=answer):
             result = chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertTrue(result["llm_used"])
         self.assertEqual(result["answer"], answer)
         self.assertEqual(result["citation_check"], "passed")
 
     def test_plain_chat_error_body_is_not_persisted_or_returned(self):
-        with patch("app.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
+        with patch("app.review.services.call_local_llm", side_effect=RuntimeError("SECRET_TOKEN")), \
                 self.assertRaises(RuntimeError) as raised:
             chat(self.case_id, "固定回报", "律师", None, True, False)
         self.assertNotIn("SECRET_TOKEN", str(raised.exception))
@@ -444,9 +444,9 @@ class ResponseDeadlineTest(unittest.TestCase):
 
     def test_headers_consume_the_same_request_budget(self):
         response = io.BytesIO(b'{"choices":[{"message":{"content":"late"}}]}')
-        with patch("app.services.local_llm_available", return_value=(True, "fake-model")), patch(
-            "app.services.urllib.request.build_opener"
-        ) as opener, patch("app.services.time.monotonic", side_effect=[0.0, 1.1]):
+        with patch("app.review.services.local_llm_available", return_value=(True, "fake-model")), patch(
+            "app.review.services.urllib.request.build_opener"
+        ) as opener, patch("app.review.services.time.monotonic", side_effect=[0.0, 1.1]):
             opener.return_value.open.return_value = response
             with self.assertRaisesRegex(RuntimeError, "TimeoutError"):
                 call_local_llm("问题", "语义检索", [], timeout=1)

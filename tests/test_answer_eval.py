@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.answer_eval import (
+from app.evaluation.answer_eval import (
     cohen_kappa,
     evaluate_answers,
     judge_answer,
@@ -12,7 +12,7 @@ from app.answer_eval import (
     score_answer,
     summarise,
 )
-from app.db import connect, db_scope, init_db
+from app.storage.db import connect, db_scope, init_db
 
 DATASET = Path(__file__).resolve().parents[1] / "benchmarks/answer_eval/v1/demo-case.json"
 

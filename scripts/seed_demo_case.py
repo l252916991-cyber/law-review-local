@@ -1490,8 +1490,8 @@ def seed(data_dir: Path, *, seed_value: int = 20260911) -> dict[str, Any]:
     os.environ.setdefault("LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB", str(data_dir / "checkpoints.sqlite"))
     os.environ.setdefault("LAW_REVIEW_AUTH_MODE", "local")
 
-    from app.db import connect, init_db, now
-    from app.services import index_upload, persist_bank_transactions
+    from app.review.services import index_upload, persist_bank_transactions
+    from app.storage.db import connect, init_db, now
 
     init_db(seed=False)
     rng = random.Random(seed_value)

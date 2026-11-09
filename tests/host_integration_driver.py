@@ -6,11 +6,11 @@ import signal
 import sys
 from pathlib import Path
 
-from app.db import db_scope
-from app.host_integration import IsolatedHostIntegration
-from app.host_writes import ISOLATED_RUNTIME, LocalHostWritePort
-from app.runtime_adapter import current_actor_identity
-from app.runtime_ports import ModelConfig, RunRequest, RunScope, WriteAction
+from app.integration.host_integration import IsolatedHostIntegration
+from app.integration.host_writes import ISOLATED_RUNTIME, LocalHostWritePort
+from app.integration.runtime_adapter import current_actor_identity
+from app.integration.runtime_ports import ModelConfig, RunRequest, RunScope, WriteAction
+from app.storage.db import db_scope
 
 
 def request():
@@ -42,7 +42,7 @@ def main():
                 return result
             LocalHostWritePort._apply = apply
         elif mode == "response":
-            import app.host_integration as integration
+            import app.integration.host_integration as integration
             send = integration._send
 
             def committed(process, message):
@@ -51,11 +51,11 @@ def main():
                 return send(process, message)
             integration._send = committed
         elif mode == "journal":
-            import app.host_integration as integration
-            real_worker = integration.ROOT / "app/host_integration_worker.py"
+            import app.integration.host_integration as integration
+            real_worker = integration.ROOT / "app/integration/host_integration_worker.py"
             wrapper_root = path.parent / "test-worker"
-            (wrapper_root / "app").mkdir(parents=True)
-            (wrapper_root / "app/host_integration_worker.py").write_text(
+            (wrapper_root / "app/integration").mkdir(parents=True)
+            (wrapper_root / "app/integration/host_integration_worker.py").write_text(
                 "import os, signal, runpy\n"
                 "from forgeharness.sdk.durable import DurableRunner\n"
                 "original = DurableRunner._complete\n"
@@ -68,7 +68,7 @@ def main():
         elif mode == "projection":
             IsolatedHostIntegration._project = lambda *args, **kwargs: crash()
         elif mode == "cancel":
-            import app.host_integration as integration
+            import app.integration.host_integration as integration
             send = integration._send
             cancelled = False
 

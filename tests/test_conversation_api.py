@@ -1,6 +1,6 @@
 """Conversation lifecycle over HTTP: list, read, archive (idempotent), delete.
 
-Covers the handlers in app/routes/chat.py that previously ran only through the
+Covers the handlers in app/api/routes/chat.py that previously ran only through the
 browser suite, plus the read-only tool endpoint's error mapping.
 """
 from __future__ import annotations
@@ -15,8 +15,8 @@ from tests.support import IsolatedDatabaseTestCase
 class ConversationApiTests(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import now, transaction
         from app.main import app
+        from app.storage.db import now, transaction
 
         cls.client = TestClient(app)
         with transaction() as conn:
@@ -33,7 +33,7 @@ class ConversationApiTests(IsolatedDatabaseTestCase):
                 "INSERT INTO pages(document_id, page_no, text, summary) VALUES (?, 1, ?, ?)",
                 (document_id, "甲方向乙方借款人民币十万元，约定年利率百分之六。", "借款十万元"),
             )
-        from app.db import sync_fts_index
+        from app.storage.db import sync_fts_index
 
         sync_fts_index()
 
@@ -50,7 +50,7 @@ class ConversationApiTests(IsolatedDatabaseTestCase):
         return response.json()
 
     def audit_actions(self) -> list[str]:
-        from app.db import connect
+        from app.storage.db import connect
 
         with closing(connect()) as conn:
             return [row[0] for row in conn.execute(

@@ -1,4 +1,4 @@
-from app.benchmark_postprocess import postprocess, preserve_correction_surface
+from app.benchmarks.postprocess import postprocess, preserve_correction_surface
 
 
 def test_preserves_lexical_fix_but_restores_source_surface():

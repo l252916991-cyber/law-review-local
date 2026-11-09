@@ -5,8 +5,8 @@
 ## 1. 边界与版本
 
 - 使用现有 `WriteAction`、`WriteRequest`、`WriteReceipt`、`HostWritePort` 六类动作，公共运行协议/历史快照事件/结果仍为 v2/v2/v1。
-- 新实现为 `app/host_writes.py::LocalHostWritePort`，仅接受通过 `create_isolated_database` 排他新建并标记的合成数据库。现有库升级不会自动获得隔离标记，没有开启真实库写入的配置开关。
-- 隔离控制为 `app/host_integration.py::IsolatedHostIntegration`，运行时 `forgeharness-isolated-v1`，显式合成图 `synthetic-host-writes-v1`，宿主写入 schema v1，独立往返协议 v2，宿主持久追加事件 v1。它不是正式 `RuntimeControl` 路由；`FrameworkReadonlyControl` 的原能力声明保持不变。
+- 新实现为 `app/integration/host_writes.py::LocalHostWritePort`，仅接受通过 `create_isolated_database` 排他新建并标记的合成数据库。现有库升级不会自动获得隔离标记，没有开启真实库写入的配置开关。
+- 隔离控制为 `app/integration/host_integration.py::IsolatedHostIntegration`，运行时 `forgeharness-isolated-v1`，显式合成图 `synthetic-host-writes-v1`，宿主写入 schema v1，独立往返协议 v2，宿主持久追加事件 v1。它不是正式 `RuntimeControl` 路由；`FrameworkReadonlyControl` 的原能力声明保持不变。
 - 框架仍为精确 0.8.3 wheel，SHA-256 `1d5880ed2ba1cabcb20b0970a55727bcca7b68f9b4beace70ce7600d58ba7555`。独立 Python 3.12 只导入安装包；宿主不导入 ForgeHarness。
 - 新 schema v16 增量迁移只添加表、约束与删除 outbox。v15 旧代码按既有防降级规则拒绝 v16；不会自动降级库。v14/v15 历史请求列继续保留原含义及未绑定身份的拒绝逻辑。
 

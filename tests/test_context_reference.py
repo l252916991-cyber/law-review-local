@@ -6,7 +6,7 @@ antecedent sits in the same sentence triggered a needless clarification, and
 """
 import pytest
 
-from app.context import refers_to_earlier_turn, resolve_question
+from app.review.context import refers_to_earlier_turn, resolve_question
 
 DOCUMENTS = [
     {"id": 1, "name": "01_起诉意见书.txt"},

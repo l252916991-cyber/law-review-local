@@ -4,7 +4,7 @@
 
 依据：[迁移计划书 §4.1/§5 M1](../../architecture/forgeharness-migration-plan-20261021.md)、[现状检查与改进计划书](status-and-improvement-plan-20261021.md)（A1/A2/A3 补强）、[迁移台账](ledger.md)。
 
-机器可读的权威定义是 [app/runtime_ports.py](../../../app/runtime_ports.py)（纯标准库、零业务/零框架导入，由 `tests/test_runtime_ports.py` 的 AST 边界测试强制）；本文档记录字段与旧行为的对应关系、语义规则和 M1 边界。两者不一致时以代码为准并修订本文档。
+机器可读的权威定义是 [app/integration/runtime_ports.py](../../../app/integration/runtime_ports.py)（纯标准库、零业务/零框架导入，由 `tests/test_runtime_ports.py` 的 AST 边界测试强制）；本文档记录字段与旧行为的对应关系、语义规则和 M1 边界。两者不一致时以代码为准并修订本文档。
 
 **补强摘要（状态审查 I-01/I-02/I-03，2026-10-21 当日）**：`RUNTIME_PROTOCOL_VERSION` 1→2（actor 与认证主体强校验、租户显式拒绝、幂等重放需规范摘要一致）；`RUN_EVENT_VERSION` 1→2（事件明确为快照投影，身份 = (run_id, trace_revision, seq)）；schema v15 为 `runtime_requests` 增加 `request_digest`/`principal_name` 绑定列；`RUN_RESULT_VERSION` 保持 1（结果语义未变）。详见 §10。
 
@@ -12,7 +12,7 @@
 
 | 契约（计划书 §4.1） | 定义 | M1 实现 | 后续 |
 | --- | --- | --- | --- |
-| RunRequest | `runtime_ports.RunRequest` | 校验 + 幂等受理（[runtime_adapter.py](../../../app/runtime_adapter.py)） | M2 跨进程编码 |
+| RunRequest | `runtime_ports.RunRequest` | 校验 + 幂等受理（[runtime_adapter.py](../../../app/integration/runtime_adapter.py)） | M2 跨进程编码 |
 | HostReadPort | `runtime_ports.HostReadPort` | 仅冻结接口（字段对照现有只读工具/检索） | M2 授权导出/读端口实现 |
 | HostWritePort | `runtime_ports.HostWritePort` | 仅冻结接口（动作枚举 + 回执） | M2/M4 宿主写入实现 |
 | RunEvent | `runtime_ports.RunEvent` | 从 agent_steps 幂等投影 | M2 对接框架 trace 事件 |
@@ -39,7 +39,7 @@
 
 ## 3. RunResult / RunEvent ↔ 旧结果语义
 
-- `RunResult.from_legacy(dict)` 将 `process_query` 返回值（native：[agents.py 返回块](../../../app/agents.py)；langgraph：`_complete`）拆为类型化字段 + `extra`；`to_legacy()` 精确还原原 dict（含 `agent_type`、`tools_used`、`memory_hits`、`mode`、`user_name`、`checkpoint_size_bytes`、`conversation_id` 及未来新增键），两个测试固定了逐字节往返。
+- `RunResult.from_legacy(dict)` 将 `process_query` 返回值（native：[agents.py 返回块](../../../app/review/agents.py)；langgraph：`_complete`）拆为类型化字段 + `extra`；`to_legacy()` 精确还原原 dict（含 `agent_type`、`tools_used`、`memory_hits`、`mode`、`user_name`、`checkpoint_size_bytes`、`conversation_id` 及未来新增键），两个测试固定了逐字节往返。
 - 类型化字段即计划书 §4.1 RunResult 行：answer、citations、route、plan、steps、retrieval_metrics、validation、llm_used、fallback_reason、runtime、resumable（+ resume_count、checkpoint_thread_id、total_ms、memory_persisted、citation_check、llm_model、run_id）。
 - `RunEvent` 是 agent_steps 的**快照投影**（事件版本 2，状态审查 A3）：旧运行时的步骤行是可变的——LangGraph 恢复会把失败节点原地改写为完成——因此 `seq`（按 `agent_steps.id ASC` 单调）**不是不可变的追加事件身份**。事件身份 = `(run_id, trace_revision, seq)`：消费者必须按 `RunTrace.trace_revision` 缓存与更新（修订变化→整份投影替换），不得把旧快照的事件当终态；同一修订内重复读取幂等且跨进程/重启确定。`node_id`=node_name、`usage=None`（旧运行时不按节点归因 token，未知保持未知）。`trace_revision` 由 `compute_trace_revision()` 对运行行与全部步骤行做内容寻址（方案 `lexvault-trace-revision/1`）。框架侧（M2+）提供持久追加事件流；两种语义的映射由适配层文档化，若未来统一为追加事件需先落持久事件表与兼容投影，单独升版本号不解决漏更新。
 - `RunTrace.raw_steps` 保留旧 step dict 原样，保证现有 UI 载荷兼容；事件是并行提供的版本化投影，不替换旧字段。
@@ -87,7 +87,7 @@
 
 ## 7. 宿主端口冻结说明（M2 实现依据）
 
-- `HostReadPort` 方法与现有实现的字段对照：`list_documents`/`list_evidence`/`saved_gap_analysis` ↔ [agent_tools.py](../../../app/agent_tools.py) 白名单工具（含 `concise` 截断策略）；`search` ↔ `HybridRetriever.retrieve` 允许字段集（`SearchHit.extra` 携带其余诊断字段）；`read_page` ↔ pages 表 + `text_sha256` 内容身份（与框架 bundle 页身份对齐：document_id + 文档内页号 + 摘要哈希，覆盖多文档同页码场景）；`recall_memories` ↔ `rag.recall_memories`；`search_statutes` ↔ 法条检索族（corpus_version 显式携带）。
+- `HostReadPort` 方法与现有实现的字段对照：`list_documents`/`list_evidence`/`saved_gap_analysis` ↔ [agent_tools.py](../../../app/review/agent_tools.py) 白名单工具（含 `concise` 截断策略）；`search` ↔ `HybridRetriever.retrieve` 允许字段集（`SearchHit.extra` 携带其余诊断字段）；`read_page` ↔ pages 表 + `text_sha256` 内容身份（与框架 bundle 页身份对齐：document_id + 文档内页号 + 摘要哈希，覆盖多文档同页码场景）；`recall_memories` ↔ `rag.recall_memories`；`search_statutes` ↔ 法条检索族（corpus_version 显式携带）。
 - 界限常量冻结：query ≤500 字符、search limit 1..20（默认 6）、目录 limit 1..100（默认 50）、单页文本 ≤20000 字符（与框架 `MAX_PAGE_CHARS` 一致）。
 - 每次访问重新检查当前权限；返回内容是未受信任案件数据；M2 试点审计写隔离实验存储（现行 `execute_readonly_tool` 写业务 audit_log，只读对照不得直接使用——计划书 §5.2）。
 - `HostWritePort` 动作枚举 = M1 冻结的全集（run_record/step_record/gap_detection/memory_draft/conversation_message/audit_entry），与现有幂等键对齐：agent_steps `ON CONFLICT(run_id,node_name)`、memories `source_run_id` 唯一部分索引、gap_detections `(run_id,gap_type,description)` 唯一部分索引。回执含 `duplicate` 标志；未知结果先 `query_receipt` 再决定重试，禁止盲重放。新动作需要契约版本说明，不允许临时载荷。

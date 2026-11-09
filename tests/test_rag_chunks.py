@@ -5,10 +5,10 @@ from contextlib import closing
 
 import pytest
 
-from app import rag_child_index
-from app.db import connect, db_scope, init_db, now, transaction
-from app.rag import HybridRetriever, embedding_identity, hashed_embedding
-from app.rag_chunks import page_chunks
+from app.retrieval import rag_child_index
+from app.retrieval.rag import HybridRetriever, embedding_identity, hashed_embedding
+from app.retrieval.rag_chunks import page_chunks
+from app.storage.db import connect, db_scope, init_db, now, transaction
 
 
 class FakeEmbeddingClient:

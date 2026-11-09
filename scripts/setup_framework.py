@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def setup(destination: Path, *, offline: bool = False) -> Path:
-    from app.forge_bridge import framework_binding
+    from app.integration.forge_bridge import framework_binding
 
     binding, wheel = framework_binding()
     requirements = ROOT / "vendor/forgeharness-runtime-requirements.txt"

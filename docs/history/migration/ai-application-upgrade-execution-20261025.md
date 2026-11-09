@@ -37,7 +37,7 @@ A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回�
 
 ### A04.1 Agent 工具循环
 
-- 原生 DAG 审校节点在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/tool_loop.py`；历史/记忆/对象说明作为不可信数据进入工具循环（此前非流式工具路径会丢掉这些上下文）。
+- 原生 DAG 审校节点在 `LAW_REVIEW_TOOL_LOOP=on` 时复用 `app/review/tool_loop.py`；历史/记忆/对象说明作为不可信数据进入工具循环（此前非流式工具路径会丢掉这些上下文）。
 - 端点拒绝 tools 时显式回退并记 `endpoint_rejected_tools`；宿主管控作用域内拒绝运行，不绕过准入账本。
 - 轨迹 `tools={enabled,reason,rounds,tool_calls,trace,model,budget}` 进入 critic 输出、`agent_steps` 与最终结果；工具轮次按次记入 `llm_calls`，Agent 路径现在带 `run_id`。
 - LangGraph 路径按运行时策略关闭工具循环（`tools.reason=runtime_policy`），因为它没有独立的工具预算归属。
@@ -51,7 +51,7 @@ A04.1 与 A09.1 合并为一个提交：两包改的是审校节点同一条回�
 
 ### A02.2 问答级估算费用
 
-- `app/pricing.py`：版本、币种、单位、来源与每模型单价；解析失败失败关闭；内部 8 位小数、展示 4 位（ROUND_HALF_UP）。
+- `app/llm/pricing.py`：版本、币种、单位、来源与每模型单价；解析失败失败关闭；内部 8 位小数、展示 4 位（ROUND_HALF_UP）。
 - `llm_calls.pricing_json` 在写入时复制价目快照，改价不重算历史；`turn_key` 归组一次提问（聊天 `request:<id>`，Agent `run:<id>`）。
 - `cost` 与 `turns`：只有全部调用可计价才有 `total`，否则给 `partial_total` 与覆盖计数；缺 usage 与未配置单价分开统计；多币种不求和；未配置显示"未配置成本"，不写 0。
 - 面板新增"问答级估算费用"，文案标明是估算费用而非账单。

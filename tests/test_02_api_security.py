@@ -14,8 +14,8 @@ os.environ["LAW_REVIEW_DATA_DIR"] = TEST_DATA
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import connect, init_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.storage.db import connect, init_db  # noqa: E402
 
 
 class APIBoundaryTest(IsolatedDatabaseTestCase):
@@ -38,8 +38,8 @@ class APIBoundaryTest(IsolatedDatabaseTestCase):
         import json as json_module
         import logging
 
-        from app.logger import StructuredFormatter
-        from app.logger import request_id as request_id_var
+        from app.core.logger import StructuredFormatter
+        from app.core.logger import request_id as request_id_var
         echoed = self.client.get("/api/health", headers={"X-Request-ID": "req-fixed-123456"})
         self.assertEqual(echoed.headers["x-request-id"], "req-fixed-123456")
         generated = self.client.get("/api/health")

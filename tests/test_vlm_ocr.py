@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app import vlm_ocr
-from app.services import extract_image_text
+from app.documents import vlm_ocr
+from app.review.services import extract_image_text
 
 
 class _FakeResponse:
@@ -122,20 +122,20 @@ class OcrFallbackTests(unittest.TestCase):
         self.image.write_bytes(b"\x89PNG fake")
 
     def test_vision_text_is_preferred_when_available(self):
-        with patch("app.vlm_ocr.image_to_text", return_value="视觉转录"), \
-                patch("app.services.run_text_command") as tesseract:
+        with patch("app.documents.vlm_ocr.image_to_text", return_value="视觉转录"), \
+                patch("app.review.services.run_text_command") as tesseract:
             self.assertEqual(extract_image_text(self.image), ["视觉转录"])
         tesseract.assert_not_called()
 
     def test_tesseract_is_used_when_vision_fails(self):
-        with patch("app.vlm_ocr.image_to_text", side_effect=vlm_ocr.VlmUnavailable("off")), \
-                patch("app.services.run_text_command", return_value="OCR 文本") as tesseract:
+        with patch("app.documents.vlm_ocr.image_to_text", side_effect=vlm_ocr.VlmUnavailable("off")), \
+                patch("app.review.services.run_text_command", return_value="OCR 文本") as tesseract:
             self.assertEqual(extract_image_text(self.image), ["OCR 文本"])
         self.assertEqual(tesseract.call_count, 1)
 
     def test_empty_vision_result_falls_back_instead_of_returning_blank(self):
-        with patch("app.vlm_ocr.image_to_text", return_value="   "), \
-                patch("app.services.run_text_command", return_value="OCR 兜底"):
+        with patch("app.documents.vlm_ocr.image_to_text", return_value="   "), \
+                patch("app.review.services.run_text_command", return_value="OCR 兜底"):
             self.assertEqual(extract_image_text(self.image), ["OCR 兜底"])
 
 

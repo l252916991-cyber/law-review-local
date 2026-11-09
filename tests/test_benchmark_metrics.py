@@ -1,6 +1,6 @@
 import unittest
 
-from app.benchmark_metrics import (
+from app.benchmarks.metrics import (
     char_f1,
     correction_f05,
     extract_option_set,
@@ -9,7 +9,7 @@ from app.benchmark_metrics import (
     score_lexeval_item,
     set_f1,
 )
-from app.rag_benchmark_dataset import DATASET_VERSION, build_rag_benchmark
+from app.evaluation.rag_benchmark_dataset import DATASET_VERSION, build_rag_benchmark
 
 
 class BenchmarkMetricTest(unittest.TestCase):

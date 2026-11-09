@@ -1,8 +1,8 @@
 # 模型层拆分：provider、wire api 与模型声明（2026-10-30）
 
-- 结论：模型调用从"一个内联的 OpenAI 请求字典"改为 `app/model_ports.py` 的分层——provider 管端点与凭证，wire api 管请求/响应形状，`ModelSpec` 管能力与价格列。默认行为不变，新增 `anthropic-messages` 作为第二个协议。
+- 结论：模型调用从"一个内联的 OpenAI 请求字典"改为 `app/llm/model_ports.py` 的分层——provider 管端点与凭证，wire api 管请求/响应形状，`ModelSpec` 管能力与价格列。默认行为不变，新增 `anthropic-messages` 作为第二个协议。
 - 设计来源：pi-ai（`packages/ai`，MIT）文档中 provider / API 二分、模型可序列化、跨 provider 交接丢弃 thinking 三条约定。只取形状，未复制源码、未引入依赖；来源记录见 `docs/runbook/licenses.md`。
-- 范围：`app/model_ports.py`（新）、`app/services.py`、`app/llm_usage.py`、`app/model_router.py`、`app/tool_loop.py`、`app/agents.py`（一行透传）、测试与运行手册。未改检索、评分、回答契约与数据库结构。
+- 范围：`app/llm/model_ports.py`（新）、`app/review/services.py`、`app/llm/llm_usage.py`、`app/llm/model_router.py`、`app/review/tool_loop.py`、`app/review/agents.py`（一行透传）、测试与运行手册。未改检索、评分、回答契约与数据库结构。
 
 ## 为什么改
 
@@ -23,7 +23,7 @@
 
 ## 对 native 对照基线的影响
 
-`services.py` 与 `agents.py` 在 `native_baseline_identity()` 的摘要门禁内，本次改动使摘要变化，按既有规则重登记为 `specialist-review-v4`（`app/model_comparison.py`），并在 review note 中说明：提示模板、`PROMPT_VERSION`、检索、回答契约、校验与工具循环行为未变；默认协议下请求体与响应解析结果与改动前逐字段一致（`tests/test_chat_stream.py` 覆盖）；`agents.py` 只是把回退目标自带的协议透传给 `call_local_llm`。
+`services.py` 与 `agents.py` 在 `native_baseline_identity()` 的摘要门禁内，本次改动使摘要变化，按既有规则重登记为 `specialist-review-v4`（`app/evaluation/model_comparison.py`），并在 review note 中说明：提示模板、`PROMPT_VERSION`、检索、回答契约、校验与工具循环行为未变；默认协议下请求体与响应解析结果与改动前逐字段一致（`tests/test_chat_stream.py` 覆盖）；`agents.py` 只是把回退目标自带的协议透传给 `call_local_llm`。
 
 ## 验证
 

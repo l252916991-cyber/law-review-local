@@ -5,7 +5,14 @@ from contextlib import closing
 
 import pytest
 
-from app.answerability import (
+from app.integration.runtime_ports import (
+    ContractValidationError,
+    ModelConfig,
+    RequestConflictError,
+    UnsupportedCapabilityError,
+)
+from app.llm.local_backends import LocalModels
+from app.review.answerability import (
     ANSWERABILITY_GRAMMAR,
     GRAMMAR_VERSION,
     POLICY_VERSION,
@@ -17,9 +24,7 @@ from app.answerability import (
     parse_decision,
     policy_identity,
 )
-from app.db import connect
-from app.local_backends import LocalModels
-from app.runtime_ports import ContractValidationError, ModelConfig, RequestConflictError, UnsupportedCapabilityError
+from app.storage.db import connect
 from tests.test_candidate_domain import actual, candidate, candidate_request  # noqa: F401
 from tests.test_domain_integration import counts
 from tests.test_domain_writes import domain  # noqa: F401
@@ -226,6 +231,6 @@ def test_candidate_cannot_bypass_policy_with_rule_only_request(candidate):
 def test_changed_policy_cannot_reinterpret_saved_run(candidate, monkeypatch):
     control, _ = candidate
     control.accept(candidate_request(control))
-    monkeypatch.setattr("app.answerability.SYSTEM_PROMPT", "changed policy")
+    monkeypatch.setattr("app.review.answerability.SYSTEM_PROMPT", "changed policy")
     with pytest.raises(RequestConflictError, match="policy"):
         control.status("domain-process")

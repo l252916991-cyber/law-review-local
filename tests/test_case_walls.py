@@ -31,8 +31,8 @@ ADMIN_TOKEN = "compliance-admin-token-" + "x" * 24
 class CaseWallTests(IsolatedDatabaseTestCase):
     @classmethod
     def setUpClass(cls):
-        from app.db import connect, init_db, sync_fts_index, system_access
         from app.main import app
+        from app.storage.db import connect, init_db, sync_fts_index, system_access
 
         env = patch.dict(os.environ, {
             "LAW_REVIEW_AUTH_MODE": "token",
@@ -118,7 +118,7 @@ class CaseWallTests(IsolatedDatabaseTestCase):
         return answered
 
     def audit_actions(self) -> list[str]:
-        from app.db import connect, system_access
+        from app.storage.db import connect, system_access
 
         with system_access(), closing(connect()) as conn:
             return [row[0] for row in conn.execute("SELECT action FROM audit_log WHERE case_id = 1 ORDER BY id")]
@@ -170,7 +170,7 @@ class CaseWallTests(IsolatedDatabaseTestCase):
         self.assertNotIn(MARKER, json.dumps(walls, ensure_ascii=False), "wall management must not show the title")
 
     def test_break_glass_is_reasoned_time_limited_and_audited(self):
-        from app.db import connect, system_access, transaction
+        from app.storage.db import connect, system_access, transaction
 
         self.assertEqual(self.client.post("/api/case-walls/1/break-glass", headers=self.admin,
                                           json={"reason": "太短"}).status_code, 422)
@@ -217,7 +217,7 @@ class CaseWallTests(IsolatedDatabaseTestCase):
             self.assertEqual(restored.status_code, 200)
 
     def test_walls_cannot_be_set_in_local_single_user_mode_and_mcp_refuses_walled_cases(self):
-        from app import mcp_server
+        from app.integration import mcp_server
 
         with patch.dict(os.environ, {"LAW_REVIEW_AUTH_MODE": "local"}):
             response = self.client.put("/api/case-walls/2", json={"reason": "本机演示设墙", "insiders": ["本机律师"]})
@@ -226,13 +226,13 @@ class CaseWallTests(IsolatedDatabaseTestCase):
 
     # -- PostgreSQL: the database enforces the wall by itself ---------------------
     def test_row_level_security_holds_without_the_application_check(self):
-        from app.db import backend_name
+        from app.storage.db import backend_name
 
         if backend_name() != "postgresql":
             self.skipTest("row-level security exists only on PostgreSQL")
-        nothing_hidden = patch.multiple("app.case_walls", hidden_case_ids=lambda: frozenset())
-        with nothing_hidden, patch("app.routes.cases.hidden_case_ids", lambda: frozenset()), \
-                patch("app.routes.system.hidden_case_ids", lambda: frozenset()), \
+        nothing_hidden = patch.multiple("app.cases.case_walls", hidden_case_ids=lambda: frozenset())
+        with nothing_hidden, patch("app.api.routes.cases.hidden_case_ids", lambda: frozenset()), \
+                patch("app.api.routes.system.hidden_case_ids", lambda: frozenset()), \
                 TestClient(self.app, raise_server_exceptions=False) as client:
             self.sweep(client, self.admin, refused=False)
             self.sweep(client, self.screened, refused=False)
@@ -242,13 +242,13 @@ class CaseWallTests(IsolatedDatabaseTestCase):
 
         The sweep above only proves something if it can see a leak; here it must.
         """
-        from app.db import backend_name
+        from app.storage.db import backend_name
 
         if backend_name() == "postgresql":
             self.skipTest("on PostgreSQL row-level security still holds; see the test above")
-        with patch("app.case_walls.hidden_case_ids", lambda: frozenset()), \
-                patch("app.routes.cases.hidden_case_ids", lambda: frozenset()), \
-                patch("app.routes.system.hidden_case_ids", lambda: frozenset()), \
+        with patch("app.cases.case_walls.hidden_case_ids", lambda: frozenset()), \
+                patch("app.api.routes.cases.hidden_case_ids", lambda: frozenset()), \
+                patch("app.api.routes.system.hidden_case_ids", lambda: frozenset()), \
                 TestClient(self.app, raise_server_exceptions=False) as client:
             leaked = sorted({path for headers in (self.admin, self.screened)
                              for path, _, _, body in self.responses(client, headers) if MARKER in body})
@@ -258,8 +258,8 @@ class CaseWallTests(IsolatedDatabaseTestCase):
             self.assertIn(path, leaked)
 
     def test_database_rows_follow_the_wall(self):
-        from app.db import backend_name, connect, now
-        from app.security import Principal, _principal
+        from app.core.security import Principal, _principal
+        from app.storage.db import backend_name, connect, now
 
         if backend_name() != "postgresql":
             self.skipTest("row-level security exists only on PostgreSQL")

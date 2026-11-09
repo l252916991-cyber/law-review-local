@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app.security import AccessConfigurationError, configured_tokens
+from app.core.security import AccessConfigurationError, configured_tokens
 
 SHORT = "111"
 

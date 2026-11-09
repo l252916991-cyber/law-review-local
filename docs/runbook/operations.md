@@ -12,7 +12,7 @@
 
 ```bash
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8765
-uv run arq app.tasks.WorkerSettings
+uv run arq app.documents.tasks.WorkerSettings
 ```
 
 只在需要批量导入时启动 Redis/worker。Docker Redis 绑定 `127.0.0.1:6379:6379`；Web/worker 的队列名、Redis DB 和数据路径须一致。不要在已运行长测试时重启本地模型或并行发起模型基准。

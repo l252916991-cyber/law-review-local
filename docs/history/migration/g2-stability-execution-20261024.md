@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | S01 十九题与四道阻塞题冻结、实际输入输出归因 | 完成 | `output/migration/g2-stability-20261024/s01/blocker-analysis.json` |
 | S02 结构化输出能力验证 | 在隔离 oMLX 进程内实际启用 xgrammar；全局服务环境未改动 | `s02/structured-output-capability.json`、`s02/grammar-env-freeze.txt` |
-| S03 “未见记录”判断边界 | 协议升级为 `candidate-answerability-v9-grammar`，区分明确未见、未提及、有记录和要求认定未发生 | `app/answerability.py`、`tests/test_answerability.py` |
+| S03 “未见记录”判断边界 | 协议升级为 `candidate-answerability-v9-grammar`，区分明确未见、未提及、有记录和要求认定未发生 | `app/review/answerability.py`、`tests/test_answerability.py` |
 | S04 用量压缩 | 结构化语法约束输出形状；系统提示和用户输入去除重复排版与 route/文件元数据；实际 39 次评估全部逐题及总量 ≤1.10 | `s05/actual-summary.json`、`s05/latency-usage-summary.json` |
 | S05 冻结方案与合成复验 | 39 次题目评估、78 条双对照；25 成功 / 14 业务拒绝 / 0 系统失败，全部符合预期，unknown=0，源库不变 | `s05/final-full19/`、`s05/stability-holdout/`、`s05/final-blockers-repeat*/` |
 | S06 工程、发布与新进程复用 | 三版 Python 各 987 passed / 0 failed / 3 skipped；静态、依赖 Export、发布允许清单及发布包重建流程通过 | `s06/tests-311|312|314/`、`s06/static-312-final/`、`s06/release-312-final/`、`s06/package-final/` |

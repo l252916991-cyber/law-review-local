@@ -17,10 +17,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app import lawbench
-from app.benchmark_metrics import SCORER_VERSION, score_lawbench_item
-from app.benchmark_reporting import atomic_json, metrics
-from app.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task
+from app.benchmarks import lawbench
+from app.benchmarks.lawbench import LAW_BENCH_COMMIT, TASK_NAMES, load_task
+from app.benchmarks.metrics import SCORER_VERSION, score_lawbench_item
+from app.benchmarks.reporting import atomic_json, metrics
 
 
 def digest(path: Path) -> str:
@@ -57,7 +57,7 @@ def profiles() -> dict[str, dict[str, Any]]:
 
 
 def probe_model(config: dict[str, Any]) -> None:
-    from app.benchmark_solver import _endpoint, _NoRedirect
+    from app.benchmarks.solver import _endpoint, _NoRedirect
 
     endpoint = _endpoint(config["url"]).removesuffix("/chat/completions") + "/models"
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
@@ -104,8 +104,8 @@ def prepare(baseline: Path, destination: Path, seed: int = 8505) -> dict[str, An
     destination.mkdir(parents=True)
     write_rows(destination / "inputs.jsonl", inputs)
     write_rows(destination / "references.jsonl", references)
-    frozen_files = {"app/benchmark_metrics.py": digest(ROOT / "app/benchmark_metrics.py"),
-                    "app/lawbench.py": digest(ROOT / "app/lawbench.py")}
+    frozen_files = {"app/benchmarks/metrics.py": digest(ROOT / "app/benchmarks/metrics.py"),
+                    "app/benchmarks/lawbench.py": digest(ROOT / "app/benchmarks/lawbench.py")}
     manifest = {
         "campaign_version": 1, "goal_score": 85.0, "scorer_version": SCORER_VERSION,
         "dataset_commit": LAW_BENCH_COMMIT, "seed": seed,
@@ -132,7 +132,7 @@ def validate_campaign(directory: Path) -> dict[str, Any]:
         if name not in {"inputs.jsonl", "references.jsonl"} or digest(directory / name) != expected:
             raise ValueError(f"Changed campaign file: {name}")
     for name, expected in manifest["frozen_sources"].items():
-        if name not in {"app/benchmark_metrics.py", "app/lawbench.py"} or digest(ROOT / name) != expected:
+        if name not in {"app/benchmarks/metrics.py", "app/benchmarks/lawbench.py"} or digest(ROOT / name) != expected:
             raise ValueError(f"Frozen scorer changed: {name}")
     for task, expected in manifest["dataset_files"].items():
         if task not in TASK_NAMES or digest(lawbench.LAW_BENCH_DIR / f"{task}.json") != expected:
@@ -177,7 +177,7 @@ def service_may_still_be_busy(error: str | None) -> bool:
 
 
 def run(directory: Path, name: str, profile: str, split: str, per_task: int, resume: bool = False) -> dict[str, Any]:
-    from app.benchmark_solver import solve
+    from app.benchmarks.solver import solve
 
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", name):
         raise ValueError("Invalid run name")
@@ -191,7 +191,7 @@ def run(directory: Path, name: str, profile: str, split: str, per_task: int, res
     # Interleave tasks so early interruption does not exclusively cover one task.
     selected.sort(key=lambda item: (item["position_in_task"], list(TASK_NAMES).index(item["task"])))
     references = {item["question_id"]: item["reference"] for item in read_rows(directory / "references.jsonl")}
-    sources = ["scripts/benchmark_campaign.py", "app/benchmark_solver.py", "app/services.py", "app/config.py"]
+    sources = ["scripts/benchmark_campaign.py", "app/benchmarks/solver.py", "app/review/services.py", "app/core/config.py"]
     manifest = {"campaign_sha256": digest(directory / "campaign.json"), "profile": profile, "split": split,
                 "config": campaign["profiles"][profile], "question_ids": [item["question_id"] for item in selected],
                 "input_hashes": {item["question_id"]: item["input_hash"] for item in selected},

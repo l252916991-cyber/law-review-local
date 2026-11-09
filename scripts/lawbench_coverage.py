@@ -20,7 +20,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.benchmark_retrieval import SUPPORTED_TASKS, retrieve  # noqa: E402
+from app.benchmarks.retrieval import SUPPORTED_TASKS, retrieve  # noqa: E402
 from scripts.build_npc_corpus import QUESTION_LAW, canonical_law_name  # noqa: E402
 
 WORKLIST_FIELDS = ("question_id", "task", "task_name", "instruction", "question")

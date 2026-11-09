@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from app.db_postgres import Row, _python_value, identity_tables, translate
+from app.storage.db_postgres import Row, _python_value, identity_tables, translate
 
 ADMIN_URL = os.environ.get("LAW_REVIEW_TEST_POSTGRES_URL")
 needs_postgres = pytest.mark.skipif(not ADMIN_URL, reason="set LAW_REVIEW_TEST_POSTGRES_URL to a PostgreSQL server")
@@ -74,8 +74,8 @@ def test_a_sqlite_process_never_imports_the_postgresql_driver(tmp_path):
 
     script = (
         "import sys, tempfile; from pathlib import Path\n"
-        "from app.eval_gate import _isolated_case\n"
-        "from app.services import chat\n"
+        "from app.evaluation.eval_gate import _isolated_case\n"
+        "from app.review.services import chat\n"
         "with _isolated_case(Path(sys.argv[1]), endpoint='http://127.0.0.1:1/v1', model='none'):\n"
         "    chat(1, '涉案账户累计流入多少万元', 'test', None, False, False)\n"
         "assert 'psycopg' not in sys.modules, 'psycopg imported on the SQLite path'\n"
@@ -97,7 +97,7 @@ def test_generated_postgres_schema_matches_the_current_sqlite_schema():
 
 @pytest.fixture
 def pg_url():
-    from app.db_postgres import create_database, drop_database, ensure_role
+    from app.storage.db_postgres import create_database, drop_database, ensure_role
     from tests.support import POSTGRES_APP_ROLE
 
     ensure_role(ADMIN_URL, POSTGRES_APP_ROLE)
@@ -111,7 +111,7 @@ def pg_url():
 
 @pytest.fixture
 def pg_db(pg_url):
-    from app.db import init_db, postgres_scope
+    from app.storage.db import init_db, postgres_scope
 
     with tempfile.TemporaryDirectory() as directory, \
             pytest.MonkeyPatch.context() as patcher, postgres_scope(pg_url):
@@ -122,7 +122,7 @@ def pg_db(pg_url):
 
 @needs_postgres
 def test_postgres_tables_and_columns_equal_the_sqlite_schema(pg_db):
-    from app.db import connect, db_scope, init_db, table_names
+    from app.storage.db import connect, db_scope, init_db, table_names
 
     with closing(connect()) as conn:
         pg = {name: {row["name"] for row in conn.execute(f"PRAGMA table_info({name})")}
@@ -141,7 +141,7 @@ def test_postgres_tables_and_columns_equal_the_sqlite_schema(pg_db):
 
 @needs_postgres
 def test_failed_statement_leaves_the_transaction_usable_like_sqlite(pg_db):
-    from app.db import connect, now
+    from app.storage.db import connect, now
 
     with closing(connect()) as conn:
         case_id = conn.execute("INSERT INTO cases(title, created_at, updated_at) VALUES ('保留', ?, ?)",
@@ -158,7 +158,7 @@ def test_failed_statement_leaves_the_transaction_usable_like_sqlite(pg_db):
 
 @needs_postgres
 def test_explicit_ids_do_not_collide_with_later_inserts(pg_db):
-    from app.db import now, transaction
+    from app.storage.db import now, transaction
 
     with transaction() as conn:
         conn.execute("INSERT INTO cases(id, title, created_at, updated_at) VALUES (40, '指定', ?, ?)", (now(), now()))
@@ -170,8 +170,8 @@ def test_explicit_ids_do_not_collide_with_later_inserts(pg_db):
 def test_begin_immediate_serializes_writers_across_connections(pg_db):
     import psycopg
 
-    from app.db import connect
-    from app.db_postgres import WRITER_LOCK_KEY
+    from app.storage.db import connect
+    from app.storage.db_postgres import WRITER_LOCK_KEY
 
     holder = connect()
     try:
@@ -186,8 +186,8 @@ def test_begin_immediate_serializes_writers_across_connections(pg_db):
 
 @needs_postgres
 def test_full_text_index_follows_page_and_document_changes(pg_db):
-    from app.db import connect, now, transaction
-    from app.search_backend import fts_page_candidates
+    from app.retrieval.search_backend import fts_page_candidates
+    from app.storage.db import connect, now, transaction
 
     with transaction() as conn:
         case_id = conn.execute("INSERT INTO cases(title, created_at, updated_at) VALUES ('检索', ?, ?)",
@@ -216,7 +216,7 @@ def test_full_text_index_follows_page_and_document_changes(pg_db):
 
 @needs_postgres
 def test_text_parameters_drop_nul_and_booleans_store_as_integers(pg_db):
-    from app.db import connect, now
+    from app.storage.db import connect, now
 
     with closing(connect()) as conn:
         case_id = conn.execute("INSERT INTO cases(title, created_at, updated_at) VALUES (?, ?, ?)",
@@ -227,8 +227,8 @@ def test_text_parameters_drop_nul_and_booleans_store_as_integers(pg_db):
 
 @needs_postgres
 def test_vector_search_returns_the_same_pages_and_scores_on_both_backends():
-    from app.eval_gate import _isolated_case
-    from app.rag import HybridRetriever
+    from app.evaluation.eval_gate import _isolated_case
+    from app.retrieval.rag import HybridRetriever
 
     questions = ["涉案账户累计流入多少万元", "谁负责客户招揽", "宣传材料由谁审批"]
     results = {}
@@ -248,7 +248,7 @@ def test_vector_search_returns_the_same_pages_and_scores_on_both_backends():
 def test_answer_quality_gate_passes_on_postgresql(tmp_path):
     import json
 
-    from app.eval_gate import DEFAULT_BASELINES, compare, run
+    from app.evaluation.eval_gate import DEFAULT_BASELINES, compare, run
 
     report = run("rules", workdir=tmp_path, postgres_admin_url=ADMIN_URL)
     assert report["manifest"]["database_backend"] == "postgresql"
@@ -259,16 +259,16 @@ def test_answer_quality_gate_passes_on_postgresql(tmp_path):
 
 @needs_postgres
 def test_sqlite_file_snapshots_are_refused_on_postgresql(pg_db):
-    from app.db import SQLITE_FILE_ONLY
-    from app.host_ports import capture_case_rows
-    from app.runtime_ports import UnsupportedCapabilityError
+    from app.integration.host_ports import capture_case_rows
+    from app.integration.runtime_ports import UnsupportedCapabilityError
+    from app.storage.db import SQLITE_FILE_ONLY
 
     with pytest.raises(UnsupportedCapabilityError, match=SQLITE_FILE_ONLY):
         capture_case_rows(1)
 
 
 def test_isolated_harnesses_never_inherit_a_configured_postgresql(monkeypatch, tmp_path):
-    from app.db import backend_name
+    from app.storage.db import backend_name
     from scripts.validate_application_acceptance import isolated_environment
 
     monkeypatch.setenv("LAW_REVIEW_DATABASE_URL", "postgresql://example.invalid/real_cases")
@@ -284,8 +284,8 @@ def test_postgresql_schemas_that_cannot_be_upgraded_in_place_are_refused(pg_db):
     one older than the migration baseline, or newer than the code, is refused."""
     import psycopg
 
-    from app.db import SCHEMA_VERSION, init_db
-    from app.db_postgres import MIGRATION_BASELINE
+    from app.storage.db import SCHEMA_VERSION, init_db
+    from app.storage.db_postgres import MIGRATION_BASELINE
 
     with psycopg.connect(pg_db, autocommit=True) as conn:
         conn.execute("UPDATE lexvault_schema_meta SET version = %s", (MIGRATION_BASELINE - 1,))

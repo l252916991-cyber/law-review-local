@@ -160,7 +160,7 @@ def check_identity(conn: sqlite3.Connection, *, multi_user: bool = False) -> lis
 def check_database(db_path: Path) -> list[Check]:
     if not db_path.is_file():
         return [_check("database", "fail", f"找不到 {db_path}")]
-    from app.db import SCHEMA_VERSION
+    from app.storage.db import SCHEMA_VERSION
 
     with closing(open_readonly(db_path)) as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -189,7 +189,7 @@ def check_database(db_path: Path) -> list[Check]:
 
 
 def check_collaboration(db_path: Path) -> list[Check]:
-    from app.report_basis import basis_hash, basis_snapshot
+    from app.cases.report_basis import basis_hash, basis_snapshot
 
     with closing(open_readonly(db_path)) as conn:
         conn.row_factory = sqlite3.Row

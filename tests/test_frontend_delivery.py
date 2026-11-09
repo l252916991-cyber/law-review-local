@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db import db_scope, init_db
 from app.main import app
+from app.storage.db import db_scope, init_db
 
 
 class FrontendDeliveryTests(unittest.TestCase):

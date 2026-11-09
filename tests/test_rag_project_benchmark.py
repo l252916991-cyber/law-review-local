@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.rag_benchmark_dataset import (
+from app.evaluation.rag_benchmark_dataset import (
     LONG_PAGE_V2_VERSION,
     LONG_PAGE_VERSION,
     build_long_page_benchmark,
     build_long_page_v2_benchmark,
 )
-from app.rag_chunks import page_chunks
+from app.retrieval.rag_chunks import page_chunks
 from rag_project_benchmark import (
     paired_channel_comparison,
     paired_comparison,

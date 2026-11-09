@@ -9,9 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from app import collaboration_ablation as ablation
-from app import services
-from app.collaboration_ablation import (
+from app.evaluation import collaboration_ablation as ablation
+from app.evaluation.collaboration_ablation import (
     GROUPS,
     Generation,
     build_prompt,
@@ -24,6 +23,7 @@ from app.collaboration_ablation import (
     summarise_attempts,
     verify_prepared_integrity,
 )
+from app.review import services
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "benchmarks/answer_eval/v2/dataset.json"
@@ -289,7 +289,7 @@ def test_appendix_cannot_inflate_the_scored_model_answer(batch):
 def test_live_generator_targets_the_probed_endpoint_explicitly():
     from unittest.mock import patch
 
-    from app.collaboration_ablation import live_generator
+    from app.evaluation.collaboration_ablation import live_generator
 
     captured = {}
 
@@ -297,7 +297,7 @@ def test_live_generator_targets_the_probed_endpoint_explicitly():
         captured.update(kwargs)
         return "合成回答[资料1]。请律师复核原文与上述结论。"
 
-    with patch("app.services.call_local_llm", side_effect=fake_call):
+    with patch("app.review.services.call_local_llm", side_effect=fake_call):
         generated = live_generator("stub-chat", 30, "http://127.0.0.1:18000/v1")(
             "问题", "事实检索", [], "")
     assert captured["base_url_override"] == "http://127.0.0.1:18000/v1"

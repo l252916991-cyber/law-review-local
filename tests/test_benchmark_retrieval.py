@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from app.benchmark_retrieval import corpus_fingerprint, matched_law_names, retrieve
-from app.legal_corpus import SCHEMA_VERSION, split_articles
+from app.benchmarks.retrieval import corpus_fingerprint, matched_law_names, retrieve
+from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
 
 
 def _law(name, aliases):

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.db import db_scope, init_db, now, transaction
 from app.main import app
+from app.storage.db import db_scope, init_db, now, transaction
 
 
 class RunTraceApiTests(unittest.TestCase):
