@@ -20,6 +20,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from app.core.digest import json_sha256
+
 REFUSAL_MARKERS = ("资料不足", "无法核验", "未检索到", "材料中没有", "不足以", "无法判断", "需要补充")
 _NORMALISE = re.compile(r"[\s,，、；;：:％%]+")
 
@@ -75,8 +77,7 @@ def validate_frozen_sources(payload: dict[str, Any]) -> None:
     sources = payload.get("sources")
     if not isinstance(sources, list) or not sources:
         raise ValueError("v2 必须冻结非空 sources")
-    digest = hashlib.sha256(json.dumps(sources, ensure_ascii=False, sort_keys=True,
-                                     separators=(",", ":")).encode()).hexdigest()
+    digest = json_sha256(sources)
     if payload.get("source_sha256") != digest:
         raise ValueError("sources 摘要不匹配")
     pages = {}

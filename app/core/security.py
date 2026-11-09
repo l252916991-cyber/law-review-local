@@ -318,6 +318,11 @@ def has_case_role(permission: str, case_id: int | None, roles: frozenset[str]) -
     return principal.has_for_case(permission, case_id)
 
 
+def is_case_reviewer(case_id: int) -> bool:
+    """A review action needs the approve permission *and* a review case role."""
+    return has_case_role("approve", case_id, REVIEW_ROLES)
+
+
 def require_case_role(permission: str, case_id: int, roles: frozenset[str], label: str) -> None:
     if not has_case_role(permission, case_id, roles):
         raise HTTPException(403, label)

@@ -18,6 +18,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app.core.digest import json_sha256
 from app.evaluation.answer_eval import (
     JUDGE_PROMPT_VERSION,
     evaluate_answers,
@@ -25,7 +26,7 @@ from app.evaluation.answer_eval import (
     load_dataset,
     valid_judge_payload,
 )
-from app.evaluation.answer_review import content_digest, human_agreement, review_manifest
+from app.evaluation.answer_review import human_agreement, review_manifest
 from scripts.validate_application_acceptance import isolated_environment, loopback_endpoint
 
 
@@ -138,7 +139,7 @@ def package_review(directory: Path, archive: Path) -> None:
     sample = json.loads(contents["sample-manifest.json"])
     blind = json.loads(contents["blind-review.json"])
     template = json.loads(contents["human-labels.template.json"])
-    expected = content_digest({key: value for key, value in sample.items() if key != "sample_sha256"})
+    expected = json_sha256({key: value for key, value in sample.items() if key != "sample_sha256"})
     ids = sample["sample_ids"]
     if (sample["sample_sha256"] != expected or len(ids) < 20 or len(set(ids)) != len(ids)
             or [item["id"] for item in blind["items"]] != ids

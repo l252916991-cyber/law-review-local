@@ -30,7 +30,7 @@ from app.cases.report_delivery import (
 from app.core.security import (
     REVIEW_ROLES,
     current_principal,
-    has_case_role,
+    is_case_reviewer,
     require_case_access,
     require_case_role,
     require_permission,
@@ -42,11 +42,6 @@ router = APIRouter(prefix="/api", tags=["reports"])
 REPORT_STATUSES = ("草稿", "待复核", "已退回", "已批准", "已作废")
 OPEN_STATUSES = ("草稿", "待复核", "已退回")
 REVIEW_ACTIONS = {"return", "approve", "void"}
-
-
-def _is_reviewer(case_id: int) -> bool:
-    """A review action needs the approve permission *and* a review case role."""
-    return has_case_role("approve", case_id, REVIEW_ROLES)
 
 
 def _load(conn, report_id: int):
@@ -134,7 +129,7 @@ def _payload(conn, row, current_hash: str, *, sheet_sha: str | None = None) -> d
             for item in events
         ],
         "can_edit": current_principal().has_for_case("edit", row["case_id"]),
-        "can_review": _is_reviewer(row["case_id"]),
+        "can_review": is_case_reviewer(row["case_id"]),
         "can_export": current_principal().has_for_case("export", row["case_id"]),
     }
 

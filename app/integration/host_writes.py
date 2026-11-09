@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.core.digest import canonical_json
 from app.core.security import auth_mode, configured_tokens, current_principal, oidc_settings
 from app.integration.runtime_ports import (
     DEFAULT_TENANT_ID,
@@ -40,7 +41,7 @@ MAX_WRITE_BYTES = 200_000
 
 def canonical(value: Any) -> str:
     try:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return canonical_json(value, allow_nan=False).decode("utf-8")
     except (TypeError, ValueError) as exc:
         raise ContractValidationError("payload must be finite JSON") from exc
 

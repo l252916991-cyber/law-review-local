@@ -27,12 +27,12 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.core.digest import json_sha256
 from app.core.security import require_case_access, require_permission
 from app.integration.forge_sources import statute_source, verify_statutes
 from app.integration.host_ports import (
     LocalHostReadPort,
     SnapshotChangedError,
-    canonical_digest,
     capture_case_rows,
     case_identity,
     memory_record_context,
@@ -142,7 +142,7 @@ class ReadonlyCaseSession:
         rows = self._capture()
         self._case_identity = case_identity(rows)
         self.corpus_identity, self._corpus = self._capture_corpus()
-        self.source_identity = canonical_digest({"case": self._case_identity, "corpus": self.corpus_identity})
+        self.source_identity = json_sha256({"case": self._case_identity, "corpus": self.corpus_identity})
         if request.data_snapshot_version and request.data_snapshot_version != self.source_identity:
             raise SnapshotChangedError("requested source snapshot is not current")
         self._temporary = tempfile.TemporaryDirectory(prefix="lexvault-m2-private-")

@@ -19,10 +19,10 @@ from pydantic import BaseModel, Field
 
 from app.core.security import (
     MANAGER_ROLES,
-    REVIEW_ROLES,
     ROLE_PERMISSIONS,
     current_principal,
     has_case_role,
+    is_case_reviewer,
     require_case_access,
 )
 from app.storage.db import connect, now, record_security_event, transaction
@@ -53,11 +53,6 @@ def _parse_due(value: str | None) -> str | None:
 def _is_manager(case_id: int) -> bool:
     """Managing people, dates and cancellation needs edit rights *and* 承办."""
     return has_case_role("edit", case_id, MANAGER_ROLES)
-
-
-def _is_reviewer(case_id: int) -> bool:
-    """Returning or completing a task is a review action, not just a role."""
-    return has_case_role("approve", case_id, REVIEW_ROLES)
 
 
 def _can_work(case_id: int, task: Any) -> bool:
@@ -131,7 +126,7 @@ def _task_payload(conn, row, *, today: str) -> dict[str, Any]:
         # The interface mirrors these server-side decisions; a hidden button is
         # never the authorization, only the explanation of a refused action.
         "can_manage": _is_manager(case_id),
-        "can_review": _is_reviewer(case_id),
+        "can_review": is_case_reviewer(case_id),
         "can_work": _can_work(case_id, row),
         "events": [
             {"action": item["action"], "actor": item["actor"], "note": item["note"],
@@ -306,7 +301,7 @@ def act_on_task(task_id: int, payload: TaskAction):
 
         if action in {"assign", "due", "cancel"} and not _is_manager(case_id):
             raise HTTPException(403, "需要编辑权限及案件负责人角色")
-        if action in {"return", "complete"} and not _is_reviewer(case_id):
+        if action in {"return", "complete"} and not is_case_reviewer(case_id):
             raise HTTPException(403, "需要审批确认权限及复核律师或案件负责人角色")
         if action in {"start", "submit"} and not _can_work(case_id, row):
             raise HTTPException(403, "需要编辑权限且为任务负责人或案件负责人")

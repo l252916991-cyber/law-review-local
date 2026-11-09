@@ -11,24 +11,18 @@ X1..Xn in a seeded order; the mapping lives in a separate key file.
 """
 from __future__ import annotations
 
-import hashlib
-import json
 import random
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
 
+from app.core.digest import json_sha256
 from app.evaluation.answer_eval import score_answer_v2
 
 BLIND_VERSION = "ablation-blind-v1"
 SAMPLE_RULE = "two-per-category-case-coverage-then-sha256-order-v1"
 MIN_SAMPLE = 20
 COLLECTION_MODES = ("real_model", "stub")
-
-
-def content_digest(value: Any) -> str:
-    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
-                                     separators=(",", ":")).encode()).hexdigest()
 
 
 def eligible_items(rows: Iterable[dict[str, Any]], groups: Iterable[str]) -> dict[str, int]:
@@ -61,14 +55,14 @@ def sample_ids(dataset: dict[str, Any], eligible: dict[str, int], size: int = MI
         raise ValueError(f"盲审样本至少 {MIN_SAMPLE} 题")
     if size > len(pool):
         raise ValueError(f"可用题目只有 {len(pool)} 道，少于要求的 {size} 道")
-    ordered = sorted(pool, key=lambda item: content_digest([dataset["source_sha256"], item["id"]]))
+    ordered = sorted(pool, key=lambda item: json_sha256([dataset["source_sha256"], item["id"]]))
     selected: list[str] = []
     for category in sorted({item["category"] for item in pool}):
         selected.extend(item["id"] for item in [row for row in ordered if row["category"] == category][:2])
     covered = {str(items[item_id].get("case_id")) for item_id in selected}
     remaining = [item for item in ordered if item["id"] not in selected]
     # A holdout spanning several cases should not be decided by one case alone.
-    remaining.sort(key=lambda item: (str(item.get("case_id")) in covered, content_digest(item["id"])))
+    remaining.sort(key=lambda item: (str(item.get("case_id")) in covered, json_sha256(item["id"])))
     selected.extend(item["id"] for item in remaining)
     return selected[:size]
 
@@ -89,7 +83,7 @@ def build_package(
         raise ValueError(f"未登记的采集方式：{collection_mode}")
     if collection_mode == "stub" and not allow_stub:
         raise ValueError("替身答案不能生成盲审包；确需演练请显式加 --allow-stub 并保留替身标记")
-    attempts_sha256 = content_digest(rows)
+    attempts_sha256 = json_sha256(rows)
     eligible = eligible_items(rows, groups)
     if not eligible:
         raise ValueError("没有三组都成功的题目，不能生成盲审包")
@@ -125,21 +119,21 @@ def build_package(
         "notice": ("三组答案已隐藏组别并随机呈现；请按要点完整性、无据断言、引用准确与正确拒答四项独立判断。"
                    + ("本包使用替身答案，只用于流程演练，不得作为质量证据。"
                       if collection_mode == "stub" else "")),
-        "dataset_sha256": content_digest(dataset), "attempts_sha256": attempts_sha256,
+        "dataset_sha256": json_sha256(dataset), "attempts_sha256": attempts_sha256,
         "groups_hidden": True, "sample_rule": SAMPLE_RULE, "items": review_items,
     }
     key = {"schema_version": 1, "blind_version": BLIND_VERSION,
-           "dataset_sha256": content_digest(dataset), "attempts_sha256": attempts_sha256,
+           "dataset_sha256": json_sha256(dataset), "attempts_sha256": attempts_sha256,
            "items": key_items,
-           "sample_sha256": content_digest([item["id"] for item in review_items])}
+           "sample_sha256": json_sha256([item["id"] for item in review_items])}
     review["sample_sha256"] = key["sample_sha256"]
     manifest = {
         "schema_version": 1, "blind_version": BLIND_VERSION, "collection_mode": collection_mode,
         "sample_rule": SAMPLE_RULE, "seed": seed, "groups": list(groups),
         "items": len(review_items), "cases": len({str(item.get("case_id")) for item in review_items}),
         "eligible_pool": len(eligible),
-        "dataset_sha256": content_digest(dataset), "attempts_sha256": attempts_sha256,
-        "review_sha256": content_digest(review), "key_sha256": content_digest(key),
+        "dataset_sha256": json_sha256(dataset), "attempts_sha256": attempts_sha256,
+        "review_sha256": json_sha256(review), "key_sha256": json_sha256(key),
         "notes": ["review.json 不含组别映射；key.json 单独保管",
                   "没有三组成功尝试的题目不进样本，也不补造答案"],
     }

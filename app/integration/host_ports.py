@@ -30,6 +30,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.core.digest import json_sha256
 from app.core.security import require_case_access, require_permission
 from app.integration.runtime_ports import (
     CATALOG_LIMIT_DEFAULT,
@@ -92,12 +93,6 @@ class SnapshotChangedError(RuntimeError):
     """The authorized source changed; the pinned snapshot must be rebuilt."""
 
 
-def canonical_digest(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
-    ).hexdigest()
-
-
 def capture_case_rows(
     case_id: int,
     *,
@@ -149,7 +144,7 @@ def capture_case_rows(
 
 def case_identity(rows: dict[str, list[dict[str, Any]]]) -> str:
     """Content identity of one authorized case snapshot."""
-    return canonical_digest(rows)
+    return json_sha256(rows)
 
 
 def _bounded_int(value: Any, *, name: str, default: int, minimum: int, maximum: int) -> int:

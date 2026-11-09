@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from app.core.digest import json_sha256
 from app.evaluation.ablation_review import (
     build_package,
-    content_digest,
     eligible_items,
     preview_scores,
     sample_ids,
@@ -78,7 +78,7 @@ def test_package_hides_groups_and_keeps_the_mapping_in_the_key():
         assert set(key["items"][entry["id"]]) == set(labels)
         assert sorted(key["items"][entry["id"]].values()) == ["A", "B", "C"]
     assert review["sample_sha256"] == key["sample_sha256"]
-    assert review["dataset_sha256"] == content_digest(dataset)
+    assert review["dataset_sha256"] == json_sha256(dataset)
 
 
 def test_label_order_is_seeded_and_may_differ_between_items():

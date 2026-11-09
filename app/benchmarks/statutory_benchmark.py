@@ -7,7 +7,7 @@ from statistics import mean
 from typing import Any
 
 from app.benchmarks.statutory_hybrid import MODES, StatutoryHybrid
-from app.benchmarks.statutory_index import digest
+from app.core.digest import json_sha256
 
 METRICS = ("hit_at_5", "mrr_at_10", "ndcg_at_10")
 
@@ -100,9 +100,9 @@ def evaluate(retriever: StatutoryHybrid, dataset: dict[str, Any], config: dict[s
                            "p95_ms": percentile([r["latency_ms"] for r in records], .95),
                            "embedding_calls_per_query": mean(r["embedding_calls"] for r in records),
                            "rerank_candidates_per_query": mean(r["rerank_candidates"] for r in records)}
-    identity = {"dataset_sha256": digest(dataset), "config_sha256": digest(config),
+    identity = {"dataset_sha256": json_sha256(dataset, allow_nan=False), "config_sha256": json_sha256(config, allow_nan=False),
                 "index_fingerprint": retriever.index.fingerprint,
-                "vectors_sha256": digest(retriever.index.vectors),
+                "vectors_sha256": json_sha256(retriever.index.vectors, allow_nan=False),
                 "retrieval": {"candidates": retriever.candidates, "rrf_k": retriever.rrf_k,
                               "soft_boost": retriever.soft_boost},
                 "embedding_model": getattr(retriever.embedding, "model", None),
@@ -128,9 +128,9 @@ def evaluate(retriever: StatutoryHybrid, dataset: dict[str, Any], config: dict[s
             and summaries[mode]["embedding_calls_per_query"] <= config["max_embedding_calls_per_query"]
             and summaries[mode]["rerank_candidates_per_query"] <= config["max_rerank_candidates_per_query"])
         comparisons[mode]["preset_gate_passed"] = False  # A single split can never promote.
-    return {"dataset_sha256": digest(dataset), "config_sha256": digest(config),
+    return {"dataset_sha256": json_sha256(dataset, allow_nan=False), "config_sha256": json_sha256(config, allow_nan=False),
             "experiment_identity": identity, "identity_complete": identity_complete,
-            "experiment_fingerprint": digest(identity), "primary_metric": "hit_at_5",
+            "experiment_fingerprint": json_sha256(identity, allow_nan=False), "primary_metric": "hit_at_5",
             "index_fingerprint": retriever.index.fingerprint, "split": split,
             "direction": config["direction"], "fixture": dataset.get("fixture", False),
             "gate_notice": "Preset acceptance thresholds, not demonstrated benefits",

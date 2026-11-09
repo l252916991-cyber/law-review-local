@@ -11,13 +11,9 @@ from operator import mul
 from pathlib import Path
 from typing import Any
 
+from app.core.digest import json_sha256
 from app.paths import APP_DIR
 from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus
-
-
-def digest(value: Any) -> str:
-    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False,
-                                     allow_nan=False, separators=(",", ":")).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -86,9 +82,9 @@ class StatutoryIndex:
         self.validity = json.loads(json.dumps(validity or {}, allow_nan=False))
         documents = json.loads(json.dumps(corpus.documents, allow_nan=False))
         parser_sha = hashlib.sha256((APP_DIR / "retrieval" / "legal_corpus.py").read_bytes()).hexdigest()
-        self.fingerprint = digest({"format": "statutory-index-v1", "manifest": corpus.manifest,
+        self.fingerprint = json_sha256({"format": "statutory-index-v1", "manifest": corpus.manifest,
                                    "documents": documents, "spec": asdict(spec),
-                                   "parser_sha256": parser_sha, "validity": self.validity})
+                                   "parser_sha256": parser_sha, "validity": self.validity}, allow_nan=False)
         self.rows: dict[str, dict[str, Any]] = {}
         self.documents: dict[str, dict[str, Any]] = {}
         for doc in documents:
@@ -125,7 +121,7 @@ class StatutoryIndex:
     def save(self, path: str | Path) -> None:
         payload = {"fingerprint": self.fingerprint,
                    "vectors": {key: list(value) for key, value in self.vectors.items()}}
-        Path(path).write_text(json.dumps({"payload": payload, "sha256": digest(payload)},
+        Path(path).write_text(json.dumps({"payload": payload, "sha256": json_sha256(payload, allow_nan=False)},
                                         allow_nan=False), encoding="utf-8")
 
     @classmethod
@@ -134,7 +130,7 @@ class StatutoryIndex:
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         payload = envelope["payload"]
         index = cls(corpus, spec, validity=validity)
-        if envelope["sha256"] != digest(payload) or payload["fingerprint"] != index.fingerprint:
+        if envelope["sha256"] != json_sha256(payload, allow_nan=False) or payload["fingerprint"] != index.fingerprint:
             raise ValueError("Statutory index cache mismatch")
         vectors = payload["vectors"]
         if vectors and set(vectors) != set(index.rows):

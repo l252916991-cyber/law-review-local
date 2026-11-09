@@ -37,6 +37,7 @@ from app.cases.exports import (
     csv_safe_cell,
     get_export_template,
 )
+from app.core.digest import json_sha256
 from app.core.files import contained_path, file_sha256, safe_filename
 from app.documents.bank_ledger import iter_bank_transactions
 from app.storage.db import SCHEMA_VERSION, connect, get_db_path, now, rowdict, transaction
@@ -198,20 +199,12 @@ def _hashed_source(source: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def canonical_bytes(payload: Any) -> bytes:
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-
-def digest(payload: Any) -> str:
-    return hashlib.sha256(canonical_bytes(payload)).hexdigest()
-
-
 def source_digest(source: dict[str, Any]) -> str:
-    return digest(_hashed_source(source))
+    return json_sha256(_hashed_source(source))
 
 
 def content_digest(body: dict[str, Any]) -> str:
-    return digest({
+    return json_sha256({
         "blocks": body["blocks"],
         "transactions": body["transactions"],
         "attachments": body["attachments"],

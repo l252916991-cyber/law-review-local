@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.core.digest import canonical_json
 from app.evaluation.answer_eval import SCORING_VERSION, load_dataset, score_answer_v2
 from app.review.review_collaboration import build_collaboration, review_appendix
 from app.storage.db import connect, db_scope, init_db
@@ -87,12 +88,8 @@ class Generation:
 Generator = Callable[[str, str, list[dict[str, Any]], str], Generation]
 
 
-def canonical(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-
 def digest(value: Any) -> str:
-    return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
+    return hashlib.sha256(value if isinstance(value, bytes) else canonical_json(value)).hexdigest()
 
 
 def load_batch_dataset(path: str | Path) -> dict[str, Any]:
