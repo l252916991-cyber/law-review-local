@@ -375,39 +375,6 @@ class StatutoryConflictAgent:
                 "warning": result.get("warning"), "needs_lawyer_review": result["status"] != "ok"}
 
 
-class AnalysisAgent:
-    """Compatibility facade exposing two analysis operations as tools."""
-
-    def __init__(self, case_id: int):
-        self.case_id = case_id
-
-    def analyze_contradiction(self, evidence_list: str) -> str:
-        lines = [line for line in evidence_list.splitlines() if line.strip()]
-        negatives = [line for line in lines if any(term in line for term in ContradictionAgent.NEGATIONS)]
-        positives = [line for line in lines if any(term in line for term in ContradictionAgent.ASSERTIONS)]
-        if negatives and positives:
-            return f"候选矛盾：{negatives[0]} ↔ {positives[0]}\n待质证：核验原页、时间与载体。"
-        return "未形成足够的跨来源矛盾对，请补充材料。"
-
-    def summarize_case_facts(self, evidence_list: str) -> str:
-        lines = [line.strip() for line in evidence_list.splitlines() if line.strip()]
-        return "## 已检索事实\n" + "\n".join(f"- {line}" for line in lines[:5])
-
-
-class CrossExaminationAgent:
-    def __init__(self, case_id: int, prefer_remote_embeddings: bool = True):
-        self.retrieval_agent = RetrievalAgent(case_id, prefer_remote_embeddings)
-
-    def cross_examine(self, statement: str, person: str) -> dict[str, Any]:
-        statements = self.retrieval_agent.retrieve_evidence(f"{person} 陈述 笔录 供述", "hybrid")
-        corroboration = self.retrieval_agent.retrieve_evidence(f"{statement} 流水 邮件 合同", "hybrid")
-        return {
-            "all_statements": statements,
-            "corroborating_evidence": corroboration,
-            "focus_statement": statement,
-        }
-
-
 class GapDetectionAgent:
     """证据疏漏检测 Agent
 
@@ -954,8 +921,6 @@ class LawReviewCoordinator:
         self.evidence_agent = EvidenceAgent()
         self.contradiction_agent = ContradictionAgent()
         self.gap_detection_agent = GapDetectionAgent(case_id)
-        self.analysis_agent = AnalysisAgent(case_id)
-        self.cross_exam_agent = CrossExaminationAgent(case_id, prefer_remote_embeddings)
         self.critic_agent = CriticAgent(case_id)
 
     def _start_run(self, question: str, route: str, *, context: dict[str, Any] | None = None) -> int:

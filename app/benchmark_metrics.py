@@ -157,56 +157,6 @@ def extract_gold_options(reference: str) -> set[str]:
     return set(stripped) if stripped and all(char in "ABCDE" for char in stripped) else set()
 
 
-def extract_labels(text: str, label_space: Iterable[str]) -> set[str]:
-    """改进的标签提取函数，支持更灵活的匹配"""
-    # Long labels first prevents a shorter label embedded in a longer one from
-    # being counted as a second, spurious prediction.
-    found: set[str] = set()
-    occupied: list[tuple[int, int]] = []
-
-    # 按长度降序排序标签，优先匹配较长的标签
-    sorted_labels = sorted(set(label_space), key=len, reverse=True)
-
-    for label in sorted_labels:
-        # 精确匹配
-        for match in re.finditer(re.escape(label), text):
-            span = match.span()
-            if not any(span[0] >= start and span[1] <= end for start, end in occupied):
-                found.add(label)
-                occupied.append(span)
-                break
-
-        # 如果没有精确匹配，尝试模糊匹配（去除空格、标点）
-        if label not in found:
-            # 规范化标签和文本用于模糊匹配
-            normalized_label = re.sub(r'[\s、,，;；。]', '', label)
-            normalized_text = re.sub(r'[\s、,，;；。]', '', text)
-
-            if normalized_label in normalized_text:
-                # 找到模糊匹配位置
-                pos = normalized_text.find(normalized_label)
-                # 估算原始文本中的位置（粗略）
-                if pos >= 0 and not any(
-                    pos >= start and pos + len(normalized_label) <= end
-                    for start, end in occupied
-                ):
-                    found.add(label)
-                    occupied.append((pos, pos + len(normalized_label)))
-
-    # 如果仍然没有找到，尝试关键词匹配
-    if not found and sorted_labels:
-        for label in sorted_labels:
-            # 提取标签中的关键词（超过2个字的词）
-            keywords = [word for word in jieba.cut(label) if len(word) >= 2]
-            if keywords:
-                # 如果文本包含标签的大部分关键词，认为匹配
-                matched = sum(1 for kw in keywords if kw in text)
-                if matched >= len(keywords) * 0.6:  # 60%关键词匹配
-                    found.add(label)
-
-    return found
-
-
 def split_reference_labels(task_id: str, reference: str) -> set[str]:
     """Parse labels using each task's declared output delimiter.
 
@@ -564,24 +514,3 @@ def score_prediction(
         return score_lexeval_item(prediction, reference)
     else:
         raise ValueError(f"不支持的数据集：{dataset}，仅支持 'lawbench' 或 'lexeval'")
-
-
-def extract_crime_amount(text: str) -> float | None:
-    """提取犯罪金额，处理千分位和单位"""
-    # 移除千分位逗号
-    text = text.replace(',', '').replace('，', '')
-
-    # 匹配数字 + 单位
-    match = re.search(r'([\d.]+)\s*(万|千)?元', text)
-    if match:
-        num = float(match.group(1))
-        unit = match.group(2)
-        if unit == '万':
-            num *= 10000
-        elif unit == '千':
-            num *= 1000
-        return num
-
-    # 回退: 纯数字
-    values = [float(x) for x in re.findall(r'\d+(?:\.\d+)?', text)]
-    return values[0] if len(values) == 1 else None

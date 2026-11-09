@@ -238,9 +238,6 @@ class Cursor:
             return []
         return self._cursor.fetchall()
 
-    def fetchmany(self, size: int = 1) -> list[Row]:
-        return [row for row in (self.fetchone() for _ in range(size)) if row is not None]
-
     def __iter__(self) -> Iterator[Row]:
         while (row := self.fetchone()) is not None:
             yield row

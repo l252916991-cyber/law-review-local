@@ -103,14 +103,6 @@ def load_batch_dataset(path: str | Path) -> dict[str, Any]:
     return dataset
 
 
-def dataset_case_ids(dataset: dict[str, Any]) -> list[int]:
-    """Cases referenced by the frozen items; the development set is a single case."""
-    ids = sorted({int(item.get("case_id", 1)) for item in dataset["items"]})
-    if not ids:
-        raise ValueError("数据集没有题目")
-    return ids
-
-
 def seed_dataset_cases(dataset: dict[str, Any]) -> dict[int, int]:
     """Create the authored holdout cases from the frozen dataset itself.
 

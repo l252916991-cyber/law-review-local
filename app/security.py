@@ -43,16 +43,6 @@ def _session_hash(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def _session_key(value: str) -> str:
-    return _session_hash(value)
-
-
-def _purge_sessions() -> None:
-    with transaction() as conn:
-        from .db import purge_expired_sessions
-        purge_expired_sessions(conn)
-
-
 def session_principal(value: str) -> Principal | None:
     if not value:
         return None
@@ -133,12 +123,6 @@ def identity_providers_configured() -> bool:
     except Exception as exc:
         logger.error("Member directory unavailable (%s)", type(exc).__name__)
         return False
-
-
-def oidc_session_principal(request_value: str) -> Principal | None:
-    # Compatibility helper retained for callers; all session kinds now resolve
-    # through the durable table and current authorization mappings.
-    return session_principal(request_value)
 
 
 logger = logging.getLogger(__name__)

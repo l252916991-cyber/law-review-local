@@ -15,8 +15,6 @@ from typing import cast
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("LAW_REVIEW_DATA_DIR", ROOT / "data"))
-UPLOAD_DIR = DATA_DIR / "uploads"
-EXPORT_DIR = DATA_DIR / "exports"
 DB_PATH = DATA_DIR / "law_review.db"
 _INITIAL_DB_PATH = DB_PATH
 _scoped_db: ContextVar[Path | None] = ContextVar("lexvault_db", default=None)

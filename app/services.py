@@ -1135,11 +1135,6 @@ def last_llm_usage() -> dict[str, Any] | None:
 _active_turn_key: ContextVar[str | None] = ContextVar("lexvault_active_turn_key", default=None)
 
 
-def current_turn_key() -> str | None:
-    """The logical-question key for calls made inside the current turn."""
-    return _active_turn_key.get()
-
-
 def _account_llm_call(
     case_id: int,
     kind: str,
@@ -1758,7 +1753,6 @@ def csv_safe_cell(value: Any) -> Any:
 
 EXPORT_RENDERER_VERSION = "export-blocks-v1"
 DEFAULT_EXPORT_BLOCKS = BUILTIN_EXPORT_TEMPLATES[0]["blocks"]
-EXPORT_BLOCK_TYPES = ("case_summary", "catalog_csv", "evidence_table", "qa_log", "static_markdown", "attachments")
 _TEXT_BLOCK_EXT = {"case_summary": ".md", "qa_log": ".md", "static_markdown": ".md", "catalog_csv": ".csv", "evidence_table": ".csv"}
 
 

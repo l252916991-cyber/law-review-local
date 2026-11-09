@@ -39,7 +39,7 @@ def test_native_baseline_identifies_reviewed_snapshot_without_claiming_an_old_co
 
     identity = native_baseline_identity()
     assert identity["schema_version"] == 2
-    assert identity["revision"] == "specialist-review-v11"
+    assert identity["revision"] == "specialist-review-v12"
     # A re-registered baseline must carry its review note, not just new hashes.
     assert "PROMPT_VERSION" in identity["review_note"]
     assert identity["source_commit"] == "31a811c92acae30caf82c9c5109ce812bd99bb04"

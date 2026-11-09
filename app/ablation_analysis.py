@@ -254,8 +254,3 @@ def analyse(
             "规则降级在受控对照中表现为 model_unavailable/timeout/transport_error，记为未通过，不进入通过率分子",
         ],
     }
-
-
-def main_report(path: str | Path, baseline: str, compare: str, *, iterations: int = DEFAULT_ITERATIONS,
-                seed: int = DEFAULT_SEED) -> dict[str, Any]:
-    return analyse(load_attempts(path), baseline, compare, iterations=iterations, seed=seed)
