@@ -51,7 +51,7 @@ Model functions require an explicitly configured compatible local endpoint and a
 ```sh
 uv run --locked ruff check app tests scripts
 uv run --locked mypy
-uv run --locked python scripts/build_answer_eval.py
+uv run --locked python scripts/evaluation/build_answer_eval.py
 pnpm --dir frontend contract:check
 pnpm --dir frontend typecheck
 pnpm --dir frontend lint

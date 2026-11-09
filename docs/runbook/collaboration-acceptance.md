@@ -2,7 +2,7 @@
 
 适用范围：一家律所内部、单组织、单实例部署的协同阅卷首版。本文给出可执行的验收步骤与判定口径；不构成对真实案件试点、法律质量或等保合规的结论。
 
-配套工具：[`scripts/collaboration_acceptance.py`](../../scripts/collaboration_acceptance.py)（只读检查）与 [`scripts/data_snapshot.py`](../../scripts/data_snapshot.py)（停写备份/恢复）。
+配套工具：[`scripts/acceptance/collaboration_acceptance.py`](../../scripts/acceptance/collaboration_acceptance.py)（只读检查）与 [`scripts/ops/data_snapshot.py`](../../scripts/ops/data_snapshot.py)（停写备份/恢复）。
 
 ## 1. 验收前置
 
@@ -14,7 +14,7 @@
 ## 2. 只读检查
 
 ```sh
-uv run --locked python -m scripts.collaboration_acceptance --data-dir /path/to/data
+uv run --locked python -m scripts.acceptance.collaboration_acceptance --data-dir /path/to/data
 ```
 
 可选参数：
@@ -66,15 +66,15 @@ uv run --locked python -m scripts.collaboration_acceptance --data-dir /path/to/d
 
 ```sh
 # 停止 API 与 worker 后执行
-uv run --locked python -m scripts.collaboration_acceptance \
+uv run --locked python -m scripts.acceptance.collaboration_acceptance \
   --data-dir /path/to/data --backup-drill /tmp/lexvault-drill --quiescent
 ```
 
 脚本会：备份到 `DIR/backup` → 校验清单与哈希 → 恢复到 `DIR/restored` → 运行完整性/外键检查 → 比对双方都存在的业务表行数 → 核对已批准报告的冻结工件。缺失的表单列为 `restore_schema` 警告（旧 schema 未迁移），不会中断演练。恢复耗时写入 `backup_drill` 明细，作为恢复时间的实测基线。演练产物可保留为证据，但不得含真实案件材料对外流转。
 
-恢复实例的真实启动与业务验证（登录、权限、任务、报告、下载）属于人工验收，脚本只覆盖数据与工件层；`scripts/data_snapshot.py restore` 产出的 `RESTORE_REPORT.json` 用于配置恢复进程的 `LAW_REVIEW_DATA_DIR` 与 checkpoint 路径。
+恢复实例的真实启动与业务验证（登录、权限、任务、报告、下载）属于人工验收，脚本只覆盖数据与工件层；`scripts/ops/data_snapshot.py restore` 产出的 `RESTORE_REPORT.json` 用于配置恢复进程的 `LAW_REVIEW_DATA_DIR` 与 checkpoint 路径。
 
-恢复真实环境仍使用 `scripts/data_snapshot.py restore`，并在恢复后执行一次只读检查确认 `schema_version`、`integrity` 与行数。
+恢复真实环境仍使用 `scripts/ops/data_snapshot.py restore`，并在恢复后执行一次只读检查确认 `schema_version`、`integrity` 与行数。
 
 ## 4. 人工业务验收（五个身份）
 
@@ -117,7 +117,7 @@ uv run --locked python -m scripts.collaboration_acceptance \
 3. 批准只作用于复核人实际预览的冻结版本：批准前再次校验冻结文件、附件字节与来源摘要。并发批准/退回使用状态与 `row_version` 条件更新，只有一个成功，其余返回冲突。
 4. 正式下载读取指定报告版本的冻结字节，不再从活动表拼接正文。清单 `清单.json` 登记报告 ID/版本、`content_hash`、`source_hash`、冻结版本号、批准记录、冻结文件摘要与包内实际文件摘要；期间作废、撤权或依据变化会拒绝登记并返回失败。
 5. 以下情况要求重新准备并审批新版本：案件信息、材料正文/目录、证据、纳入的问答、资金流水、同一模板的区块或静态正文发生变化。未选择问答区块的报告不依赖聊天内容。
-6. 冻结工件存放在数据目录 `report_versions/case-<案件>/report-<报告>-<序号>-<随机>/`，数据库只保存相对路径，随 `scripts/data_snapshot.py` 一并备份/恢复；恢复到新目录后仍可正常预览与下载。目录是受保护数据，不提供静态下载地址。
+6. 冻结工件存放在数据目录 `report_versions/case-<案件>/report-<报告>-<序号>-<随机>/`，数据库只保存相对路径，随 `scripts/ops/data_snapshot.py` 一并备份/恢复；恢复到新目录后仍可正常预览与下载。目录是受保护数据，不提供静态下载地址。
 7. 历史上批准但没有冻结正文的报告保留批准人与事件，但不能正式导出：需要重新准备、冻结并批准。冻结中断或工件缺失时，预览、批准与下载都会明确失败，不会伪造成功。
 8. 本批不自动清理历史工件。空间预算按每案「渲染文件总量 × 复核轮次」估算，超过保留期由运维按记录手工归档。
 
@@ -139,7 +139,7 @@ uv run --locked python -m scripts.collaboration_acceptance \
 |---|---|---|
 | `/api/ready`、`legal_verification=unavailable` | 每 5 分钟 | 法条语料缺失只降级核验；接口连续失败通知交付接收人并暂停签发 |
 | 数据目录剩余空间 < 2 GiB | 每小时 | 停止批量导入、清理旧导出包、扩容后复核 |
-| `python -m scripts.collaboration_acceptance --data-dir ... --multi-user` | 每日（只读，可随时执行） | 出现 `FAIL` 时按检查名定位；`multi_user` 失败说明身份模式退回单用户 |
+| `python -m scripts.acceptance.collaboration_acceptance --data-dir ... --multi-user` | 每日（只读，可随时执行） | 出现 `FAIL` 时按检查名定位；`multi_user` 失败说明身份模式退回单用户 |
 | 备份任务与恢复演练 | 每日备份、每月演练一次 | 备份失败当日重试；演练失败保留目录并记录责任人 |
 | 登录失败与 `security_events` 中 `denied` 增长 | 每日 | 核对来源与成员状态，必要时停用成员并轮换令牌 |
 | 已批准报告“依据已变化”后长期未重新签发 | 每周 | 通知承办律师重新准备、冻结并复核 |

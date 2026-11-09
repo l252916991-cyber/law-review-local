@@ -1,25 +1,25 @@
 # 评测协议与入口
 
-统一模型评测入口是 `unified_benchmark_runner.py --help`。旧 `simple_benchmark.py`、`model_benchmark.py`、`comprehensive_benchmark.py`、各 `run_*test*`/`rescore_*` 属于历史实验，保留原件，不作为新实验推荐入口。2026-09-05 的 1,000 题已按[测试计划](../../BENCHMARK_TEST_PLAN.md)完成，原始记录和评分审计分目录保存。
+统一模型评测入口是 `scripts/benchmarks/unified_benchmark_runner.py --help`。旧 `simple_benchmark.py`、`model_benchmark.py`、`comprehensive_benchmark.py`、各 `run_*test*`/`rescore_*` 属于历史实验，保留原件，不作为新实验推荐入口。2026-09-05 的 1,000 题已按[测试计划](benchmark-test-plan.md)完成，原始记录和评分审计分目录保存。
 
 统一 runner 在评分前对 2-1/2-7/2-9/3-8 的成功响应应用 `app/benchmark_postprocess.py` 的无参考答案规则（2-1 恢复源句标点与句尾形式；2-7 取有界导语摘要；2-9 按公开事件本体词表标注；3-8 去除 Markdown 标记并恢复题面要求的「回答→法律依据」结构）；2-10 因实测增益为噪声（15 升 16 降）未启用。1-1 需要法条库，传 `--corpus-dir <法条库>`（可重复）后才会在评分前用官方法条正文替换模型输出；不传则保持模型原始输出。同一参数会默认启用[3-2 词法 RAG 采纳协议](3-2-lexical-rag-adoption-20260913.md)；`--disable-3-2-rag` 提供同 solver 的无检索配对控制路径，未提供语料时 3-2 保留旧路径。`prediction` 是评分文本，处理、检索、路由、实际请求和有效配置均逐题保存。manifest 冻结任务范围、版本、路由、后处理与检索源码哈希、语料目录及文件哈希；旧 manifest、语料变更或缺失溯源的检查点不能续跑为新配置，请使用新运行目录。
 
-已完成实验的评分修正入口为 `python scripts/audit_benchmark.py <原运行目录> <新的审计目录>`。它不调用模型、不覆盖旧产物，对新旧同题回答统一重评，记录逐题变化、源文件哈希与分层配对 bootstrap 区间。默认 `verify_benchmark_run.py` 同时要求源码版本和评分复算一致；源码升级后，可使用 `--artifacts-only` 验证历史文件完整性，但该模式不验证历史评分正确性，不能冒充完整评分复算。
+已完成实验的评分修正入口为 `python scripts/benchmarks/audit_benchmark.py <原运行目录> <新的审计目录>`。它不调用模型、不覆盖旧产物，对新旧同题回答统一重评，记录逐题变化、源文件哈希与分层配对 bootstrap 区间。默认 `scripts/benchmarks/verify_benchmark_run.py` 同时要求源码版本和评分复算一致；源码升级后，可使用 `--artifacts-only` 验证历史文件完整性，但该模式不验证历史评分正确性，不能冒充完整评分复算。
 
-离线重放确定性后处理的入口为 `python scripts/postprocess_audit.py <原运行目录> <新的审计目录> [--corpus-dir <法条库> ...] [--charge-canonicalization]`：
+离线重放确定性后处理的入口为 `python scripts/benchmarks/postprocess_audit.py <原运行目录> <新的审计目录> [--corpus-dir <法条库> ...] [--charge-canonicalization]`：
 在已保存回答上应用 `app/benchmark_postprocess.py` 的无参考答案规则后重新评分，逐题保留原预测与原分数。
 默认重放 2-1/2-7/2-9/2-10；提供 `--corpus-dir` 后额外重放 1-1 的精确条文策略（检索只用题面）。
 `--charge-canonicalization` 是诊断选项，会把 3-3 本体外罪名按唯一超串映射回本体，属评分口径放宽，须与严格分分列。
 
-法条库覆盖与补库工作单入口为 `python scripts/lawbench_coverage.py --run <运行目录> --corpus-dir <法条库> ...`：
-只读题面统计 1-1 的精确命中率，并把未覆盖题写成 `scripts/build_npc_corpus.py --campaign` 可直接消费的 `inputs.jsonl`。
+法条库覆盖与补库工作单入口为 `python scripts/benchmarks/lawbench_coverage.py --run <运行目录> --corpus-dir <法条库> ...`：
+只读题面统计 1-1 的精确命中率，并把未覆盖题写成 `scripts/corpus/build_npc_corpus.py --campaign` 可直接消费的 `inputs.jsonl`。
 
 实测收益、已证伪手段与剩余差距见[均分提升实测与路线图](score-uplift-20260909.md)。
 
 项目 RAG 回归入口为：
 
 ```sh
-uv run --locked python rag_project_benchmark.py \
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py \
   --embedding-mode hashed-local --reranker off \
   --output-dir output/rag-240-v2-hashed
 ```

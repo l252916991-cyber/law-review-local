@@ -291,7 +291,7 @@ G3 放行：对新的组织、实例、数据规模和故障域重新做隔离�
 | [security.py](/Users/xiaoy/law-review-local/app/core/security.py:52) / [review_jobs.py](/Users/xiaoy/law-review-local/app/review/review_jobs.py:23) | 配置凭证、案件授权、任务边界 |
 | [legal_corpus.py](/Users/xiaoy/law-review-local/app/retrieval/legal_corpus.py:164) | 法条版本选择及来源字段 |
 | [pyproject.toml](/Users/xiaoy/law-review-local/pyproject.toml:51) / [CI](/Users/xiaoy/law-review-local/.github/workflows/test.yml) | 已配置门槛、检查范围及运行环境 |
-| [data_snapshot.py](/Users/xiaoy/law-review-local/scripts/data_snapshot.py:128) / [发布手册](release.md) | 停写备份、恢复对象、排除项 |
+| [data_snapshot.py](/Users/xiaoy/law-review-local/scripts/ops/data_snapshot.py:128) / [发布手册](release.md) | 停写备份、恢复对象、排除项 |
 | [历史验收](validation-20260905.md) | 带日期的工程、浏览器和模型验证记录；本次未重跑 |
 | [模型实验计划](../benchmarks/SCORE_85_PLAN.md) | 区分模型开发/锚点验证与应用验收 |
 

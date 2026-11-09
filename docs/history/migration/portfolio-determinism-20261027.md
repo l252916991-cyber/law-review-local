@@ -33,7 +33,7 @@ critical_types = ("询问笔录", "银行流水", "合同")
 
 ## 3. 身份重登记
 
-`app/evaluation/model_comparison.py` 的摘要门禁覆盖 `agents.py`，因此按计划第 4.1 节“若修改其受检算法，显式登记新身份，旧结果不被覆盖”处理：
+`app/model_comparison.py` 的摘要门禁覆盖 `agents.py`，因此按计划第 4.1 节“若修改其受检算法，显式登记新身份，旧结果不被覆盖”处理：
 
 | 项 | 值 |
 |---|---|

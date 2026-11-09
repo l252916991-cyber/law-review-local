@@ -16,7 +16,7 @@
 ## 1. 干净机器安装
 
 ```sh
-uv run --locked python scripts/doctor.py
+uv run --locked python scripts/ops/doctor.py
 docker version
 docker build --pull --tag lexvault-local:<git-sha> .
 docker compose config --quiet

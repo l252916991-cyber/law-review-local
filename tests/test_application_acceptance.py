@@ -7,14 +7,14 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.validate_application_acceptance import loopback_endpoint, main
+from scripts.acceptance.validate_application_acceptance import loopback_endpoint, main
 
 
 def test_subprocess_mcp_probe_isolated_and_offline_by_default():
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "report.json"
         with patch.dict(os.environ, {"LAW_REVIEW_DATA_DIR": directory}), \
-                patch("scripts.validate_application_acceptance.live_models", side_effect=AssertionError("no live opt-in")):
+                patch("scripts.acceptance.validate_application_acceptance.live_models", side_effect=AssertionError("no live opt-in")):
             assert main(["--output", str(output)]) == 0
             assert os.environ["LAW_REVIEW_DATA_DIR"] == directory
         report = json.loads(output.read_text())

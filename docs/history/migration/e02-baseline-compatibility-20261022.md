@@ -46,7 +46,7 @@
 
 | 层 | 版本/结构 | 兼容规则 | 回滚 |
 | --- | --- | --- | --- |
-| LexVault 业务库 | schema **v15**（`SCHEMA_VERSION`，`app/storage/db.py:379`） | v13→v14（`runtime_requests` 映射表）→v15（`request_digest`/`principal_name` 绑定列）增量迁移；高版本拒绝降级 | 旧代码（≤v13）打开 v15 库按既有防降级拒绝；回滚需恢复备份 + `output/migration/m0-baseline-20261021/pre-change/` 文件级回滚基线 |
+| LexVault 业务库 | schema **v15**（`SCHEMA_VERSION`，`app/db.py:379`） | v13→v14（`runtime_requests` 映射表）→v15（`request_digest`/`principal_name` 绑定列）增量迁移；高版本拒绝降级 | 旧代码（≤v13）打开 v15 库按既有防降级拒绝；回滚需恢复备份 + `output/migration/m0-baseline-20261021/pre-change/` 文件级回滚基线 |
 | LexVault 运行表 | `agent_runs`/`agent_steps`/`review_jobs`/`memory`/`gap_detections`/`audit_log` | 执行状态仍由这些表单一拥有；框架映射表只做关联（M1 契约 §5） | 同上 |
 | LangGraph 检查点 | 独立 SQLite（`LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB`） | 线程 ID `agent-run-{run_id}`；恢复前校验案件/线程/问题一致 | 与业务库同目录备份 |
 | ForgeHarness SDK | SDK API **1**（当前绑定 wheel） | 公共 SDK 按框架兼容策略演进，新候选重新资格化 | 发行物按 sha256 指认，不覆盖旧件 |

@@ -22,8 +22,8 @@
 
 | 编号 | 当前问题 | 基线依据 | 交付影响 |
 |---|---|---|---|
-| F1 | 报告及任务复核只判断承办/复核角色，没有同时检查成员的实际审批权限 | `app/cases/case_reports.py` 的 `_is_reviewer`、`app/cases/human_tasks.py` 的 `_is_reviewer`；相关 PATCH 中间件只要求 `view` | 被撤去 `approve` 但仍保留角色的成员存在继续复核的路径 |
-| F2 | 批准依据不包含完整交付正文，报告模板与导出模板未绑定 | `app/cases/report_basis.py:basis_snapshot` 仅含案件/材料/证据；`app/services.py:build_export_package` 独立读取请求模板和当前问答；前端创建报告未传选中的模板 | 换模板、改模板静态正文或新增问答后，新内容可能沿用旧批准记录导出 |
+| F1 | 报告及任务复核只判断承办/复核角色，没有同时检查成员的实际审批权限 | `app/case_reports.py` 的 `_is_reviewer`、`app/human_tasks.py` 的 `_is_reviewer`；相关 PATCH 中间件只要求 `view` | 被撤去 `approve` 但仍保留角色的成员存在继续复核的路径 |
+| F2 | 批准依据不包含完整交付正文，报告模板与导出模板未绑定 | `app/report_basis.py:basis_snapshot` 仅含案件/材料/证据；`app/services.py:build_export_package` 独立读取请求模板和当前问答；前端创建报告未传选中的模板 | 换模板、改模板静态正文或新增问答后，新内容可能沿用旧批准记录导出 |
 | F3 | 导出正文、批准记录、依据、模板和流水分次读取，没有统一的数据快照 | `app/services.py:build_export_package`、`iter_bank_transactions` | 并发修改或批准新报告时，包内正文与批准版本可能不一致 |
 | F4 | 完整工程检查证据不足 | 原计划第 12 节仅记录 `pytest -q`；M2 因缺 `LAW_REVIEW_FORGE_PYTHON` 跳过 | 无法据此确认实际框架进程、分支覆盖率、工程脚本和最终发布范围通过 |
 | F5 | 巡检通过与部署通过尚未严格分层 | `scripts/collaboration_acceptance.py`；`local`/缺 OCR 可仅警告，模型只探测 `/models`，恢复仅比对六表行数 | 退出码 0 不能证明多人权限、推理、页面和恢复后业务可用 |

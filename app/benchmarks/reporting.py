@@ -66,7 +66,7 @@ def atomic_json(path: Path, value: object) -> None:
 
 def source_hashes() -> dict:
     return {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in (
-        "unified_benchmark_runner.py", "app/benchmarks/metrics.py", "app/benchmarks/reporting.py", "app/benchmarks/lawbench.py",
+        "scripts/benchmarks/unified_benchmark_runner.py", "app/benchmarks/metrics.py", "app/benchmarks/reporting.py", "app/benchmarks/lawbench.py",
         "app/benchmarks/solver.py", "app/benchmarks/rag_solver.py", "app/benchmarks/postprocess.py",
         "app/benchmarks/retrieval.py", "app/retrieval/legal_corpus.py",
     )}

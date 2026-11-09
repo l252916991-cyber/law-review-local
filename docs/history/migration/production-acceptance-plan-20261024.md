@@ -6,9 +6,9 @@
 
 ## 1. 当前实现与进入条件
 
-`app/integration/candidate_domain.py::CandidateDeployment` 只接受新建的 acceptance 数据库，固定部署版本、数据库文件身份、案件范围和容量；它没有收养现有库或开启生产的开关。`DomainHostWritePort` 已有领域来源校验、六类动作和持久回执。`IsolatedHostIntegration` 已有稳定映射、框架状态查询、投影、准入与 worker lease，但未接正式 `review_jobs` 或 HTTP 后台路由。
+`app/candidate_domain.py::CandidateDeployment` 只接受新建的 acceptance 数据库，固定部署版本、数据库文件身份、案件范围和容量；它没有收养现有库或开启生产的开关。`DomainHostWritePort` 已有领域来源校验、六类动作和持久回执。`IsolatedHostIntegration` 已有稳定映射、框架状态查询、投影、准入与 worker lease，但未接正式 `review_jobs` 或 HTTP 后台路由。
 
-公开真实案例的只读开发对照只覆盖相应材料和隔离库。既有演示库为 schema v13，本次仅作只读清点；升级和写入验收需在新副本执行。当前应用 schema 版本与迁移步骤以 `app/storage/db.py` 的最终实现为准，不沿用旧部署手册的 v6→v7 示例作本批验收。
+公开真实案例的只读开发对照只覆盖相应材料和隔离库。既有演示库为 schema v13，本次仅作只读清点；升级和写入验收需在新副本执行。当前应用 schema 版本与迁移步骤以 `app/db.py` 的最终实现为准，不沿用旧部署手册的 v6→v7 示例作本批验收。
 
 | 进入条件 | 要登记的实际值 | 当前状态 |
 | --- | --- | --- |

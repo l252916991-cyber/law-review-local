@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.demo_identity_report import build_report, frontend_binding, git_state, main
+from scripts.ops.demo_identity_report import build_report, frontend_binding, git_state, main
 
 ROOT = Path(__file__).resolve().parents[1]
 

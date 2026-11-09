@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from scripts.capacity_smoke import (
+from scripts.acceptance.capacity_smoke import (
     Counter,
     Result,
     _new_client,

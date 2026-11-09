@@ -68,7 +68,7 @@ def resolve_framework_python(explicit: str | Path | None = None) -> Path:
     if not raw:
         raise UnsupportedCapabilityError(
             "framework interpreter is not configured; set LAW_REVIEW_FORGE_PYTHON to the "
-            "separately installed Python 3.12 environment (scripts/setup_framework.py)"
+            "separately installed Python 3.12 environment (scripts/ops/setup_framework.py)"
         )
     path = Path(raw).expanduser()
     if not path.is_file():

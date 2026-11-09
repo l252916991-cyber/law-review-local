@@ -35,15 +35,15 @@
 
 | 能力 | 位置 | 现状 | 缺口 |
 |---|---|---|---|
-| 案件隔离 | `app/core/security.py:191`、`app/core/security.py:196` | 按 `case_ids` 过滤，越权返回 404 | 授权只能写在环境配置里 |
-| 权限矩阵 | `app/core/security.py:95`、`app/core/security.py:205` | 五类权限，中间件按方法与路径推导 | 无可视化管理；`manage` 是全局唯一管理员，无"案件负责人" |
-| 会话 | `app/core/security.py:56`、`app/core/security.py:357` | 服务端不透明会话，8 小时过期、空闲 30 分钟、注销吊销 | 身份平台停用账号不等于本系统会话立即失效；无人员级撤权 |
+| 案件隔离 | `app/security.py:191`、`app/security.py:196` | 按 `case_ids` 过滤，越权返回 404 | 授权只能写在环境配置里 |
+| 权限矩阵 | `app/security.py:95`、`app/security.py:205` | 五类权限，中间件按方法与路径推导 | 无可视化管理；`manage` 是全局唯一管理员，无"案件负责人" |
+| 会话 | `app/security.py:56`、`app/security.py:357` | 服务端不透明会话，8 小时过期、空闲 30 分钟、注销吊销 | 身份平台停用账号不等于本系统会话立即失效；无人员级撤权 |
 | 证据审批 | `app/main.py:986`、`app/main.py:1024` | 确认时记录审批人；改内容自动回到待复核 | 保存不校验版本，后写覆盖先写 |
 | 材料目录纠错 | `app/main.py:827` | 可改类型/人员/时间/摘要/状态 | 审计只记文件名；页码原文不可纠错 |
 | 案件信息 | `app/main.py:574`、`app/main.py:649` | 建案后只能归档/回收/恢复 | **没有任何修改入口**（标题、案号、当事人、类型、说明） |
 | 流水 | `app/services.py:199`、`app/services.py:1686` | 列表分页上限 500 | 统计、图谱、导出都只取前 500 条 |
 | 导出 | `app/services.py:1612`、`app/services.py:1656` | 正式交付仅校验模板必选块有数据 | 无报告级复核、无版本绑定、无签发人 |
-| 后台任务 | `app/review/review_jobs.py` | AI 阅卷任务队列与执行器 | 不是人员任务；无指派、期限、提交/退回 |
+| 后台任务 | `app/review_jobs.py` | AI 阅卷任务队列与执行器 | 不是人员任务；无指派、期限、提交/退回 |
 | 部署 | `scripts/data_snapshot.py`、`docs/runbook/deployment-acceptance.md` | 备份与验收清单存在 | 清单未与代码/环境核对，缺可执行检查 |
 
 ## 4. 已确认缺陷（P0，先修）
@@ -54,7 +54,7 @@
 | D2 | 流水超过 500 条时统计与导出不完整 | `app/services.py:1686` 导出取 `limit=500`；`app/services.py:215`、`app/services.py:229` 同样只算前 500 条 | 大额案件导出缺失流水，`清单.json` 的 `transaction_count` 与哈希覆盖范围不符 |
 | D3 | 案件信息不可修改 | 无 `PATCH /api/cases/{id}`，前端无入口 | 录错案号/当事人只能重建案件，破坏案件 ID 与审计连续性 |
 | D4 | 材料纠错不完整 | `app/main.py:827` 仅目录字段；`app/main.py:843` 审计只记文件名 | OCR 错字无法修正（直接污染检索与引用）；纠错无前后值、无失效传播 |
-| D5 | 人员停用不终止会话 | `app/core/security.py:56` 每次请求重读配置，但身份平台停用不发信号 | 离职人员最多可继续使用 8 小时 |
+| D5 | 人员停用不终止会话 | `app/security.py:56` 每次请求重读配置，但身份平台停用不发信号 | 离职人员最多可继续使用 8 小时 |
 
 ## 5. 目标模型
 
@@ -140,7 +140,7 @@
 
 ## 8. 数据与迁移
 
-- 只做增量：新增表 + `ALTER TABLE ... ADD COLUMN ... DEFAULT`，沿用 `app/storage/db.py` 的有序迁移与 `user_version` 拒绝未来 schema 的策略。
+- 只做增量：新增表 + `ALTER TABLE ... ADD COLUMN ... DEFAULT`，沿用 `app/db.py` 的有序迁移与 `user_version` 拒绝未来 schema 的策略。
 - `version` 列默认 1，历史行不需要回填；更新语句 `SET version = version + 1, ... WHERE id = ? AND version = ?`。
 - 删除成员不物理删除历史记录，改为 `active = 0` 并保留审计与任务历史。
 - 导出 `清单.json` 增加 `report`、`evidence_versions`、`schema_version` 提升说明，旧包仍可读。
@@ -186,7 +186,7 @@
 |---|---|
 | `e52af15` | 本计划书与文档索引 |
 | `2e57cce` | D2：流水汇总、资金链路图与导出覆盖全部记录（620 条回归，含清单哈希复算） |
-| `6679b71` | D1/D3/D4：schema v22 版本列、`app/core/audit_trail.py` 字段级审计、`PATCH /api/cases/{id}`、单页原文纠错与审批失效 |
+| `6679b71` | D1/D3/D4：schema v22 版本列、`app/audit_trail.py` 字段级审计、`PATCH /api/cases/{id}`、单页原文纠错与审批失效 |
 | `0721da9` | 前端接入：证据与目录冲突提示、案件信息编辑、原文纠错、审计摘要 |
 
 已完成行为（与第 4 节逐项对应）：

@@ -1,6 +1,6 @@
 import json
 
-from scripts.build_npc_corpus import TITLE_OVERRIDES, canonical_law_name, extract_document, requested_laws
+from scripts.corpus.build_npc_corpus import TITLE_OVERRIDES, canonical_law_name, extract_document, requested_laws
 
 
 def _line(text):
@@ -84,7 +84,7 @@ def test_constitution_maps_to_official_consolidated_title():
 
 
 def test_candidate_titles_try_both_prefix_forms():
-    from scripts.build_npc_corpus import _candidate_titles
+    from scripts.corpus.build_npc_corpus import _candidate_titles
 
     # Administrative regulations are usually published without the prefix...
     assert _candidate_titles("工伤保险条例") == ["工伤保险条例", "中华人民共和国工伤保险条例"]
@@ -138,7 +138,7 @@ def test_repair_is_rejected_when_it_would_not_match_the_official_tree():
 
 def test_chinese_article_numbers_round_trip_through_the_shared_parser():
     from app.retrieval.legal_corpus import article_number
-    from scripts.build_npc_corpus import _chinese_number
+    from scripts.corpus.build_npc_corpus import _chinese_number
 
     for value in (1, 10, 12, 20, 100, 105, 110, 218, 999):
         assert article_number(_chinese_number(value)) == value
@@ -186,7 +186,7 @@ def test_inline_alignment_is_rejected_when_an_article_is_missing():
 
 def test_article_numbers_above_one_hundred_use_the_legal_spelling():
     from app.retrieval.legal_corpus import article_number
-    from scripts.build_npc_corpus import _chinese_number
+    from scripts.corpus.build_npc_corpus import _chinese_number
 
     assert _chinese_number(110) == "一百一十"
     assert _chinese_number(111) == "一百一十一"

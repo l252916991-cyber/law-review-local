@@ -23,7 +23,7 @@
 | 完成度 | 10,000 / 10,000，0 技术失败，18 解析失败，7 截断 |
 | 混合均分 | **58.45%** |
 | 时延 | 均 2.29s，p50 1.56s，p95 5.73s |
-| 校验 | `verify_benchmark_run.py`：`scoring_verified=true`、`live_source_matches=true` |
+| 校验 | `scripts/benchmarks/verify_benchmark_run.py`：`scoring_verified=true`、`live_source_matches=true` |
 | 关键任务 | 1-1 26.68、3-2 35.65、3-4 86.17、3-5 85.78、2-9 83.53、3-8 20.35 |
 
 ## 3. 与 2026-09-14「63.32%」的分解

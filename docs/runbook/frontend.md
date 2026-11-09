@@ -49,7 +49,7 @@ pnpm --dir frontend test:e2e
 纯源码包默认不包含构建产物。需要可直接运行的 UI 时先构建，再显式打包：
 
 ```sh
-uv run --locked python scripts/package_release.py --with-frontend --output dist/lexvault-ui.zip
+uv run --locked python scripts/ops/package_release.py --with-frontend --output dist/lexvault-ui.zip
 ```
 
 发布脚本只加入 `build-info.json` 绑定且哈希匹配的公开资源，拒绝篡改、越界与符号链接；不会把任意 `out/` 文件、源码缓存、凭据或案件材料打包。对最终 ZIP 解包后使用隔离数据目录验证启动、资源、登录、API 与 SSE，另行记录源码和发布清单摘要。

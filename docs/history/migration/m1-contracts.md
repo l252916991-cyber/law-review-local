@@ -4,7 +4,7 @@
 
 依据：[迁移计划书 §4.1/§5 M1](../../architecture/forgeharness-migration-plan-20261021.md)、[现状检查与改进计划书](status-and-improvement-plan-20261021.md)（A1/A2/A3 补强）、[迁移台账](ledger.md)。
 
-机器可读的权威定义是 [app/integration/runtime_ports.py](../../../app/integration/runtime_ports.py)（纯标准库、零业务/零框架导入，由 `tests/test_runtime_ports.py` 的 AST 边界测试强制）；本文档记录字段与旧行为的对应关系、语义规则和 M1 边界。两者不一致时以代码为准并修订本文档。
+机器可读的权威定义是 [app/runtime_ports.py](../../../app/integration/runtime_ports.py)（纯标准库、零业务/零框架导入，由 `tests/test_runtime_ports.py` 的 AST 边界测试强制）；本文档记录字段与旧行为的对应关系、语义规则和 M1 边界。两者不一致时以代码为准并修订本文档。
 
 **补强摘要（状态审查 I-01/I-02/I-03，2026-10-21 当日）**：`RUNTIME_PROTOCOL_VERSION` 1→2（actor 与认证主体强校验、租户显式拒绝、幂等重放需规范摘要一致）；`RUN_EVENT_VERSION` 1→2（事件明确为快照投影，身份 = (run_id, trace_revision, seq)）；schema v15 为 `runtime_requests` 增加 `request_digest`/`principal_name` 绑定列；`RUN_RESULT_VERSION` 保持 1（结果语义未变）。详见 §10。
 

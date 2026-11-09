@@ -8,7 +8,7 @@
 
 ```sh
 uv sync --locked --group dev
-uv run --locked python -m scripts.migration_demo \
+uv run --locked python -m scripts.ops.migration_demo \
   --output output/migration-demo-first-run
 ```
 
@@ -27,7 +27,7 @@ uv run --locked python -m scripts.migration_demo \
 | 包内校验 | 核对附件和流水工件的清单摘要，比较恢复前后所有非清单成员的字节摘要；清单生成时间和 ZIP 元数据不要求相同 |
 | 回退演练 | 将升级前快照恢复到第三个新目录，用旧程序 `init_db(seed=False)` 打开，仍为 schema 16；指定业务列和 checkpoint 与升级前一致；原合成源库及原 checkpoint 字节摘要未变 |
 
-这是小规模、合成数据的兼容性与恢复演练。历史代码使用当前锁定依赖运行；未重建历史依赖环境，未验证 v13 迁移、真实旧批准报告兼容、恢复后的跨版本 LangGraph 续跑、真实模型效果或律所生产停写。另有 `scripts/test_snapshot_runtime.py` 测试当前版本的中断续跑，它不等于本演练覆盖了跨版本续跑。总耗时包含建样本和验收，不能当作生产 RTO。
+这是小规模、合成数据的兼容性与恢复演练。历史代码使用当前锁定依赖运行；未重建历史依赖环境，未验证 v13 迁移、真实旧批准报告兼容、恢复后的跨版本 LangGraph 续跑、真实模型效果或律所生产停写。另有 `tests/test_snapshot_runtime.py` 测试当前版本的中断续跑，它不等于本演练覆盖了跨版本续跑。总耗时包含建样本和验收，不能当作生产 RTO。
 
 ## 看哪些产物
 

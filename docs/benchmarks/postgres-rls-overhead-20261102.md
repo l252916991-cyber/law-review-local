@@ -5,7 +5,7 @@
 原始结果：[postgres-rls-overhead-20261102.json](postgres-rls-overhead-20261102.json)（三版策略各一份完整输出）；复现命令：
 
 ```sh
-uv run --locked python scripts/benchmark_vector_search.py \
+uv run --locked python scripts/benchmarks/benchmark_vector_search.py \
   --postgres "host=127.0.0.1 port=55432 user=postgres dbname=postgres" \
   --pages 10000 --cases 5 --queries 30 --rls
 ```

@@ -1,7 +1,13 @@
 """Frozen-value checks reject wrong answers and unsupported or unavailable citations."""
 from copy import deepcopy
 
-from scripts.local_model_acceptance import assess_answer, assess_backends, known_value_in_text, normalize, p95
+from scripts.acceptance.local_model_acceptance import (
+    assess_answer,
+    assess_backends,
+    known_value_in_text,
+    normalize,
+    p95,
+)
 
 
 def fixture():

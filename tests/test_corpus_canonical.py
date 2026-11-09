@@ -9,7 +9,7 @@ import pytest
 from app.benchmarks.corpus_audit import audit
 from app.benchmarks.corpus_canonical import REASON, build, select, source_tier
 from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus
-from scripts.build_canonical_corpus import main as build_main
+from scripts.corpus.build_canonical_corpus import main as build_main
 
 
 def write_corpus(root: Path, name: str, docs: list[dict]) -> str:

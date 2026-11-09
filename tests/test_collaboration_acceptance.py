@@ -8,7 +8,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.collaboration_acceptance import run_checks
+from scripts.acceptance.collaboration_acceptance import run_checks
 
 #: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
 SQLITE_ONLY = "installation checks and the backup drill read the SQLite data directory"
@@ -164,12 +164,12 @@ class AcceptanceChecksTest(unittest.TestCase):
 
         empty = run_checks(self.data, model_url="http://127.0.0.1:9000/v1")
         self.assertEqual(self.checks_by_name(empty)["model_endpoint"]["status"], "fail")
-        with patch("scripts.collaboration_acceptance.urllib.request.urlopen",
+        with patch("scripts.acceptance.collaboration_acceptance.urllib.request.urlopen",
                    return_value=Response({"data": []})):
             no_models = self.checks_by_name(run_checks(self.data, model_url="http://127.0.0.1:9000/v1"))
         self.assertEqual(no_models["model_endpoint"]["status"], "pass")
         self.assertEqual(no_models["model_list"]["status"], "fail")
-        with patch("scripts.collaboration_acceptance.urllib.request.urlopen",
+        with patch("scripts.acceptance.collaboration_acceptance.urllib.request.urlopen",
                    return_value=Response({"data": [{"id": "qwen3-32b"}]})):
             missing_target = self.checks_by_name(
                 run_checks(self.data, model_url="http://127.0.0.1:9000/v1", model_id="other-model")

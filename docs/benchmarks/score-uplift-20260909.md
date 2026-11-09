@@ -41,15 +41,15 @@
 ## 3. 离线后处理复算（P0：立刻可拿的分）
 
 `app/benchmark_postprocess.py` 已实现这些规则；截至 2026-09-11，统一 runner 已对 2-1/2-7/2-9/3-8 启用，
-1-1 需传 `--corpus-dir` 才启用（见 [BENCHMARK_TEST_PLAN.md](../../BENCHMARK_TEST_PLAN.md)）。
-`scripts/postprocess_audit.py` 在已保存回答上重放后处理并重新评分，不修改原运行、不调用模型：
+1-1 需传 `--corpus-dir` 才启用（见[评测验证计划](benchmark-test-plan.md)）。
+`scripts/benchmarks/postprocess_audit.py` 在已保存回答上重放后处理并重新评分，不修改原运行、不调用模型：
 
 ```sh
-python scripts/postprocess_audit.py \
+python scripts/benchmarks/postprocess_audit.py \
   output/benchmark_full_10k/run_20260907_8bit_task_guided \
   output/postprocess-audit-10k-20260909
 # 提供法条库后才会离线重放 1-1 的精确条文策略（检索只用题面）
-python scripts/postprocess_audit.py \
+python scripts/benchmarks/postprocess_audit.py \
   output/benchmark_full_10k/run_20260907_8bit_task_guided \
   output/postprocess-audit-10k-20260909-full --corpus-dir output/score85/legal_corpus ...
 ```
@@ -74,17 +74,17 @@ python scripts/postprocess_audit.py \
 
 ## 4. 1-1 法条补库：覆盖率 74% → 98.2%
 
-`scripts/lawbench_coverage.py` 只读题面，统计已保存 1-1 题在冻结法条库上的精确命中率，并把未覆盖题
+`scripts/benchmarks/lawbench_coverage.py` 只读题面，统计已保存 1-1 题在冻结法条库上的精确命中率，并把未覆盖题
 写成 `build_npc_corpus.py` 兼容的 `inputs.jsonl`：
 
 ```sh
-python scripts/lawbench_coverage.py --run output/benchmark_full_10k/run_20260907_8bit_task_guided \
+python scripts/benchmarks/lawbench_coverage.py --run output/benchmark_full_10k/run_20260907_8bit_task_guided \
   --task 1-1 --corpus-dir output/score85/legal_corpus ... \
   --output output/analysis/lawbench-coverage-1-1/coverage.json \
   --worklist output/analysis/lawbench-coverage-1-1/worklist/inputs.jsonl
-python scripts/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v6 \
+python scripts/corpus/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v6 \
   --campaign output/analysis/lawbench-coverage-1-1/worklist --existing-corpus ... --cutoff 2023-11-13
-python scripts/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v7 \
+python scripts/corpus/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v7 \
   --campaign output/analysis/lawbench-coverage-1-1/worklist_remaining --existing-corpus ... --cutoff 2023-11-13
 ```
 
@@ -97,7 +97,7 @@ python scripts/build_npc_corpus.py --output output/score85/legal_corpus_suppleme
   家庭教育促进法、就业促进法、归侨侨眷权益保护法、海事诉讼特别程序法、海商法、电子签名法、老年人权益保障法、
   证券法、宪法修正案（1988 年），共 1,718 条（npc_v6 1,492 条 + npc_v7 226 条）。
 - npc_v6 的抓取进程曾被中断，其 `manifest.json` 由已下载文档与原始页包哈希重建，并用
-  `python scripts/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v6 --verify`
+  `python scripts/corpus/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v6 --verify`
   复核通过（15 部 / 1,492 条，`valid=true`）；npc_v7 由构建器正常写出。
 - 仍缺 **9 题 / 2 部**：中华人民共和国宪法（8 题，官方库返回「cutoff 前无精确版本」）与宪法修正案（2018 年）（1 题），
   合计约 0.08pp，不影响结论。

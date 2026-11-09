@@ -1,15 +1,15 @@
 # 答案级评测口径
 
-`app/answer_eval.py` + `scripts/run_answer_eval.py` 回答的是"答案对不对"，与页级检索评测（"页找没找到"）分开报告，两者不可互相替代。
+`app/answer_eval.py` + `scripts/evaluation/run_answer_eval.py` 回答的是"答案对不对"，与页级检索评测（"页找没找到"）分开报告，两者不可互相替代。
 
 ## 1. 与其它层的区别
 
 | 层 | 问题 | 入口 |
 | --- | --- | --- |
-| 页级检索 | 金标页是否召回、排序是否靠前 | `rag_project_benchmark.py` |
-| 法条检索 | 正确法条是否排在前列 | `scripts/statutory_gold_report.py` |
-| **答案级** | 必需要点是否写全、是否出现无据断言、引用页是否可接受 | `scripts/run_answer_eval.py` |
-| 模型 LawBench | 任务级混合分，不等于应用准确率 | `unified_benchmark_runner.py` |
+| 页级检索 | 金标页是否召回、排序是否靠前 | `scripts/benchmarks/rag_project_benchmark.py` |
+| 法条检索 | 正确法条是否排在前列 | `scripts/benchmarks/statutory_gold_report.py` |
+| **答案级** | 必需要点是否写全、是否出现无据断言、引用页是否可接受 | `scripts/evaluation/run_answer_eval.py` |
+| 模型 LawBench | 任务级混合分，不等于应用准确率 | `scripts/benchmarks/unified_benchmark_runner.py` |
 
 ## 2. 数据集
 
@@ -49,10 +49,10 @@
 
 ```bash
 # 离线评分（CI 使用，无需模型）
-uv run --locked python scripts/run_answer_eval.py --answers answers.json --output output/answer_eval/report.json
+uv run --locked python scripts/evaluation/run_answer_eval.py --answers answers.json --output output/answer_eval/report.json
 
 # 在线收集后评分（需要本地模型）
-uv run --locked python scripts/run_answer_eval.py --live --case-id 1
+uv run --locked python scripts/evaluation/run_answer_eval.py --live --case-id 1
 ```
 
 ## 6. 已知限制

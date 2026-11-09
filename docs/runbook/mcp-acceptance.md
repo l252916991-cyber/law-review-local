@@ -3,7 +3,7 @@
 先执行不调用模型的协议探针：
 
 ```sh
-uv run --locked python scripts/validate_application_acceptance.py --output output/mcp-acceptance.json
+uv run --locked python scripts/acceptance/validate_application_acceptance.py --output output/mcp-acceptance.json
 ```
 
 它验证真实 Python stdio 子进程，但客户端是标准库协议探针，不能写成 Cursor/Claude Desktop 已通过。服务绑定启动案件，默认离线检索，token 模式没有 stdin 身份而拒绝启动；保持该边界。

@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-import unified_benchmark_runner as runner
-from scripts.postprocess_audit import CHARGE_POLICY, canonicalize_charges, replay
+from scripts.benchmarks import unified_benchmark_runner as runner
+from scripts.benchmarks.postprocess_audit import CHARGE_POLICY, canonicalize_charges, replay
 
 
 def _run(tmp_path: Path, tasks: list[str], answer: str, limit: int = 2) -> Path:
@@ -37,7 +37,7 @@ def test_charge_canonicalization_maps_only_a_unique_superstring():
 
 def test_ambiguous_charge_is_left_untouched():
     ontology = frozenset({"盗窃、抢劫", "盗窃、诈骗", "诈骗"})
-    with patch("scripts.postprocess_audit.task_label_space", return_value=ontology):
+    with patch("scripts.benchmarks.postprocess_audit.task_label_space", return_value=ontology):
         assert canonicalize_charges("罪名：盗窃") == ("罪名：盗窃", [])
 
 
@@ -76,10 +76,10 @@ def test_retrieval_replay_is_opt_in_and_uses_only_the_question(tmp_path):
     source = _run(tmp_path, ["1-1"], "模型幻觉条文")
     context = {"mode": "exact_article", "hits": [{"document_id": "law", "article_id": "1", "text": "第一条 官方正文。"}]}
     fake = Mock(return_value=context)
-    with patch("scripts.postprocess_audit.retrieve", fake):
+    with patch("scripts.benchmarks.postprocess_audit.retrieve", fake):
         replay(source, tmp_path / "without-corpus")
     fake.assert_not_called()
-    with patch("scripts.postprocess_audit.retrieve", fake):
+    with patch("scripts.benchmarks.postprocess_audit.retrieve", fake):
         result = replay(source, tmp_path / "with-corpus", corpus_directories=["/frozen/corpus"])
     assert result["corpus_directories"] == ["/frozen/corpus"]
     audited = [json.loads(line) for line in (tmp_path / "with-corpus" / "detailed_results.jsonl").read_text(encoding="utf-8").splitlines()]

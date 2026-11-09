@@ -6,9 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import unified_benchmark_runner as runner
 from app.benchmarks.metrics import extract_final_amount, extract_final_months, score_lawbench_item
 from app.benchmarks.reporting import metrics, paired_baseline, prompt_for, source_hashes
+from app.benchmarks.solver import TASK_GUIDANCE
+from scripts.benchmarks import unified_benchmark_runner as runner
 
 
 class ScoringRegressionTest(unittest.TestCase):
@@ -123,18 +124,18 @@ class BenchmarkProtocolTest(unittest.TestCase):
             system, prompt = prompt_for(row)
             self.assertIn(row["instruction"].strip(), prompt)
             self.assertIn(row["question"], prompt)
-            self.assertIn(runner.TASK_GUIDANCE[row["task"]], system)
+            self.assertIn(TASK_GUIDANCE[row["task"]], system)
 
     def test_hybrid_guides_only_whitelisted_tasks(self):
         from app.benchmarks.reporting import GUIDED_TASK_WHITELIST, SYSTEM_PROMPT
 
         row = runner.load_lawbench_dataset(["2-2"], 1)[0]
         guided_system, _ = prompt_for(row, strategy="hybrid")
-        self.assertIn(runner.TASK_GUIDANCE["2-2"], guided_system)
+        self.assertIn(TASK_GUIDANCE["2-2"], guided_system)
         row_direct = runner.load_lawbench_dataset(["3-1"], 1)[0]
         direct_system, _ = prompt_for(row_direct, strategy="hybrid")
         self.assertEqual(direct_system, SYSTEM_PROMPT)
-        self.assertNotIn(runner.TASK_GUIDANCE["3-1"], direct_system)
+        self.assertNotIn(TASK_GUIDANCE["3-1"], direct_system)
         self.assertTrue(GUIDED_TASK_WHITELIST <= set(runner.TASK_NAMES))
 
     def test_prompt_never_uses_reference(self):
@@ -413,7 +414,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertNotIn("retrieval", row)
 
     def test_offline_verifier_accepts_complete_run_and_detects_tampering(self):
-        from verify_benchmark_run import verify
+        from scripts.benchmarks.verify_benchmark_run import verify
 
         def fake_model(*args, metadata, **kwargs):
             metadata.update(attempts=1, finish_reason="stop", usage={"completion_tokens": 10})
@@ -426,7 +427,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 runner.run_benchmark(args)
             root = Path(directory)
             self.assertTrue(verify(root)["valid"])
-            with patch("verify_benchmark_run.source_hashes", return_value={**source_hashes(), "app/benchmarks/metrics.py": "changed"}):
+            with patch("scripts.benchmarks.verify_benchmark_run.source_hashes", return_value={**source_hashes(), "app/benchmarks/metrics.py": "changed"}):
                 self.assertFalse(verify(root, write=False)["valid"])
                 artifacts = verify(root, artifacts_only=True, write=False)
                 self.assertTrue(artifacts["valid"])
@@ -439,8 +440,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertIn("Summary mismatch: mean_score_all", verify(root)["issues"])
 
     def test_offline_audit_preserves_originals_and_rejects_overwrite(self):
-        from scripts.audit_benchmark import audit
-        from verify_benchmark_run import verify
+        from scripts.benchmarks.audit_benchmark import audit
+        from scripts.benchmarks.verify_benchmark_run import verify
 
         def fake_model(*args, metadata, **kwargs):
             metadata.update(attempts=1, finish_reason="stop", usage={"completion_tokens": 10})

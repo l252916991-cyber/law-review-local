@@ -50,20 +50,20 @@ jobs:
       - name: Environment and static checks
         run: |
           export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
-          uv run --locked python scripts/doctor.py
+          uv run --locked python scripts/ops/doctor.py
           uv run --locked python -m compileall -q app tests scripts
           uv run --locked ruff check app tests scripts
           uv run --locked mypy
       - name: Install separate framework interpreter from the reviewed wheel
         run: |
-          uv run --locked python -m scripts.setup_framework --output "$RUNNER_TEMP/lexvault-framework"
+          uv run --locked python -m scripts.ops.setup_framework --output "$RUNNER_TEMP/lexvault-framework"
           echo "LAW_REVIEW_FORGE_PYTHON=$RUNNER_TEMP/lexvault-framework/bin/python" >> "$GITHUB_ENV"
       - name: Offline tests with actual reports
         run: |
           export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
           mkdir -p output/ci
           set -o pipefail
-          uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py scripts/test_snapshot_runtime.py \
+          uv run --locked pytest tests \
             -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
             --junitxml=output/ci/junit.xml --cov=app --cov-branch \
             --cov-report=term-missing --cov-report=xml:output/ci/coverage.xml \
@@ -71,9 +71,9 @@ jobs:
             2>&1 | tee output/ci/pytest.log
       - name: Answer-quality gate (rules mode, no model)
         run: |
-          uv run --locked python scripts/eval_gate.py --report output/ci/eval-gate.json --markdown "$GITHUB_STEP_SUMMARY"
+          uv run --locked python scripts/evaluation/eval_gate.py --report output/ci/eval-gate.json --markdown "$GITHUB_STEP_SUMMARY"
       - name: Validate release allowlist
-        run: uv run --locked python scripts/package_release.py --dry-run > output/ci/release-manifest.json
+        run: uv run --locked python scripts/ops/package_release.py --dry-run > output/ci/release-manifest.json
       - name: Upload test evidence (including failures)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -116,18 +116,18 @@ jobs:
           python -m pip install uv==0.12.0
           uv sync --locked --group dev --python "$(command -v python)"
       - name: Schema generated from the current SQLite migrations
-        run: uv run --locked python scripts/generate_postgres_schema.py --check
+        run: uv run --locked python scripts/ops/generate_postgres_schema.py --check
       - name: Answer-quality gate on PostgreSQL
         run: |
           mkdir -p output/ci
-          uv run --locked python scripts/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL" \
+          uv run --locked python scripts/evaluation/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL" \
             --report output/ci/eval-gate-postgres.json --markdown "$GITHUB_STEP_SUMMARY"
       - name: Offline tests against PostgreSQL
         run: |
           export LAW_REVIEW_DATA_DIR="$RUNNER_TEMP/lexvault-data" LAW_REVIEW_LANGGRAPH_CHECKPOINT_DB="$RUNNER_TEMP/lexvault-data/checkpoints.sqlite"
           export LAW_REVIEW_TEST_POSTGRES_REPORT=output/ci/postgres-tests.json
           set -o pipefail
-          uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py scripts/test_snapshot_runtime.py \
+          uv run --locked pytest tests \
             -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
             --junitxml=output/ci/junit-postgres.xml --cov=app --cov-branch --cov-report=term:skip-covered \
             --cov-report=json:output/ci/coverage-postgres.json 2>&1 | tee output/ci/pytest-postgres.log

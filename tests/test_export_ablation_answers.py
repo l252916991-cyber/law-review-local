@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scripts.export_ablation_answers import export
+from scripts.evaluation.export_ablation_answers import export
 
 
 def batch(tmp_path, rows):

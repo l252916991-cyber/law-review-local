@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
-from scripts.lawbench_coverage import coverage, load_rows, write_worklist
+from scripts.benchmarks.lawbench_coverage import coverage, load_rows, write_worklist
 
 
 def _corpus(directory: Path) -> Path:

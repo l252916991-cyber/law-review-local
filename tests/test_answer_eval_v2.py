@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from app.evaluation.answer_eval import load_dataset, score_answer, validate_dataset
-from scripts.build_answer_eval import build, main
+from scripts.evaluation.build_answer_eval import build, main
 
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "benchmarks/answer_eval/v2"

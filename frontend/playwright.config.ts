@@ -13,6 +13,6 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
-  webServer: { command: 'uv run --project .. --locked python ../scripts/frontend_test_server.py',
+  webServer: { command: 'uv run --project .. --locked python ../scripts/acceptance/frontend_test_server.py',
     url: 'http://127.0.0.1:13000/api/auth/me', timeout: 60_000, reuseExistingServer: false },
 });

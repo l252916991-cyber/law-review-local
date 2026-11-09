@@ -11,7 +11,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.local_capacity_acceptance import Profile, evaluate, percentile, run, seed_data, verify_package
+from scripts.acceptance.local_capacity_acceptance import Profile, evaluate, percentile, run, seed_data, verify_package
 
 
 class CapacityDriverTest(unittest.TestCase):
@@ -58,7 +58,7 @@ class CapacityDriverTest(unittest.TestCase):
             path = Path(name)
             marker = path / "law_review.db"
             marker.write_bytes(b"synthetic existing database")
-            with patch("scripts.local_capacity_acceptance.seed_data") as seed:
+            with patch("scripts.acceptance.local_capacity_acceptance.seed_data") as seed:
                 with self.assertRaisesRegex(ValueError, "new directory"):
                     run(path)
                 seed.assert_not_called()

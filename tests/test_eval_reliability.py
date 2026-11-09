@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pytest
 
-from scripts.analyse_eval_reliability import analyse, main, metric
+from scripts.evaluation.analyse_eval_reliability import analyse, main, metric
 
 
 def row(item="q1", repeat=0, **extra):

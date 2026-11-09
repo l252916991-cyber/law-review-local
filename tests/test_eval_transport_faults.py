@@ -14,7 +14,7 @@ import urllib.error
 
 import pytest
 
-from scripts.eval_transport_faults import ROOT, failure_class, local_endpoint, main, run
+from scripts.evaluation.eval_transport_faults import ROOT, failure_class, local_endpoint, main, run
 
 
 def test_cli_requires_opt_in_before_creating_any_output(tmp_path):
@@ -69,7 +69,7 @@ def actual_transport_samples():
     # proving real HTTP behaviour. No pytest plugin is loaded in the child.
     code = """
 import json
-from scripts.eval_transport_faults import FAULTS, PATHS, run_attempt
+from scripts.evaluation.eval_transport_faults import FAULTS, PATHS, run_attempt
 rows = [run_attempt(mode, path) for mode in ('healthy', *FAULTS) for path in PATHS]
 print(json.dumps(rows))
 """

@@ -44,7 +44,7 @@ def upload_error_message(exc: Exception) -> str:
     if isinstance(exc, ValueError) and str(exc).startswith("暂不支持该文件类型"):
         return str(exc)
     if isinstance(exc, FileNotFoundError):
-        return "缺少对应的本机文档解析工具，请运行 scripts/doctor.py 检查环境"
+        return "缺少对应的本机文档解析工具，请运行 scripts/ops/doctor.py 检查环境"
     if isinstance(exc, subprocess.TimeoutExpired):
         return "文档解析超时；请拆分文件或检查 OCR 资源"
     return f"文档解析失败（{type(exc).__name__}）；详细原因仅记录在本机诊断日志"

@@ -18,7 +18,7 @@ uv pip check
 
 CI Python 3.11/3.14 运行全部 `tests/` 与工程脚本侧测试（发布/模型安装/备份恢复），使用 `pytest-socket` 禁止网络连接、允许仅用于事件循环的 Unix socket。模型、Redis 依赖应通过 mock/fake 隔离；不使用 `continue-on-error` 把模型服务缺失伪装成成功。CI 禁止自动载入未知 pytest 插件并显式启用 pytest-cov/pytest-socket。
 
-M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --locked python -m scripts.setup_framework --output .venv-framework-local` 创建新环境，设置 `LAW_REVIEW_FORGE_PYTHON="$PWD/.venv-framework-local/bin/python"` 后运行离线套件。安装使用随包的带 hash 依赖导出和 wheel；可加 `--offline` 使用完整缓存。CI 已自动准备该环境；本地未设置变量会明确跳过实际框架进程测试，不能据此声称 M2 集成通过。用例固定关闭真实模型与远程检索服务。
+M2 实际进程测试另需独立 Python 3.12 框架环境：先用 `uv run --locked python -m scripts.ops.setup_framework --output .venv-framework-local` 创建新环境，设置 `LAW_REVIEW_FORGE_PYTHON="$PWD/.venv-framework-local/bin/python"` 后运行离线套件。安装使用随包的带 hash 依赖导出和 wheel；可加 `--offline` 使用完整缓存。CI 已自动准备该环境；本地未设置变量会明确跳过实际框架进程测试，不能据此声称 M2 集成通过。用例固定关闭真实模型与远程检索服务。
 
 输出真实 `junit.xml`、pytest 日志、覆盖率 XML/JSON/HTML；任何测试失败或分支覆盖率低于 70 都阻止通过，失败报告也上传。未在托管环境实际运行前，不能把本地验证表述为远程 CI 已通过。
 
@@ -41,21 +41,21 @@ CI 的 `postgres` 任务用 PostgreSQL 16 + pgvector 再跑一遍同一套离线
 
 ## 真实页面流程验证
 
-2026-10-25 起，`scripts/page_flow_check.py` 是当前 Playwright 验收的兼容入口：启动隔离 FastAPI、合成数据与模型测试替身，加载当前静态构建。保留 flow 名称，计数与历史 CDP 步骤数不可互换；`--data-dir` 不再复用数据。先安装锁定前端依赖并 `pnpm --dir frontend build:static`，浏览器通过 `--browser`、`LEXVAULT_BROWSER_PATH` 或 Playwright Chromium 指定。历史 CDP 驱动保留为工具源码，正式 UI 不使用旧 DOM 流程。
+2026-10-25 起，`scripts/acceptance/page_flow_check.py` 是当前 Playwright 验收的兼容入口：启动隔离 FastAPI、合成数据与模型测试替身，加载当前静态构建。保留 flow 名称，计数与历史 CDP 步骤数不可互换；`--data-dir` 不再复用数据。先安装锁定前端依赖并 `pnpm --dir frontend build:static`，浏览器通过 `--browser`、`LEXVAULT_BROWSER_PATH` 或 Playwright Chromium 指定。历史 CDP 驱动保留为工具源码，正式 UI 不使用旧 DOM 流程。
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/acceptance/page_flow_check.py \
   --flow metrics --output-dir output/browser-check          # 用量与费用面板：正常/空案件/部分缺失/失败/快速切案
-UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/acceptance/page_flow_check.py \
   --flow chat --output-dir output/browser-check-chat       # 流式问答：引用回原文、撤回、同键回放、消息落库
-UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/acceptance/page_flow_check.py \
   --flow workbench --output-dir output/browser-check-wb    # Agent 工作台：工具轨迹、回退徽标、切案清理
-UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/page_flow_check.py \
+UV_CACHE_DIR=/tmp/uv-cache uv run --locked python scripts/acceptance/page_flow_check.py \
   --flow agent --output-dir output/browser-check-agent     # API 级：工具循环、运行轨迹、用量记账
 ```
 
 - 输出：`browser-check.json`（步骤、失败项、浏览器路径、源码 HEAD）、各步骤整页与元素截图、`server.log`。
-- `--flow chat` / `workbench` / `agent` 会启动 `scripts/stub_model.py`：一个 OpenAI 兼容的**模型测试替身**，答案是固定字符串、embedding 是哈希向量、rerank 按位置给分，并可按问题标记返回一次不合格答案以触发回退。它只用于验证协议、引用契约与页面行为；报告里 `model` 字段标为 `stub`，不能当作真实模型效果。
+- `--flow chat` / `workbench` / `agent` 会启动 `scripts/acceptance/stub_model.py`：一个 OpenAI 兼容的**模型测试替身**，答案是固定字符串、embedding 是哈希向量、rerank 按位置给分，并可按问题标记返回一次不合格答案以触发回退。它只用于验证协议、引用契约与页面行为；报告里 `model` 字段标为 `stub`，不能当作真实模型效果。
 - 报告步骤名与任务包对应：`wb-01-run`/`wb-02-trace`/`wb-03-fallback`/`wb-04-switch` 对应 A06.1 的 Agent 轨迹、回退与切案清理验收；`chat-*` 对应 A01.1；`0x-*` 对应 A02.1/A02.2。
 - 未安装受支持浏览器时脚本退出码 2 并输出 `browser unavailable`；这属于未验证，不是通过。
 - 该验证不联网、不写真实案件数据；模型调用另由真实模型验收单列，不用页面替身代替。

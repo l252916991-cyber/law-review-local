@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_2_2_sft_data import POOL_PATH, build, render
+from scripts.benchmarks.build_2_2_sft_data import POOL_PATH, build, render
 
 # The 16 label names exactly as enumerated in the pinned 2-2 instruction.
 LABEL_SPACE = {

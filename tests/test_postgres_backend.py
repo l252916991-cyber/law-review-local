@@ -88,9 +88,9 @@ def test_a_sqlite_process_never_imports_the_postgresql_driver(tmp_path):
 
 
 def test_generated_postgres_schema_matches_the_current_sqlite_schema():
-    from scripts.generate_postgres_schema import main
+    from scripts.ops.generate_postgres_schema import main
 
-    assert main(["--check"]) == 0, "run scripts/generate_postgres_schema.py after a SQLite migration"
+    assert main(["--check"]) == 0, "run scripts/ops/generate_postgres_schema.py after a SQLite migration"
 
 
 # --- live PostgreSQL ----------------------------------------------------------------
@@ -269,7 +269,7 @@ def test_sqlite_file_snapshots_are_refused_on_postgresql(pg_db):
 
 def test_isolated_harnesses_never_inherit_a_configured_postgresql(monkeypatch, tmp_path):
     from app.storage.db import backend_name
-    from scripts.validate_application_acceptance import isolated_environment
+    from scripts.acceptance.validate_application_acceptance import isolated_environment
 
     monkeypatch.setenv("LAW_REVIEW_DATABASE_URL", "postgresql://example.invalid/real_cases")
     assert backend_name() == "postgresql"

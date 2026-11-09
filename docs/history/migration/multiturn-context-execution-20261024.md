@@ -141,7 +141,7 @@
 
 ### 7.1 本批对比较基线的更新
 
-`app/evaluation/model_comparison.py` 以内容哈希固定 native 对比基线（`agents.py`、`rag.py`、`services.py`、`model_domain.py`、`statutory_retrieval.py`）。本批有意修改了 `agents.py` 与 `services.py`（上下文、记忆、资料不足门控），旧哈希必然失配。已更新这两个哈希并把基线指向包含最终被固定文件的提交 `93e93fe`；此前基于旧基线的 native 对比结果与更新后的实现**不可直接混用**，需要重新采集。候选/answerability 路径未改动。
+`app/model_comparison.py` 以内容哈希固定 native 对比基线（`agents.py`、`rag.py`、`services.py`、`model_domain.py`、`statutory_retrieval.py`）。本批有意修改了 `agents.py` 与 `services.py`（上下文、记忆、资料不足门控），旧哈希必然失配。已更新这两个哈希并把基线指向包含最终被固定文件的提交 `93e93fe`；此前基于旧基线的 native 对比结果与更新后的实现**不可直接混用**，需要重新采集。候选/answerability 路径未改动。
 
 ### 7.2 未执行或不可用
 

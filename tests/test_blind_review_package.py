@@ -9,7 +9,7 @@ import pytest
 
 from app.evaluation.answer_eval import load_dataset
 from app.evaluation.answer_review import review_manifest
-from scripts.run_answer_judge import fenced, package_review, prepare_review
+from scripts.evaluation.run_answer_judge import fenced, package_review, prepare_review
 
 DATASET = Path(__file__).resolve().parents[1] / "benchmarks/answer_eval/v2/dataset.json"
 

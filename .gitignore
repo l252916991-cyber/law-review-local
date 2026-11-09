@@ -57,17 +57,12 @@ test-results/
 
 # Keep the source root intentionally small. Historical one-off reports and
 # experiment drivers remain on disk and under docs/history, but are not staged
-# by an accidental `git add .`. Maintained root entry points are allowlisted.
+# by an accidental `git add .`. Entry points live under scripts/; only these root files are allowlisted.
 /*.md
 !/README.md
 !/README.en.md
-!/BENCHMARK_TEST_PLAN.md
 !/AGENTS.md
 /*.py
-!/unified_benchmark_runner.py
-!/verify_benchmark_run.py
-!/compare_agent_runtimes.py
-!/rag_project_benchmark.py
 /*.sh
 !/run.sh
 !/run_worker.sh

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.demo_recovery_check import main
+from scripts.ops.demo_recovery_check import main
 
 
 def _evidence(path: Path) -> dict:

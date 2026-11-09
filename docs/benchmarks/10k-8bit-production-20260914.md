@@ -1,9 +1,9 @@
 # LawBench 全量 10k 复测（8bit 生产配置）
 
 日期：2026-09-14。运行目录 `output/sft-38-v2/10k-8bit-production`，
-命令 = `unified_benchmark_runner.py --dataset lawbench --corpus-dir output/score85/legal_corpus_canonical_v2
+命令 = `scripts/benchmarks/unified_benchmark_runner.py --dataset lawbench --corpus-dir output/score85/legal_corpus_canonical_v2
 --max-tokens 1600 --timeout 240 --retry 0`（Qwythos-9B-v2-8bit-mlx、task_guided、temperature 0）。
-零技术失败、零截断、parse_failed 16、reference_invalid 8，`verify_benchmark_run.py` 通过
+零技术失败、零截断、parse_failed 16、reference_invalid 8，`scripts/benchmarks/verify_benchmark_run.py` 通过
 （`scoring_verified: true`、`live_source_matches: true`）。
 
 ## 结果：混合均分 63.32%（历史 v4 62.75%，+0.57pp）
@@ -50,4 +50,4 @@
 ## 证据位置
 
 `output/sft-38-v2/10k-8bit-production/`（manifest、逐题 checkpoints、detailed_results、summary、
-source_snapshot）；`verify_benchmark_run.py` 校验通过。
+source_snapshot）；`scripts/benchmarks/verify_benchmark_run.py` 校验通过。

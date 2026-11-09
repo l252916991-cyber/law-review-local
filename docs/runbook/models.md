@@ -21,7 +21,7 @@ Web 项目通过本地 OpenAI-compatible 服务调用模型，模型运行环境
 ## 已有模型
 
 ```bash
-uv run python scripts/setup_models.py inspect models/Qwythos-9B-v2-4bit-mlx
+uv run python scripts/ops/setup_models.py inspect models/Qwythos-9B-v2-4bit-mlx
 ```
 
 此操作只读取配置、权重文件数量/大小及链接情况，不发送请求、不重算全部权重或移动文件。现有本机转换的 Qwythos 权重没有完整上游 commit/转换工具来源时，不能声称从任意新下载可逐字节复现。
@@ -31,7 +31,7 @@ uv run python scripts/setup_models.py inspect models/Qwythos-9B-v2-4bit-mlx
 先核对模型仓库许可证、实际存在的 immutable commit、所需格式和磁盘空间，在独立模型环境安装 Hugging Face `hf` CLI，再调用：
 
 ```bash
-uv run python scripts/setup_models.py download \
+uv run python scripts/ops/setup_models.py download \
   --repo OWNER/MODEL --revision VERIFIED_40_CHARACTER_COMMIT \
   --target /absolute/private-models/model-name
 ```

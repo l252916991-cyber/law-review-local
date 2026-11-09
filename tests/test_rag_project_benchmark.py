@@ -9,7 +9,7 @@ from app.evaluation.rag_benchmark_dataset import (
     build_long_page_v2_benchmark,
 )
 from app.retrieval.rag_chunks import page_chunks
-from rag_project_benchmark import (
+from scripts.benchmarks.rag_project_benchmark import (
     paired_channel_comparison,
     paired_comparison,
     paired_run_comparison,

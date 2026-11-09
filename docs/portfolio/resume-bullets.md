@@ -13,13 +13,13 @@
 **2. 实现基于页摘要的断点恢复校验，区分“复用”与“过期拒用”**
 checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文；来源改动后拒绝恢复旧分析且不消耗重试次数。提供了三阶段（中断 / 新进程恢复 / 篡改）可复现脚本与证据 JSON。
 
-- 证据：`app/review/langgraph_agents.py`、`scripts/demo_recovery_check.py`、[P3](../history/migration/portfolio-p3-demo-status-20261027.md)
+- 证据：`app/review/langgraph_agents.py`、`scripts/ops/demo_recovery_check.py`、[P3](../history/migration/portfolio-p3-demo-status-20261027.md)
 - 实测：审校完成后中断，独立进程恢复 `steps 9 → 9`（未重复专家节点）、`resume_count=1`、审校摘要一致；改动一页后恢复被拒绝、`resume_count=0`。
 
 **3. 设计三组隔离对照实验（基础 RAG / 结构化交接 / 交叉审校）并实现冻结与记账**
 `prepare` 阶段冻结隔离合成库、检索上下文、规则专家发现与三组提示（不调用模型）；`run` 阶段只读冻结批次、复算提示摘要、每次尝试写入账本；失败、未尝试、规则拒答与未知用量分别统计，失败计入分母，预算超限显式失败且不截断。
 
-- 证据：`app/evaluation/collaboration_ablation.py`、`scripts/run_collaboration_ablation.py`、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md)
+- 证据：`app/evaluation/collaboration_ablation.py`、`scripts/evaluation/run_collaboration_ablation.py`、[P1](../history/migration/portfolio-p1-ablation-driver-20261027.md)
 - 实测：60 题冻结提示长度 A 中位 855、B 7,568、C 9,719 字符；三组对照 16 项、六案例保留集 6 项、恢复演示 4 项回归覆盖变量隔离、跨案例引用拒绝与 fail-closed 行为。
 
 **4. 从允许清单源码包在新目录完成可复现交付**
@@ -50,14 +50,14 @@ checkpoint 记录每页 `page_text_sha256`，恢复前逐页比对当前原文�
 **7. 业务库支持 SQLite 与 PostgreSQL + pgvector 双后端，同一套代码**
 保留 sqlite3 形态的数据访问接口，在 PostgreSQL 一侧做占位符与方言翻译、逐语句 savepoint、写锁、错误类型映射；表结构由 SQLite 迁移自动生成（含全文检索触发器与向量列），CI 校验两边一致。案件内向量检索改在库内精确排序。
 
-- 证据：`app/storage/db_postgres.py`、`scripts/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
+- 证据：`app/storage/db_postgres.py`、`scripts/ops/generate_postgres_schema.py`、[postgresql.md](../runbook/postgresql.md)、[向量检索基准](../benchmarks/postgres-vector-search-20261102.md)
 - 实测：全量测试在两种数据库上都通过；门禁 60 题两库逐题结果一致；10,000 页单案向量检索 p50 1.29 s → 48 ms，前 20 页及顺序完全相同。
 - 边界：多实例部署还需要把任务队列和 checkpoint 移出进程。PostgreSQL 逐版本迁移已有：只执行迁移文件得到的结构须与新建库逐项一致。
 
 **8. 实现信息隔离墙：应用层检查 + PostgreSQL 行级安全双层执行**
 设墙案件只有墙内名单上的人可见，管理员也不例外，墙外返回与案件不存在相同的 404；破窗访问限 30 分钟、须写理由并审计。数据库层 35 张表启用 `FORCE ROW LEVEL SECURITY`，每个连接写入当前身份，子表按主键回查父表；生成器发现未归类的案件关联表直接失败，新表不会绕过隔离墙。
 
-- 证据：`app/cases/case_walls.py`、`scripts/generate_postgres_schema.py`、`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)、[开销基准](../benchmarks/postgres-rls-overhead-20261102.md)
+- 证据：`app/cases/case_walls.py`、`scripts/ops/generate_postgres_schema.py`、`tests/test_case_walls.py`、[case-walls.md](../runbook/case-walls.md)、[开销基准](../benchmarks/postgres-rls-overhead-20261102.md)
 - 实测：以墙外管理员和墙外律师身份遍历全部 GET 接口，墙内标记一次都没出现；在 PostgreSQL 上关掉应用层检查重做一遍依旧干净，同样操作在 SQLite 上有 10 个接口泄露（对照测试）。10,000 页检索 p50：对照 56 ms，没被挡的用户 68 ms，五分之四材料被隐藏的用户 120 ms，结果相同；子表策略从"在父表可见行里"改为主键回查后，这两类用户分别从 1,520 ms、373 ms 降下来（同机依次测三版写法）。
 - 边界：SQLite 部署只有应用层一道防线；本项目是单律所实例，多租户是同一机制的迁移方向，未实现。
 - 配套：利益冲突检查（`app/cases/conflicts.py`、[conflict-check.md](../runbook/conflict-check.md)）。登记委托人、对方当事人、关联方后检索全所案件，名称按组织形式、曾用名、统一社会信用代码比对；命中后该案所有写操作返回 409，须由检查发起人以外的合伙人写明理由放行。命中隔离案件时照样查出，但墙外的人只看到“存在冲突”，看不到是哪个案件。

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.replay_model_gate import load_recorded, recorded_answer
+from scripts.evaluation.replay_model_gate import load_recorded, recorded_answer
 
 
 def _request(question: str) -> dict:

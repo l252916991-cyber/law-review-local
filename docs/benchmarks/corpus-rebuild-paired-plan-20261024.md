@@ -17,9 +17,9 @@
 
 | 步骤 | 工作 | 退出条件 |
 | --- | --- | --- |
-| P1 基础语料 | `scripts/build_legal_corpus.py --output output/score85/legal_corpus`（58 份官方法规正文，逐份抓取官方页面，保存原始 HTML 与解析结果） | 构建无失败项；`--verify` 通过；`valid=true` |
-| P2 覆盖测量与补充 | 用进行中的万题 1-1 结果跑 `scripts/lawbench_coverage.py` 得未覆盖清单（`--worklist`），再以 `scripts/build_npc_corpus.py --cutoff 2023-11-13` 从国家法律法规数据库补齐 | 1-1 条号覆盖 **500/500**；补充集 `--verify` 通过 |
-| P3 canonical 合并 | `scripts/build_canonical_corpus.py --root output/score85 --output output/score85/legal_corpus_canonical_v2`，同一 `(law_name, version_date)` 只保留一份原文，冲突即拒绝 | 合并报告无冲突；语料文档数、逐文书 SHA-256 与经济性摘要冻结 |
+| P1 基础语料 | `scripts/corpus/build_legal_corpus.py --output output/score85/legal_corpus`（58 份官方法规正文，逐份抓取官方页面，保存原始 HTML 与解析结果） | 构建无失败项；`--verify` 通过；`valid=true` |
+| P2 覆盖测量与补充 | 用进行中的万题 1-1 结果跑 `scripts/benchmarks/lawbench_coverage.py` 得未覆盖清单（`--worklist`），再以 `scripts/corpus/build_npc_corpus.py --cutoff 2023-11-13` 从国家法律法规数据库补齐 | 1-1 条号覆盖 **500/500**；补充集 `--verify` 通过 |
+| P3 canonical 合并 | `scripts/corpus/build_canonical_corpus.py --root output/score85 --output output/score85/legal_corpus_canonical_v2`，同一 `(law_name, version_date)` 只保留一份原文，冲突即拒绝 | 合并报告无冲突；语料文档数、逐文书 SHA-256 与经济性摘要冻结 |
 | P4 1000 题配对 | 同 `Qwythos-9B-v2-OptiQ-4bit`、`lawbench-task-guided-v4`、`lawbench-local-v3`、`seed=42`、每类 50 题；两臂：无库 / 有库，逐题配对 | 两臂各 1000 题完成、0 技术失败；报 1-1、3-2 与混合均分的配对差值和 95% 区间 |
 | P5 27B 决策门 | 若 P4 有库臂稳定（1-1 明显提升、其余任务无回退），再以同一 1000 题跑 27B 4-bit 一臂 | 给出「是否值得上全量」的结论与成本估算；无结论则不跑万题 |
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.benchmarks.corpus_audit import audit, classify, dedup_digest, heading_leak_articles
 from app.retrieval.legal_corpus import SCHEMA_VERSION, split_articles
-from scripts.audit_corpus_conflicts import main as audit_main
+from scripts.corpus.audit_corpus_conflicts import main as audit_main
 
 
 def write_corpus(root: Path, name: str, laws: list[tuple[str, str, str]]) -> str:

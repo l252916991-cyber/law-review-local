@@ -62,8 +62,8 @@ kernel 对模型/工具的准入及结算串行化，避免并发花同一额度
 示例（只用于已授权隔离数据和测试，不是生产启用命令）：
 
 ```python
-from app.llm.forge_governance import OfflineModelTest
-from app.integration.forge_runtime import FrameworkReadonlyControl
+from app.forge_governance import OfflineModelTest
+from app.forge_runtime import FrameworkReadonlyControl
 
 control = FrameworkReadonlyControl(model_test=OfflineModelTest())
 # 使用可信宿主构造的 request；仍为 use_llm=False、远程嵌入=False、persist_memory=False。

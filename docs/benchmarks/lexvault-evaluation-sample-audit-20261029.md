@@ -52,7 +52,7 @@ dev-A 关键词覆盖 97.5% 与 claim 代理支持率 46.37% 可以并列报告�
 
 原始 `output/portfolio-ablation/{dev,holdout}-qwen38-27b-20261027/run/attempts.jsonl` 已记录生成调用的 input/output tokens、provider latency、elapsed、outcome 和 usage_known。旧 `export_ablation_answers.py` 只导出正文、引用与 answer_status，因此“导出的 answers 缺 usage”不能扩大解释为原始生成没有成本数据。
 
-本轮导出保留这些原字段和账本摘要：缺失保持 null，记录的零仍为零；失败和调用前拒答也保留独立 outcome，不根据空正文或 answer_status 冒充生成成功。新增分析器 [analyse_eval_reliability.py](../../scripts/analyse_eval_reliability.py) 只读账本，计划分母包含失败及 not_attempted；已执行调用的成本也包含 contract_failed，不只统计 ok。
+本轮导出保留这些原字段和账本摘要：缺失保持 null，记录的零仍为零；失败和调用前拒答也保留独立 outcome，不根据空正文或 answer_status 冒充生成成功。新增分析器 [analyse_eval_reliability.py](../../scripts/evaluation/analyse_eval_reliability.py) 只读账本，计划分母包含失败及 not_attempted；已执行调用的成本也包含 contract_failed，不只统计 ok。
 
 | 数据 / 臂 | 计划 / 已执行 | 通过 / 计划 | 已执行 input + output token（含失败） | 每通过采样 token |
 |---|---:|---:|---:|---:|
@@ -76,10 +76,10 @@ dev 每题每臂只有一次记录，不能估同题重复方差；单条记录�
 ## 6. 复算与验证
 
 ```sh
-uv run --locked python scripts/analyse_eval_reliability.py \
+uv run --locked python scripts/evaluation/analyse_eval_reliability.py \
   --attempts <已有只读批次>/run/attempts.jsonl \
   --expected-repeats 5 --output <全新私有路径>/reliability.json
-uv run --locked python scripts/export_ablation_answers.py \
+uv run --locked python scripts/evaluation/export_ablation_answers.py \
   --batch <已有只读批次> --group A --repeat 0 --output <另一个新路径>/answers.json
 ```
 

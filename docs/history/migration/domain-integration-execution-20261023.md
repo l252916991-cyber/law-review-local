@@ -68,7 +68,7 @@ E12：六动作、非空引用、同事务回执、已确认容量与受信候�
 
 ## 8. D06：Qwythos 9B 双对照工具与五题合成对照
 
-已收敛未提交实现：新增 `app/evaluation/model_comparison.py`、`scripts/compare_local_models.py`、`tests/test_model_comparison.py` 和 `tests/test_local_backends_exclusive.py`；`LocalModels` 增加显式 `exclusive_residency`，每次推理前仅卸载已登记的三个模型角色，未知卸载错误、超时和身份绑定均不降级；`local_model_payload` 统一候选与原生对照的请求构造；`read_json_with_deadline` 兼容实际 oMLX `HTTPError` 响应体。新增 6 项独占驻留测试和原有模型/对照测试合计 **30 passed**；Ruff、Mypy（42 个脚本）通过。
+已收敛未提交实现：新增 `app/model_comparison.py`、`scripts/compare_local_models.py`、`tests/test_model_comparison.py` 和 `tests/test_local_backends_exclusive.py`；`LocalModels` 增加显式 `exclusive_residency`，每次推理前仅卸载已登记的三个模型角色，未知卸载错误、超时和身份绑定均不降级；`local_model_payload` 统一候选与原生对照的请求构造；`read_json_with_deadline` 兼容实际 oMLX `HTTPError` 响应体。新增 6 项独占驻留测试和原有模型/对照测试合计 **30 passed**；Ruff、Mypy（42 个脚本）通过。
 
 本机身份清单在私有证据 `output/migration/domain-integration-20261023/d06-qwythos9b/local-model/` 重新计算，生成模型固定为 `Qwythos-9B-v2-OptiQ-4bit`，embedding/reranker 分别固定为 `Qwen3-Embedding-4B-4bit-DWQ`、`bge-reranker-v2-m3-mlx`。模型均记录完整顶层文件 SHA-256、字节数和本地身份摘要；上游 revision 与转换可复现性仍标为未证实。临时 oMLX 0.7.0 服务仅监听 `127.0.0.1:18083`，`--memory-guard safe`、`--max-concurrent-requests 1`，未修改项目默认模型，未调用外部或付费推理服务。服务日志观察到生成模型多次加载/卸载，验证开始下一次推理前释放已登记模型；实际生成引擎为 VLM 发现失败后回退的 LLM BatchedEngine，约 6.95GB。
 

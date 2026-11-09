@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from app.benchmarks.lawbench import TASK_NAMES, load_task
-from scripts import benchmark_campaign as campaign
+from scripts.benchmarks import benchmark_campaign as campaign
 
 
 @pytest.fixture(autouse=True)
@@ -101,7 +101,7 @@ def test_campaign_aborts_after_local_server_busy_signal(tmp_path, error):
 
 def test_verifier_recomputes_requests_and_detects_changed_final_answer(tmp_path):
     from app.benchmarks import solver as benchmark_solver
-    from scripts.verify_campaign import verify
+    from scripts.benchmarks.verify_campaign import verify
 
     directory = make_campaign(tmp_path)
 

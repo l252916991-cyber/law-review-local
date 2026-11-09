@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.documents.bank_transactions import parse_csv
-from scripts.seed_demo_case import _bank_transactions, _documents, _evidence, seed
+from scripts.ops.seed_demo_case import _bank_transactions, _documents, _evidence, seed
 
 #: Runs on SQLite even when the suite targets PostgreSQL (see tests/conftest.py).
 SQLITE_ONLY = "the seeding tool writes the SQLite file in --data-dir"

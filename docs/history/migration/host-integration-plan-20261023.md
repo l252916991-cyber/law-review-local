@@ -35,10 +35,10 @@ H06 可与主线交错推进；这是任务依赖安排，不预设额外执行�
 | 编号 | 工作与交付物 | 主要涉及位置（以实际设计为准） | 退出条件 | 主责 |
 | --- | --- | --- | --- | --- |
 | H00 | 重核规则、当前差异、源码清单、wheel/锁及 E03 待办；保存修改前副本 | `vendor/FRAMEWORK_BINDING.json`、来源清单与迁移台账 | 实施基线可复现；既有改动与本批范围清楚 | QA |
-| H01 | 形成宿主接入设计：六类动作字段、摘要、唯一键、事务；映射状态机、事件游标、sidecar 往返协议及迁移兼容 | `app/integration/runtime_ports.py`、`app/storage/db.py`、`app/integration/runtime_adapter.py`、`app/integration/forge_bridge.py` | 每个故障窗口有持久事实来源；不假设跨库原子提交；契约变化有版本策略 | LV/FW，LV 主责 |
+| H01 | 形成宿主接入设计：六类动作字段、摘要、唯一键、事务；映射状态机、事件游标、sidecar 往返协议及迁移兼容 | `app/runtime_ports.py`、`app/db.py`、`app/runtime_adapter.py`、`app/forge_bridge.py` | 每个故障窗口有持久事实来源；不假设跨库原子提交；契约变化有版本策略 | LV/FW，LV 主责 |
 | H02 | 实现授权宿主写适配、动作校验、源版本核验、持久幂等回执；补六类动作正常/冲突/拒绝测试 | 宿主端口模块、数据库迁移、相关测试 | 业务效果和回执同宿主事务；同键同内容复用，同键换内容拒绝；草稿不升级为确认事实 | LV |
-| H03 | 实现 request/job/host run/framework run 持久关联；唯一会话、终态和配额释放；版本兼容读取 | `app/integration/runtime_adapter.py`、`app/review/review_jobs.py`、`app/storage/db.py`、相关测试 | 重复/并发受理不新增业务效果；重启后可由持久状态对账；不依赖进程内标志恢复正确性 | LV |
-| H04 | 接入显式版本化 DAG、宿主写回调和可信回执 resolver；实现投影去重、历史授权读取及隔离控制入口 | `app/integration/forge_worker.py`、`app/integration/forge_bridge.py`、`app/integration/forge_runtime.py`、相关测试 | 实际独立解释器验证；已完成结果复用，未知结果保持待对账；仅在已实现路径声明能力 | LV/FW，LV 主责 |
+| H03 | 实现 request/job/host run/framework run 持久关联；唯一会话、终态和配额释放；版本兼容读取 | `app/runtime_adapter.py`、`app/review_jobs.py`、`app/db.py`、相关测试 | 重复/并发受理不新增业务效果；重启后可由持久状态对账；不依赖进程内标志恢复正确性 | LV |
+| H04 | 接入显式版本化 DAG、宿主写回调和可信回执 resolver；实现投影去重、历史授权读取及隔离控制入口 | `app/forge_worker.py`、`app/forge_bridge.py`、`app/forge_runtime.py`、相关测试 | 实际独立解释器验证；已完成结果复用，未知结果保持待对账；仅在已实现路径声明能力 | LV/FW，LV 主责 |
 | H05 | 执行本批故障矩阵、受影响回归与完整离线检查；审查 schema、发行清单、差异并更新台账 | `tests/`、`scripts/`、实施记录及私有证据目录 | 下述验收全部适用项通过；失败/跳过逐项解释；报告绑定最终内容 | QA |
 | H06 | 列清 LLM/embedding/reranker 后端和旁路；完成 E05 适配，依 E03 分阶段做 E07 双对照 | 治理模块、领域模型/检索调用、对照脚本、E01 登记 | 未知用量明确标记；合成、真实模型、专业评价分开结论；G2 按完整范围验收 | LV/QA，LV 主责 |
 

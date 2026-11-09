@@ -5,8 +5,8 @@ v2 为编码助手从单一虚构案件构造的回归集，未经律师或独�
 ## 离线采集及冻结盲审
 
 ```sh
-uv run --locked python scripts/build_answer_eval.py
-uv run --locked python scripts/run_answer_judge.py --collect-rules \
+uv run --locked python scripts/evaluation/build_answer_eval.py
+uv run --locked python scripts/evaluation/run_answer_judge.py --collect-rules \
   --answers-output output/answer-review/rule-answers.json \
   --review-directory output/answer-review/blind \
   --review-archive output/answer-review/blind.zip \
@@ -28,7 +28,7 @@ uv run --locked python scripts/run_answer_judge.py --collect-rules \
 ## 显式运行真实 Judge
 
 ```sh
-uv run --locked python scripts/run_answer_judge.py \
+uv run --locked python scripts/evaluation/run_answer_judge.py \
   --answers output/answer-review/rule-answers.json --judge \
   --endpoint http://127.0.0.1:8000/v1 --judge-model ACTUAL_MODEL_ID \
   --output output/answer-review/judge-report.json
@@ -41,7 +41,7 @@ uv run --locked python scripts/run_answer_judge.py \
 ## 从冻结结果离线复算 κ
 
 ```sh
-uv run --locked python scripts/run_answer_judge.py \
+uv run --locked python scripts/evaluation/run_answer_judge.py \
   --answers output/answer-review/rule-answers.json \
   --judge-results output/answer-review/judge-report.json \
   --human-labels output/answer-review/human-labels.json \

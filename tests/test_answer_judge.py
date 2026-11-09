@@ -11,7 +11,7 @@ from app.evaluation.answer_eval import JUDGE_PROMPT_VERSION, cohen_kappa, judge_
 from app.evaluation.answer_judge_client import request_judge
 from app.evaluation.answer_review import human_agreement, review_manifest
 from app.llm.forge_governance import BackendAdmissionError, BackendLedger
-from scripts.run_answer_judge import cached_judges, main, read_json, run_judges
+from scripts.evaluation.run_answer_judge import cached_judges, main, read_json, run_judges
 
 DATASET = Path(__file__).resolve().parents[1] / "benchmarks/answer_eval/v2/dataset.json"
 VALID = {"coverage_ok": True, "unsupported_claims": [], "citation_ok": True, "refusal_ok": True, "rationale": "合成判定"}
@@ -166,7 +166,7 @@ def test_cached_judge_and_complete_fixture_humans_recompute_without_network():
 
 
 def test_legacy_rule_human_comparison_also_rejects_truthy_string_labels():
-    from scripts.run_answer_eval import main as legacy_main
+    from scripts.evaluation.run_answer_eval import main as legacy_main
     _, answers, _, _, _ = sample()
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)

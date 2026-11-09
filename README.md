@@ -82,14 +82,14 @@ benchmarks/   评测数据集与历史实验产物（LawBench 上游数据、结
 scripts/      发布、运维与维护工具（环境自检、备份、语料构建、发布打包）
 docs/         架构说明、运维手册、评测口径与求职材料；过程记录归档在 docs/history/
 
-unified_benchmark_runner.py   模型评测公开入口
-rag_project_benchmark.py      项目 RAG 页级检索回归入口
-verify_benchmark_run.py       评测产物完整性与评分复算校验
-compare_agent_runtimes.py     双运行时对比入口
+scripts/benchmarks/unified_benchmark_runner.py   模型评测公开入口
+scripts/benchmarks/rag_project_benchmark.py      项目 RAG 页级检索回归入口
+scripts/benchmarks/verify_benchmark_run.py       评测产物完整性与评分复算校验
+scripts/benchmarks/compare_agent_runtimes.py     双运行时对比入口
 BENCHMARK_TEST_PLAN.md        评测验证计划
 ```
 
-评测**入口脚本有意保留在根目录**，由 `.gitignore` 白名单与[发布白名单](scripts/package_release.py)显式维护，使公开发布入口一眼可见；评测**数据与产物**则归入 `benchmarks/`，避免把可执行代码混入评测资产树。这是设计结果，不是历史残留。
+评测**入口脚本有意保留在根目录**，由 `.gitignore` 白名单与[发布白名单](scripts/ops/package_release.py)显式维护，使公开发布入口一眼可见；评测**数据与产物**则归入 `benchmarks/`，避免把可执行代码混入评测资产树。这是设计结果，不是历史残留。
 
 `data/`、`models/`、`output/` 是本地运行边界（数据库、上传、导出、模型权重与实验产物），永不入库。
 
@@ -106,7 +106,7 @@ BENCHMARK_TEST_PLAN.md        评测验证计划
 | 协作 | 案件信息可修改；材料目录与单页原文可人工纠错，原文纠错使引用不再匹配的“已确认”证据退回待复核；成员目录、案件分工（承办/复核/助理/只读）与角色权限收窄；人工任务可指派到人、设期限、提交、退回（必须写原因）、确认完成，流转留痕；报告具备草稿/待复核/已退回/已批准/已作废状态并绑定材料快照，材料变化后批准自动失效；改动写入字段级审计 | 部署验收按[多人协作首版计划](docs/history/migration/collaboration-first-release-plan-20261027.md)推进 |
 | 审计与可观测 | 业务审计、独立 `security_events`（不随案件删除消失）、请求关联 ID、结构化 JSON 日志；逐次模型调用记录 tokens、总延迟与首 token 延迟，缺失值保持未知而非按零计 | 外部独立审计存储（防管理员篡改）待建设 |
 | 导出 | 案件包导出附 `清单.json`（哈希、审批状态与报告绑定）；正式交付要求存在**已批准且材料快照未变化**的报告，包内记录报告版本、复核人与批准人 | 导出为人工授权动作，不自动外发；预览包不要求签发 |
-| 部署 | 非 root Docker 镜像与 compose（web/worker/redis）；`scripts/data_snapshot.py` 停写备份与恢复；`scripts/collaboration_acceptance.py` 只读验收与备份恢复演练（身份、成员、schema、容量、依据失效） | 未做在线热备、异地复制与自动故障转移；验收脚本不替代律师业务验收 |
+| 部署 | 非 root Docker 镜像与 compose（web/worker/redis）；`scripts/ops/data_snapshot.py` 停写备份与恢复；`scripts/acceptance/collaboration_acceptance.py` 只读验收与备份恢复演练（身份、成员、schema、容量、依据失效） | 未做在线热备、异地复制与自动故障转移；验收脚本不替代律师业务验收 |
 | 供应链 | 依赖锁定带哈希、每周 pip-audit + gitleaks 扫描、发布白名单拒绝符号链接 | 扫描为周检，不替代发版前人工审查 |
 
 ## 3. RAG 检索策略
@@ -193,7 +193,7 @@ Agent 专家协作使用来源绑定的结构化交接：事实摘录、证据�
 ```bash
 python3 -m pip install uv==0.12.0
 uv sync --locked --group dev
-uv run python scripts/doctor.py            # 环境自检
+uv run python scripts/ops/doctor.py            # 环境自检
 # 首次运行或更新前端后，使用 frontend/.node-version 的 Node 和 packageManager 指定的 pnpm
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir frontend build:static
@@ -211,7 +211,7 @@ OCR 依赖：
 brew install poppler tesseract tesseract-lang
 # Debian/Ubuntu
 sudo apt-get install poppler-utils tesseract-ocr tesseract-ocr-chi-sim
-uv run python scripts/doctor.py --require-ocr
+uv run python scripts/ops/doctor.py --require-ocr
 ```
 
 ### 6.2 批量导入（可选）
@@ -260,7 +260,7 @@ docker compose up -d
 ## 8. 运维
 
 - **健康检查**：`GET /api/health`（存活）；`GET /api/system/health`（就绪：启动完成 + 数据库可读才 200，Redis 状态单独报告，批量导入能力随之启停）。
-- **备份恢复**：`scripts/data_snapshot.py` 基于停写快照，含完整性/外键校验、清单哈希与恢复工具；Redis 与 `.env` 不在默认备份内。恢复演练流程见[发布手册](docs/runbook/release.md)。
+- **备份恢复**：`scripts/ops/data_snapshot.py` 基于停写快照，含完整性/外键校验、清单哈希与恢复工具；Redis 与 `.env` 不在默认备份内。恢复演练流程见[发布手册](docs/runbook/release.md)。
 - **日志与排查**：`LAW_REVIEW_JSON_LOGS=1` 输出结构化日志；日志不含原始卷宗内容、令牌或连接串。批量导入问题按运维手册的 503/排队排查节处理。
 - **升级**：SQLite schema 有序迁移（当前 v26），拒绝未来版本；跨版本升级前先做备份，迁移失败自动回滚。v13 增加页内子块缓存，v16/v17 增加隔离宿主回执、恢复映射和受控后端调用账本（这些表不自动开放正式模型入口），v18–v20 增加多轮会话关联、模型调用账本与聊天请求幂等记录，v23–v26 增加成员与案件分工、人工任务、报告复核与版本化签发。旧库升级已在获准旧库的副本上从 v13 实测到 v26 并验证旧程序回退。
 
@@ -271,8 +271,8 @@ docker compose up -d
 ```bash
 uv run --locked ruff check app tests scripts
 uv run --locked mypy
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests scripts/test_engineering.py scripts/test_data_snapshot.py \
-  scripts/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest tests tests/test_engineering.py tests/test_data_snapshot.py \
+  tests/test_snapshot_runtime.py -p pytest_cov -p pytest_socket --disable-socket --allow-unix-socket \
   --cov=app --cov-branch --cov-report=term-missing
 # 本机若存在 output/score85 下的旧法条资产，需显式指定冻结资产根目录，否则两项旧断言会失败（见 docs/benchmarks/collaboration-corpus-recovery-20261028.md）
 # LAW_REVIEW_CORPUS_REGRESSION_ROOT=<冻结资产目录> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --locked pytest ...
@@ -289,13 +289,13 @@ pnpm --dir frontend test:e2e
 
 | 层级 | 用途 | 入口 |
 |---|---|---|
-| 模型 LawBench | 法律任务混合指标，不等于应用准确率 | `unified_benchmark_runner.py` |
-| 项目 RAG | 页级召回和排序，不等于答案事实正确率 | `rag_project_benchmark.py` |
-| 法条检索 | 冻结 gold 上的配对排序评测（hit@5 / MRR@10 / nDCG@10），衡量是否检索到正确法条与条号，不等于法条现行有效性 | `scripts/statutory_hybrid_experiment.py`、`scripts/statutory_gold_report.py` |
-| 答案级 | 必需要点、无据断言与引用页可接受性；确定性评分 + 可选 judge，不等于法律准确率 | `scripts/run_answer_eval.py` |
-| 运行时对比 | 双运行时结构、契约、性能与恢复 | `compare_agent_runtimes.py` |
+| 模型 LawBench | 法律任务混合指标，不等于应用准确率 | `scripts/benchmarks/unified_benchmark_runner.py` |
+| 项目 RAG | 页级召回和排序，不等于答案事实正确率 | `scripts/benchmarks/rag_project_benchmark.py` |
+| 法条检索 | 冻结 gold 上的配对排序评测（hit@5 / MRR@10 / nDCG@10），衡量是否检索到正确法条与条号，不等于法条现行有效性 | `scripts/benchmarks/statutory_hybrid_experiment.py`、`scripts/benchmarks/statutory_gold_report.py` |
+| 答案级 | 必需要点、无据断言与引用页可接受性；确定性评分 + 可选 judge，不等于法律准确率 | `scripts/evaluation/run_answer_eval.py` |
+| 运行时对比 | 双运行时结构、契约、性能与恢复 | `scripts/benchmarks/compare_agent_runtimes.py` |
 
-- **LawBench 全量成绩**（2026-09-14，`Qwythos-9B-v2-8bit-mlx` + task_guided 提示 + canonical 85 部法条库，20 类 × 500 题 = 10,000 题，零技术失败、零截断，`verify_benchmark_run.py` 校验通过）：**混合均分 63.32%**（20 任务等权平均，同配置历史基线 62.75%）。
+- **LawBench 全量成绩**（2026-09-14，`Qwythos-9B-v2-8bit-mlx` + task_guided 提示 + canonical 85 部法条库，20 类 × 500 题 = 10,000 题，零技术失败、零截断，`scripts/benchmarks/verify_benchmark_run.py` 校验通过）：**混合均分 63.32%**（20 任务等权平均，同配置历史基线 62.75%）。
 
 | 任务 | 分数 | 任务 | 分数 | 任务 | 分数 | 任务 | 分数 |
 |---|---:|---|---:|---|---:|---|---:|

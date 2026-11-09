@@ -8,7 +8,7 @@ import pytest
 
 from app.benchmarks.statutory_gold import citations, gold_citations
 from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from scripts.statutory_gold_report import evaluate_task, resolve
+from scripts.benchmarks.statutory_gold_report import evaluate_task, resolve
 
 
 @pytest.mark.parametrize("text,expected", [
@@ -87,7 +87,7 @@ def corpus(tmp_path):
 
 
 def test_resolve_maps_aliases_and_reports_missing(corpus):
-    from scripts.statutory_gold_report import alias_index
+    from scripts.benchmarks.statutory_gold_report import alias_index
 
     index = alias_index([LegalCorpus(corpus[0])])
     gold, missing = resolve([("刑法", 264), ("不存在法", 1)], index)

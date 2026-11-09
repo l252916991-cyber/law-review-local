@@ -4,8 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import unified_benchmark_runner as runner
-from verify_benchmark_run import verify
+from scripts.benchmarks import unified_benchmark_runner as runner
+from scripts.benchmarks.verify_benchmark_run import verify
 
 
 def _record(task: str, index: int = 0) -> dict:

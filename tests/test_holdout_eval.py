@@ -16,7 +16,7 @@ from app.evaluation.collaboration_ablation import (
     prepare_batch,
     run_batch,
 )
-from scripts.build_holdout_eval import build, load_cases, main, validate_cross_case
+from scripts.evaluation.build_holdout_eval import build, load_cases, main, validate_cross_case
 
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "benchmarks/answer_eval/holdout-v1"

@@ -63,5 +63,5 @@ val loss 由 1.61 降至 **1.462@2400（最低点）**，选该 checkpoint。曲
 ## 证据位置
 
 - 训练：`output/sft-38-v2/adapter/{0000400,adapter-r2c/serve-2400}`、`train-r2c.log`（完整 val 曲线）
-- 数据：`output/sft-38-v2/manifest.json`、`scripts/build_38_sft_data_v2.py`
+- 数据：`output/sft-38-v2/manifest.json`、`scripts/benchmarks/build_38_sft_data_v2.py`
 - 评测：`output/sft-38-v2/full-3-8-{on,off}`（全量 500 题配对）、`campaign-e2e-dense/runs/dev20-38-sft2-*`、`dev10-12-sft2-*`

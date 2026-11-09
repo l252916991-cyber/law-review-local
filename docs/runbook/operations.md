@@ -6,7 +6,7 @@
 
 多人律所部署前按 [deployment-acceptance.md](deployment-acceptance.md) 逐项执行；当前 compose 只向 loopback 发布 Web 端口，生产必须由 TLS 代理提供 HSTS，并通过 `LAW_REVIEW_ALLOWED_HOSTS` 配置正式域名。
 
-执行 `uv run python scripts/doctor.py --require-ocr`，检查 Python 3.11–3.14、SQLite FTS5、Python 包、Poppler 三个命令及 Tesseract `chi_sim`/`eng`。此命令不探测模型、不读取案件。缺少 OCR 时仍可使用纯文本/DOCX。
+执行 `uv run python scripts/ops/doctor.py --require-ocr`，检查 Python 3.11–3.14、SQLite FTS5、Python 包、Poppler 三个命令及 Tesseract `chi_sim`/`eng`。此命令不探测模型、不读取案件。缺少 OCR 时仍可使用纯文本/DOCX。
 
 复制 `.env.example` 为 `.env` 后人工核对；在每个服务终端显式 `set -a; . ./.env; set +a`。不要在共享终端打印 token 或带密码的 Redis URL。服务应从项目根目录启动；相对数据目录以进程工作目录为准。
 
@@ -69,7 +69,7 @@ token 模式的 `LAW_REVIEW_API_TOKENS_JSON` 是“随机 token → principal �
 
 前置：在独立目录演练，禁止触碰真实案件数据。记录每次演练的实际数据损失窗口与总耗时。
 
-1. `python scripts/data_snapshot.py --output /tmp/drill-$(date +%Y%m%d)` 生成停写快照（业务库 + checkpoint + 文件清单哈希）。
+1. `python scripts/ops/data_snapshot.py --output /tmp/drill-$(date +%Y%m%d)` 生成停写快照（业务库 + checkpoint + 文件清单哈希）。
 2. 模拟原环境不可用：清空 `LAW_REVIEW_DATA_DIR` 指向的新目录，将快照恢复到该目录，并确认恢复工具的路径重定位输出。
 3. 用恢复后的目录启动服务（`LAW_REVIEW_AUTH_MODE=local`、指向空 Redis 或跳过批量导入），验证：案件列表可读、文档原文可下载、证据与确认状态完整、清单哈希与快照清单一致。
 4. 故障注入核查：`PRAGMA integrity_check` 与外键检查在恢复副本上执行；缺失文件应被恢复工具标记而非静默跳过。

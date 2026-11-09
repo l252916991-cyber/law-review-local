@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.local_workflow_acceptance import Session, check_package, local_url, run, write_json
+from scripts.acceptance.local_workflow_acceptance import Session, check_package, local_url, run, write_json
 
 
 class LocalWorkflowToolTest(unittest.TestCase):
@@ -32,7 +32,7 @@ class LocalWorkflowToolTest(unittest.TestCase):
             output = Path(directory)
             marker = output / "existing.txt"
             marker.write_text("preserve")
-            with patch("scripts.local_workflow_acceptance.exercise") as exercise:
+            with patch("scripts.acceptance.local_workflow_acceptance.exercise") as exercise:
                 with self.assertRaisesRegex(RuntimeError, "new directory"):
                     run(output)
                 exercise.assert_not_called()
@@ -43,7 +43,7 @@ class LocalWorkflowToolTest(unittest.TestCase):
         journal = []
         session = Session("http://127.0.0.1:8765", "admin", journal)
         token = "synthetic-private-token"
-        with patch("scripts.local_workflow_acceptance._request", return_value=(200, b'{"name":"synthetic"}', {})):
+        with patch("scripts.acceptance.local_workflow_acceptance._request", return_value=(200, b'{"name":"synthetic"}', {})):
             self.assertEqual(session.login(token), {"name": "synthetic"})
         self.assertNotIn(token, json.dumps(journal))
         self.assertNotIn("synthetic", json.dumps(journal))

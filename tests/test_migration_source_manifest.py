@@ -6,7 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from scripts.migration_source_manifest import build_manifest, main
+from scripts.ops.migration_source_manifest import build_manifest, main
 
 
 def git(root: Path, *arguments: str) -> str:

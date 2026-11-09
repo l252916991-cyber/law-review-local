@@ -63,7 +63,7 @@ uv run --locked python scripts/eval_dataset_custody.py agreement \
 
 ## 5. 四类实际故障注入
 
-[异常脚本](../../../scripts/eval_transport_faults.py)通过真实回环TCP服务，分别经过实际 `ablation.live_generator` 和 `services.chat` 落库路径，每故障/每路径5次，另有两个健康控制。共40次注入＋2次健康控制，全部技术检查通过。
+[异常脚本](../../../scripts/evaluation/eval_transport_faults.py)通过真实回环TCP服务，分别经过实际 `ablation.live_generator` 和 `services.chat` 落库路径，每故障/每路径5次，另有两个健康控制。共40次注入＋2次健康控制，全部技术检查通过。
 
 | 故障 | 证据 | 最大实测耗时 |
 |---|---|---:|

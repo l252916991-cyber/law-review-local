@@ -1,6 +1,6 @@
 # 答案质量门禁
 
-改动提示词、检索、路由、可答性判断或换模型之前，先跑门禁：在冻结的 v2 评测集（演示案件 60 题）上，本次结果不能比已登记的基线差。实现见 `app/evaluation/eval_gate.py`，命令行入口为 `scripts/eval_gate.py`。
+改动提示词、检索、路由、可答性判断或换模型之前，先跑门禁：在冻结的 v2 评测集（演示案件 60 题）上，本次结果不能比已登记的基线差。实现见 `app/evaluation/eval_gate.py`，命令行入口为 `scripts/evaluation/eval_gate.py`。
 
 ## 两种模式
 
@@ -15,14 +15,14 @@
 
 ```sh
 # 与已登记基线比较；通过退出 0，被拦下退出 1
-uv run --locked python scripts/eval_gate.py --report output/eval-gate.json
+uv run --locked python scripts/evaluation/eval_gate.py --report output/eval-gate.json
 
 # 本机真实模型（端点必须是回环地址）
-uv run --locked python scripts/eval_gate.py --mode model \
+uv run --locked python scripts/evaluation/eval_gate.py --mode model \
   --endpoint http://127.0.0.1:8000/v1 --model ACTUAL_MODEL_ID
 
 # 有意改动并确认结果后登记新基线；原因与上一版摘要写进 history
-uv run --locked python scripts/eval_gate.py --update-baseline --reason "说明改了什么、为什么可以接受"
+uv run --locked python scripts/evaluation/eval_gate.py --update-baseline --reason "说明改了什么、为什么可以接受"
 ```
 
 模型模式的基线已登记：本机 Qwen3.8-27B 4-bit，首轮 51/60，按失败题修复后第二轮 57/60（2026-11-02，[两轮记录与复核](../history/eval-gate-model-baseline-20261102.md)）；评分升为 v4 后，改用第三次运行（a71abd4）的回答重新评分登记，60/60。要和它比较，端点、模型名、`LAW_REVIEW_LLM_TEMPERATURE=0.2`、`LAW_REVIEW_LLM_MAX_TOKENS=700` 需与登记时一致，否则比较的是另一套推理配置。如果没有任何一题实际调用到模型（端点不通、模型名错误），门禁报配置错误，不会把规则回答当成模型结果。单题模型调用失败记为该题失败，不跳过。
@@ -30,7 +30,7 @@ uv run --locked python scripts/eval_gate.py --update-baseline --reason "说明�
 模型模式一轮要二十多分钟。已经跑完并复核过的报告可以直接登记，不必重跑：
 
 ```sh
-uv run --locked python scripts/eval_gate.py --update-baseline --from-report output/.../report.json --reason "..."
+uv run --locked python scripts/evaluation/eval_gate.py --update-baseline --from-report output/.../report.json --reason "..."
 ```
 
 门禁会用当前代码重新算推理清单：门禁版本、提示词、推理模块摘要、评测集、数据库后端任何一项与报告不同都拒绝登记，并列出不同的项；模型名、端点与采样参数取自报告。基线里记下报告文件的 SHA-256。
@@ -42,7 +42,7 @@ uv run --locked python scripts/eval_gate.py --update-baseline --from-report outp
 门禁的分数只能和**同一个模型**的基线比。评分按基线模型的写法校准，换模型后分数的差距里混着格式、评分口径和真实质量（[跨模型记录](../history/eval-gate-cross-model-20261107.md)：35B-A3B 两次运行的 18 道失败题里没有一道是回答本身错了）。所以给其他模型单独指定基线文件：
 
 ```sh
-uv run --locked python scripts/eval_gate.py --mode model --endpoint http://127.0.0.1:8000/v1 \
+uv run --locked python scripts/evaluation/eval_gate.py --mode model --endpoint http://127.0.0.1:8000/v1 \
   --model OTHER_MODEL_ID --baseline benchmarks/eval_gate/baseline-model-OTHER.json --report output/other.json
 ```
 
@@ -53,7 +53,7 @@ uv run --locked python scripts/eval_gate.py --mode model --endpoint http://127.0
 改回答契约、引用处理、可答性或评分时，可以用保存的真实模型输出检验，不需要跑模型的机器：
 
 ```sh
-uv run --locked python scripts/replay_model_gate.py output/eval-gate-models-.../MODEL_DIR --report output/replay.json
+uv run --locked python scripts/evaluation/replay_model_gate.py output/eval-gate-models-.../MODEL_DIR --report output/replay.json
 ```
 
 脚本在本地起一个假端点，按问题返回该次运行保存在 `model-calls.jsonl` 里的原始输出，然后在当前代码上跑一遍模型模式。记录里必须是模型返回的原文：维护者本机的采集脚本从 2026-11-07 起在来源标记改写之前取文本（改写后的文本另存为 `rewritten_answer`）；此前用带改写的代码采集的两次运行（35B 第二次、27B 第三次）存的是改写之后的文本，只能用来检验改写之后的代码。先用运行时的代码回放，结果必须与原报告逐题一致，回放才可信；再用改动后的代码回放，看哪些题变了。如果改动影响了送给模型的问题或检索结果，找不到对应输出的调用会被列出（退出码 1），这时只能重新跑模型。回放报告里的时延不是模型时延。

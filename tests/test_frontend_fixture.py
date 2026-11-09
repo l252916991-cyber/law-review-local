@@ -1,5 +1,5 @@
 """Keep browser test model scenarios independent across browser projects."""
-from scripts.stub_model import CHAT_MODEL, FALLBACK_MODEL, INVALID_ANSWER, VALID_ANSWER, StubModel
+from scripts.acceptance.stub_model import CHAT_MODEL, FALLBACK_MODEL, INVALID_ANSWER, VALID_ANSWER, StubModel
 
 
 def test_repeatable_fallback_rejects_each_primary_and_accepts_only_fallback():

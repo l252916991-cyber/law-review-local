@@ -21,7 +21,7 @@ jobs:
           python-version: '3.12'
       - name: Build and verify allowlisted source archive
         run: |
-          python scripts/package_release.py --output "$RUNNER_TEMP/lexvault-source.zip"
+          python scripts/ops/package_release.py --output "$RUNNER_TEMP/lexvault-source.zip"
           python - "$RUNNER_TEMP/lexvault-source.zip" "$RUNNER_TEMP/source" <<'PY'
           import hashlib, json, pathlib, sys, zipfile
           path, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
@@ -65,7 +65,7 @@ jobs:
             sleep 2
           done
           curl --fail --silent http://127.0.0.1:18919/api/health >/dev/null
-          python "$RUNNER_TEMP/source/scripts/delivery_smoke.py" \
+          python "$RUNNER_TEMP/source/scripts/acceptance/delivery_smoke.py" \
             --base-url http://127.0.0.1:18919 --mode offline
       - name: Inspect service on failure and remove disposable data
         if: always()

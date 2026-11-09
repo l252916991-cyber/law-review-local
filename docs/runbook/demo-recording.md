@@ -37,11 +37,11 @@ LEXVAULT_BROWSER_PATH=/absolute/path/to/chromium-family-browser \
 
 ```sh
 D=output/portfolio-demo/anomaly-YYYYMMDD
-uv run --locked python scripts/demo_recovery_check.py --phase interrupt \
+uv run --locked python scripts/ops/demo_recovery_check.py --phase interrupt \
   --data-dir "$D/case-reuse" --output "$D/01-interrupt.json"
-uv run --locked python scripts/demo_recovery_check.py --phase resume \
+uv run --locked python scripts/ops/demo_recovery_check.py --phase resume \
   --data-dir "$D/case-reuse" --output "$D/02-resume.json" --state "$D/01-interrupt.json"
-uv run --locked python scripts/demo_recovery_check.py --phase tamper \
+uv run --locked python scripts/ops/demo_recovery_check.py --phase tamper \
   --data-dir "$D/case-tamper" --output "$D/03-tamper.json"
 ```
 

@@ -7,8 +7,8 @@
 - 新增`--suite challenges`：劳动、知识产权、建设工程、伤害四个独立案件，12道相似页、文字变体、多方面证据诊断题。同案件变体按同一聚类统计。
 
 ```sh
-uv run --locked python rag_project_benchmark.py --suite challenges --k 2 --embedding-mode hashed-local --reranker off --output-dir output/rag-challenges-local
-uv run --locked python rag_project_benchmark.py --suite challenges --k 2 --embedding-mode model --reranker on --output-dir output/rag-challenges-full
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite challenges --k 2 --embedding-mode hashed-local --reranker off --output-dir output/rag-challenges-local
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite challenges --k 2 --embedding-mode model --reranker on --output-dir output/rag-challenges-full
 ```
 
 2026-09-09实测：hashed-local完整召回10/12，多方面证据2/4；模型embedding+重排完整召回11/12，多方面证据3/4。后者12题均为omlx后端，零降级，重排全部启用。配对recall差+0.0417，案件聚类95%区间[0,0.125]；样本只够诊断，不能证明总体收益。伤害案仍遗漏伤情页。
@@ -26,12 +26,12 @@ uv run --locked python rag_project_benchmark.py --suite challenges --k 2 --embed
 四臂同一数据集、同一 `k`、同一后端：
 
 ```sh
-uv run --locked python rag_project_benchmark.py --suite long-pages-v2 --k 3 --output-dir output/rc/A   # 页级基线
-uv run --locked python rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite long-pages-v2 --k 3 --output-dir output/rc/A   # 页级基线
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
   --output-dir output/rc/B --paired-with output/rc/A                                                  # 子块 exact-scan
-uv run --locked python rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
   --child-chunk-profile whole-page --output-dir output/rc/C --paired-with output/rc/B                 # 窗口消融
-uv run --locked python rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
+uv run --locked python scripts/benchmarks/rag_project_benchmark.py --suite long-pages-v2 --k 3 --page-children \
   --child-pipeline unified --output-dir output/rc/D --paired-with output/rc/A                         # 共享管线
 ```
 

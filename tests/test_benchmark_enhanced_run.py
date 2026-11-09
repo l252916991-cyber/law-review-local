@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-import scripts.benchmark_enhanced_run as enhanced
-import unified_benchmark_runner as runner
+import scripts.benchmarks.benchmark_enhanced_run as enhanced
+from scripts.benchmarks import unified_benchmark_runner as runner
 
 
 def _fake_solve(recorded: list[dict]) -> object:

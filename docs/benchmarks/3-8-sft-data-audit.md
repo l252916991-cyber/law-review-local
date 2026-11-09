@@ -21,7 +21,7 @@
 给 Pair 样本配依据。两个库均未在本机预置，2026-09-13 从 HuggingFace 下载至 `output/sft-audit-38/`
 （85.5MB + 94MB + 24MB，不入库）。
 
-## 3. 泄漏审计（对 LawBench 3-8 全部 500 题，scripts/audit_38_sft_data.py）
+## 3. 泄漏审计（对 LawBench 3-8 全部 500 题，scripts/benchmarks/audit_38_sft_data.py）
 
 方法：归一化精确匹配 + 对称字符 8-gram containment（近重复阈值 0.5，观察区 0.3）。
 

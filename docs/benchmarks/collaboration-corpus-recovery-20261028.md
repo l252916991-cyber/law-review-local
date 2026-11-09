@@ -22,7 +22,7 @@
 
 ## 复验
 
-将清单中的七个来源目录放入新的私有根目录，禁止覆盖现有 `output/score85/`。新获取的五份文本使用更新后的 `scripts/build_legal_corpus.py --source <ID> --output <新目录>` 构建，再用 `--verify` 检查；其余两份冻结来源按 manifest 摘要从获准归档恢复。
+将清单中的七个来源目录放入新的私有根目录，禁止覆盖现有 `output/score85/`。新获取的五份文本使用更新后的 `scripts/corpus/build_legal_corpus.py --source <ID> --output <新目录>` 构建，再用 `--verify` 检查；其余两份冻结来源按 manifest 摘要从获准归档恢复。
 
 ```sh
 LAW_REVIEW_CORPUS_REGRESSION_ROOT=/absolute/private/frozen-inputs \

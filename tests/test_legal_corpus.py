@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-import scripts.build_legal_corpus as corpus_builder
+import scripts.corpus.build_legal_corpus as corpus_builder
 from app.retrieval.legal_corpus import (
     SCHEMA_VERSION,
     LegalCorpus,
@@ -15,7 +15,7 @@ from app.retrieval.legal_corpus import (
     html_to_text,
     split_articles,
 )
-from scripts.build_legal_corpus import build_document
+from scripts.corpus.build_legal_corpus import build_document
 
 
 def test_ministry_supplement_sources_are_complete_official_publications():

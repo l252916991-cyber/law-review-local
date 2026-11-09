@@ -45,7 +45,7 @@
 ## 4. 运行步骤（源码路径，已实测）
 
 ```sh
-uv run --locked python scripts/package_release.py --output output/portfolio-repro/lexvault-source-YYYYMMDD.zip
+uv run --locked python scripts/ops/package_release.py --output output/portfolio-repro/lexvault-source-YYYYMMDD.zip
 unzip -q output/portfolio-repro/lexvault-source-YYYYMMDD.zip -d /tmp/portfolio-repro
 cd /tmp/portfolio-repro && uv sync --locked --no-dev --offline
 
@@ -54,7 +54,7 @@ LAW_REVIEW_AUTH_MODE=token LAW_REVIEW_ALLOWED_HOSTS=127.0.0.1,localhost \
 LAW_REVIEW_API_TOKENS_JSON='{"<32 字节以上随机令牌>": {"name": "管理员", "admin": true}}' \
   uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 18766
 
-LAW_REVIEW_SMOKE_TOKEN=<同一令牌> uv run --locked python scripts/delivery_smoke.py \
+LAW_REVIEW_SMOKE_TOKEN=<同一令牌> uv run --locked python scripts/acceptance/delivery_smoke.py \
   --base-url http://127.0.0.1:18766 --mode offline
 ```
 
@@ -63,18 +63,18 @@ LAW_REVIEW_SMOKE_TOKEN=<同一令牌> uv run --locked python scripts/delivery_sm
 三组对照（无需模型也可复现到“冻结提示”这一步）：
 
 ```sh
-uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
+uv run --locked python scripts/evaluation/run_collaboration_ablation.py --mode prepare \
   --output output/portfolio-ablation/dev-YYYYMMDD
-uv run --locked python scripts/run_collaboration_ablation.py --mode precheck \
+uv run --locked python scripts/evaluation/run_collaboration_ablation.py --mode precheck \
   --output output/portfolio-ablation/dev-YYYYMMDD
 ```
 
 恢复/拒用片段：
 
 ```sh
-uv run --locked python scripts/demo_recovery_check.py --phase interrupt --data-dir /tmp/demo/case --output /tmp/demo/01.json
-uv run --locked python scripts/demo_recovery_check.py --phase resume --data-dir /tmp/demo/case --output /tmp/demo/02.json --state /tmp/demo/01.json
-uv run --locked python scripts/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
+uv run --locked python scripts/ops/demo_recovery_check.py --phase interrupt --data-dir /tmp/demo/case --output /tmp/demo/01.json
+uv run --locked python scripts/ops/demo_recovery_check.py --phase resume --data-dir /tmp/demo/case --output /tmp/demo/02.json --state /tmp/demo/01.json
+uv run --locked python scripts/ops/demo_recovery_check.py --phase tamper --data-dir /tmp/demo/tamper --output /tmp/demo/03.json
 ```
 
 ## 4.1 质量基线（2026-11-09，提交 `993d893`）

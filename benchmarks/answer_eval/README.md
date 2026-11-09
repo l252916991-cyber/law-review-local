@@ -15,8 +15,8 @@
 每题包含案情、问题、必需要点、可接受页、拒答预期和场景类别。v2 可回答题必须有可接受引用；关键词规则仍可能因同义表述或否定句产生误判。来源摘要证明冻结内容一致，不能证明事实或法律判断真实。
 
 ```sh
-uv run --locked python scripts/build_answer_eval.py
-uv run --locked python scripts/run_answer_eval.py --dataset benchmarks/answer_eval/v2/dataset.json --answers /path/to/answers.json --output output/answer-v2/report.json
+uv run --locked python scripts/evaluation/build_answer_eval.py
+uv run --locked python scripts/evaluation/run_answer_eval.py --dataset benchmarks/answer_eval/v2/dataset.json --answers /path/to/answers.json --output output/answer-v2/report.json
 ```
 
 构建/核对使用临时合成数据库，不接触运行数据，不调用模型。缺少冻结输出时显式 `--write`；已有产物不同则拒绝覆盖，应建立新版本及其生成规则。`manifest.json` 记录题目、来源、最终数据集摘要和分组数量。
@@ -27,11 +27,11 @@ uv run --locked python scripts/run_answer_eval.py --dataset benchmarks/answer_ev
 
 `holdout-v1/cases.json` 是作者编写的 6 个独立虚构案例（建设工程、劳动争议、买卖质量异议、民间借贷、交通事故、股权转让），每案 2 份文书共 24 页、4 题，合计 24 题：正常 12、候选矛盾 6、资料不足 3、无关 2、法条缺失 1。案例与开发集在当事人、金额、文书名和问题上都不同，不共享任何页面。
 
-`holdout-v1/dataset.json` 由 fixture 派生并冻结：来源逐页摘要、`source_sha256`、每题的 `case_id` 与 `case_description`。`scripts/build_holdout_eval.py` 额外校验“题目只能引用本案例页面”，并拒绝跨案例引用。
+`holdout-v1/dataset.json` 由 fixture 派生并冻结：来源逐页摘要、`source_sha256`、每题的 `case_id` 与 `case_description`。`scripts/evaluation/build_holdout_eval.py` 额外校验“题目只能引用本案例页面”，并拒绝跨案例引用。
 
 ```sh
-uv run --locked python scripts/build_holdout_eval.py            # 核对冻结产物
-uv run --locked python scripts/run_collaboration_ablation.py --mode prepare \
+uv run --locked python scripts/evaluation/build_holdout_eval.py            # 核对冻结产物
+uv run --locked python scripts/evaluation/run_collaboration_ablation.py --mode prepare \
   --dataset benchmarks/answer_eval/holdout-v1/dataset.json --output output/portfolio-ablation/holdout-v1
 ```
 

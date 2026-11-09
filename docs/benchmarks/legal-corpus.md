@@ -1,6 +1,6 @@
 # 独立官方法条语料
 
-`app/legal_corpus.py` 与 `scripts/build_legal_corpus.py` 提供按法律版本隔离的全文下载、按条切分、条号精确查询及中文二元词检索。模块不会读取基准答案、旧预测、应用案件数据库或调用本地模型，也尚未改变应用的默认检索行为。
+`app/legal_corpus.py` 与 `scripts/corpus/build_legal_corpus.py` 提供按法律版本隔离的全文下载、按条切分、条号精确查询及中文二元词检索。模块不会读取基准答案、旧预测、应用案件数据库或调用本地模型，也尚未改变应用的默认检索行为。
 
 语料位置是 `output/score85/legal_corpus/`。2026-09-05 首次完整构建获得 **4 部法律、5 个版本、1998 个条文单元**：
 
@@ -51,8 +51,8 @@ uv run --locked pytest tests/test_statutory_retrieval.py --disable-socket --allo
 ## 复现与使用
 
 ```sh
-.venv/bin/python scripts/build_legal_corpus.py --output output/score85/legal_corpus_rebuild
-.venv/bin/python scripts/build_legal_corpus.py --output output/score85/legal_corpus --verify
+.venv/bin/python scripts/corpus/build_legal_corpus.py --output output/score85/legal_corpus_rebuild
+.venv/bin/python scripts/corpus/build_legal_corpus.py --output output/score85/legal_corpus --verify
 .venv/bin/python -m pytest -q tests/test_legal_corpus.py --disable-socket --allow-unix-socket
 ```
 
@@ -91,13 +91,13 @@ matches = corpus.search("盈余 分配 成员 交易量", law_name="农民专业
 为覆盖场景到法条任务中缺失的公开部门规章，构建器新增四个独立官方来源：国务院公报公开的《道路交通安全违法行为记分管理办法》，以及国家市场监督管理总局公开的《医疗器械注册与备案管理办法》《医疗器械经营监督管理办法》《化妆品生产经营监督管理办法》。它们合计 300 个基础条文；每份文书仍执行版本证据、连续条号、法定收尾句和哈希校验。
 
 ```sh
-uv run --locked python scripts/build_legal_corpus.py \
+uv run --locked python scripts/corpus/build_legal_corpus.py \
   --output output/score85/legal_corpus_supplement_ministry_v1 \
   --source traffic-points-2021 \
   --source medical-device-registration-2021 \
   --source medical-device-operation-2022 \
   --source cosmetics-operation-2021
-uv run --locked python scripts/build_legal_corpus.py \
+uv run --locked python scripts/corpus/build_legal_corpus.py \
   --output output/score85/legal_corpus_supplement_ministry_v1 --verify
 ```
 
@@ -110,8 +110,8 @@ uv run --locked python scripts/build_legal_corpus.py \
 版本日期补充来源写入文书元数据。页面只刊载部分附件，因此索引范围明确为86条正文，附件全部排除；原始网页完整保留。
 
 ```sh
-uv run --locked python scripts/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --source traffic-police-duty-2008
-uv run --locked python scripts/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --verify
+uv run --locked python scripts/corpus/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --source traffic-police-duty-2008
+uv run --locked python scripts/corpus/build_legal_corpus.py --output output/score85/legal_corpus_supplement_police_v1 --verify
 ```
 
 构建与离线复验通过：1份文书、86条、valid=true。实验配置为 `benchmarks/score85/qwythos8bit-statutory-police-v9.json`。
@@ -125,11 +125,11 @@ uv run --locked python scripts/build_legal_corpus.py --output output/score85/leg
 `app/benchmark_retrieval.py` 增加最小回退：当问题点名某修正案、而该条不在修正案自身条文中时，落到同法制定的整合版文本按条号查询。第500题"宪法修正案2018年第一百二十六条"命中整合版宪法第一百二十六条。
 
 ```sh
-uv run --locked python scripts/build_npc_corpus.py \
+uv run --locked python scripts/corpus/build_npc_corpus.py \
   --output output/score85/legal_corpus_supplement_npc_v8 \
   --campaign <仅含宪法题的 inputs.jsonl> \
   --existing-corpus <已有语料目录，可重复>
-uv run --locked python scripts/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v8 --verify
+uv run --locked python scripts/corpus/build_npc_corpus.py --output output/score85/legal_corpus_supplement_npc_v8 --verify
 ```
 
 LawBench 1-1 法条检索覆盖由 492/500 提升到 **500/500**（按 `weak4-candidate-v1.json` 链 + npc_v8 实测）。该口径只证明条号可精确检索到官方法条，不代表生成模型最终得分；模型基准仍需授权环境实测。

@@ -7,7 +7,7 @@ import zipfile
 from copy import deepcopy
 from pathlib import Path
 
-from scripts.eval_dataset_custody import (
+from scripts.evaluation.eval_dataset_custody import (
     DIMENSIONS,
     agreement,
     annotation_package,

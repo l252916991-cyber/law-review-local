@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.fullscale_paired import load_profile, main
+from scripts.benchmarks.fullscale_paired import load_profile, main
 
 
 def write_profiles(tmp_path):
@@ -35,7 +35,7 @@ def run_main(tmp_path, limit=3):
 def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
     with patch("app.benchmarks.solver.solve", fake_solve()), \
          patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         assert run_main(tmp_path) == 0
         out = tmp_path / "out"
         for arm in ("tg", "lex"):
@@ -47,7 +47,7 @@ def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
         # Second invocation resumes from checkpoints: rows unchanged, no new solve calls.
         with patch("app.benchmarks.solver.solve", fake_solve()), \
              patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-             patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+             patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
             assert run_main(tmp_path) == 0
         rows = [json.loads(line) for line in (out / "lex" / "detailed_results.jsonl").read_text().splitlines()]
         assert len(rows) == 3
@@ -56,7 +56,7 @@ def test_fullscale_paired_runs_and_resumes(tmp_path, capsys):
 def test_fullscale_rejects_tampered_checkpoint(tmp_path):
     with patch("app.benchmarks.solver.solve", fake_solve()), \
          patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         assert run_main(tmp_path) == 0
     out = tmp_path / "out"
     path = out / "tg" / "detailed_results.jsonl"
@@ -65,7 +65,7 @@ def test_fullscale_rejects_tampered_checkpoint(tmp_path):
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     with patch("app.benchmarks.solver.solve", fake_solve()), \
          patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         with pytest.raises(ValueError, match="checkpoint input changed"):
             run_main(tmp_path)
 
@@ -87,7 +87,7 @@ def test_transport_failure_aborts_without_checkpoint(tmp_path):
 
     with patch("app.benchmarks.solver.solve", solve), \
          patch("app.benchmarks.rag_solver.solve", solve), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         tg, rag = write_profiles(tmp_path)
         with pytest.raises(RuntimeError, match="aborting tg for repair"):
             main(["--task", "3-2", "--profile-tg", str(tg), "--profile-rag", str(rag),
@@ -102,7 +102,7 @@ def test_transport_error_rows_regenerate_on_resume(tmp_path):
     out = tmp_path / "out4"
     with patch("app.benchmarks.solver.solve", fake_solve()), \
          patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         assert main(["--task", "3-2", "--profile-tg", str(tg), "--profile-rag", str(rag),
                      "--output", str(out), "--limit", "2"]) == 0
     path = out / "tg" / "detailed_results.jsonl"
@@ -112,7 +112,7 @@ def test_transport_error_rows_regenerate_on_resume(tmp_path):
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     with patch("app.benchmarks.solver.solve", fake_solve()), \
          patch("app.benchmarks.rag_solver.solve", fake_solve()), \
-         patch("scripts.fullscale_paired.corpus_fingerprint", return_value={}):
+         patch("scripts.benchmarks.fullscale_paired.corpus_fingerprint", return_value={}):
         assert main(["--task", "3-2", "--profile-tg", str(tg), "--profile-rag", str(rag),
                      "--output", str(out), "--limit", "2"]) == 0
     rows = [json.loads(line) for line in path.read_text().splitlines()]

@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts import benchmark_experiment as experiment
-from scripts.verify_campaign import verify
+from scripts.benchmarks import benchmark_experiment as experiment
+from scripts.benchmarks.verify_campaign import verify
 from tests.test_benchmark_campaign import make_campaign
 
 
@@ -99,7 +99,7 @@ def test_capacity_error_stops_after_first_record(tmp_path):
 
 
 def test_status_does_not_reuse_stale_verification(tmp_path):
-    from scripts.score85_status import summarize
+    from scripts.benchmarks.score85_status import summarize
     directory = make_campaign(tmp_path)
     profile = tmp_path / "fixture.json"
     profile.write_text(json.dumps({"model": "fixture", "strategy": "task_guided"}))

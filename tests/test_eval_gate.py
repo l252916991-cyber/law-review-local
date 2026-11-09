@@ -132,7 +132,7 @@ def test_manifest_names_the_inference_configuration(current):
 
 
 def test_cli_exit_codes(tmp_path, capsys):
-    from scripts.eval_gate import main
+    from scripts.evaluation.eval_gate import main
 
     assert main(["--baseline", str(tmp_path / "missing.json")]) == 2
     # A baseline in which one currently failing question used to pass.
@@ -151,7 +151,7 @@ def test_cli_exit_codes(tmp_path, capsys):
 
 
 def test_model_mode_requires_an_endpoint_and_a_model():
-    from scripts.eval_gate import main
+    from scripts.evaluation.eval_gate import main
 
     with pytest.raises(SystemExit):
         main(["--mode", "model"])
@@ -170,7 +170,7 @@ def test_without_a_baseline_the_summary_never_says_passed(current):
 
 
 def test_a_saved_report_is_registered_only_when_the_current_code_would_produce_it(current, tmp_path, capsys):
-    from scripts.eval_gate import main
+    from scripts.evaluation.eval_gate import main
 
     def register(report: dict) -> tuple[int, Path]:
         source = tmp_path / f"report-{len(list(tmp_path.iterdir()))}.json"
@@ -216,7 +216,7 @@ def test_reports_keep_their_answers_for_rescoring(current):
 
 def test_an_older_report_is_rescored_only_if_its_answers_reproduce_it(current, tmp_path, capsys):
     from app.evaluation.answer_eval import load_dataset, score_answer_v2
-    from scripts.eval_gate import main
+    from scripts.evaluation.eval_gate import main
 
     # A report as eval-gate-v1 wrote it: v2 scores, no saved answers.
     dataset = load_dataset(eval_gate.DEFAULT_DATASET)

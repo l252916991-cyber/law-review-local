@@ -13,7 +13,7 @@ from app.evaluation.ablation_analysis import (
     pair_attempts,
     repeat_variation,
 )
-from scripts.analyse_collaboration_ablation import main
+from scripts.evaluation.analyse_collaboration_ablation import main
 
 
 def row(item: str, group: str, passed: bool, **overrides):

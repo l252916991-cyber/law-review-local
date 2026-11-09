@@ -19,7 +19,7 @@
 | B 结构化交接 | A + 原始规则专家发现（`facts / evidence / contradiction / gap_detection`，剥离 `upstream_review`） | 无 |
 | C 交叉审校 | B + `source_checks`、`issues`、跨专家待补项与限制声明 | 原始回答通过产品校验后追加确定性分歧附录 |
 
-- 实现入口：`app/evaluation/collaboration_ablation.py` 的 `group_note()`，`C = B + crosscheck` 前缀关系由回归锁定。
+- 实现入口：`app/collaboration_ablation.py` 的 `group_note()`，`C = B + crosscheck` 前缀关系由回归锁定。
 - 专家是确定性规则节点，协议禁止把 C 描述为“多个自主 LLM 分别推理”。
 
 ## 3. 不变项

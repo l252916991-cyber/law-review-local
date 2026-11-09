@@ -21,10 +21,10 @@
 
 | 已有能力 | 依据 | 本轮需要补齐 |
 |---|---|---|
-| 原生 DAG / LangGraph、多专家交接、来源快照及恢复校验 | [首批实施记录](specialist-collaboration-20261026.md)、`app/review/agents.py`、`app/review/review_collaboration.py` | 当前版本的真实模型效果与成本对照 |
+| 原生 DAG / LangGraph、多专家交接、来源快照及恢复校验 | [首批实施记录](specialist-collaboration-20261026.md)、`app/agents.py`、`app/review_collaboration.py` | 当前版本的真实模型效果与成本对照 |
 | 60 题冻结回归、独立来源和类别分布 | `benchmarks/answer_eval/v2/manifest.json` | 按案件划分的保留样本；现有 60 题来自单一虚构案件，不能证明跨案件泛化 |
 | 离线评分、模型 Judge、20 题盲审与结果绑定 | [评测手册](../../runbook/answer-evaluation.md) | 三组答案的隔离采集、匿名配对评审与新结果复算 |
-| Forge 候选 / native 的共享与独立检索对照 | `app/evaluation/model_comparison.py` | 它用于运行时对照，尚不提供本计划三组消融，也不直接评价模型质量 |
+| Forge 候选 / native 的共享与独立检索对照 | `app/model_comparison.py` | 它用于运行时对照，尚不提供本计划三组消融，也不直接评价模型质量 |
 | 合成界面演示、前端构建、签发和权限流程 | [录屏手册](../../runbook/demo-recording.md)、[首版实施记录](collaboration-first-release-plan-20261027.md) | 当前代码、真实模型输出及异常路径的可核验演示 |
 | G1 工程门禁与检查产物 | [G1 执行记录](collaboration-release-readiness-evidence-20261027.md) | 重新核对最近执行产物对应的代码身份；旧文档中的“待执行”不能直接当作最新状态 |
 
@@ -59,7 +59,7 @@
 
 每组记录实际提示、上下文和输出摘要及各节点输出。预期答案、评分标签和 Judge 结果只用于评价，不进入生成上下文。输入 token 的变化是协作机制的成本，应计入结果；固定同一硬上限，超限明确失败，禁止静默截断。配置可复现的采样参数，记录后端不支持 seed 等情况，不承诺跨设备逐字一致。三组实验只测量 C 中两项机制的组合增量；若要区分各自的因果贡献，另行预注册拆分实验。
 
-`scripts/run_answer_eval.py --live` 当前只采集普通 `services.chat` 路径；不能直接作为三组驱动。P1 应复用现有采集/计量组件，补齐缺少的适配层及回归。`app/evaluation/model_comparison.py` 的固定摘要门禁继续保留；若修改其受检算法，显式登记新身份，旧结果不被覆盖。
+`scripts/run_answer_eval.py --live` 当前只采集普通 `services.chat` 路径；不能直接作为三组驱动。P1 应复用现有采集/计量组件，补齐缺少的适配层及回归。`app/model_comparison.py` 的固定摘要门禁继续保留；若修改其受检算法，显式登记新身份，旧结果不被覆盖。
 
 ### 4.2 数据、轮次与预算
 

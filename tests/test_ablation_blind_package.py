@@ -14,7 +14,7 @@ from app.evaluation.ablation_review import (
     sample_ids,
 )
 from app.evaluation.collaboration_ablation import load_batch_dataset
-from scripts.build_ablation_blind_package import main
+from scripts.evaluation.build_ablation_blind_package import main
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "benchmarks/answer_eval/holdout-v1/dataset.json"

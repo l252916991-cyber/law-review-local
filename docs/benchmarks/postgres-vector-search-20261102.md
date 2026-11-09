@@ -5,7 +5,7 @@
 原始结果：[postgres-vector-search-20261102.json](postgres-vector-search-20261102.json)；复现命令：
 
 ```sh
-uv run --locked python scripts/benchmark_vector_search.py \
+uv run --locked python scripts/benchmarks/benchmark_vector_search.py \
   --postgres "host=127.0.0.1 port=55432 user=postgres dbname=postgres" \
   --pages 10000 --cases 5 --queries 30
 ```

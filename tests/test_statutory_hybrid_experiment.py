@@ -8,7 +8,7 @@ import pytest
 
 from app.benchmarks.statutory_index import IndexSpec, StatutoryIndex
 from app.retrieval.legal_corpus import SCHEMA_VERSION, LegalCorpus, split_articles
-from scripts.statutory_hybrid_experiment import build_dataset, build_validity
+from scripts.benchmarks.statutory_hybrid_experiment import build_dataset, build_validity
 
 
 def write_corpus(tmp_path: Path, docs: list[dict]) -> LegalCorpus:
@@ -114,6 +114,6 @@ def test_production_scope_adds_hint_when_question_names_law(tmp_path):
     index = make_index(corpus)
     rows = [{"instruction": "x", "question": f"根据刑法认定盗窃的事实{i}",
              "answer": "法条:刑法第264条"} for i in range(12)]
-    with patch("scripts.statutory_hybrid_experiment.load_task", return_value=tuple(rows)):
+    with patch("scripts.benchmarks.statutory_hybrid_experiment.load_task", return_value=tuple(rows)):
         dataset = build_dataset("3-1", index, per_split=5, effective_date="2026-01-01", scope="production")
     assert dataset["tasks"][0]["explicit_laws"] == ["中华人民共和国刑法"]

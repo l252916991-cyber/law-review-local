@@ -55,7 +55,7 @@
 | `POST /api/cases/{id}/documents` | HTTP | `upload_documents` `main.py:656` | tesseract 子进程（无模型） | documents, pages, audit_log | 有 | HOST/JOB | LV | 导入与解析；OCR 子进程登记 |
 | `POST /api/cases/{id}/batch-import` | HTTP→arq | `batch_import_documents` `main.py:685` → `tasks.process_batch_import` `tasks.py:82` | 无模型（OCR） | batch_imports/files/dispatch | 无（worker 侧写） | JOB | LV | 后台导入队列 |
 | `GET /api/benchmarks/lawbench` | HTTP | `lawbench_dataset` `main.py:490` | 无（本地数据集） | 无 | 无 | EV（数据集登记） | LV | 评测数据入口 |
-| `ReadonlyCaseSession` / `run_framework` | Python（M2） | `app/integration/forge_readonly.py`、`app/integration/forge_bridge.py` | 离线；NoModel 拒绝推理 | 仅私有临时快照 | 无（内存 access_log） | **RT**(`forgeharness-readonly`，E04 已实现控制面) | LV | 当前唯一框架执行链路 |
+| `ReadonlyCaseSession` / `run_framework` | Python（M2） | `app/forge_readonly.py`、`app/forge_bridge.py` | 离线；NoModel 拒绝推理 | 仅私有临时快照 | 无（内存 access_log） | **RT**(`forgeharness-readonly`，E04 已实现控制面) | LV | 当前唯一框架执行链路 |
 | 基准/评测脚本族 | CLI | `benchmark_solver.py`、`rag_project_benchmark.py`、`compare_agent_runtimes.py`、`unified_benchmark_runner.py`、`scripts/*` | 生成模型/embedding（**自建出口校验或直连**） | 输出文件；部分写 embedding_cache | 无 | **EV**+MP（旁路 §6-2/6-3） | LV | 评测与基准必须纳入治理或明确排除 |
 
 ## 4. ForgeCommerce AI 入口总表（按代码清点，E21 复核）

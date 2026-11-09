@@ -15,7 +15,7 @@
 1. 在解压目录复制 `.env.example` 为 `.env` 并完成配置，然后在可信终端执行 `set -a; . ./.env; set +a`。Compose 会自行读取 `.env`，但后续 `curl` 和验收脚本中的 `${WEB_PORT:-8000}` 只有在当前 shell 也加载该文件后才会使用同一端口；应用本身不会自动加载 `.env`。不得执行来源不可信的 `.env`，也不得上传或提交该文件。
 2. 为 Docker 演示设置 `LAW_REVIEW_AUTH_MODE=token`，生成至少 32 字符的随机 Bearer 令牌，并在 `LAW_REVIEW_API_TOKENS_JSON` 中配置一个有 `view/edit/export` 权限的管理员；不要使用样例短令牌。Web 默认只发布在宿主机 `127.0.0.1:${WEB_PORT:-8000}`。若宿主模型也占用 8000，设置 `WEB_PORT=8765`。
 3. 在解压目录运行 `docker compose up -d --build`，查看 `docker compose ps`；验证 `curl -fsS http://127.0.0.1:${WEB_PORT:-8000}/api/health`。Compose 启动单 Web、单批量任务 worker 和 Redis，应用数据保存在 Docker 命名卷；不得再启动第二个 Web 指向同一数据卷。
-4. 仅在**一次性数据卷**上执行 `LAW_REVIEW_SMOKE_TOKEN=<本次令牌> python scripts/delivery_smoke.py --base-url http://127.0.0.1:${WEB_PORT:-8000} --mode offline`。脚本实际创建两页合成 TXT、关闭 LLM 和远程 embedding 问答、核对第 2 页引用及导出包/清单哈希，然后将自己创建的案件移入回收站。API 有审计保留和 30 天回收站，不提供立即彻底删除；验收结束用 `docker compose down -v` **仅销毁本次一次性卷**，不得对已有业务卷执行此命令。
+4. 仅在**一次性数据卷**上执行 `LAW_REVIEW_SMOKE_TOKEN=<本次令牌> python scripts/acceptance/delivery_smoke.py --base-url http://127.0.0.1:${WEB_PORT:-8000} --mode offline`。脚本实际创建两页合成 TXT、关闭 LLM 和远程 embedding 问答、核对第 2 页引用及导出包/清单哈希，然后将自己创建的案件移入回收站。API 有审计保留和 30 天回收站，不提供立即彻底删除；验收结束用 `docker compose down -v` **仅销毁本次一次性卷**，不得对已有业务卷执行此命令。
 
 离线演示证明的是发布包、镜像、权限访问、解析、检索、引用定位和导出链路能在隔离环境工作；不证明生成模型质量、法条现行有效性或真实律师审阅收益。
 
@@ -30,7 +30,7 @@ LAW_REVIEW_AUTH_MODE=token LAW_REVIEW_ALLOWED_HOSTS=127.0.0.1,localhost \
 LAW_REVIEW_API_TOKENS_JSON='{"<32 字符以上令牌>": {"name": "管理员", "admin": true}}' \
   uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 18766
 
-uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:18766 \
+uv run --locked python scripts/ops/release_smoke.py --base-url http://127.0.0.1:18766 \
   --admin-token '<同一令牌>' --output /tmp/release-smoke
 ```
 
@@ -41,7 +41,7 @@ uv run --locked python scripts/release_smoke.py --base-url http://127.0.0.1:1876
 应用使用 OpenAI-compatible 的本地接口，模型服务须明确提供：对话 `/v1/chat/completions`、embedding `/v1/embeddings`、重排 `/v1/rerank`（或分别配置三台服务）。设置 `LAW_REVIEW_LLM_URL`、`LAW_REVIEW_EMBEDDING_URL`、`LAW_REVIEW_RERANK_URL` 和对应 `*_MODEL` 为服务**实际列出的 ID**；不要默认下载或换用另一个模型。嵌入权重变化时修改 `LAW_REVIEW_EMBEDDING_REVISION`，避免混用旧向量空间。先用服务自身的 `/v1/models` 与健康检查核对型号、URL、网络可达性，再启动模型模式的合成验收：
 
 ```bash
-LAW_REVIEW_SMOKE_TOKEN=<本次令牌> python scripts/delivery_smoke.py \
+LAW_REVIEW_SMOKE_TOKEN=<本次令牌> python scripts/acceptance/delivery_smoke.py \
   --base-url http://127.0.0.1:${WEB_PORT:-8000} --mode model
 ```
 
@@ -55,7 +55,7 @@ LAW_REVIEW_SMOKE_TOKEN=<本次令牌> python scripts/delivery_smoke.py \
 
 - 源码非容器路径：`uv sync --locked --no-dev`，显式加载私有配置后执行 `bash run.sh`；zip 解压工具可能不保留可执行位，因此接收验收不依赖 `./run.sh`。批量导入需要 Redis 和 `bash run_worker.sh`，普通合成问答不需要队列服务。
 - 查看故障：`docker compose ps`、`docker compose logs --tail 100 web worker`；停止服务用 `docker compose down`（**不加** `-v`，保留数据卷）。应用 `/api/health` 只表明进程可应答；`/api/ready` 另外显示受控法条语料是否完整，缺语料时可为 degraded。
-- 正式升级前停 Web 和 worker、排空任务，并按[发布手册](release.md)用 `scripts/data_snapshot.py` 停写备份及 verify；Docker 命名卷数据应先复制到受控私有目录再按工具要求处理。恢复演练必须使用新数据目录，不能对正在写入的 SQLite 文件直接复制，不能复用较新 schema 数据库运行旧应用。
+- 正式升级前停 Web 和 worker、排空任务，并按[发布手册](release.md)用 `scripts/ops/data_snapshot.py` 停写备份及 verify；Docker 命名卷数据应先复制到受控私有目录再按工具要求处理。恢复演练必须使用新数据目录，不能对正在写入的 SQLite 文件直接复制，不能复用较新 schema 数据库运行旧应用。
 - 法条语料、模型权重、TLS 代理、组织授权、备份加密及保留期限均由部署方配置。多用户或 LAN 服务须 token/OIDC 身份、实际 Host 白名单及 TLS 代理；回环 `local` 模式只用于单机。
 
 当前交付边界为单实例本地/受控内网辅助阅卷。CI 的合成 HTTP 验收和离线回归不能代替目标硬件的模型、OCR、代理权限、备份恢复或律师业务验收；验收结论应分别记录。

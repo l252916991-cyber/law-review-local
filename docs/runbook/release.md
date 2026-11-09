@@ -3,15 +3,15 @@
 ## 不破坏当前目录的发布方式
 
 ```bash
-uv run python scripts/package_release.py --dry-run
-uv run python scripts/package_release.py --output dist/lexvault-source.zip
+uv run python scripts/ops/package_release.py --dry-run
+uv run python scripts/ops/package_release.py --output dist/lexvault-source.zip
 ```
 
 脚本仅打包明确允许的源码、Docker 配置、项目合成样例、配置模板、测试和维护文档，拒绝符号链接；不覆盖已存在的 zip，并记录每个成员的 SHA-256。默认不包含模型、案件、checkpoint、导出、凭证、日志、历史评测原始答案或 LawBench。需要随包运行 LawBench 测试时，核对 `benchmarks/lawbench/SOURCE.md` 与原始数据集许可证，再显式增加 `--with-benchmarks`。接收方从解压包安装与验收的路线见[交付指南](delivery.md)。
 
 `.gitignore` 不是发布权限检查，也不会清除已经跟踪的数据。首次 git 提交前检查暂存区，切勿无检查地执行 `git add .`；发布包仍须人工检查源码/文档中是否有手工粘贴的案件片段。不要把“文件不在 data 目录”当作已经脱敏。
 
-框架接入另精确包含 `vendor/FRAMEWORK_BINDING.json`、最终绑定的 0.8.3 wheel 和 `vendor/forgeharness-runtime-requirements.txt`，不遍历整个 vendor；旧 wheel 在本机保留，发布仅交付当前精确版本。`uv run --locked python -m scripts.verify_deployment_release` 校验摘要，并分别从解压源码的带 hash requirements 和 vendor 依赖安装全新宿主、独立框架环境。随后执行只读合成 M2、隔离宿主、候选成功与业务拒绝流程，通过两次全新宿主进程核对结果、调用及回执不重复。候选模型使用离线替身，`measurement_valid=false`；该命令不验证真实模型效果、目标生产环境或 HTTP/UI。实现与证据见 [G2 修复记录](../history/migration/g2-remediation-execution-20261024.md)；框架兼容边界见 [R2 记录](../history/migration/r2-execution-20261023.md)。
+框架接入另精确包含 `vendor/FRAMEWORK_BINDING.json`、最终绑定的 0.8.3 wheel 和 `vendor/forgeharness-runtime-requirements.txt`，不遍历整个 vendor；旧 wheel 在本机保留，发布仅交付当前精确版本。`uv run --locked python -m scripts.ops.verify_deployment_release` 校验摘要，并分别从解压源码的带 hash requirements 和 vendor 依赖安装全新宿主、独立框架环境。随后执行只读合成 M2、隔离宿主、候选成功与业务拒绝流程，通过两次全新宿主进程核对结果、调用及回执不重复。候选模型使用离线替身，`measurement_valid=false`；该命令不验证真实模型效果、目标生产环境或 HTTP/UI。实现与证据见 [G2 修复记录](../history/migration/g2-remediation-execution-20261024.md)；框架兼容边界见 [R2 记录](../history/migration/r2-execution-20261023.md)。
 
 ## 单进程运行与升级边界
 
@@ -31,10 +31,10 @@ Web 启动在迁移及中断任务恢复之前获取数据库旁的 `law_review.
 
 ```bash
 # 先停止 API/worker 并排空队列；路径为维护者选择的私有目录。
-uv run python scripts/data_snapshot.py backup \
+uv run python scripts/ops/data_snapshot.py backup \
   --data-dir /absolute/private-data --output /absolute/backups/snapshot-001 --quiescent
-uv run python scripts/data_snapshot.py verify /absolute/backups/snapshot-001
-uv run python scripts/data_snapshot.py restore /absolute/backups/snapshot-001 \
+uv run python scripts/ops/data_snapshot.py verify /absolute/backups/snapshot-001
+uv run python scripts/ops/data_snapshot.py restore /absolute/backups/snapshot-001 \
   --output /absolute/new-restored-data
 ```
 
@@ -49,7 +49,7 @@ checkpoint 不在默认数据目录时，备份必须显式提供 `--checkpoint-
 可重复的无模型恢复演练（只使用临时合成数据）：
 
 ```bash
-uv run python -m pytest scripts/test_data_snapshot.py scripts/test_snapshot_runtime.py \
+uv run python -m pytest tests/test_data_snapshot.py tests/test_snapshot_runtime.py \
   --disable-socket --allow-unix-socket -v
 ```
 

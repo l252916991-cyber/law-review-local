@@ -18,7 +18,7 @@ Qwythos-9B-v2-8bit、temperature 0、max_tokens 1600、timeout 240 秒、canonic
 ```sh
 LAW_REVIEW_LLM_URL=http://127.0.0.1:8000/v1 \
 LAW_REVIEW_LLM_MODEL=Qwythos-9B-v2-8bit-mlx \
-uv run --locked python unified_benchmark_runner.py \
+uv run --locked python scripts/benchmarks/unified_benchmark_runner.py \
   --dataset lawbench --tasks 3-2 \
   --corpus-dir output/score85/legal_corpus_canonical_v2 \
   --max-tokens 1600 --timeout 240 --retry 0 \
@@ -29,7 +29,7 @@ uv run --locked python unified_benchmark_runner.py \
 目标模型服务已加载；运行完成后执行：
 
 ```sh
-uv run --locked python verify_benchmark_run.py \
+uv run --locked python scripts/benchmarks/verify_benchmark_run.py \
   output/official-3-2-lexical-rag-20260913
 ```
 

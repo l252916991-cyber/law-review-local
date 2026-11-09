@@ -13,7 +13,7 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 - 应用必须用**非超级用户**角色连接，最好让它拥有业务表：信息隔离墙依靠行级安全（RLS），超级用户和 `BYPASSRLS` 角色会绕过它。每个连接建立时写入当前身份，见[信息隔离墙](case-walls.md)。
 - 第一次启动按 `app/storage/schema_postgres.sql` 建出最新结构（当前 schema 28），版本记在 `lexvault_schema_meta`。
 - 已有库的版本比代码旧时，启动时按版本逐步升级：`app/storage/postgres_migrations/NNNN.sql` 把库从 NNNN−1 升到 NNNN，每一步与版本号更新在同一个事务里，失败整步回滚；多个实例同时启动时用 advisory 锁排队。升完再执行一遍完整结构，重建函数、触发器与行级策略。缺少某一步、库比代码新（不降级）、或库早于 v27（第一个可原地升级的版本），启动都会拒绝。
-- 改表结构时，SQLite 迁移与 PostgreSQL 迁移要一起写。`scripts/generate_postgres_schema.py --check` 要求每个新版本都有迁移文件；`tests/test_postgres_migrations.py` 从冻结的 v27 结构（`baseline_v27.sql`）出发，只执行迁移文件，再与新建库逐项比对列、约束、索引、触发器、函数、行级策略，漏写一项就失败。另有一条对照测试故意删掉一列、一条策略和一个索引，确认比对能发现。
+- 改表结构时，SQLite 迁移与 PostgreSQL 迁移要一起写。`scripts/ops/generate_postgres_schema.py --check` 要求每个新版本都有迁移文件；`tests/test_postgres_migrations.py` 从冻结的 v27 结构（`baseline_v27.sql`）出发，只执行迁移文件，再与新建库逐项比对列、约束、索引、触发器、函数、行级策略，漏写一项就失败。另有一条对照测试故意删掉一列、一条策略和一个索引，确认比对能发现。
 - URL 写法同 libpq，`postgresql://user:pass@host:5432/db?sslmode=require` 也可以。
 
 ## 同一套 SQL 怎么在两边都能跑
@@ -31,7 +31,7 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 | `sqlite3.IntegrityError` 等异常 | psycopg 的完整性错误转成同名 sqlite3 异常，调用方不用改 |
 | 结果类型 | `SUM` 等返回的 `numeric` 转回 `int`/`float`，布尔比较结果转回 `0`/`1` |
 
-表结构由 `scripts/generate_postgres_schema.py` 从 SQLite 迁移结果自动翻译，CI 检查生成文件是否过期：改了 SQLite 迁移却没重新生成，构建会失败。全文检索表、它的触发器和 pgvector 列是手写部分，在同一个脚本里。
+表结构由 `scripts/ops/generate_postgres_schema.py` 从 SQLite 迁移结果自动翻译，CI 检查生成文件是否过期：改了 SQLite 迁移却没重新生成，构建会失败。全文检索表、它的触发器和 pgvector 列是手写部分，在同一个脚本里。
 
 确实写不成通用 SQL 的两段检索查询放在 `app/retrieval/search_backend.py`：
 
@@ -53,7 +53,7 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 | --- | --- | --- |
 | 隔离框架运行时（M2 sidecar、只读快照、宿主端口） | 明确拒绝，抛 `UnsupportedCapabilityError`（`app.storage.db.SQLITE_FILE_ONLY`） | 它复制的是 SQLite 文件本身 |
 | LangGraph checkpoint | 仍写数据目录里的 SQLite 文件 | 中断的运行只能在同一台机器上恢复 |
-| 数据快照与恢复脚本（`scripts/data_snapshot.py`） | 设置了 `LAW_REVIEW_DATABASE_URL` 时拒绝执行 `backup`，避免只备份到上传文件而漏掉数据库 | 它复制的是 SQLite 文件；PostgreSQL 用 `pg_dump` 或数据库自身的备份方案 |
+| 数据快照与恢复脚本（`scripts/ops/data_snapshot.py`） | 设置了 `LAW_REVIEW_DATABASE_URL` 时拒绝执行 `backup`，避免只备份到上传文件而漏掉数据库 | 它复制的是 SQLite 文件；PostgreSQL 用 `pg_dump` 或数据库自身的备份方案 |
 | 演示与容量造数、安装验收（`seed_demo_case.py`、`capacity_seed.py`、`collaboration_acceptance.py`、`validate_application_acceptance.py`） | 固定写 `--data-dir` 里的 SQLite 文件，忽略 `LAW_REVIEW_DATABASE_URL` | 防止把合成数据写进存有真实案件的库 |
 
 **多实例尚未支持**：后台阅卷任务在 Web 进程内执行，Web 进程锁和 LangGraph checkpoint 都是本机文件。换成 PostgreSQL 解决的是数据库这一层（并发写、容量、备份工具、库内向量检索），多副本部署还需要把任务队列和 checkpoint 也移出进程，见企业级改进计划的阶段 1。
@@ -63,7 +63,7 @@ export LAW_REVIEW_DATA_DIR=/srv/lexvault/data   # 仍需要：上传原件、导
 ```sh
 export LAW_REVIEW_TEST_POSTGRES_URL="host=127.0.0.1 port=5432 user=postgres dbname=postgres"
 uv run --locked pytest tests -p pytest_socket --disable-socket --allow-unix-socket
-uv run --locked python scripts/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL"
+uv run --locked python scripts/evaluation/eval_gate.py --postgres "$LAW_REVIEW_TEST_POSTGRES_URL"
 ```
 
 - 设置后，每个测试函数拿到一个新建的空库，每个 `IsolatedDatabaseTestCase` 测试类共用一个库；结束即删除。该账号需要建库和建角色的权限：测试库归非超级用户角色 `lexvault_app` 所有，应用以它的身份连接，所以行级安全对全部用例生效。
