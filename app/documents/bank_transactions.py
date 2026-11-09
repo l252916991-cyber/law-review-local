@@ -209,7 +209,7 @@ def parse_spreadsheet(payload: bytes, filename: str) -> list[ParsedTransaction]:
             workbook = xlrd.open_workbook(file_contents=payload, on_demand=True)
         except Exception as exc:
             raise ValueError("XLS 文件无法解析") from exc
-        output: list[ParsedTransaction] = []
+        output = []
         for worksheet in workbook.sheets():
             if worksheet.nrows:
                 rows = parse_matrix(worksheet.row_values(0), (worksheet.row_values(i) for i in range(1, worksheet.nrows)), sheet=worksheet.name)

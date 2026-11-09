@@ -15,6 +15,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from functools import lru_cache
+from typing import Any
 
 import cn2an
 import jieba
@@ -411,6 +412,9 @@ def score_lawbench_item(
 ) -> ItemScore:
     metric = LAW_BENCH_METRICS[task_id]
     prediction = prediction.strip()
+    # Each task family parses into its own type (label set, list, months, amount).
+    expected: Any
+    actual: Any
 
     # 修复：只有在原始预测为空时才判定为拒答，而非提取失败
     abstained = not prediction

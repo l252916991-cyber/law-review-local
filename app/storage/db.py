@@ -502,7 +502,7 @@ SCHEMA_VERSION = 28
 
 # Built-in case-closing export templates (E32). Block schema is owned by the
 # renderer in services.py; this constant is the seeding source of truth.
-BUILTIN_EXPORT_TEMPLATES = [
+BUILTIN_EXPORT_TEMPLATES: list[dict[str, Any]] = [
     {
         "name": "刑事阅卷结案包",
         "description": "完整阅卷归档：案件摘要、双层目录、证据清单、问答记录与原始卷宗。",

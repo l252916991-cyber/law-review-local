@@ -96,7 +96,7 @@ def auto_analyze_case(case_id: int) -> dict[str, int]:
         existing = {x[0] for x in conn.execute("SELECT title FROM evidence WHERE case_id = ?", (case_id,))}
     finally:
         conn.close()
-    candidates = []
+    candidates: list[tuple[str, str, str, Any, str]] = []
     rules = [
         (r"不知道|不清楚|没听说|我以为", "口供中的不知情/认识表述", "言词证据", "待质证"),
         (r"元|转账|入账|流水|账户", "资金流向事项", "银行流水", "待核验"),

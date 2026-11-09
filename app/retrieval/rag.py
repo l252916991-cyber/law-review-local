@@ -135,7 +135,7 @@ def hashed_embedding(text: str, dimensions: int = 384) -> list[float]:
 class EmbeddingClient:
     def __init__(self, prefer_remote: bool = True, model: str | None = None):
         self.prefer_remote = prefer_remote
-        self.model: str = model or os.getenv("LAW_REVIEW_EMBEDDING_MODEL", EMBEDDING_MODEL)
+        self.model: str = model if model else os.getenv("LAW_REVIEW_EMBEDDING_MODEL", EMBEDDING_MODEL)
         self.base_url = os.getenv("LAW_REVIEW_EMBEDDING_URL", LLMConfig.load().base_url).rstrip("/")
         self.last_failure: str | None = None
 
@@ -832,7 +832,7 @@ class HybridRetriever:
             indices.sort(key=lambda i: (-final_scores[i], i))
         else:
             final_scores = scores
-        selected = []
+        selected: list[dict[str, Any]] = []
         seen = set()
         for index in indices:
             child = children[index]

@@ -64,8 +64,8 @@ def verify_statutes(content: str, sources: list[dict[str, Any]], *,
         if not markers or len(markers) != len(quotes):
             return False, "statutory answer requires an exact quote for every marker"
         for number, quote in quotes:
-            source = by_index.get(int(number))
-            if source is None or not quote.strip() or quote not in source["text"]:
+            matched = by_index.get(int(number))
+            if matched is None or not quote.strip() or quote not in matched["text"]:
                 return False, "statute quote or identity is unavailable"
     except (ValueError, TypeError, KeyError):
         return False, "statute source contract is invalid"

@@ -8,7 +8,7 @@ import re
 import sys
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from typing import Any, TextIO
+from typing import Any, TextIO, cast
 
 _context: ContextVar[dict[str, Any]] = ContextVar("lexvault_log_context", default={})  # noqa: B039 - never mutated; set() stores a new dict
 request_id: ContextVar[str] = ContextVar("lexvault_request_id", default="")
@@ -59,7 +59,7 @@ def setup_logging(level: str = "INFO", *, stream: TextIO | None = None) -> None:
         handler.set_name(_HANDLER_NAME)
         root.addHandler(handler)
     elif stream is not None:
-        handler.setStream(stream)
+        cast(logging.StreamHandler, handler).setStream(stream)
     handler.setFormatter(StructuredFormatter())
     handler.setLevel(resolved_level)
     root.setLevel(resolved_level)

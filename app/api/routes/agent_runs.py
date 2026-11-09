@@ -49,6 +49,7 @@ def agent_chat(case_id: int, payload: AgentChatRequest):
                 audit_detail=f"{user_name}：{payload.question[:60]}",
             )
             return {**result, "mode": payload.mode, "user_name": user_name}
+        coordinator: Any  # LangGraph or native coordinator; both expose process_query
         if payload.mode == "langgraph":
             from app.review.langgraph_agents import create_langgraph_coordinator
 

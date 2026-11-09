@@ -14,7 +14,7 @@ import uuid
 from contextlib import closing
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import HTTPException
 
@@ -121,7 +121,8 @@ def source_version(conn: sqlite3.Connection, scope: RunScope, *, writing: bool =
         "relations": "SELECT * FROM evidence_relations WHERE case_id=? ORDER BY id",
         "memories": "SELECT * FROM memories WHERE case_id=? AND kind!='runtime_draft' ORDER BY id",
     }
-    inputs = {name: [dict(r) for r in conn.execute(sql, (scope.case_id,))] for name, sql in queries.items()}
+    inputs: dict[str, Any] = {name: [dict(r) for r in conn.execute(sql, (scope.case_id,))]
+                              for name, sql in queries.items()}
     inputs["case"] = dict(row)
     inputs["knowledge"] = [dict(r) for r in conn.execute("SELECT * FROM knowledge ORDER BY id")]
     return digest(inputs)
@@ -336,4 +337,4 @@ class LocalHostWritePort:
                                   (case, canonical({"actor": current_principal().name, "detail": p["detail"]}), ts)).lastrowid
             table = "audit_log"
         return {"schema_version": self.receipt_version, "table": table, "row_id": row_id,
-                "effect_version": self._effect_version(conn, table, row_id)}
+                "effect_version": self._effect_version(conn, table, cast(int, row_id))}

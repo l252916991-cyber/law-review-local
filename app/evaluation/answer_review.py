@@ -15,7 +15,7 @@ def review_manifest(dataset: dict[str, Any], answers: dict[str, Any], size: int 
     if not 20 <= size <= len(items):
         raise ValueError("盲审样本至少 20 题且不能超过数据集")
     ordered = sorted(items, key=lambda item: json_sha256([dataset["source_sha256"], item["id"]]))
-    selected = []
+    selected: list[str] = []
     for category in sorted({item["category"] for item in items}):
         selected.extend(item["id"] for item in [row for row in ordered if row["category"] == category][:2])
     selected.extend(item["id"] for item in ordered if item["id"] not in selected)

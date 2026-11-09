@@ -21,7 +21,7 @@ import urllib.parse
 from contextlib import closing
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -830,7 +830,7 @@ def oidc_callback(request: Request, code: str = "", state: str = "", error: str 
         principal = settings["principals"].get(subject) if isinstance(subject, str) else None
         if principal is None:
             return _oidc_failure(request, "denied")
-        session = _register_oidc_session(subject, flow)
+        session = _register_oidc_session(cast(str, subject), flow)
     except HTTPException:
         # Revocation/storage failures must remain 503, never a successful login.
         response = JSONResponse({"detail": "会话服务暂不可用"}, status_code=503)

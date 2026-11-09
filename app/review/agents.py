@@ -333,7 +333,7 @@ class ContradictionAgent:
                 denials.append((index, item))
             if any(term in text for term in self.ASSERTIONS):
                 assertions.append((index, item))
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
         for left_index, left in denials:
             for right_index, right in assertions:
                 if left["document_id"] == right["document_id"] and left["page_no"] == right["page_no"]:
@@ -436,7 +436,7 @@ class GapDetectionAgent:
 
     def _detect_missing_evidence_types(self, contexts: list[dict]) -> list[dict]:
         """检测缺失的证据类型"""
-        gaps = []
+        gaps: list[dict] = []
 
         # 统计现有证据类型
         present_types = set(item.get("doc_type", "其他材料") for item in contexts)
@@ -468,7 +468,7 @@ class GapDetectionAgent:
 
     def _detect_timeline_gaps(self, contexts: list[dict]) -> list[dict]:
         """检测时间线缺口（超过30天空白期）"""
-        gaps = []
+        gaps: list[dict] = []
 
         # 提取所有日期范围
         import re
@@ -541,7 +541,7 @@ class GapDetectionAgent:
 
         # 统计各类型证据的数量
         from collections import defaultdict
-        type_counts = defaultdict(int)
+        type_counts: defaultdict[str, int] = defaultdict(int)
         for item in contexts:
             doc_type = item.get("doc_type", "其他材料")
             type_counts[doc_type] += 1

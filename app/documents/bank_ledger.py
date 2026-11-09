@@ -3,7 +3,7 @@ counterparty graph."""
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Generator
 from typing import Any
 
 from app.documents.bank_transactions import PARSER_VERSION, parse_csv
@@ -43,7 +43,7 @@ def _bank_transaction_clause(case_id: int, *, account: str | None = None, direct
     return " AND ".join(clauses), params
 
 
-def iter_bank_transactions(case_id: int, **filters: Any) -> Iterator[dict[str, Any]]:
+def iter_bank_transactions(case_id: int, **filters: Any) -> Generator[dict[str, Any], None, None]:
     """Stream every matching row for aggregation and export.
 
     The interactive list endpoint stays paginated and capped at 500 rows, but

@@ -108,7 +108,9 @@ def _table_text(table) -> str:
 
 def extract_docx_pages(path: Path) -> list[str]:
     _check_parse_budget(path)
-    doc = DocxDocument(path)
+    # A Path goes through zipfile (BadZipFile on corrupt input); a str would raise
+    # python-docx's PackageNotFoundError instead and change the reported error type.
+    doc = DocxDocument(path)  # type: ignore[arg-type]
     chunks: list[str] = []
     current: list[str] = []
 

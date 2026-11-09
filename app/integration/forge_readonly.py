@@ -172,7 +172,8 @@ class ReadonlyCaseSession:
                 max_chars=self.max_chars,
             )
             self.coordinator = agents.LawReviewCoordinator(request.scope.case_id, False)
-            self.coordinator.statutory_conflict_agent = self._statutory_agent()
+            # Optional hook, read with getattr by agents.specialist_specs.
+            self.coordinator.statutory_conflict_agent = self._statutory_agent()  # type: ignore[attr-defined]
             self.specs = agents.specialist_specs(self.coordinator)
         except BaseException:
             self.close()
@@ -285,18 +286,18 @@ class ReadonlyCaseSession:
         if "retrieve" not in self.outputs:
             raise ValueError("retrieval must complete first")
         contexts = self.outputs["retrieve"]["contexts"]
-        plan = {item["name"]: item for item in self.outputs["planner"]["nodes"]}
-        if node in self.specs and node in plan:
-            if not set(plan[node]["depends_on"]) <= self.outputs.keys():
+        planned = {item["name"]: item for item in self.outputs["planner"]["nodes"]}
+        if node in self.specs and node in planned:
+            if not set(planned[node]["depends_on"]) <= self.outputs.keys():
                 raise ValueError("specialist dependencies have not completed")
             spec = self.specs[node]
             return agents.run_specialist(spec, question, contexts, self.outputs)
         if node == "critic":
-            if not set(plan["critic"]["depends_on"]) <= self.outputs.keys():
+            if not set(planned["critic"]["depends_on"]) <= self.outputs.keys():
                 raise ValueError("critic dependencies have not completed")
             output = self.coordinator.critic_agent.run(
                 question, self.outputs["planner"]["route"], deepcopy(contexts),
-                {name: deepcopy(self.outputs[name]) for name in self.specs if name in plan}, False,
+                {name: deepcopy(self.outputs[name]) for name in self.specs if name in planned}, False,
             )
             output["summary"] = f"引用检查 {output['citation_check']}，LLM=off"
             return output
@@ -380,9 +381,9 @@ class ReadonlyCaseSession:
 
         with self._scope(native_db):
             coordinator = agents.LawReviewCoordinator(self.request.scope.case_id, False)
-            coordinator.statutory_conflict_agent = self._statutory_agent()
+            coordinator.statutory_conflict_agent = self._statutory_agent()  # type: ignore[attr-defined]
             if shared_inputs:
-                coordinator.retrieval_agent = FrozenRetrieval()
+                coordinator.retrieval_agent = FrozenRetrieval()  # type: ignore[assignment]  # duck-typed retrieve()
             result = coordinator.process_query(
                 self.request.question.strip(), use_llm=False, persist_memory=False,
                 memory_snapshot=deepcopy(self.outputs["memory_recall"]["items"]) if shared_inputs else None,

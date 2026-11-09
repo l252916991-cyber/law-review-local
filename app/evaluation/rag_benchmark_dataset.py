@@ -231,7 +231,7 @@ _LONG_PAGE_V2_CASES: list[dict[str, str]] = [
 
 def build_long_page_benchmark() -> list[dict[str, Any]]:
     """Synthetic long-page diagnostics; each case is one independent cluster."""
-    fixtures = [
+    fixtures: list[dict[str, Any]] = [
         {
             "case_key": "cold-chain",
             "document": "冷链运输交接记录.txt",

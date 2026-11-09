@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 GROUNDING_VERSION = "case-findings-v1"
 REVIEW_VERSION = "specialist-review-v1"
@@ -43,7 +43,7 @@ def validate_grounding(output: dict[str, Any], contexts: list[dict[str, Any]]) -
     def check(reference: Any) -> None:
         if not isinstance(reference, dict):
             raise ValueError("specialist citation must be an object")
-        expected = source_reference(contexts, reference.get("source_index"))
+        expected = source_reference(contexts, cast(int, reference.get("source_index")))
         if reference != expected:
             raise ValueError("specialist citation differs from the frozen source")
 

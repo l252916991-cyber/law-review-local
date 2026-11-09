@@ -12,7 +12,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from contextvars import copy_context
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -80,11 +80,16 @@ def _execute(job_id: str, case_id: int, body: ReviewJobRequest) -> None:
                 audit_action="后台 Agent 阅卷", audit_detail=f"{body.user_name}：任务 {job_id}",
             )
         else:
+            # Both runtimes expose _start_run and process_query; their classes differ.
+            coordinator: Any
             if body.mode == "langgraph":
-                from app.review.langgraph_agents import create_langgraph_coordinator as factory
+                from app.review.langgraph_agents import create_langgraph_coordinator
+
+                coordinator = create_langgraph_coordinator(case_id, body.use_remote_embeddings)
             else:
-                from app.review.agents import create_coordinator as factory
-            coordinator = factory(case_id, body.use_remote_embeddings)
+                from app.review.agents import create_coordinator
+
+                coordinator = create_coordinator(case_id, body.use_remote_embeddings)
             original_start = coordinator._start_run
 
             def track_start(*args, **kwargs):

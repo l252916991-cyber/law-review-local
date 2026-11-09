@@ -284,7 +284,7 @@ def _parse_clarification_options(row: Any) -> tuple[dict[str, Any], ...]:
         if not isinstance(item, dict):
             continue
         try:
-            document_id = int(item.get("document_id"))
+            document_id = int(item.get("document_id"))  # type: ignore[arg-type]  # None raises TypeError, handled below
         except (TypeError, ValueError):
             continue
         parsed.append({"document_id": document_id, "name": str(item.get("name") or "")})
@@ -784,7 +784,7 @@ def _history_object_candidates(
         cited: list[int] = []
         for citation in turn.citations:
             try:
-                document_id = int(citation.get("document_id"))
+                document_id = int(citation.get("document_id"))  # type: ignore[arg-type]  # None raises TypeError, handled below
             except (TypeError, ValueError):
                 continue
             if document_id in documents and document_id not in cited:
@@ -832,7 +832,7 @@ def resolve_question(
     correction = bool(CORRECTION_PATTERN.search(question))
 
     def result(**kwargs: Any) -> ResolvedQuestion:
-        base = {
+        base: dict[str, Any] = {
             "original": question,
             "retrieval_query": question,
             "status": "explicit",
@@ -1408,7 +1408,7 @@ def valid_memory_clues(
                 excluded.append({"memory_id": memory_id, "reason": "trust_marker_missing"})
                 continue
             try:
-                source_run_id = int(item.get("source_run_id"))
+                source_run_id = int(item.get("source_run_id"))  # type: ignore[arg-type]  # None raises TypeError, handled below
             except (TypeError, ValueError):
                 excluded.append({"memory_id": memory_id, "reason": "source_run_missing"})
                 continue

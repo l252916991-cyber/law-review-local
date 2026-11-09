@@ -294,8 +294,11 @@ class Provider(Protocol):
     this codebase resolves effective configuration per call.
     """
 
-    name: str
-    api: str
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def api(self) -> str: ...
 
     def auth(self) -> ProviderAuth: ...
 

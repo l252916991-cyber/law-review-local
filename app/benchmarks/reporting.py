@@ -42,7 +42,7 @@ def prompt_for(record: dict, *, strategy: str | None = None) -> tuple[str, str]:
     if record["dataset"] == "lawbench" and not instruction:
         raise ValueError(f"Missing instruction: {record['question_id']}")
     task = record.get("task")
-    guidance = TASK_GUIDANCE.get(task, "") if record["dataset"] == "lawbench" else ""
+    guidance = TASK_GUIDANCE.get(task or "", "") if record["dataset"] == "lawbench" else ""
     strategy = strategy or record.get("prompt_strategy", "task_guided")
     system = SYSTEM_PROMPT
     guided = guidance and (strategy in {"task_guided", "few_shot", "correction_locate"}

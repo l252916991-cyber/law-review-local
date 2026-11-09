@@ -453,7 +453,7 @@ def get_gap_analysis(case_id: int, severity: str = Query(None)):
     conn = connect()
     try:
         query = "SELECT * FROM gap_detections WHERE case_id = ?"
-        params = [case_id]
+        params: list[Any] = [case_id]
 
         if severity:
             query += " AND severity = ?"

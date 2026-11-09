@@ -11,7 +11,7 @@ import time
 import zipfile
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import IO, Any, cast
 
 from app.integration.forge_readonly import ReadonlyCaseSession
 from app.llm.forge_governance import OfflineModelTest
@@ -116,7 +116,7 @@ def run_framework(session: ReadonlyCaseSession, python: Path, *, timeout_seconds
                             "timeout_seconds": timeout_seconds})
             sequence = 0
             with selectors.DefaultSelector() as selector:
-                selector.register(process.stdout, selectors.EVENT_READ)
+                selector.register(cast(IO[bytes], process.stdout), selectors.EVENT_READ)
                 pending = bytearray()
                 while True:
                     message = _read_message(process, selector, pending, deadline)
@@ -137,7 +137,7 @@ def run_framework(session: ReadonlyCaseSession, python: Path, *, timeout_seconds
                         raise SidecarProtocolError("unexpected or repeated framework request")
                     sequence += 1
                     before_backends = len(session.backends.events)
-                    output = session.call(message.get("node"))
+                    output = session.call(cast(str, message.get("node")))
                     if time.monotonic() > deadline:
                         raise TimeoutError("deadline exceeded during a read-only host node")
                     _send(process, {"wire_version": WIRE_VERSION, "token": token,

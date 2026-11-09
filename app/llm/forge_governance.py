@@ -57,7 +57,8 @@ class BackendLedger:
         if type(max_input_chars) is not int or not 1 <= max_input_chars <= 20_000_000:
             raise ValueError("backend max_input_chars must be in [1, 20000000]")
         self.authorize, self.max_calls, self.max_input_chars = authorize, max_calls, max_input_chars
-        self.clock, self.deadline = clock, None
+        self.clock = clock
+        self.deadline: float | None = None
         self.events: list[dict[str, Any]] = []
         self.calls = self.input_chars = 0
 

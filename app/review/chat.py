@@ -327,14 +327,14 @@ def chat(
     documents_by_id = {document["id"]: document for document in documents}
     resolution = resolve_question(case_id, question, history, documents=documents, policy=policy)
     resolution_meta = resolution.as_dict(documents_by_id)
-    context_meta = {
+    context_meta: dict[str, Any] = {
         "policy": policy.as_dict(),
         "history": history.as_dict(),
         "resolution": resolution_meta,
         "memory": memory_meta(policy, reason="not_started"),
     }
     audit = ("AI阅卷问答", f"{user_name or '本机律师'}：{concise(question, 60)}")
-    notice_turn = {
+    notice_turn: dict[str, Any] = {
         "case_id": case_id, "conversation_id": conversation_id, "question": question,
         "context_meta": context_meta, "user_name": user_name, "audit": audit,
         "should_cancel": should_cancel, "request_key": request_key,
@@ -368,7 +368,7 @@ def chat(
         context_meta["memory"] = memory_meta(policy, reason="route_not_model")
         answer, contexts, validation, retrieval_metrics = _statistics_turn(case_id, question)
         llm_used = False
-        provenance = {"mode": "database-statistics"}
+        provenance: dict[str, Any] = {"mode": "database-statistics"}
         citation_check = "not_applicable"
     else:
         # Keep the prompt context and the clickable citation cards one-to-one.
