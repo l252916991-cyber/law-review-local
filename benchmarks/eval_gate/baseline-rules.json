@@ -12,20 +12,23 @@
     "context_policy": "multiturn-context-v2",
     "system_prompt_sha256": "afcb75bf4230d08537290d8a655c5a0ff1228631fa3ffd9aa0ff4efa6e52e1e4",
     "modules": {
-      "agents.py": "5d149c01eb28959af48dce824c011ca63ac36d6e1695815122c6b89f159a2f57",
-      "answerability.py": "9868326b8e14befaf3f98ccab853a9bc94bc932dd0fa6d30d359b5baab14f778",
-      "context.py": "ee52a6494b7c6d0b4c0c474ad63591569d3eb091edbaa06b5af647250811e79f",
-      "model_domain.py": "e52add5a08b4578285ccb3ecf910a8e2f3a09a467d9ed550b5ddf88afe3c7905",
-      "rag.py": "2f5e3d9a9fcd2964c61fdf9a76ab79d6c3d66e0aef91093a83d272c871934430",
-      "rag_child_index.py": "e65e665e98cdbc86c72b77499c89abda1ae184184103a014de13555a983bfe1b",
-      "review_collaboration.py": "474781456cd4c969087065599077d1eb04889434b67283aec2fda71c8ffddf0e",
-      "search_backend.py": "240ce7f87e37a653782b73316ce23e5e498cbaa0094c07dcad16e3609f8471be",
-      "services.py": "2ca10ee058e791f50855131a3a5242198b49d3c46f8f30664673145d78a865ff",
-      "statutory_retrieval.py": "a0025ca52872131c74b2b9ccdc0143c7f9d5835b34dbffc7275cb780fb78c84a"
+      "review/agents.py": "cd9079120ea4daa573796341bed88c6645c8ad72618e257e6ab9c2e62dfc9257",
+      "review/answerability.py": "026db39322f128c2f1eaec080ef7ec40b0828300e4d58e482f1c0a7f850715b6",
+      "review/context.py": "36e8d09d3920b507e2be909dfc62097b12c7627d77e786ecb95030256255e079",
+      "integration/model_domain.py": "b32602b3ede6ed3b6dfd8be3f246e45b492e3e990b3b0d1338e5b9bbff28855b",
+      "retrieval/rag.py": "66e793374377b67ca6f3e6ba11e6afd270f987e2119a0266c17724181bf49b2b",
+      "retrieval/rag_child_index.py": "00416c56d260443feb28e9d3ab011d9051c9c31febef48f2c397f25916e611cb",
+      "review/review_collaboration.py": "bd31436a75e69b9571f9300ed68dbe5efc519ac4bc09f0faae4aeec4fb66ee9b",
+      "retrieval/search_backend.py": "c52bc34710b004c9afebb514d2f40e73bf0fbe4a7321f95a811723074997b98d",
+      "review/chat.py": "3d5282a80b6d923c0274003e96e12488adc94b06117b80e335d6c50201261a09",
+      "review/generation.py": "e76677eadc80f51dc369cdc4c7a14b1dbf3508d690d8d7a2ce379f39e37cb314",
+      "retrieval/search.py": "c20867d789449ffbddd3d9ecff1a6703e54950b6f45c1d3f6c90f34ffd93b92a",
+      "core/egress.py": "213228963aff19f39adfaad746023b0c14dd3ffebeea21b825f53e4cddf0e008",
+      "retrieval/statutory_retrieval.py": "2e3540e3795c347f8002da7d9798646dc0ac609351a789b3517b781482492d53"
     },
     "database_backend": "sqlite",
     "embeddings": "hashed-local",
-    "inference_id": "d328470375221de3"
+    "inference_id": "3d7b259ddc17b14f"
   },
   "summary": {
     "queries": 60,
@@ -38,8 +41,8 @@
     "refusal_queries": 20,
     "refusal_correct": 6,
     "required_pages_cited": 40,
-    "latency_p50_ms": 13.34,
-    "latency_p95_ms": 21.86,
+    "latency_p50_ms": 14.14,
+    "latency_p95_ms": 20.72,
     "llm_used": 0,
     "overreach_answers": 0
   },
@@ -225,8 +228,8 @@
       "passed": false
     }
   },
-  "registered_at": "2026-11-09T07:24:52+00:00",
-  "reason": "回答契约两处修正（canonical_source_markers 删除不指向来源的占位符“[资料N]”；复核提醒检查不再把描述案情的“无需核验……”当成放弃复核）。规则模式逐题结果不变，46/60，推理版本随 services.py、agents.py 变化重新登记",
+  "registered_at": "2026-11-09T13:37:05+00:00",
+  "reason": "2026-11-09 代码重组：app/ 按领域拆包、services.py 拆分、类型注解清理、is_postgres 包路径修复；推理模块路径与文件摘要变化，60 题回答与重组前逐题一致",
   "history": [
     {
       "inference_id": "7ed9da5433b41e2b",
@@ -375,6 +378,28 @@
         "required_pages_cited": 40,
         "latency_p50_ms": 13.45,
         "latency_p95_ms": 19.06,
+        "llm_used": 0,
+        "overreach_answers": 0
+      }
+    },
+    {
+      "inference_id": "d328470375221de3",
+      "gate_version": "eval-gate-v3",
+      "registered_at": "2026-11-09T07:24:52+00:00",
+      "reason": "回答契约两处修正（canonical_source_markers 删除不指向来源的占位符“[资料N]”；复核提醒检查不再把描述案情的“无需核验……”当成放弃复核）。规则模式逐题结果不变，46/60，推理版本随 services.py、agents.py 变化重新登记",
+      "summary": {
+        "queries": 60,
+        "passed": 46,
+        "pass_rate": 0.7667,
+        "answerable_queries": 40,
+        "coverage_avg": 1.0,
+        "citation_precision_avg": 0.2729,
+        "violation_count": 0,
+        "refusal_queries": 20,
+        "refusal_correct": 6,
+        "required_pages_cited": 40,
+        "latency_p50_ms": 13.34,
+        "latency_p95_ms": 21.86,
         "llm_used": 0,
         "overreach_answers": 0
       }
