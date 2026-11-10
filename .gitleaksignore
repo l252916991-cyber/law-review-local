@@ -12,3 +12,6 @@ be469d2796b737e50ccd2eedac3370e9988d90b4:app/rag_benchmark_dataset.py:generic-ap
 # Keyword argument `api=api_override` (wire-protocol selector, not a credential)
 # introduced with the provider/wire-api split. Exact historical finding only.
 e80dd06012e0ce5f2de15ea3ac405f58f98ba082:app/services.py:generic-api-key:1034
+# The same `api=api_override` keyword argument after services.py was split into
+# app/review/generation.py (2026-11-09). Exact finding in that commit only.
+412bf7f87b2337e1341e2c2c560061f5172a9167:app/review/generation.py:generic-api-key:395
