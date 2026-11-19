@@ -22,6 +22,8 @@ from app.benchmarks.solver import GUIDED_SYSTEM_SUFFIX, TASK_GUIDANCE  # noqa: E
 
 POOL_PATH = ROOT / "benchmarks/fewshot/2-2_sft_pool.jsonl"
 PINNED_PATH = ROOT / "benchmarks/lawbench/zero_shot/2-2.json"
+# Same layout as build_38_sft_data.py; pass --tokenizer for a model kept elsewhere.
+TOKENIZER_PATH = ROOT / "models/Qwythos-9B-v2-8bit-mlx"
 
 
 class ChatTemplateTokenizer(Protocol):
@@ -50,7 +52,9 @@ def render(
     return {"prompt": prompt, "completion": f"[争议焦点]{label}<eoa>"}
 
 
-def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
+def build(
+    pool_path: Path, pinned_path: Path, output: Path, tokenizer_path: Path = TOKENIZER_PATH
+) -> dict[str, int]:
     pool = [json.loads(line) for line in pool_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     pinned = json.loads(pinned_path.read_text(encoding="utf-8"))
     instruction = pinned[0]["instruction"].strip()
@@ -60,7 +64,7 @@ def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
         from mlx_lm import load  # type: ignore[import-not-found]  # optional training-environment dependency
     except ImportError as exc:  # repo venv has no mlx; build with the training venv
         raise SystemExit("run with output/lora-2-2-v1/venv/bin/python (needs mlx_lm)") from exc
-    _, tokenizer = load("/Users/xiaoy/.omlx/models/Qwythos-9B-v2-8bit-mlx")
+    _, tokenizer = load(str(tokenizer_path))
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as handle:
         for item in pool:
@@ -72,8 +76,10 @@ def build(pool_path: Path, pinned_path: Path, output: Path) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "output/lora-2-2-v1/train.jsonl")
+    parser.add_argument("--tokenizer", type=Path, default=TOKENIZER_PATH,
+                        help="mlx model directory whose chat template renders the prompts")
     args = parser.parse_args(argv)
-    result = build(POOL_PATH, PINNED_PATH, args.output)
+    result = build(POOL_PATH, PINNED_PATH, args.output, args.tokenizer)
     print(json.dumps({**result, "output": str(args.output)}, ensure_ascii=False))
     return 0
 
