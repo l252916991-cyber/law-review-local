@@ -21,7 +21,7 @@
 
 ## 2. 框架实现与版本
 
-框架新增 `runtime/tool_executor.py` 与 [ADR 030](/Users/xiaoy/Documents/多agent协作/docs/adr/030-shared-tool-executor.md)。审批与 checkpoint 仍归调用方，执行器不另建第二套审批或调度状态。ReAct 的调用方法保留委托入口，现有恢复与故障注入继续复用。
+框架新增 `runtime/tool_executor.py` 与 ADR 030。审批与 checkpoint 仍归调用方，执行器不另建第二套审批或调度状态。ReAct 的调用方法保留委托入口，现有恢复与故障注入继续复用。
 
 kernel 对模型/工具的准入及结算串行化，避免并发花同一额度或覆盖累计用量。嵌套工具的步数、调用数及 token 与 ReAct 同样计入。工具刚好用完额度仍可完成，后续调用继续执行准入检查；超过额度失败。自定义编排没有持久日志或恢复声明。
 

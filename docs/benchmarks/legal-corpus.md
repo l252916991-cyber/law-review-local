@@ -1,6 +1,6 @@
 # 独立官方法条语料
 
-`app/legal_corpus.py` 与 `scripts/corpus/build_legal_corpus.py` 提供按法律版本隔离的全文下载、按条切分、条号精确查询及中文二元词检索。模块不会读取基准答案、旧预测、应用案件数据库或调用本地模型，也尚未改变应用的默认检索行为。
+`app/retrieval/legal_corpus.py` 与 `scripts/corpus/build_legal_corpus.py` 提供按法律版本隔离的全文下载、按条切分、条号精确查询及中文二元词检索。模块不会读取基准答案、旧预测、应用案件数据库或调用本地模型，也尚未改变应用的默认检索行为。
 
 语料位置是 `output/score85/legal_corpus/`。2026-09-05 首次完整构建获得 **4 部法律、5 个版本、1998 个条文单元**：
 
@@ -16,7 +16,7 @@
 
 ## 引用安全边界：能保证什么、不能保证什么
 
-本节界定产品侧法条引用（`app/statutory_retrieval.py`）对外承诺的范围，供验收与集成方判断可用性。产品路径只有三种状态，不存在第四种：
+本节界定产品侧法条引用（`app/retrieval/statutory_retrieval.py`）对外承诺的范围，供验收与集成方判断可用性。产品路径只有三种状态，不存在第四种：
 
 | 状态 | 触发条件 | 含义 |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ uv run --locked pytest tests/test_statutory_retrieval.py --disable-socket --allo
 已有 manifest 的目录拒绝覆盖。重建应使用新目录；`--verify` 完全离线，校验文件哈希，并从原始 HTML 重新切分，要求完整文书与保存 JSON 一致。
 
 ```python
-from app.legal_corpus import LegalCorpus
+from app.retrieval.legal_corpus import LegalCorpus
 
 corpus = LegalCorpus("output/score85/legal_corpus")
 article = corpus.lookup("农民专业合作社法", 44, version_date="2017-12-27")
@@ -122,7 +122,7 @@ uv run --locked python scripts/corpus/build_legal_corpus.py --output output/scor
 
 `build_npc_corpus.py` 原按题目推导出的法名做官方标题精确匹配，官方库把整合版登记为《中华人民共和国宪法（2018年修正文本）》，导致 `中华人民共和国宪法` 报 "No exact official version"。新增 `TITLE_OVERRIDES` 将该请求名映射到官方整合版标题，抓取到 1 份文书、143 条（含第一百二十六条），valid=true。本次为完整的 2018 年修正后整合文本，非修正案（修正案本身只含第32–52项）。
 
-`app/benchmark_retrieval.py` 增加最小回退：当问题点名某修正案、而该条不在修正案自身条文中时，落到同法制定的整合版文本按条号查询。第500题"宪法修正案2018年第一百二十六条"命中整合版宪法第一百二十六条。
+`app/benchmarks/retrieval.py` 增加最小回退：当问题点名某修正案、而该条不在修正案自身条文中时，落到同法制定的整合版文本按条号查询。第500题"宪法修正案2018年第一百二十六条"命中整合版宪法第一百二十六条。
 
 ```sh
 uv run --locked python scripts/corpus/build_npc_corpus.py \
@@ -136,13 +136,13 @@ LawBench 1-1 法条检索覆盖由 492/500 提升到 **500/500**（按 `weak4-ca
 
 ## P2 独立实验层（默认不启用）
 
-`app/statutory_index.py` 接收 `LegalCorpus`、`IndexSpec`、以 `document_id/article_id` 为键的预计算 vectors，以及按 document_id 的 validity 映射。索引仅做文件与纯计算操作，不创建模型客户端，不接入现有 `retrieve` 或 `retrieve_statutory`。指纹包括完整 manifest/文书内容、schema、parser 版本与源码哈希、embedding 模型身份（应含不可变 revision）/backend/dim、normalization、segmentation 和 validity；加载缓存逐项失配即拒绝，不能只匹配维度。
+`app/benchmarks/statutory_index.py` 接收 `LegalCorpus`、`IndexSpec`、以 `document_id/article_id` 为键的预计算 vectors，以及按 document_id 的 validity 映射。索引仅做文件与纯计算操作，不创建模型客户端，不接入现有 `retrieve` 或 `retrieve_statutory`。指纹包括完整 manifest/文书内容、schema、parser 版本与源码哈希、embedding 模型身份（应含不可变 revision）/backend/dim、normalization、segmentation 和 validity；加载缓存逐项失配即拒绝，不能只匹配维度。
 
 现有 `effective_date` 仅是已核实施行日期，`version_date` 是公布/修订日期，`currentness_not_asserted` 不等于现行。validity 必须显式提供 `effective_from`、`effective_to`、非空 `source`；`effective_to: null` 是有依据的开放区间声明，不是字段缺失的默认值。不得从后版公布时间、年份状态字符串或金标推造历史区间。适配器检查与已有 effective_date 一致；需要人工核实来源真实性。按 `effective_from <= query_effective_date < effective_to` 过滤，无日期使用当天。元数据缺失、矛盾或同法多个有效版本会报告，实验请求不可用，不静默混用版本。
 
-`app/statutory_hybrid.py` 的 `StatutoryHybrid.search` 提供 lexical、dense、rrf、rerank 四模式；explicit_law 是硬过滤，inferred_law 只加分。客户端按现有 `EmbeddingClient.embed` / `RerankClient.score` 协议注入，默认不创建客户端。query embedding 身份、backend、维度与有限值必须匹配；last_failure、无结果或非法分数不会伪装成 lexical 成功。rerank 对 RRF 候选排序，默认候选上限48。
+`app/benchmarks/statutory_hybrid.py` 的 `StatutoryHybrid.search` 提供 lexical、dense、rrf、rerank 四模式；explicit_law 是硬过滤，inferred_law 只加分。客户端按现有 `EmbeddingClient.embed` / `RerankClient.score` 协议注入，默认不创建客户端。query embedding 身份、backend、维度与有限值必须匹配；last_failure、无结果或非法分数不会伪装成 lexical 成功。rerank 对 RRF 候选排序，默认候选上限48。
 
-`app/statutory_benchmark.evaluate(retriever, dataset, config, split="both")` 是独立离线基准入口。dataset 包含 `tasks`，每题提供唯一 id、query、dev/confirm split、冻结 query_effective_date、`gold: {"document_id/article_id": 1..3}` 和可选 explicit_law/inferred_law；fixture 必须设置 `fixture: true`。相同 query 禁止跨题复用，检索只看到 query/约束，不看到 gold。先在 dev 调参，冻结数据、索引与配置哈希后只在 confirm 验收，不按 confirm 调参。
+`app.benchmarks.statutory_benchmark.evaluate(retriever, dataset, config, split="both")` 是独立离线基准入口。dataset 包含 `tasks`，每题提供唯一 id、query、dev/confirm split、冻结 query_effective_date、`gold: {"document_id/article_id": 1..3}` 和可选 explicit_law/inferred_law；fixture 必须设置 `fixture: true`。相同 query 禁止跨题复用，检索只看到 query/约束，不看到 gold。先在 dev 调参，冻结数据、索引与配置哈希后只在 confirm 验收，不按 confirm 调参。
 
 输出四组 Hit@5、MRR@10、NDCG@10，逐题 available/failure，成功子集均值、与 lexical 的共同成功配对数、candidate-minus-lexical delta、固定随机种子的逐题 paired bootstrap 95% CI、全部尝试的 p50/p95、embedding calls/query、rerank candidates/query。失败指标是 null，不把失败当成功或回退；门槛要求所有 confirm 查询成功。模型时间由客户端真实计时，fixture 时间不可代表模型性能。
 

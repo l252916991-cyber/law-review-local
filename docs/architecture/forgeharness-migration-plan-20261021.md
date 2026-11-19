@@ -36,7 +36,7 @@
 | 运行环境 | LexVault 声明 Python 3.11–3.14；ForgeHarness 声明 Python ≥3.12、<3.14 | 首期使用独立 Python 3.12 进程和锁定环境，保留宿主兼容范围；同进程嵌入另行验证 |
 | 版本控制 | 当前两个目录均未识别为 Git 仓库 | 保存可复现源码清单；核实原仓库来源，恢复或经明确授权建立 Git 基线；不得伪造历史或整体收录运行数据 |
 
-实施应复用 ForgeHarness 的[剩余完善与验收计划书](/Users/xiaoy/Documents/多agent协作/docs/REMAINING_WORK_PLAN_2026-10-20.md)。其中 R1/R2 对应共享工具执行与自定义恢复，R3 对应共同契约，R4/R6 对应律所宿主及质量验证，R7/R8 对应版本与冻结交付。本计划补充 LexVault 的完整产品切换、业务状态、回滚和旧运行时退出；两份计划中的同一工作只实施和计费一次。
+实施应复用 ForgeHarness 的剩余完善与验收计划书。其中 R1/R2 对应共享工具执行与自定义恢复，R3 对应共同契约，R4/R6 对应律所宿主及质量验证，R7/R8 对应版本与冻结交付。本计划补充 LexVault 的完整产品切换、业务状态、回滚和旧运行时退出；两份计划中的同一工作只实施和计费一次。
 
 ## 3. 替换范围与职责
 
@@ -187,7 +187,7 @@ LexVault 以当前 [CI 配置](../../.github/workflows/test.yml)、[工程配置
 - 隔离数据和 checkpoint 目录；禁网离线测试包含 `tests` 及 CI 列出的三个工程脚本；显式插件、分支覆盖率和原始报告参数保持一致。
 - 保持现有 70% 覆盖率门槛，执行发布清单检查；不得通过删测试或放宽断言放行。
 
-ForgeHarness 以其 [Makefile](/Users/xiaoy/Documents/多agent协作/Makefile)、[CI](/Users/xiaoy/Documents/多agent协作/.github/workflows/ci.yml) 和剩余计划 R0/R3/R8 为准：保留全范围格式、lint、类型、覆盖率/分支门禁、keyless 控制评测、锁一致性、构建/最小安装与候选冻结审查。当前旧候选输出路径需先按 R0 修正，不能覆盖旧证据；历史测试数量不作为本轮预期值。
+ForgeHarness 以其 Makefile、CI 和剩余计划 R0/R3/R8 为准：保留全范围格式、lint、类型、覆盖率/分支门禁、keyless 控制评测、锁一致性、构建/最小安装与候选冻结审查。当前旧候选输出路径需先按 R0 修正，不能覆盖旧证据；历史测试数量不作为本轮预期值。
 
 跨进程集成使用合成/获准脱敏数据、隔离数据库和独立进程。离线测试与需要网络的依赖审计、真实模型评测分开运行和报告。沿用现有模型外发控制；本计划本身不授权付费调用、真实材料外发或生产部署。
 
@@ -261,7 +261,7 @@ ForgeHarness 以其 [Makefile](/Users/xiaoy/Documents/多agent协作/Makefile)�
 
 - [LexVault 系统架构](system.md)、[策略基线](strategy-baseline-20260914.md)。
 - [原生领域节点与协调器](../../app/review/agents.py)、[LangGraph 运行时](../../app/review/langgraph_agents.py)、[后台任务](../../app/review/review_jobs.py)。
-- [ForgeHarness 当前状态](/Users/xiaoy/Documents/多agent协作/docs/STATUS.md)、[框架路线](/Users/xiaoy/Documents/多agent协作/docs/FRAMEWORK_STRATEGY.md)、[剩余完善与验收计划书](/Users/xiaoy/Documents/多agent协作/docs/REMAINING_WORK_PLAN_2026-10-20.md)。
-- [自定义编排内核](/Users/xiaoy/Documents/多agent协作/src/forgeharness/sdk/kernel.py)、[Harness 控制入口](/Users/xiaoy/Documents/多agent协作/src/forgeharness/sdk/harness.py)、[法律原型](/Users/xiaoy/Documents/多agent协作/src/forgeharness/applications/legal/lexvault/dag.py)、[只读导出器](/Users/xiaoy/Documents/多agent协作/src/forgeharness/applications/legal/lexvault/exporter.py)。
+- ForgeHarness 当前状态、框架路线、剩余完善与验收计划书。
+- 自定义编排内核、Harness 控制入口、法律原型、只读导出器。
 
 ForgeHarness 链接指向本机配套项目，向其他环境交付时需同时提供对应版本的源码或文档。历史计划存在阶段性描述，以源码、最新状态入口和本轮冻结证据为准。

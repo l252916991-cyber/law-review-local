@@ -20,7 +20,7 @@ P00 重新核对源码身份：框架 422 文件与已封存 0.7.1 完全相同�
 | 工作包 | 交付与验收 |
 | --- | --- |
 | P00 | 核对两侧规则、现有差异、锁文件与发行物；保存内容寻址清单和修改前副本；未触碰真实案件与电商部署 |
-| P01 | [ADR 031](/Users/xiaoy/Documents/多agent协作/docs/adr/031-durable-orchestration-r2.md) 固定节点/调用身份、状态迁移、事务、预算、UTC 时间、所有权、生命周期及兼容矩阵 |
+| P01 | ADR 031 固定节点/调用身份、状态迁移、事务、预算、UTC 时间、所有权、生命周期及兼容矩阵 |
 | P02 | `OrchestrationStore` 持久保存节点、输出、实际用量/预留、审批绑定、owner token、修订号；图状态、checkpoint 投影和 outbox 同事务提交 |
 | P03 | `DurableOrchestrator` 使用现有 ToolExecutor、invocation journal 与审批账本；消费授权与节点准入同事务；完成结果复用；未知效果/费用保留待对账 |
 | P04 | 本机非过期 flock 和持久 owner/revision 防并发写；并行图状态与 join 可重建；ready 分支按定义顺序使用单一外部调用槽；取消、deadline、预算竞争与终态幂等有测试 |

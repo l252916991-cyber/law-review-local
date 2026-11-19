@@ -76,7 +76,7 @@ P07 不因框架支持恢复就直接将律所 `RuntimeControl.resume/inspect/st
 
 需要区分“尚未执行”“已准入待执行”“正在执行或结果未知”“已完成”“待审批”“待对账”“失败/取消”等概念状态，不能仅凭缺少节点完成记录推定工具没有执行。具体状态名和迁移必须由事务边界及恢复规则支持。
 
-优先复用现有 checkpoint、approval、invocation journal 和 ToolExecutor。按照[ADR 030](/Users/xiaoy/Documents/多agent协作/docs/adr/030-shared-tool-executor.md)，调用方负责持久化准入、审批和编排进度，共享执行器负责调用日志、尝试、重试、恢复判定及嵌套用量；不得分别计费或制造第二套审批账本。
+优先复用现有 checkpoint、approval、invocation journal 和 ToolExecutor。按照ADR 030，调用方负责持久化准入、审批和编排进度，共享执行器负责调用日志、尝试、重试、恢复判定及嵌套用量；不得分别计费或制造第二套审批账本。
 
 现有审批消费与精确执行准入的原子保证应复用；P01 逐一列出节点状态、预算预留、审批消费、journal 和事件之间的事务边界。特别处理“审批已消费、执行准入已记录、journal 尚未开始”的状态，恢复时不能再次消费同一授权，也不能丢失已授权但尚未开始的动作。
 
@@ -131,7 +131,7 @@ P01 明确 SDK API、事件、checkpoint、编排定义和恢复语义的版本�
 
 每个工作包遵循[总执行书 §7.1](execution-plan-20261022.md)：实现前记录 → 单主题修改 → 受影响验证 → 必要完整检查 → 最终差异审查 → 证据和状态收口。Git 可用后按项目规则原子提交；当前两个目录仍以内容寻址清单、修改前副本与差异留证，不自动初始化基线。
 
-框架按[工程规则](/Users/xiaoy/Documents/多agent协作/AGENTS.md)与[当前 CI](/Users/xiaoy/Documents/多agent协作/.github/workflows/ci.yml)执行 Python 3.12 完整门禁、依赖审计、共同契约、干净副本及独立 wheel 安装。87 道是既有门禁基线，新增 R2 场景纳入检查，不通过缩减门禁维持数量。
+框架按工程规则与当前 CI执行 Python 3.12 完整门禁、依赖审计、共同契约、干净副本及独立 wheel 安装。87 道是既有门禁基线，新增 R2 场景纳入检查，不通过缩减门禁维持数量。
 
 律所按[当前 CI](../../../.github/workflows/test.yml)与[质量手册](../../runbook/quality.md)执行完整离线检查、静态检查、依赖导出一致性和发布清单/重建验证。CI Python 3.11/3.14 与 Node 22 为必核范围，Python 3.12 继续保留本机回归；框架子进程使用新建独立 3.12 环境，设置 `LAW_REVIEW_FORGE_PYTHON`。各次运行独立数据目录、数据库、checkpoint 和覆盖率文件。
 

@@ -1,6 +1,6 @@
 # 答案级评测口径
 
-`app/answer_eval.py` + `scripts/evaluation/run_answer_eval.py` 回答的是"答案对不对"，与页级检索评测（"页找没找到"）分开报告，两者不可互相替代。
+`app/evaluation/answer_eval.py` + `scripts/evaluation/run_answer_eval.py` 回答的是"答案对不对"，与页级检索评测（"页找没找到"）分开报告，两者不可互相替代。
 
 ## 1. 与其它层的区别
 

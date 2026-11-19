@@ -88,7 +88,7 @@ LexVault 已具备本地法律卷宗工作台的主要技术基础：多格式�
 
 E02/E03 的现状依据：`extract_docx_pages` 遍历段落并按约 1,800 字分段，没有在该函数遍历表格；`extract_pdf_pages` 在页文本去空白后不足 24 字时才触发 OCR。这意味着应单独检验“文字足够但图中仍有关键内容”的页面。此处是源码识别的风险，并非已测出的漏检率。见 [ingest.py](../../app/documents/ingest.py)。
 
-E05–E07 的现状依据：`validate_review_answer` 明确返回 `semantic_entailment_checked=False` 和 `amount_calculations_checked=False`；结构合格草稿可写入并召回。见 [校验](/Users/xiaoy/law-review-local/app/review/agents.py:52)、[记忆写入](/Users/xiaoy/law-review-local/app/review/agents.py:767)、[记忆召回](/Users/xiaoy/law-review-local/app/retrieval/rag.py:423)。
+E05–E07 的现状依据：`validate_review_answer` 明确返回 `semantic_entailment_checked=False` 和 `amount_calculations_checked=False`；结构合格草稿可写入并召回。见 [校验](../../app/review/agents.py)、[记忆写入](../../app/review/agents.py)、[记忆召回](../../app/retrieval/rag.py)。
 
 ### 4.2 数据保护与访问控制
 
@@ -120,7 +120,7 @@ E05–E07 的现状依据：`validate_review_answer` 明确返回 `semantic_enta
 
 当前阅卷任务有数据库状态及重启中断标记；建议先统一任务契约，再决定是否全部迁入 arq。若迁移到多 worker，必须设计任务租约、运行所有权与启动恢复逻辑，避免一个实例把另一实例仍在执行的任务标记失败。框架 checkpoint 与队列确认、业务事务之间的故障窗口仍需显式测试。
 
-当前备份工具基于停写前提，已覆盖业务库、checkpoint 和文件校验。Redis、系统密钥及 `.env` 不包含在默认备份内；不能直接宣称在线原子快照或完整灾备。见 [恢复边界](/Users/xiaoy/law-review-local/docs/runbook/release.md:31)。
+当前备份工具基于停写前提，已覆盖业务库、checkpoint 和文件校验。Redis、系统密钥及 `.env` 不包含在默认备份内；不能直接宣称在线原子快照或完整灾备。见 [恢复边界](release.md)。
 
 依赖哈希提升安装完整性，但不证明组件没有漏洞或满足所有使用条件；供应链控制还需关注来源、更新、漏洞和构建产物。参考 [pip 安装安全说明](https://pip.pypa.io/en/stable/topics/secure-installs/)。
 
@@ -284,14 +284,14 @@ G3 放行：对新的组织、实例、数据规模和故障域重新做隔离�
 
 | 依据 | 本次使用方式 |
 |---|---|
-| [README](/Users/xiaoy/law-review-local/README.md) / [系统架构](../architecture/system.md) | 产品定位、运行时、部署及输出边界 |
-| [db.py](/Users/xiaoy/law-review-local/app/storage/db.py:329) | 增量迁移、schema 标记、启动恢复 |
+| [README](../../README.md) / [系统架构](../architecture/system.md) | 产品定位、运行时、部署及输出边界 |
+| [db.py](../../app/storage/db.py) | 增量迁移、schema 标记、启动恢复 |
 | [ingest.py](../../app/documents/ingest.py) | PDF/DOCX 提取与实际模型请求 |
-| [agents.py](/Users/xiaoy/law-review-local/app/review/agents.py:52) / [rag.py](/Users/xiaoy/law-review-local/app/retrieval/rag.py:423) | 引用校验、草稿记忆、检索与缓存 |
-| [security.py](/Users/xiaoy/law-review-local/app/core/security.py:52) / [review_jobs.py](/Users/xiaoy/law-review-local/app/review/review_jobs.py:23) | 配置凭证、案件授权、任务边界 |
-| [legal_corpus.py](/Users/xiaoy/law-review-local/app/retrieval/legal_corpus.py:164) | 法条版本选择及来源字段 |
-| [pyproject.toml](/Users/xiaoy/law-review-local/pyproject.toml:51) / [CI](/Users/xiaoy/law-review-local/.github/workflows/test.yml) | 已配置门槛、检查范围及运行环境 |
-| [data_snapshot.py](/Users/xiaoy/law-review-local/scripts/ops/data_snapshot.py:128) / [发布手册](release.md) | 停写备份、恢复对象、排除项 |
+| [agents.py](../../app/review/agents.py) / [rag.py](../../app/retrieval/rag.py) | 引用校验、草稿记忆、检索与缓存 |
+| [security.py](../../app/core/security.py) / [review_jobs.py](../../app/review/review_jobs.py) | 配置凭证、案件授权、任务边界 |
+| [legal_corpus.py](../../app/retrieval/legal_corpus.py) | 法条版本选择及来源字段 |
+| [pyproject.toml](../../pyproject.toml) / [CI](../../.github/workflows/test.yml) | 已配置门槛、检查范围及运行环境 |
+| [data_snapshot.py](../../scripts/ops/data_snapshot.py) / [发布手册](release.md) | 停写备份、恢复对象、排除项 |
 | [历史验收](validation-20260905.md) | 带日期的工程、浏览器和模型验证记录；本次未重跑 |
 | [模型实验计划](../benchmarks/SCORE_85_PLAN.md) | 区分模型开发/锚点验证与应用验收 |
 

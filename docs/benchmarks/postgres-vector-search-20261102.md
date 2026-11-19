@@ -18,7 +18,7 @@ uv run --locked python scripts/benchmarks/benchmark_vector_search.py \
 | 软件 | PostgreSQL 16.15、pgvector 0.6.0（Ubuntu 24.04 软件源）、SQLite 3.45.1、Python 3.11 |
 | 数据 | 5 个案件 × 10,000 页，页文本由固定种子从 40 个法律词组合生成；向量为应用自带的 384 维哈希向量 |
 | 查询 | 30 个固定种子查询；单案检索取前 20 页，跨案检索取前 10 页 |
-| 被测代码 | `app/search_backend.py` 的 `scored_page_vectors`，即检索时实际调用的函数 |
+| 被测代码 | `app/retrieval/search_backend.py` 的 `scored_page_vectors`，即检索时实际调用的函数 |
 
 ## 结果
 

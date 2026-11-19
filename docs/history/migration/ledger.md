@@ -2,7 +2,7 @@
 
 编制日期：2026-10-21（M0 启动）
 
-依据：[LexVault → ForgeHarness 框架替换计划书](../../architecture/forgeharness-migration-plan-20261021.md)。本台账是计划书第 5 节要求的迁移记录入口：登记全部实际项目、发行物与版本、里程碑状态、既有失败与 Git 前置条件。计划书第 2 节要求"两份计划中的同一工作只实施和计费一次"，本台账同时登记框架侧 [REMAINING_WORK_PLAN_2026-10-20](/Users/xiaoy/Documents/多agent协作/docs/REMAINING_WORK_PLAN_2026-10-20.md) R0–R8 的对应状态，避免重复实施。
+依据：[LexVault → ForgeHarness 框架替换计划书](../../architecture/forgeharness-migration-plan-20261021.md)。本台账是计划书第 5 节要求的迁移记录入口：登记全部实际项目、发行物与版本、里程碑状态、既有失败与 Git 前置条件。计划书第 2 节要求"两份计划中的同一工作只实施和计费一次"，本台账同时登记框架侧 REMAINING_WORK_PLAN_2026-10-20 R0–R8 的对应状态，避免重复实施。
 
 台账只记录事实与状态，不代替验收结论。所有摘要均为 SHA-256。
 

@@ -12,7 +12,7 @@ uv run --locked python scripts/benchmarks/benchmark_vector_search.py \
 
 ## 条件
 
-与[页向量检索基准](postgres-vector-search-20261102.md)相同：云端开发容器 2 vCPU、7 GiB，PostgreSQL 16.15 + pgvector 0.6.0 同机，5 个案件 × 10,000 页合成数据，384 维哈希向量，被测函数是 `app/search_backend.py` 的 `scored_page_vectors`（统计不兼容向量 + 排序两条语句）。
+与[页向量检索基准](postgres-vector-search-20261102.md)相同：云端开发容器 2 vCPU、7 GiB，PostgreSQL 16.15 + pgvector 0.6.0 同机，5 个案件 × 10,000 页合成数据，384 维哈希向量，被测函数是 `app/retrieval/search_backend.py` 的 `scored_page_vectors`（统计不兼容向量 + 排序两条语句）。
 
 `--rls` 另建一个归非超级用户角色 `lexvault_app` 所有的库，装入同样的数据，给案件 2–5 设墙（墙内只有"其他律师"），然后在案件 1 内检索：
 
@@ -31,7 +31,7 @@ uv run --locked python scripts/benchmarks/benchmark_vector_search.py \
 
 ## 策略写法的三版
 
-三版在同一台机器上依次运行，只替换 `app/schema_postgres.sql`：
+三版在同一台机器上依次运行，只替换 `app/storage/schema_postgres.sql`：
 
 | 版本 | 子表策略写法 | 对照 p50 | 墙外 p50 | 墙内 p50 |
 | --- | --- | --- | --- | --- |
